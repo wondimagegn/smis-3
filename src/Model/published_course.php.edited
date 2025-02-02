@@ -1,0 +1,317 @@
+<?php
+class PublishedCourse extends AppModel {
+	var $name = 'PublishedCourse';
+	var $validate = array(
+		'year_level_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'semester' => array(
+			'multiple' => array(
+				'rule' => array('multiple'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'course_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'program_type_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'program_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'department_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'section_id' => array(
+			'numeric' => array(
+				'rule' => array('numeric'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+		'published' => array(
+			'boolean' => array(
+				'rule' => array('boolean'),
+				//'message' => 'Your custom message here',
+				//'allowEmpty' => false,
+				//'required' => false,
+				//'last' => false, // Stop validation after this rule
+				//'on' => 'create', // Limit validation to 'create' or 'update' operations
+			),
+		),
+	);
+	//The Associations below have been created with all possible keys, those that are not needed can be removed
+
+	var $belongsTo = array(
+		'YearLevel' => array(
+			'className' => 'YearLevel',
+			'foreignKey' => 'year_level_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'GradeScale' => array(
+			'className' => 'GradeScale',
+			'foreignKey' => 'grade_scale_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'Course' => array(
+			'className' => 'Course',
+			'foreignKey' => 'course_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'ProgramType' => array(
+			'className' => 'ProgramType',
+			'foreignKey' => 'program_type_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'Program' => array(
+			'className' => 'Program',
+			'foreignKey' => 'program_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'Department' => array(
+			'className' => 'Department',
+			'foreignKey' => 'department_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'College' => array(
+			'className' => 'College',
+			'foreignKey' => 'college_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'Section' => array(
+			'className' => 'Section',
+			'foreignKey' => 'section_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		
+	);
+	var $hasMany = array (
+	   
+		'GradeScalePublishedCourse' => array(
+			'className' => 'GradeScalePublishedCourse',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'MakeupExam' => array(
+			'className' => 'MakeupExam',
+			'foreignKey' => 'published_course_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+		'MergedSectionsCourse' => array(
+			'className' => 'MergedSectionsCourse',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'MergedSectionsExam' => array(
+			'className' => 'MergedSectionsExam',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'SectionSplitForPublishedCourse' => array(
+			'className' => 'SectionSplitForPublishedCourse',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'CourseInstructorAssignment' => array(
+		    'className' => 'CourseInstructorAssignment',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+	  'CourseRegistration' => array(
+		    'className' => 'CourseRegistration',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'CourseAdd' => array(
+		    'className' => 'CourseAdd',
+			'foreignKey' => 'published_course_id',
+			'dependent' => false,
+			'conditions' => '',
+			'fields' => '',
+			'order' => '',
+			'limit' => '',
+			'offset' => '',
+			'exclusive' => '',
+			'finderQuery' => '',
+			'counterQuery' => ''
+		),
+		'Attendance' => array(
+			'className' => 'Attendance',
+			'foreignKey' => 'published_course_id',
+			'conditions' => '',
+			'fields' => '',
+			'order' => ''
+		),
+	);
+	
+	function recentpublishedcourses ($department_id=null) {
+	        $recentpublishedcourses=$this->find('all',array('conditions'=>array(
+	        'PublishedCourse.department_id'=>$department_id)));
+	        return $recentpublishedcourses;
+	}
+	
+	function getSectionofPublishedCourses ($data,$department_id=null,$publishedcourses=null) {
+	        $sections=$this->Section->find('list',array('conditions'=>array(
+			        'Section.department_id'=>$department_id,'Section.year_level_id'=>$data['PublishedCourse']['year_level_id'],'Section.program_id'=>$data['PublishedCourse']['program_id'],'Section.program_type_id'=>$data['PublishedCourse']['program_type_id'],
+			        'Section.academicyear'=>$data['PublishedCourse']['academic_year'],
+			        'Section.archive'=>0),'recursive'=>-1));
+	      //format section display
+	      if (!empty($sections) && !empty($publishedcourses)) {
+	        $section_organized_published_courses=array();
+	        foreach ($sections as $section_id=>$section_name) {
+	                  
+	                        foreach ($publishedcourses as $kkk=>$vvv) {
+	                             
+	                             if ($vvv['PublishedCourse']['section_id']==$section_id) {
+	                                $section_organized_published_courses[$section_name][]
+	                                =$publishedcourses[$kkk];
+	                             
+	                             }
+	              
+	                    }
+	         }
+	         return $section_organized_published_courses;
+		  }	    
+		return null;	
+	}
+<<<<<<< .mine
+	
+	function get_section_organized_published_courses($data=null,$department_id=null,$publishedcourses) {
+	     $sections=$this->Section->find('list',array('conditions'=>array(
+			       'Section.department_id'=>$department_id,
+			       'Section.program_id'=>$data['PublishedCourse']['program_id'],
+			       'Section.year_level_id'=>$data['PublishedCourse']['year_level_id'],
+			        'Section.academicyear'=>$data['PublishedCourse']['academic_year'],
+			        'Section.archive'=>0),'recursive'=>-1));
+	      //format section display
+	      if (!empty($sections) && !empty($publishedcourses)) {
+	        $section_organized_published_courses=array();
+	        foreach ($sections as $section_id=>$section_name) {
+	                  
+	                        foreach ($publishedcourses as $kkk=>$vvv) {
+	                             
+	                             if ($vvv['PublishedCourse']['section_id']==$section_id) {
+	                                $section_organized_published_courses[$section_name."(".$vvv['Section']['ProgramType']['name'].")"][]
+	                                =$publishedcourses[$kkk];
+	                             
+	                             }
+	              
+	                    }
+	         }
+	         return $section_organized_published_courses;
+		  }	
+	    return null;
+	}
+=======
+
+>>>>>>> .r233
+}

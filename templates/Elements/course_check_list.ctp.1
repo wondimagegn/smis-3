@@ -1,0 +1,512 @@
+<?php 
+    $exemptedCourses = array();
+    $allTakenCourses = array();
+    $exempted_courses_credit_sum = 0;
+    $exempted_courses_count = 0;
+
+    if(isset($student_academic_profile['CourseExemption'])){
+        foreach($student_academic_profile['CourseExemption'] as $in => $exCourse){
+            if(isset($exCourse['Course']) && !empty($exCourse['Course'])){
+                if(isset($exCourse['registrar_confirm_deny'])){
+                    if($exCourse['registrar_confirm_deny'] == true) {
+                        $exempted_courses_count ++;
+                        $exempted_courses_credit_sum += $exCourse['Course']['credit'];
+                        $exemptedCourses[] = $exCourse['Course']['id'];
+                        $allTakenCourses[] = $exCourse['Course']['id'];
+                    } else {
+                        ///
+                    }
+                }
+            
+            }
+        }
+        //debug($student_academic_profile['CourseExemption']) ;
+    }
+
+?>
+<div class="row">
+    <div class="large-12 columns">
+        <div
+            class="tabs-content edumix-tab-horz">
+
+            <style>
+            .low_padding_table tr td {
+                padding: 2px
+            }
+            </style>
+            
+            <table class="low_padding_table fs13" style="border: 0;">
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        Full Name
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php echo $student_academic_profile['BasicInfo']['Student']['full_name'];?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        ID Number
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php echo  $student_academic_profile['BasicInfo']['Student']['studentnumber'];?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        College
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php echo $student_academic_profile['BasicInfo']['College']['name'];?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        Department
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php 
+                            if(isset($student_academic_profile['BasicInfo']['Department']['name'])){
+                                echo $student_academic_profile['BasicInfo']['Department']['name'];
+                            } else {
+                                echo '---';
+                            }
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        Program
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php echo $student_academic_profile['BasicInfo']['Program']['name'];?>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width:15%;text-align:left; font-weight:bold;">
+                        Program Type
+                    </td>
+                    <td style="text-align:left; font-weight:bold;">
+                        <?php echo $student_academic_profile['BasicInfo']['ProgramType']['name'];?>
+                    </td>
+                </tr>
+            </table>
+            
+            <?php
+                $student_copys = $student_academic_profile['Exam Result'];
+                if (isset($student_copys) && !empty($student_copys)){
+            ?>
+                    <table
+                        class="low_padding_table fs13">
+                        <tr>
+                            <th
+                                style="width:2%;">
+                                N<u>o</u></th>
+                            <th
+                                style="text-align:center; width:12%">
+                                Course Code</th>
+                            <th
+                                style="width:30%">
+                                Course Title
+                            </th>
+                            <th
+                                style="width:5%; text-align:center">
+                                Credit Hour</th>
+                            <th
+                                style="width:5%; text-align:center">
+                                Grade</th>
+                            <th
+                                style="width:5%; text-align:center">
+                                Pass Grade</th>    
+                            <th>Curriculum</th>
+                        </tr>
+                            <?php
+                                $c_count = 0;
+                                $credit_hour_sum_reg = 0;
+                                $credit_hour_sum_pass = 0;
+                                $pass_courses_count = 0;
+                                $fail_courses_count = 0;
+                                $credit_hour_sum_fail = 0;
+                                $grade_point_sum = 0;
+                                $taken_exempted_courses_sum = 0;
+                                $takenCourses = array();
+                                $takenAndEquivalent = array();
+
+                                foreach ($student_copys as $index => $student_copy) {
+                                    if (isset($student_copy['courses']) && !empty($student_copy['courses'])) {
+                                        foreach ($student_copy['courses'] as $key => $course_reg_add) {
+                                            $c_count++;
+                                            if (isset($course_reg_add['Grade']['grade'])) {
+                                                if (isset($course_reg_add['Grade']['used_in_gpa']) && $course_reg_add['Grade']['used_in_gpa'] == 1) {
+                                                    if($course_reg_add['Grade']['pass_grade']){
+                                                        $credit_hour_sum_pass += $course_reg_add['Course']['credit'];
+                                                        $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                                        $pass_courses_count++;
+                                                        $grade_point_sum += ($course_reg_add['Grade']['point_value'] * $course_reg_add['Course']['credit']);
+                                                    }  else {
+                                                        $credit_hour_sum_fail += $course_reg_add['Course']['credit'];
+                                                        $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                                        $fail_courses_count++;
+                                                    }
+                                                } else if (isset($course_reg_add['Grade']['used_in_gpa']) && $course_reg_add['Grade']['used_in_gpa'] == 0) {
+                                                    if($course_reg_add['Grade']['pass_grade']){
+                                                        $credit_hour_sum_pass += $course_reg_add['Course']['credit'];
+                                                        $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                                        $pass_courses_count++;
+                                                    }  else {
+                                                        $credit_hour_sum_fail += $course_reg_add['Course']['credit'];
+                                                        $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                                        $fail_courses_count++;
+                                                    }
+                                                } else if (strcasecmp($course_reg_add['Grade']['grade'], 'I') == 0) {
+                                                    $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                                }
+                                            } else {
+                                                $credit_hour_sum_reg += $course_reg_add['Course']['credit'];
+                                            }
+                                            $takenCourses[$course_reg_add['Course']['id']] = $course_reg_add['Course']['id'];
+                                            
+                                            $color = $course_reg_add['hasEquivalentMap'] ? 'green' : 'red';
+
+                                            if ($course_reg_add['hasEquivalentMap']) {
+                                                $takenAndEquivalent[$course_reg_add['Course']['id']] = $course_reg_add['Course']['id'];
+                                                $allTakenCourses[] = $course_reg_add['Course']['id'];
+                                            }
+
+                                    
+                            ?>
+                        <tr>
+
+                            <td
+                                style="color:<?php echo $color; ?>">
+                                <?php echo $c_count; ?>
+                            </td>
+                            <td
+                                style="color:<?php echo $color; ?>">
+                                <?php echo $course_reg_add['Course']['course_code']; ?>
+                            </td>
+                            <td
+                                style="color:<?php echo $color; ?>">
+                                <?php echo $course_reg_add['Course']['course_title']; ?>
+                            </td>
+                            <td
+                                style="text-align:center;color:<?php echo $color; ?>">
+                                <?php echo $course_reg_add['Course']['credit']; ?>
+                            </td>
+                            <td
+                                style="text-align:center;color:<?php echo $color; ?>">
+                                <?php echo (isset($course_reg_add['Grade']['grade']) ? $course_reg_add['Grade']['grade'] : '---'); ?>
+                            </td>
+                                <?php
+                                if (isset($course_reg_add['Grade']['grade'])){
+                                    if($course_reg_add['Grade']['pass_grade']) {
+                                        echo '<td style="text-align:center;color:green">Pass</td>';
+                                    } else {
+                                        echo '<td style="text-align:center;color:red">Fail</td>';
+                                    } 
+                                } else {
+                                    echo '<td style="text-align:center;color:red">---</td>';
+                                }
+                                ?>
+                            <td style="color:<?php echo $color; ?>">
+                                <?php 
+                                    echo $course_reg_add['Course']['Curriculum']['curriculum_detail'] . '<br/>';
+
+                                    if (isset($course_reg_add['Course']['Curriculum']['english_degree_nomenclature'])) {
+                                        echo '(From:' . $course_reg_add['Course']['Curriculum']['english_degree_nomenclature'] . ')';
+                                    } else {
+                                        //debug($course_reg_add);
+                                        echo '---';
+                                    }
+
+                                ?>
+
+                            </td>
+
+                        </tr>
+                            <?php
+                                        }
+                                            
+                                    }
+                                    
+                                }
+                            ?>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold;" colspan="2">
+                                Attached Curriculum:</td>
+                            <td
+                                style="font-weight:bold;" colspan="6">
+                                <?php 
+                                
+                                    if(isset($student_academic_profile['BasicInfo']['Curriculum']['curriculum_detail'])){
+                                        echo $student_academic_profile['BasicInfo']['Curriculum']['curriculum_detail'].'</br>('.$student_academic_profile['BasicInfo']['Curriculum']['english_degree_nomenclature'] .')';
+                                    } else {
+                                        echo 'The student is not attached to any curriculum!';
+                                    }
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold" colspan="2">
+                                Minimum Graduation Requirement:</td>
+                            <td
+                                style="font-weight:bold" colspan="5">
+                                <?php 
+                                    if(isset($student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points'])){
+                                        echo $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points'].' '.$student_academic_profile['BasicInfo']['Curriculum']['type_credit'];
+                                    } else {
+                                        echo '---';
+                                    }
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold" colspan="2">
+                                Total Registered Sum:</td>
+                            <td
+                                style="font-weight:bold" colspan="5">
+                                <?php 
+                                    echo ($credit_hour_sum_reg != 0 ? $credit_hour_sum_reg : '---');
+                                    /* 
+                                    if($pass_courses_count){
+                                        echo ' Cr. for '. $c_count.' courses';
+                                    } 
+                                    */
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right;font-weight:bold; color:red" colspan="2">
+                                Fail Grades: </td>
+                            <td
+                                style="font-weight:bold; color:red" colspan="5">
+                                <?php
+                                    echo ($credit_hour_sum_fail != 0 ? $credit_hour_sum_fail : '---'); 
+                                    if($fail_courses_count){
+                                        echo ' '. $student_academic_profile['BasicInfo']['Curriculum']['type_credit']. ' for '. $fail_courses_count.' course(s)';
+                                    }
+                                ?>
+                                
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold; color:green" colspan="2">
+                                Pass Grades:</td>
+                            <td
+                                style="font-weight:bold; color:green" colspan="5">
+                                <?php
+                                    echo ($credit_hour_sum_pass != 0 ? $credit_hour_sum_pass : '---');
+                                    if($pass_courses_count){
+                                        echo ' '. $student_academic_profile['BasicInfo']['Curriculum']['type_credit']. ' for '. $pass_courses_count.' courses';
+                                    }
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold;" colspan="2">
+                                Remaining:</td>
+                            <td
+                                style="font-weight:bold;" colspan="5">
+                                <?php
+                                if(isset($student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points']) && $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points']!= 0){
+                                    if($credit_hour_sum_pass != 0 ){
+                                        if($exempted_courses_credit_sum){
+                                            $remainig_credits = ($credit_hour_sum_pass + $exempted_courses_credit_sum) - $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points'];
+                                        } else {
+                                            $remainig_credits = $credit_hour_sum_pass - $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points'];
+                                        }
+                                        if($remainig_credits < 0){
+                                            echo $remainig_credits.' '.$student_academic_profile['BasicInfo']['Curriculum']['type_credit'];
+                                        } else{
+                                            echo '0';
+                                        }
+                                    }
+                                } else {
+                                    echo '---';
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold;" colspan="2">
+                                Over:</td>
+                            <td
+                                style="font-weight:bold;" colspan="5">
+                                <?php
+                                if(isset($student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points']) && $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points']!= 0){
+                                    if($credit_hour_sum_pass != 0 ){
+                                        if($exempted_courses_credit_sum){
+                                            $over_credits = ($credit_hour_sum_pass + $exempted_courses_credit_sum) - $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points']; 
+                                        } else {
+                                            $over_credits = $credit_hour_sum_pass - $student_academic_profile['BasicInfo']['Curriculum']['minimum_credit_points'];
+                                        }
+                                        if($credit_hour_sum_fail){
+                                            $over_credits -=  $credit_hour_sum_fail;
+                                        } 
+                                        if($over_credits > 0){
+                                            echo $over_credits.' '.$student_academic_profile['BasicInfo']['Curriculum']['type_credit'];
+                                        } else {
+                                            echo '---';
+                                        }
+                                    }
+                                } else {
+                                    echo '---';
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td 
+                                style="text-align:right; font-weight:bold;" colspan="2">
+                                Exempted:</td>
+                            <td
+                                style="font-weight:bold;" colspan="5">
+                                <?php
+                                    echo ($exempted_courses_credit_sum != 0 ? $exempted_courses_credit_sum : '---');
+                                    if($exempted_courses_count){
+                                        echo ' '. $student_academic_profile['BasicInfo']['Curriculum']['type_credit']. ' for '. $exempted_courses_count.' course(s)';
+                                    } 
+                                ?>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td colspan="7">
+                                &nbsp;
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Green:</td>
+                            <td colspan="6">
+                                Course Taken from Attached Curriculum OR Course Equivalency is Done for Courses taken from other Curriculum(s).</td>
+                        </tr>
+                        <tr>
+                            <td>Red:</td>
+                            <td colspan="6">
+                                Course Taken from Another Curriculum and Equivalency is NOT Done.</td>
+                        </tr>
+                    </table>
+
+                    <?php
+
+                }
+                //debug($allTakenCourses) ;
+                ?>
+                <?php if (isset($student_academic_profile['BasicInfo']['Curriculum']['Course']) && !empty($student_academic_profile['BasicInfo']['Curriculum']['Course'])) { ?>
+                <h3>List of courses not taken from the attached curriculum </h3>
+                <table
+                    class="low_padding_table fs13">
+                    <tr>
+                        <th
+                            style="width:5%">
+                            N<u>o</u></th>
+                        <th
+                            style="width:13%">
+                            Course Code</th>
+                        <th>
+                            Course Title
+                        </th>
+                        <th
+                            style="width:5%; text-align:center">
+                            Credit</th>
+
+                        <th style="text-align:center;width:25%">Course Category</th>
+                    </tr>
+                    <?php
+                        $c = 1;
+                        $jjjjj = array();
+                        foreach ($student_academic_profile['BasicInfo']['Curriculum']['Course'] as $kk => $pp) {
+                            
+                            //if (((in_array($pp['id'], $takenCourses) != true) || (in_array($pp['id'], $takenAndEquivalent) != true) ||  (in_array($pp['id'], $exemptedCourses) != true))) {
+                        if (in_array($pp['id'], $allTakenCourses)== 0) {
+                        
+                        ?>
+
+                    <?php
+                            //} else {
+                            ?>
+
+                    <tr>
+                        <td><?php echo $c++; ?>
+                        </td>
+                        <td><?php echo $pp['course_code'] ?>
+                        </td>
+                        <td><?php echo $pp['course_title'] ?>
+                        </td>
+                        <td style="text-align:center;"><?php echo $pp['credit'] ?>
+                        </td>
+                        <td style="text-align:center;"><?php echo $pp['CourseCategory']['name']; ?>
+                        </td>
+
+                    </tr>
+
+                    <?php
+
+                            }
+                        }
+                        //debug($jjjjj);
+                        ?>
+                </table>
+                <h3>List of  Exempted Courses</h3>
+
+                <table>
+                <?php
+                    if(!empty($student_academic_profile['CourseExemption'][0])){
+                        echo '<tr><th colspan="4">'.strtoupper($student_academic_profile['CourseExemption'][0]['transfer_from']).'</tr>';
+                    }
+                    ?>
+                    <tr>
+                        <th>Taken Course</th>
+                        <th style="text-align:center;">Cr.</th>
+                        <th>Exempted By</th>
+                        <th style="text-align:center;">Cr.</th>
+                    </tr>
+                    <!--
+                    <tr>
+                        <th>Course</th>
+                        <th></th>
+                        <th>Course</th>
+                        <th></th>
+                    </tr> 
+                    -->
+                    <?php
+
+                        foreach ($student_academic_profile['CourseExemption'] as $in=>$value ) {
+                            $colorEx = ($value['course_taken_credit'] == $value['Course']['credit'])? 'green' : 'red';
+                            echo '<tr>';
+                            echo '<td style="color:'.$colorEx.';">'.$value['taken_course_title'].' ('.$value['taken_course_code'].')'.'</td>';
+                            echo '<td style="text-align:center;color:'.$colorEx.';">'.$value['course_taken_credit'].'</td>';
+                            echo '<td style="color:'.$colorEx.';">'.$value['Course']['course_title'].' ('.$value['Course']['course_code'].')'.'</td>';
+                            echo '<td style="text-align:center;color:'.$colorEx.';">'.$value['Course']['credit'].'</td>';
+                            echo '</tr>';
+                            $taken_exempted_courses_sum += $value['course_taken_credit'];
+                        }
+                    ?>
+                    <tr>
+                        <th style="text-align:right;">Taken Total:</th>
+                        <th>
+                            <?php
+                                echo $taken_exempted_courses_sum;
+                            ?>
+                        </th>
+                        <th style="text-align:right;">Exempted Total:</th>
+                        <th>
+                            <?php
+                                echo $exempted_courses_credit_sum;
+                            ?>
+                        </th>
+                    </tr> 
+                </table>
+        <?php 
+        } 
+        ?>
+        </div>
+    </div>
+</div>
