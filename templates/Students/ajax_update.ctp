@@ -1,2 +1,0 @@
-jkhjkjk
-<?php echo $value;?> 

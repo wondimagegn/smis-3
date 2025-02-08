@@ -1,2 +1,0 @@
-<div id="<?= (isset($params) && !empty($params['type'])? $params['type'] : 'Info'); ?>Message" class="<?= (isset($params) && !empty($params['class']) ? $params['class'] : 'info-box info-message'); ?>" style="font-family: 'Times New Roman', Times, serif; font-size: 16px;"><span style="margin-right: 15px;"></span><?= $message; ?></div>
-<?php //echo $message; ?>
