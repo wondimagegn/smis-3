@@ -111,6 +111,7 @@ if (isset($this->data['Report']['report_type'])) {
                                     
                                     <div class="Freshman" style="display:none;">
                                         <?= $this->Form->input('freshman', array('id' => 'freshman', 'label' => 'Only Freshman / Remedial', 'type' => 'checkbox')); ?>
+                                        <!-- <br style="line-height: 0.1;"> -->
                                     </div>
                                 </div>
                                 <div class="large-6 columns">
@@ -129,7 +130,6 @@ if (isset($this->data['Report']['report_type'])) {
                                             <?= $this->Form->input('year_level_id', array('id' => 'YearLevel', 'class' => 'fs13', 'label' => 'Year Level: ', 'style' => 'width:40%;', 'type' => 'select', 'options' => $yearLevels, 'default' => $default_year_level_id)); ?>
                                             <?php
                                         } ?>
-                                        
                                     </div>
                                 </div>
                             </div>
@@ -144,6 +144,10 @@ if (isset($this->data['Report']['report_type'])) {
                                 <div class="large-6 columns">
                                     <div class="OnlyWithCompleteData" style="display:none;">
                                         <?= $this->Form->input('only_with_complete_data', array('id' => 'onlyWithCompleteData', 'label' => 'Only With Complete Data', 'type' => 'checkbox')); ?>
+                                        <br style="line-height: 0.25;">
+                                    </div>
+                                    <div class="extendedReportForExitExam" style="display:none;">
+                                        <?= $this->Form->input('get_extended_report_for_exit_exam', array('id' => 'extendedReportForExitExam', 'label' => 'Get Extended Report <span class="rejected">(Very slaw, select this for a department only and if it is necessary)</span>', 'type' => 'checkbox')); ?>
                                         <br style="line-height: 0.25;">
                                     </div>
                                 </div>
@@ -330,6 +334,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".academicStatus").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'attrition_rate') {
             $(".ExcludeGraduated").hide("fast");
             $(".Freshman").show("fast");
@@ -340,6 +345,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".academicStatus").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'distributionStatsGender' ||
             $('#reportType').val() == 'distributionStatsGenderAndRegion' ||
             $('#reportType').val() == 'distributionStatsStatus' ||
@@ -359,6 +365,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'top_students') {
             $(".SexAndRegion").show("fast");
             $(".academicStatus").hide("fast");
@@ -370,15 +377,21 @@ if (isset($this->data['Report']['report_type'])) {
             $(".TopLimit").show("fast");
             $(".OnlyWithCompleteData").hide("fast");
             $(".gpaOnly").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_list_for_exit_exam') {
             $(".academicStatus").hide("fast");
+            $('#excludeGraduated').prop('checked', true);
             $(".ExcludeGraduated").show("fast");
-            $(".Region").hide("fast");
+            $(".Sex").show("fast");
+            $(".Region").show("fast");
             $(".Freshman").hide("fast");
-            $(".YearLevel").show("fast");
+            $("#YearLevel").val('0');
+            $(".YearLevel").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
-            $(".gpaOnly").show("fast");
+            $(".gpaOnly").hide("fast");
+            $(".extendedReportForExitExam").show("fast");
+            $("#Program").val(1);
         } else if ($('#reportType').val() == 'grade_change_statistics') {
             $(".academicStatus").hide("fast");
             $(".ExcludeGraduated").hide("fast");
@@ -387,6 +400,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'academic_status_range') {
             $(".SexAndRegion").show("fast");
             $(".academicStatus").show("fast");
@@ -398,6 +412,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".Sex").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_results_for_hemis' ||
             $('#reportType').val() == 'get_student_enrolment_for_hemis'
         ) {
@@ -410,6 +425,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_graduate_for_hemis') {
             $(".SexAndRegion").hide("fast");
             $(".academicStatus").hide("fast");
@@ -420,6 +436,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'active_student_list' ||
             $('#reportType').val() == 'notRegisteredList' ||
             $('#reportType').val() == 'registeredList' ||
@@ -439,6 +456,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'delayedCountGradeSubmissionList' ||
             $('#reportType').val() == 'gradeSubmittedInstructorList' ||
             $('#reportType').val() == 'lateGradeSubmission' ||
@@ -456,6 +474,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         }
     }
 
@@ -469,10 +488,23 @@ if (isset($this->data['Report']['report_type'])) {
 
     var freshman = <?= $freshman; ?>;
     var excludeGraduated = <?= $exclude_graduated; ?>;
+    var extendedReportExitExam = <?= $get_extended_report_for_exit_exam; ?>;
 
     $(document).ready(function() {
 
-        if ($("#freshman").is(":checked") || freshman) {
+        if ($("#extendedReportForExitExam").is(":checked") || extendedReportExitExam) {
+            $("#YearLevel").val('0');
+            $(".YearLevel").hide("fast");
+            $(".ExcludeGraduated").css("display", "block");
+            $("#excludeGraduated").prop('checked', true);
+            $('#freshman').prop('checked', false);
+            $(".Freshman").hide("fast");
+            $(".extendedReportForExitExam").css("display", "block");
+            $("#Program").val(1);
+            $(".Sex").show("fast");
+            $(".Region").show("fast");
+            $(".gpaOnly").hide("fast");
+        } else if ($("#freshman").is(":checked") || freshman) {
             $(".YearLevel").hide("fast");
             $(".YearLevel").css("display", "none");
             $(".ExcludeGraduated").hide("fast");
@@ -480,9 +512,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".Freshman").css("display", "block");
             $("#YearLevel").val('');
             $("#freshman").val(1);
-        }
-
-        if ($("#excludeGraduated").is(":checked") || excludeGraduated) {
+        } else if ($("#excludeGraduated").is(":checked") || excludeGraduated) {
             //$(".Freshman").css("display", "none");
             $(".ExcludeGraduated").css("display", "block");
             //$(".Freshman").hide("fast");
@@ -520,6 +550,19 @@ if (isset($this->data['Report']['report_type'])) {
             }
         });
 
+        $("#extendedReportForExitExam").click(function() {
+            $("#excludeGraduated").attr('checked', true);
+            $(".ExcludeGraduated").show("fast");
+            $('#freshman').attr('checked', false);
+            $(".Freshman").hide("fast");
+            $("#YearLevel").val(0);
+            $(".YearLevel").hide("fast");
+            $("#Program").val(1);
+            $(".Sex").show("fast");
+            $(".Region").show("fast");
+            $(".gpaOnly").hide("fast");
+        });
+
         if ($('#reportType').val() == '') {
             $(".ExcludeGraduated").hide("fast");
             $(".Freshman").hide("fast");
@@ -530,6 +573,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".academicStatus").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'attrition_rate') {
             $(".ExcludeGraduated").hide("fast");
             $(".Freshman").show("fast");
@@ -540,6 +584,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".academicStatus").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'distributionStatsGender' ||
             $('#reportType').val() == 'distributionStatsGenderAndRegion' ||
             $('#reportType').val() == 'distributionStatsStatus' ||
@@ -559,6 +604,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'top_students') {
             $(".SexAndRegion").show("fast");
             $(".academicStatus").hide("fast");
@@ -570,15 +616,22 @@ if (isset($this->data['Report']['report_type'])) {
             $(".TopLimit").show("fast");
             $(".OnlyWithCompleteData").hide("fast");
             $(".gpaOnly").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_list_for_exit_exam') {
             $(".academicStatus").hide("fast");
+            $('#excludeGraduated').prop('checked', true);
             $(".ExcludeGraduated").show("fast");
-            $(".Region").hide("fast");
+            $(".Sex").show("fast");
+            $(".Region").show("fast");
             $(".Freshman").hide("fast");
-            $(".YearLevel").show("fast");
+            $("#YearLevel").val('0');
+            $(".YearLevel").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
             $(".gpaOnly").show("fast");
+            $(".extendedReportForExitExam").show("fast");
+            $("#Program").val(1);
+            $(".gpaOnly").hide("fast");
         } else if ($('#reportType').val() == 'grade_change_statistics') {
             $(".academicStatus").hide("fast");
             $(".ExcludeGraduated").hide("fast");
@@ -587,6 +640,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+           $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'academic_status_range') {
             $(".SexAndRegion").show("fast");
             $(".academicStatus").show("fast");
@@ -598,6 +652,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".Sex").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_results_for_hemis' ||
             $('#reportType').val() == 'get_student_enrolment_for_hemis'
         ) {
@@ -610,6 +665,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'get_student_graduate_for_hemis') {
             $(".SexAndRegion").hide("fast");
             $(".academicStatus").hide("fast");
@@ -620,6 +676,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").hide("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").show("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'active_student_list' ||
             $('#reportType').val() == 'notRegisteredList' ||
             $('#reportType').val() == 'registeredList' ||
@@ -639,6 +696,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         } else if ($('#reportType').val() == 'delayedCountGradeSubmissionList' ||
             $('#reportType').val() == 'gradeSubmittedInstructorList' ||
             $('#reportType').val() == 'lateGradeSubmission' ||
@@ -656,6 +714,7 @@ if (isset($this->data['Report']['report_type'])) {
             $(".YearLevel").show("fast");
             $(".TopLimit").hide("fast");
             $(".OnlyWithCompleteData").hide("fast");
+            $(".extendedReportForExitExam").hide("fast");
         }
         
         if ($("#reportType").val() != '') {
@@ -665,17 +724,27 @@ if (isset($this->data['Report']['report_type'])) {
         }
     });
 
-    if ($("#freshman").is(":checked") || freshman) {
+    if ($("#extendedReportForExitExam").is(":checked") || extendedReportExitExam) {
+        $("#YearLevel").val('0');
+        $(".YearLevel").hide("fast");
+        $(".ExcludeGraduated").css("display", "block");
+        $("#excludeGraduated").prop('checked', true);
+        $('#freshman').prop('checked', false);
+        $(".Freshman").hide("fast");
+        $(".extendedReportForExitExam").css("display", "block");
+        $("#Program").val(1);
+        $(".Sex").show("fast");
+        $(".Region").show("fast");
+        $(".gpaOnly").hide("fast");
+    } else if ($("#excludeGraduated").is(":checked") || excludeGraduated) {
+        $(".ExcludeGraduated").css("display", "block");
+        $("#excludeGraduated").val(1);
+    } else if ($("#freshman").is(":checked") || freshman) {
         $(".ExcludeGraduated").hide("fast");
         $(".ExcludeGraduated").css("display", "none");
         $(".Freshman").css("display", "block");
         $("#YearLevel").val('');
         $("#freshman").val(1);
-    }
-
-    if ($("#excludeGraduated").is(":checked") || excludeGraduated) {
-        $(".ExcludeGraduated").css("display", "block");
-        $("#excludeGraduated").val(1);
     }
     
 	var get_report_button_clicked = false;
@@ -711,6 +780,7 @@ if (isset($this->data['Report']['report_type'])) {
 			isValid = true
 			return true;
 		} else {
+            get_report_button_clicked = false;
 			return false;
 		}
 	});

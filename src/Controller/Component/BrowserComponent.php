@@ -1,5 +1,9 @@
 <?php
 
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+
 class BrowserComponent extends Component {
 	private $agent = "";
     private $info = array();

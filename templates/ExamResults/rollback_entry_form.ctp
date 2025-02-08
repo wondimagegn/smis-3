@@ -74,6 +74,8 @@
 						<?php
 					} ?>
 
+					<?= $this->Form->input('ExamResult.pc_id', array('type' => 'hidden', 'value' => $published_course_id)); ?>
+
 					<h6 class="fs14 text-gray">Please select students and you want to rollback grade submission</h6>
 
 					<h6 id="validation-message_non_selected" class="text-red fs14"></h6>

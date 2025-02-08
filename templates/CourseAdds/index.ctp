@@ -94,19 +94,42 @@
 								<hr>
 								<?= $this->Form->submit(__('Search'), array('name' => 'search', 'class' => 'tiny radius button bg-blue', 'div' => false)); ?>
 							</fieldset>
-							
+							<br>
+
 							<?php
 							if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) { ?>
-								<br> 
-								
 								<div style="margin-top: -10px;">
 									<hr>
 									<blockquote>
 										<h6><i class="fa fa-info"></i> &nbsp; Important Note:</h6>
-										<span style="text-align:justify;" class="fs15 text-gray">The student list you will get here depends on your <b style="text-decoration: underline;"><i>assigned College or Department, assigned Program and Program Types, and with your search conditions</i></b>. You can contact the registrar to adjust permissions assigned to you if you miss your students here.</span>
+										<span style="text-align:justify;" class="fs15 text-gray">The student list you will get here depends on your <b><i>assigned College or Department, assigned Program and Program Types, and with your search conditions</i></b>. You can contact the registrar to adjust permissions assigned to you if you miss your students here.</span>
+										<?php
+										if (!isset($this->data['Search']['status']) || (isset($this->data['Search']['status']) && $this->data['Search']['status'] != 'auto_rejected')) { ?>
+											<br><br>
+											<span style="text-align:justify;" class="fs15 text-gray">You can view auto rejected student course add requests by adjusting the <b>Status</b> filter to <b>Auto Rejected</b> and check the auto rejection reason by clicking <b>'+'</b> icon for each rejected course add request.
+												<br><br>You can also approve auto rejected course add requests for <b style="text-decoration: underline;">graduating class students</b> if:
+												<ol class="fs15 text-gray" style="padding-top: 10px;">
+													<li>Grade is not submitted for the course</li>
+													<li>The student must have atleast one course registration in the requested academic year and semester</li>
+												</ol>
+												<b style="padding-top: 10px;">and the sum of current load of the student and the requested course add credit is below the allowed maximum Credit/ECTS specified in the senate legislation</b>
+											</span>
+											<?php
+										} ?>
 									</blockquote>
 								</div>
 								<?php
+							} else {
+								if (!isset($this->data['Search']['status']) || (isset($this->data['Search']['status']) && $this->data['Search']['status'] != 'auto_rejected')) { ?>
+									<div style="margin-top: -10px;">
+										<hr>
+										<blockquote>
+											<h6><i class="fa fa-info"></i> &nbsp; Important Note:</h6>
+											<span style="text-align:justify;" class="fs15 text-gray">You can view auto rejected student course add requests by adjusting the <b>Status</b> filter to <b>Auto Rejected</b> and check the auto rejection reason by clicking <b>'+'</b> icon for each rejected course add request. <b><i>You can also approve auto rejected course add requests for graduating class students if the sum of current load of the student and the requested course add credit is below the allowed maximum credit/ECTS specified in the senate legislation</i></b></span>
+										</blockquote>
+									</div>
+									<?php
+								}
 							} ?>
 						</div>
 					</div>
@@ -142,18 +165,19 @@
 								<?php
 								$start = $this->Paginator->counter('%start%');
 								//debug($courseAdds[0]);
+								$grade_submitted_for_course = 0;
 								foreach ($courseAdds as $courseAdd) { ?>
 									<tr>
-										<td class="center" onclick="toggleView(this)" id="<?= $count; ?>"><?= $this->Html->image('plus2.gif', array('id' => 'i' . $count, 'div' => false, 'align' => 'center')); ?></td>
+										<td class="center" onclick="toggleView(this)" id="<?= $count; ?>"><?= $this->Html->image('plus2.gif', array('id' => 'i' . $count, 'div' => false/* , 'align' => 'center' */)); ?></td>
 										<td class="center"><?= $start++; ?></td>
 										<td class="vcenter"><?= $this->Html->link($courseAdd['Student']['full_name'], array('controller' => 'students', 'action' => 'student_academic_profile', $courseAdd['Student']['id'])); ?></td>
 										<td class="center"><?= (strcasecmp(trim($courseAdd['Student']['gender']), 'male') == 0 ? 'M' : (strcasecmp(trim($courseAdd['Student']['gender']), 'female') == 0 ? 'F' : '')); ?></td>
 										<td class="center"><?= $courseAdd['Student']['studentnumber']; ?></td>
-										<td class="center"><?= $courseAdd['CourseAdd']['academic_year']; ?></td>
-										<td class="center"><?= $courseAdd['CourseAdd']['semester']; ?></td>
+										<td class="center"><?= (isset($courseAdd['CourseAdd']['id']) ? $courseAdd['CourseAdd']['academic_year'] : 'N/A'); ?></td>
+										<td class="center"><?= (isset($courseAdd['CourseAdd']['id']) ? $courseAdd['CourseAdd']['semester'] : 'N/A'); ?></td>
 										<td class="center"><?= (!empty($courseAdd['YearLevel']['name']) ? $courseAdd['YearLevel']['name'] : 'Pre/1st'); ?></td>
-										<td class="center"><?= (isset($courseAdd['PublishedCourse']['Course']) && !empty($courseAdd['PublishedCourse']['Course']) ? $this->Html->link($courseAdd['PublishedCourse']['Course']['course_title'], array('controller' => 'courses', 'action' => 'view', $courseAdd['PublishedCourse']['Course']['id'])) : 'N/A'); ?></td>
-										<td class="center"><?= (isset($courseAdd['PublishedCourse']['Course']) && !empty($courseAdd['PublishedCourse']['Course']) ? $courseAdd['PublishedCourse']['Course']['credit'] : 'N/A'); ?></td>
+										<td class="center"><?= (isset($courseAdd['PublishedCourse']['Course']) && !empty($courseAdd['PublishedCourse']['Course']['id']) ? $this->Html->link((trim(str_replace('  ', ' ', $courseAdd['PublishedCourse']['Course']['course_title']))), array('controller' => 'courses', 'action' => 'view', $courseAdd['PublishedCourse']['Course']['id'])) : 'N/A'); ?></td>
+										<td class="center"><?= (isset($courseAdd['PublishedCourse']['Course']) && !empty($courseAdd['PublishedCourse']['Course']['id']) ? $courseAdd['PublishedCourse']['Course']['credit'] : 'N/A'); ?></td>
 										<td class="center">
 											<?php
 											if ($courseAdd['CourseAdd']['department_approval'] == 1) {
@@ -163,7 +187,9 @@
 													echo '<span class="rejected">Accepted by department</span>';
 												}
 											} else {
-												if (!$courseAdd['CourseAdd']['auto_rejected']) {
+												if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 1) {
+													echo '<span class="on-process">Graduated Student</span>';
+												} else if (!$courseAdd['CourseAdd']['auto_rejected']) {
 													if (is_null($courseAdd['CourseAdd']['department_approval'])) {
 														echo '<span class="on-process">Waiting Decision</span>';
 													} else if ($courseAdd['CourseAdd']['department_approval'] == 0) {
@@ -171,15 +197,37 @@
 													}
 												} else {
 													echo '<span class="rejected">Auto Rejected (System)</span>';
-													if (isset($courseAdd['PublishedCourse']['Course']['id']) && $this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT && isset($courseAdd['PublishedCourse']['id']) && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id']) == 0) {
-														echo '<br>'. $this->Form->postLink(__('[Approve Anyway]'), array('action' => 'approve_auto_rejected_course_add', $courseAdd['CourseAdd']['id']), array('confirm' => __('Are you sure you want to cancel the auto rejected course add of %s for %s? Cancelling this auto rejection will auto ' . ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT ? ' approve' : ' comfirm') . ' the Course Add Request. Are you sure you want cancel the auto rejection anyway?', $courseAdd['Student']['full_name'] . ' ('.  $courseAdd['Student']['studentnumber'] . ')', $courseAdd['PublishedCourse']['Course']['course_title'] . ' (' .  $courseAdd['PublishedCourse']['Course']['course_code']. ') course  with ' . $courseAdd['PublishedCourse']['Course']['credit']. ' ' . (count(explode('ECTS', $courseAdd['PublishedCourse']['Course']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit'))));
+													$credit_type = (isset($courseAdd['Student']['Curriculum']['type_credit']) ? (count(explode('ECTS', $courseAdd['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit');
+													$enable_auto_rejection_override = false;
+													if (isset($current_load) && isset($courseAdd['Student']['id']) && isset($current_load[$courseAdd['Student']['id']])) {
+														echo '<br>Load: ' . $current_load[$courseAdd['Student']['id']] . ' ' . $credit_type;
+														//debug($graduatingClassStudent[$courseAdd['Student']['id']]);
+														if (isset($graduatingClassStudent) && $graduatingClassStudent[$courseAdd['Student']['id']] && $credit_type == 'Credit') {
+															if (isset($courseAdd['PublishedCourse']['Course']['credit']) && $courseAdd['PublishedCourse']['Course']['credit'] >= 0 && (($current_load[$courseAdd['Student']['id']] + $courseAdd['PublishedCourse']['Course']['credit']) <= (DEFAULT_MAXIMUM_CREDIT_PER_SEMESTER + ADDITIONAL_CREDIT_ALLOWED_FOR_GRADUATING_STUDENTS))) {
+																$enable_auto_rejection_override = true;
+															}
+														} else if (isset($graduatingClassStudent) && $graduatingClassStudent[$courseAdd['Student']['id']] && $credit_type == 'ECTS') {
+															if (isset($courseAdd['PublishedCourse']['Course']['credit']) && $courseAdd['PublishedCourse']['Course']['credit'] >= 0 && (($current_load[$courseAdd['Student']['id']] + $courseAdd['PublishedCourse']['Course']['credit']) <= ((int) ((DEFAULT_MAXIMUM_CREDIT_PER_SEMESTER * CREDIT_TO_ECTS) + ADDITIONAL_ECTS_ALLOWED_FOR_GRADUATING_STUDENTS)))) {
+																$enable_auto_rejection_override = true;
+															}
+														}
+													}
+													if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 0 && isset($courseAdd['PublishedCourse']['Course']['id']) && $this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT && isset($courseAdd['PublishedCourse']['id']) && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id']) == 0) {
+														if ($enable_auto_rejection_override && ENABE_AUTO_COURSE_ADD_REJECTION_OVERRIDE_FOR_DEPARTMENTS == 1) {
+															echo '<br>'. $this->Form->postLink(__('[Approve Anyway]'), array('action' => 'approve_auto_rejected_course_add', $courseAdd['CourseAdd']['id']), array('confirm' => __('Are you sure you want to cancel the auto rejected course add of %s for %s? Cancelling this auto rejection will auto approve the Course Add Request. Are you sure you want cancel the auto rejection anyway?', $courseAdd['Student']['full_name'] . ' ('.  $courseAdd['Student']['studentnumber'] . ')', $courseAdd['PublishedCourse']['Course']['course_title'] . ' (' .  $courseAdd['PublishedCourse']['Course']['course_code']. ') course  with ' . $courseAdd['PublishedCourse']['Course']['credit']. ' ' . (count(explode('ECTS', $courseAdd['PublishedCourse']['Course']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit'))));
+														}
+													} else if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 0 && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id'])) {
+														echo '<br><span class="on-process">Grade Submitted</span>';
+														$grade_submitted_for_course++;
 													}
 												}
 											} ?>
 										</td>
 										<td class="center">
 											<?php
-											if (!$courseAdd['CourseAdd']['auto_rejected']) {
+											if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 1) {
+												echo '<span class="on-process">Graduated Student</span>';
+											} else if (!$courseAdd['CourseAdd']['auto_rejected']) {
 												if ($courseAdd['CourseAdd']['department_approval'] == 1) {
 													if (is_null($courseAdd['CourseAdd']['registrar_confirmation'])) {
 														echo '<span class="on-process">Waiting Decision</span>';
@@ -191,8 +239,34 @@
 												}
 											} else {
 												echo '<span class="rejected">Auto Rejected (System)</span>';
-												if (isset($courseAdd['PublishedCourse']['Course']['id']) && $this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR && isset($courseAdd['PublishedCourse']['id']) && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id']) == 0) {
-													echo '<br>'. $this->Form->postLink(__('[Confirm Anyway]'), array('action' => 'approve_auto_rejected_course_add', $courseAdd['CourseAdd']['id']), array('confirm' => __('Are you sure you want to cancel the auto rejected course add of %s for %s? Cancelling this auto rejection will auto ' . ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT ? ' approve' : ' comfirm') . ' the Course Add Request. Are you sure you want cancel the auto rejection anyway?', $courseAdd['Student']['full_name'] . ' ('.  $courseAdd['Student']['studentnumber'] . ')', $courseAdd['PublishedCourse']['Course']['course_title'] . ' (' .  $courseAdd['PublishedCourse']['Course']['course_code']. ') course  with ' . $courseAdd['PublishedCourse']['Course']['credit']. ' ' . (count(explode('ECTS', $courseAdd['PublishedCourse']['Course']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit'))));
+												$credit_type = (isset($courseAdd['Student']['Curriculum']['type_credit']) ? (count(explode('ECTS', $courseAdd['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit');
+												$enable_auto_rejection_override = false;
+												if (isset($current_load) && isset($courseAdd['Student']['id']) && isset($current_load[$courseAdd['Student']['id']])) {
+													echo '<br>Load: ' . $current_load[$courseAdd['Student']['id']] . ' ' . $credit_type;
+													//debug($graduatingClassStudent[$courseAdd['Student']['id']]);
+													if (isset($graduatingClassStudent) && $graduatingClassStudent[$courseAdd['Student']['id']] && $credit_type == 'Credit') {
+														if (isset($courseAdd['PublishedCourse']['Course']['credit']) && $courseAdd['PublishedCourse']['Course']['credit'] >= 0 && (($current_load[$courseAdd['Student']['id']] + $courseAdd['PublishedCourse']['Course']['credit']) <= (DEFAULT_MAXIMUM_CREDIT_PER_SEMESTER + ADDITIONAL_CREDIT_ALLOWED_FOR_GRADUATING_STUDENTS))) {
+															$enable_auto_rejection_override = true;
+														}
+													} else if (isset($graduatingClassStudent) && $graduatingClassStudent[$courseAdd['Student']['id']] && $credit_type == 'ECTS') {
+														if (isset($courseAdd['PublishedCourse']['Course']['credit']) && $courseAdd['PublishedCourse']['Course']['credit'] >= 0 && (($current_load[$courseAdd['Student']['id']] + $courseAdd['PublishedCourse']['Course']['credit']) <= ((int) ((DEFAULT_MAXIMUM_CREDIT_PER_SEMESTER * CREDIT_TO_ECTS) + ADDITIONAL_ECTS_ALLOWED_FOR_GRADUATING_STUDENTS)))) {
+															$enable_auto_rejection_override = true;
+														}
+													}
+												}
+												if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 0 && isset($courseAdd['PublishedCourse']['Course']['id']) && $this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR && isset($courseAdd['PublishedCourse']['id']) && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id']) == 0) {
+													if ($enable_auto_rejection_override && ENABE_AUTO_COURSE_ADD_REJECTION_OVERRIDE_FOR_REGISTRAR) {
+														echo '<br>'. $this->Form->postLink('[Confirm Anyway]', array('action' => 'approve_auto_rejected_course_add', $courseAdd['CourseAdd']['id']), array('confirm' => __('Are you sure you want to cancel the auto rejected course add of %s for %s? Cancelling this auto rejection will auto confirm the Course Add request. Are you sure you want cancel the auto rejection anyway?', $courseAdd['Student']['full_name'] . ' ('.  $courseAdd['Student']['studentnumber'] . ')', $courseAdd['PublishedCourse']['Course']['course_title'] . ' (' .  $courseAdd['PublishedCourse']['Course']['course_code']. ') course  with ' . $courseAdd['PublishedCourse']['Course']['credit']. ' ' . (count(explode('ECTS', $courseAdd['PublishedCourse']['Course']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit'))));
+													}
+												} else if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 0 && isset($courseAdd['PublishedCourse']['Course']['id']) && $this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR && $this->Session->read('Auth.User')['is_admin'] == 1 && isset($courseAdd['PublishedCourse']['id'])) {
+													echo '<br>'. $this->Form->postLink('[Confirm Anyway]', array('action' => 'approve_auto_rejected_course_add', $courseAdd['CourseAdd']['id']), array('confirm' => __('Are you sure you want to cancel the auto rejected course add of %s for %s? Cancelling this auto rejection will auto confirm the Course Add request. Are you sure you want cancel the auto rejection anyway?', $courseAdd['Student']['full_name'] . ' ('.  $courseAdd['Student']['studentnumber'] . ')', $courseAdd['PublishedCourse']['Course']['course_title'] . ' (' .  $courseAdd['PublishedCourse']['Course']['course_code']. ') course  with ' . $courseAdd['PublishedCourse']['Course']['credit']. ' ' . (count(explode('ECTS', $courseAdd['PublishedCourse']['Course']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit'))));
+													if (ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id'])) {
+														echo '<br><span class="on-process">Grade Submitted</span><br>';
+														$grade_submitted_for_course++;
+													}
+												} else if (isset($courseAdd['Student']['graduated']) && $courseAdd['Student']['graduated'] == 0 && ClassRegistry::init('ExamGrade')->isGradeSubmittedForPublishedCourse($courseAdd['PublishedCourse']['id'])) {
+													echo '<br><span class="on-process">Grade Submitted</span>';
+													$grade_submitted_for_course++;
 												}
 											} ?>
 											
@@ -246,7 +320,7 @@
 																<span class="fs13 text-gray" style="font-weight: bold">Course Add <?= (($courseAdd['CourseAdd']['auto_rejected'] == 0 && ($courseAdd['CourseAdd']['department_approval'] == 1 || $courseAdd['CourseAdd']['registrar_confirmation'] == 1)) ? ' Approved' . ($courseAdd['CourseAdd']['registrar_confirmation'] == 1 ? ' By Registrar' : ' By Department'). ':  </span> ' . $this->Time->format("F j, Y h:i:s A", $courseAdd['CourseAdd']['modified'], NULL, NULL) : ((($courseAdd['CourseAdd']['auto_rejected'] == 1 || $courseAdd['CourseAdd']['department_approval'] == 0 || $courseAdd['CourseAdd']['registrar_confirmation'] == 0) ? '' . ($courseAdd['CourseAdd']['auto_rejected'] == 1 ? ' Auto Rejected By System' : ($courseAdd['CourseAdd']['registrar_confirmation'] == 0 ? ' Rejected By Registrar' : 'Rejected By Department')) . ':  </span> ' . $this->Time->format("F j, Y h:i:s A", $courseAdd['CourseAdd']['modified'], NULL, NULL) : ' Approval:  </span> Waiting ... '))); ?>
 															</td>
 														</tr>
-														<?= (!empty($courseAdd['CourseAdd']['reason']) ? '<tr><td class="vcenter" style="background-color: white;"><span class="fs13 text-gray" style="font-weight: bold">Reason:  </span>' .$courseAdd['CourseAdd']['reason'] . '</td></tr>' : '');  ?>
+														<?= (!empty($courseAdd['CourseAdd']['reason']) ? '<tr><td class="vcenter" style="background-color: white;"><span class="fs13 text-gray" style="font-weight: bold">Reason:  </span>' . $courseAdd['CourseAdd']['reason'] . '</td></tr>' : '');  ?>
 													</tbody>
 												</table>
 												<?php
@@ -262,6 +336,12 @@
 						</table>
 					</div>
 					<br>
+
+					<?php
+					if ($grade_submitted_for_course != 0) { ?>
+						<div class='info-box' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">Grade Submitted: one or more grade is submitted for a student or students for the published course section, not possible process course add request at this time.</div>
+						<?php
+					} ?>
 
 					<hr>
 					<div class="row">

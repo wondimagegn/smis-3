@@ -1,122 +1,74 @@
 <?php
+namespace App\Controller;
+
+use App\Controller\AppController;
+
 class RegionsController extends AppController
 {
 
-	public $name = 'Regions';
-	public $components = array('RequestHandler');
-	//var $helpers = array('Ajax','Javascript');
-	public $menuOptions = array(
-		'parent' => 'countries',
-		'exclude' => array('index'),
-		'alias' => array(
-			//'index' => 'List Regions',
-			'add' => 'Add Region',
-		)
-	);
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Countries'],
+        ];
+        $regions = $this->paginate($this->Regions);
 
-	public $paginate = array();
+        $this->set(compact('regions'));
+    }
 
-	public function beforeFilter()
-	{
-		parent::beforeFilter();
-		$this->Auth->allowedActions = array('getRegions');
-	}
+    public function view($id = null)
+    {
+        $region = $this->Regions->get($id, [
+            'contain' => ['Countries', 'AcceptedStudents', 'Cities', 'Contacts', 'HighSchoolEducationBackgrounds', 'Staffs', 'Students', 'Zones'],
+        ]);
 
-	public function index()
-	{
-		// $this->Region->recursive = 0;
-		// $this->set('regions', $this->paginate());
+        $this->set('region', $region);
+    }
 
-		$this->Paginator->settings =  array(
-			'contain' => array('Country'), 
-			'order' => array('Region.country_id' => 'ASC', 'Region.name' => 'ASC'),
-			'limit' => 100,
-			'maxLimit' => 100,
-			'recursive'=> -1
-		);
+    public function add()
+    {
+        $region = $this->Regions->newEntity();
+        if ($this->request->is('post')) {
+            $region = $this->Regions->patchEntity($region, $this->request->getData());
+            if ($this->Regions->save($region)) {
+                $this->Flash->success(__('The region has been saved.'));
 
-		$regions = array();
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The region could not be saved. Please, try again.'));
+        }
+        $countries = $this->Regions->Countries->find('list', ['limit' => 200]);
+        $this->set(compact('region', 'countries'));
+    }
 
-		try {
-			$regions = $this->Paginator->paginate($this->modelClass);
-			$this->set(compact('regions'));
-		} catch (NotFoundException $e) {
-			return $this->redirect(array('action' => 'index'));
-		} catch (Exception $e) {
-			return $this->redirect(array('action' => 'index'));
-		}
+    public function edit($id = null)
+    {
+        $region = $this->Regions->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $region = $this->Regions->patchEntity($region, $this->request->getData());
+            if ($this->Regions->save($region)) {
+                $this->Flash->success(__('The region has been saved.'));
 
-		if (empty($regions)) {
-			$this->Flash->info('No region is found in the system.');
-		}
-	}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The region could not be saved. Please, try again.'));
+        }
+        $countries = $this->Regions->Countries->find('list', ['limit' => 200]);
+        $this->set(compact('region', 'countries'));
+    }
 
-	public function view($id = null)
-	{
-		if (!$id) {
-			$this->Flash->error(__('Invalid region'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('region', $this->Region->read(null, $id));
-	}
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $region = $this->Regions->get($id);
+        if ($this->Regions->delete($region)) {
+            $this->Flash->success(__('The region has been deleted.'));
+        } else {
+            $this->Flash->error(__('The region could not be deleted. Please, try again.'));
+        }
 
-	public function add()
-	{
-		if (!empty($this->request->data)) {
-			$this->Region->create();
-			if ($this->Region->save($this->request->data)) {
-				$this->Flash->success(__('Region saved'));
-				$this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error( __('The region  could not be saved. Please, try again.'));
-			}
-		}
-		$countries = $this->Region->Country->find('list');
-		$this->set(compact('countries'));
-	}
-
-	public function edit($id = null)
-	{
-		if (!$id && empty($this->request->data)) {
-			$this->Flash->error(__('Invalid Region ID'));
-			$this->redirect(array('action' => 'index'));
-		}
-
-		if (!empty($this->request->data)) {
-			if ($this->Region->save($this->request->data)) {
-				$this->Flash->success( __('Region updated successfully'));
-				$this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error(__('The region could not be saved. Please, try again.'));
-			}
-		}
-
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Region->find('first', array('conditions' => array('Region.id' => $id), 'contain' => array('Country'), 'recursive'=> -1)); //$this->Region->read(null, $id);
-		}
-
-		$countries = $this->Region->Country->find('list');
-		$this->set(compact('countries'));
-	}
-
-	public function delete($id = null)
-	{
-		if (!$id) {
-			$this->Flash->error(__('Invalid id for region'));
-			return $this->redirect(array('action' => 'index'));
-		}
-
-		//check deletion is possible 
-		if ($this->Region->canItBeDeleted($id)) {
-			if ($this->Region->delete($id)) {
-				$this->Flash->success(__('Region deleted'));
-				$this->redirect(array('action' => 'index'));
-			}
-		} else {
-			$this->Flash->error(__('Region was not deleted. It is related to student and contacts.'));
-		}
-
-		$this->Flash->error( __('Region was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        return $this->redirect(['action' => 'index']);
+    }
 }

@@ -1,66 +1,75 @@
 <?php
-class PrerequisitesController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Prerequisites';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Prerequisite->recursive = 0;
-		$this->set('prerequisites', $this->paginate());
-	}
+class PrerequisitesController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid prerequisite'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('prerequisite', $this->Prerequisite->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Courses', 'PrerequisiteCourses'],
+        ];
+        $prerequisites = $this->paginate($this->Prerequisites);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Prerequisite->create();
-			if ($this->Prerequisite->save($this->request->data)) {
-				$this->Session->setFlash(__('The prerequisite has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The prerequisite could not be saved. Please, try again.'));
-			}
-		}
-		$courses = $this->Prerequisite->Course->find('list');
-		$this->set(compact('courses'));
-	}
+        $this->set(compact('prerequisites'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid prerequisite'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Prerequisite->save($this->request->data)) {
-				$this->Session->setFlash(__('The prerequisite has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The prerequisite could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Prerequisite->read(null, $id);
-		}
-		$courses = $this->Prerequisite->Course->find('list');
-		$this->set(compact('courses'));
-	}
+    public function view($id = null)
+    {
+        $prerequisite = $this->Prerequisites->get($id, [
+            'contain' => ['Courses', 'PrerequisiteCourses'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for prerequisite'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Prerequisite->delete($id)) {
-			$this->Session->setFlash(__('Prerequisite deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Prerequisite was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('prerequisite', $prerequisite);
+    }
+
+    public function add()
+    {
+        $prerequisite = $this->Prerequisites->newEntity();
+        if ($this->request->is('post')) {
+            $prerequisite = $this->Prerequisites->patchEntity($prerequisite, $this->request->getData());
+            if ($this->Prerequisites->save($prerequisite)) {
+                $this->Flash->success(__('The prerequisite has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The prerequisite could not be saved. Please, try again.'));
+        }
+        $this->set(compact('prerequisite'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $prerequisite = $this->Prerequisites->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $prerequisite = $this->Prerequisites->patchEntity($prerequisite, $this->request->getData());
+            if ($this->Prerequisites->save($prerequisite)) {
+                $this->Flash->success(__('The prerequisite has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The prerequisite could not be saved. Please, try again.'));
+        }
+        $courses = $this->Prerequisites->Courses->find('list', ['limit' => 200]);
+        $prerequisiteCourses = $this->Prerequisites->PrerequisiteCourses->find('list', ['limit' => 200]);
+        $this->set(compact('prerequisite', 'courses', 'prerequisiteCourses'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $prerequisite = $this->Prerequisites->get($id);
+        if ($this->Prerequisites->delete($prerequisite)) {
+            $this->Flash->success(__('The prerequisite has been deleted.'));
+        } else {
+            $this->Flash->error(__('The prerequisite could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }
-?>

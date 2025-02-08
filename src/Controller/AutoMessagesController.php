@@ -1,45 +1,75 @@
 <?php
-class AutoMessagesController extends AppController {
-	var $name = 'AutoMessages';
-	var $menuOptions = array(
-			'controllerButton' => false,
-			'exclude' => array('*')
-	);
-	public $components =array('RequestHandler');
-	function beforeFilter() {
-		parent::beforeFilter();
-		$this->Auth->Allow('delete');
-                if($this->Session->check('Message.auth')){
-               		$this->Session->delete('Message.auth');
-            	}
-		if ($this->Auth->user() && in_array($this->request->params['action'], array('login'))) {
-			return $this->redirect($this->Auth->logout());
-		}
-	}
-	
-	function delete($id = null) {
-		$this->layout = 'ajax';
-		$this->AutoMessage->id = $id;
-		if($id && $this->AutoMessage->exists() && $this->Auth->user('id')) {
-			$am_count = $this->AutoMessage->find('count',
-				array(
-					'conditions' =>
-					array(
-						'AutoMessage.user_id' => $this->Auth->user('id'),
-						'AutoMessage.id' => $id
-					)
-				)
-			);
-			if($am_count > 0) {
-				$auto_message_update['id'] = $id;
-				$auto_message_update['read'] = 1;
-				$this->AutoMessage->save($auto_message_update);
-				$auto_messages = ClassRegistry::init('AutoMessage')->getMessages($this->Auth->user('id'));
-			}
-		}
-	        debug($auto_messages);
-		debug($id);
-		$this->set('auto_messages',$auto_messages);
-		$this->set('_serialize', array('auto_messages'));
-	}
+namespace App\Controller;
+
+use App\Controller\AppController;
+
+class AutoMessagesController extends AppController
+{
+
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Users'],
+        ];
+        $autoMessages = $this->paginate($this->AutoMessages);
+
+        $this->set(compact('autoMessages'));
+    }
+
+    public function view($id = null)
+    {
+        $autoMessage = $this->AutoMessages->get($id, [
+            'contain' => ['Users'],
+        ]);
+
+        $this->set('autoMessage', $autoMessage);
+    }
+
+    public function add()
+    {
+        $autoMessage = $this->AutoMessages->newEntity();
+        if ($this->request->is('post')) {
+            $autoMessage = $this->AutoMessages->patchEntity($autoMessage, $this->request->getData());
+            if ($this->AutoMessages->save($autoMessage)) {
+                $this->Flash->success(__('The auto message has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The auto message could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('autoMessage'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $autoMessage = $this->AutoMessages->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $autoMessage = $this->AutoMessages->patchEntity($autoMessage, $this->request->getData());
+            if ($this->AutoMessages->save($autoMessage)) {
+                $this->Flash->success(__('The auto message has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The auto message could not be saved. Please, try again.'));
+        }
+        $this->set(compact('autoMessage'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $autoMessage = $this->AutoMessages->get($id);
+        if ($this->AutoMessages->delete($autoMessage)) {
+            $this->Flash->success(__('The auto message has been deleted.'));
+        } else {
+            $this->Flash->error(__('The auto message could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

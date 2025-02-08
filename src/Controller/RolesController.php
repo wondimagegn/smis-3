@@ -1,89 +1,74 @@
 <?php
-class RolesController extends AppController {
+namespace App\Controller;
 
-	public $name = 'Roles';
- 
-	public $menuOptions = array(
-			'parent'=>'security',
-			'alias' => array(
-				'index' => 'List All Roles',
-				'add' => 'Create Role'
-			),
-	);
-    
-    public function beforeFilter() {
-         parent::beforeFilter();
-         $this->Auth->allow('*');
-      
+use App\Controller\AppController;
+
+class RolesController extends AppController
+{
+
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['ParentRoles'],
+        ];
+        $roles = $this->paginate($this->Roles);
+
+        $this->set(compact('roles'));
     }
-	public function index() {
-		$this->Role->recursive = 0;
-		$this->set('roles', $this->paginate());
-	}
 
-	public function view($id = null) {
-		if (!$id) {
-			
-			$this->Session->setFlash(__('<span></span> Invalid role.'),'default',array('class'=>'error-box error-message'));
-			
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('role', $this->Role->read(null, $id));
-	}
+    public function view($id = null)
+    {
+        $role = $this->Roles->get($id, [
+            'contain' => ['ParentRoles', 'MoodleUsers', 'PasswordChanageVotes', 'ChildRoles', 'Users'],
+        ]);
 
-	public function add() {
-		if (!empty($this->request->data)) {
-			$this->Role->create();
-			if ($this->Role->save($this->request->data)) {
-				//$this->Session->setFlash(__('The role has been saved'));
-				$this->Session->setFlash(__('<span></span> The role has been saved!'),'default',
-array('class'=>'success-box success-message'));
+        $this->set('role', $role);
+    }
 
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('<span></span> The role could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));			
-			}
-		}
-	   
-		$this->set('roles', $this->Role->find('list'));
-	}
+    public function add()
+    {
+        $role = $this->Roles->newEntity();
+        if ($this->request->is('post')) {
+            $role = $this->Roles->patchEntity($role, $this->request->getData());
+            if ($this->Roles->save($role)) {
+                $this->Flash->success(__('The role has been saved.'));
 
-	public function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			
-			$this->Session->setFlash(__('<span></span> Invalid role.'),'default',array('class'=>'error-box error-message'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Role->save($this->request->data)) {
-			
-				$this->Session->setFlash(__('<span></span> The role has been saved.'),'default',array('class'=>'success-box success-message'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-					$this->Session->setFlash(__('<span></span> The role could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Role->read(null, $id);
-		}
-		$this->set('roles', $this->Role->find('list'));
-	}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The role could not be saved. Please, try again.'));
+        }
+        $this->set(compact('role'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			
-			$this->Session->setFlash(__('<span></span> Invalid id for role.'),'default',array('class'=>'error-box error-message'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Role->delete($id)) {
-			
-			$this->Session->setFlash(__('<span></span> Role deleted.'),'default',array('class'=>'success-box success-message'));
-			return $this->redirect(array('action'=>'index'));
-		}
-	
-		$this->Session->setFlash(__('<span></span> Role was not deleted.'),'default',array('class'=>'error-box error-message'));
 
-		return $this->redirect(array('action' => 'index'));
-	 }
-	
+    public function edit($id = null)
+    {
+        $role = $this->Roles->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $role = $this->Roles->patchEntity($role, $this->request->getData());
+            if ($this->Roles->save($role)) {
+                $this->Flash->success(__('The role has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The role could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('role'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $role = $this->Roles->get($id);
+        if ($this->Roles->delete($role)) {
+            $this->Flash->success(__('The role has been deleted.'));
+        } else {
+            $this->Flash->error(__('The role could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

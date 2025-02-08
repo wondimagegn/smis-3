@@ -326,18 +326,18 @@
 					
 					<?php
 					if (!empty($publishedCourses)) { ?>
-					<div id="show_published_courses_drop_down">
-						<table class="fs14" cellpadding="0" cellspacing="0" class='table'>
-							<tr>
-								<td style="width:25%;" class="center">Published Courses</td>
-								<td colspan="3">
-									<div class="large-10 columns">
-									<br>
-									<?= $this->Form->input('published_course_id', array('style' => 'width: 90%;', 'id' => 'PublishedCourse', 'class' => 'fs14', 'label' => false, 'type' => 'select', 'options' => $publishedCourses, 'default' => $published_course_combo_id)); ?>
-									</div>
-								</td>
-							</tr>
-						</table>
+						<div id="show_published_courses_drop_down">
+							<table class="fs14" cellpadding="0" cellspacing="0" class='table'>
+								<tr>
+									<td style="width:25%;" class="center">Published Courses</td>
+									<td colspan="3">
+										<div class="large-10 columns">
+										<br>
+										<?= $this->Form->input('published_course_id', array('style' => 'width: 90%;', 'id' => 'PublishedCourse', 'class' => 'fs14', 'label' => false, 'type' => 'select', 'options' => $publishedCourses, 'default' => $published_course_combo_id)); ?>
+										</div>
+									</td>
+								</tr>
+							</table>
 						</div>
 						<?php
 					} ?>
@@ -362,7 +362,9 @@
 <script>
 	$('#listPublishedCourses').click(function(event) {
 		$('#listPublishedCourses').val('Looking for Published Courses...');
+		$('#PublishedCourse').val(0);
 		$("#show_published_courses_drop_down").hide();
+
 		if ($('#show_search_results').length) {
 			$("#show_search_results").hide();
 		}

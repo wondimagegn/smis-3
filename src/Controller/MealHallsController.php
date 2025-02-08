@@ -1,90 +1,73 @@
 <?php
-class MealHallsController extends AppController {
+namespace App\Controller;
 
-	public $name = 'MealHalls';
-	public $menuOptions = array(
-		'parent' => 'mealService',
-		'exclude'=>array(''),
-		'alias' => array(
-                    'index' =>'List Meal Halls',
-					'add' =>'Add Meal Hall'
-		)
-	);
-	public $paginate=array();
+use App\Controller\AppController;
 
-	 public function beforeFilter(){
-        parent::beforeFilter();
-         //$this->Auth->allow(array('*'));
-         //$this->Auth->allow('');  
+class MealHallsController extends AppController
+{
+
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Campuses'],
+        ];
+        $mealHalls = $this->paginate($this->MealHalls);
+
+        $this->set(compact('mealHalls'));
     }
-	public function index() {
-		$this->MealHall->recursive = 0;
-		$campuses = $this->MealHall->Campus->find('list');
-		$this->set(compact('campuses'));
-		$campus = '%';
-		
-		if(!empty($this->request->data['MealHall']['campus_id'])){
-			$campus = $this->request->data['MealHall']['campus_id'];
-		}
-
-		$conditions = array('MealHall.campus_id LIKE'=>$campus);
-		$this->paginate = array('conditions'=>$conditions);
-		$this->Paginator->settings=$this->paginate;
-		$this->set('mealHalls', $this->Paginator->paginate('MealHall'));
-	}
 
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->MealHall->create();
-			if ($this->MealHall->save($this->request->data)) {
-				$this->Session->setFlash('<span></span>'.__('The meal hall has been saved'),'default',array('class'=>'success-box	success-message'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash('<span></span>'.__('The meal hall could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
-			}
-		}
-		$campuses = $this->MealHall->Campus->find('list');
-		$this->set(compact('campuses'));
-	}
+    public function view($id = null)
+    {
+        $mealHall = $this->MealHalls->get($id, [
+            'contain' => ['Campuses', 'ExceptionMealAssignments', 'MealHallAssignments', 'UserMealAssignments'],
+        ]);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash('<span></span>'.__('Invalid meal hall'),'default',array('class'=>'error-box error-message'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->MealHall->save($this->request->data)) {
-				$this->Session->setFlash('<span></span>'.__('The meal hall has been saved'),'default',array('class'=>'success-box success-message'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash('<span></span>'.__('The meal hall could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->MealHall->read(null, $id);
-		}
-		$campuses = $this->MealHall->Campus->find('list');
-		$this->set(compact('campuses'));
-	}
+        $this->set('mealHall', $mealHall);
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash('<span></span>'.__('Invalid id for meal hall'),'default',array('class'=>'error-box error-message'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		//Before delete Meal hall check this meal hall is ever been used in meal hall assignment or not
-		$is_meal_hall_ever_used = $this->MealHall->MealHallAssignment->is_meal_hall_ever_used($id);
-		if($is_meal_hall_ever_used == false){
-			if ($this->MealHall->delete($id)) {
-				$this->Session->setFlash('<span></span>'.__('Meal hall deleted'),'default',array('class'=>'success-box success-message'));
-				return $this->redirect(array('action'=>'index'));
-			} 
-		} else {
-			$this->Session->setFlash('<span></span> '.__('The meal hall can not be delete since it used in meal hall assignment.'),'default',array('class'=>'error-box error-message'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash('<span></span>'.__('Meal hall was not deleted'),'default',array('class'=>'error-box error-message'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function add()
+    {
+        $mealHall = $this->MealHalls->newEntity();
+        if ($this->request->is('post')) {
+            $mealHall = $this->MealHalls->patchEntity($mealHall, $this->request->getData());
+            if ($this->MealHalls->save($mealHall)) {
+                $this->Flash->success(__('The meal hall has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The meal hall could not be saved. Please, try again.'));
+        }
+        $this->set(compact('mealHall'));
+    }
+
+    public function edit($id = null)
+    {
+        $mealHall = $this->MealHalls->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $mealHall = $this->MealHalls->patchEntity($mealHall, $this->request->getData());
+            if ($this->MealHalls->save($mealHall)) {
+                $this->Flash->success(__('The meal hall has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The meal hall could not be saved. Please, try again.'));
+        }
+        $this->set(compact('mealHall'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $mealHall = $this->MealHalls->get($id);
+        if ($this->MealHalls->delete($mealHall)) {
+            $this->Flash->success(__('The meal hall has been deleted.'));
+        } else {
+            $this->Flash->error(__('The meal hall could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

@@ -76,7 +76,7 @@
                                                             <!--  <div class='fs16'> Year Level: <?php //echo $yk; ?></div> -->
                                                             <?php
                                                             foreach ($yv as $section_name => $section_value) { 
-                                                                debug($section_value['Semester Registered'][0]);  
+                                                                //debug($section_value['Semester Registered'][0]);  
 
                                                                 $total_published_credits = 0;
                                                                 //debug($section_value['Semester Registered'][0]['PublishedCourse']['program_id']); 

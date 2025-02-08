@@ -15,6 +15,15 @@
  * @author Mark Story <mark@mark-story.com>
  * @license http://www.opensource.org/licenses/mit-license.php The MIT License
  */
+namespace app\Controller\Component;
+
+use Cake\Cache\Cache;
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Core\App;
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+
 class MenuComponent extends Component {
 /**
  * The Default Menu Parent for things that have no parent element defined

@@ -434,7 +434,7 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 		}
 	} 
 } else { ?>
-	<div class="info-box info-message"><span style="margin-right: 15px;"></span>There is no record of course registration to show Exam Results.</div>
+	<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style='margin-right: 15px;'></span>There is no record of course registration or course add to show exam results.</div>
 	<?php
 } ?>
 

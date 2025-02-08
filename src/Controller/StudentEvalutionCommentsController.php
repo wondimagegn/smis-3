@@ -1,111 +1,73 @@
 <?php
-App::uses('AppController', 'Controller');
-/**
- * StudentEvalutionComments Controller
- *
- * @property StudentEvalutionComment $StudentEvalutionComment
- * @property PaginatorComponent $Paginator
- */
-class StudentEvalutionCommentsController extends AppController {
+namespace App\Controller;
 
-/**
- * Components
- *
- * @var array
- */
-	public $components = array('Paginator');
+use App\Controller\AppController;
+
+class StudentEvalutionCommentsController extends AppController
+{
+
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['InstructorEvalutionQuestions', 'Students', 'PublishedCourses'],
+        ];
+        $studentEvalutionComments = $this->paginate($this->StudentEvalutionComments);
+
+        $this->set(compact('studentEvalutionComments'));
+    }
 
 
-/**
- * view method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function view($id = null) {
-		if (!$this->StudentEvalutionComment->exists($id)) {
-			throw new NotFoundException(__('Invalid student evalution comment'));
-		}
-		$options = array('conditions' => array('StudentEvalutionComment.' . $this->StudentEvalutionComment->primaryKey => $id));
-		$this->set('studentEvalutionComment', $this->StudentEvalutionComment->find('first', $options));
-	}
+    public function view($id = null)
+    {
+        $studentEvalutionComment = $this->StudentEvalutionComments->get($id, [
+            'contain' => ['InstructorEvalutionQuestions', 'Students', 'PublishedCourses'],
+        ]);
 
-/**
- * add method
- *
- * @return void
- */
-	public function add() {
-		if ($this->request->is('post')) {
-			$this->StudentEvalutionComment->create();
-			if ($this->StudentEvalutionComment->save($this->request->data)) {
-				$this->Flash->success(__('The student evalution comment has been saved.'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error(__('The student evalution comment could not be saved. Please, try again.'));
-			}
-		}
-		
-		
-		$instructorEvalutionQuestions = $this->StudentEvalutionComment->InstructorEvalutionQuestion->find('list',array('conditions'=>array(
-			'InstructorEvalutionQuestion.type'=>'open-ended',
-			'InstructorEvalutionQuestion.for'=>'student',
-			'InstructorEvalutionQuestion.active'=>1
+        $this->set('studentEvalutionComment', $studentEvalutionComment);
+    }
 
-			)));
-			
-		//$students = $this->StudentEvalutionComment->Student->find('list');
-		//$publishedCourses = $this->StudentEvalutionComment->PublishedCourse->find('list');
-		$this->set(compact('instructorEvalutionQuestions', 'students', 'publishedCourses'));
-	}
+    public function add()
+    {
+        $studentEvalutionComment = $this->StudentEvalutionComments->newEntity();
+        if ($this->request->is('post')) {
+            $studentEvalutionComment = $this->StudentEvalutionComments->patchEntity($studentEvalutionComment, $this->request->getData());
+            if ($this->StudentEvalutionComments->save($studentEvalutionComment)) {
+                $this->Flash->success(__('The student evalution comment has been saved.'));
 
-/**
- * edit method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function edit($id = null) {
-		if (!$this->StudentEvalutionComment->exists($id)) {
-			throw new NotFoundException(__('Invalid student evalution comment'));
-		}
-		if ($this->request->is(array('post', 'put'))) {
-			if ($this->StudentEvalutionComment->save($this->request->data)) {
-				$this->Flash->success(__('The student evalution comment has been saved.'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error(__('The student evalution comment could not be saved. Please, try again.'));
-			}
-		} else {
-			$options = array('conditions' => array('StudentEvalutionComment.' . $this->StudentEvalutionComment->primaryKey => $id));
-			$this->request->data = $this->StudentEvalutionComment->find('first', $options);
-		}
-		$instructorEvalutionQuestions = $this->StudentEvalutionComment->InstructorEvalutionQuestion->find('list');
-		$students = $this->StudentEvalutionComment->Student->find('list');
-		$publishedCourses = $this->StudentEvalutionComment->PublishedCourse->find('list');
-		$this->set(compact('instructorEvalutionQuestions', 'students', 'publishedCourses'));
-	}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The student evalution comment could not be saved. Please, try again.'));
+        }
+        $this->set(compact('studentEvalutionComment'));
+    }
 
-/**
- * delete method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function delete($id = null) {
-		$this->StudentEvalutionComment->id = $id;
-		if (!$this->StudentEvalutionComment->exists()) {
-			throw new NotFoundException(__('Invalid student evalution comment'));
-		}
-		$this->request->allowMethod('post', 'delete');
-		if ($this->StudentEvalutionComment->delete()) {
-			$this->Flash->success(__('The student evalution comment has been deleted.'));
-		} else {
-			$this->Flash->error(__('The student evalution comment could not be deleted. Please, try again.'));
-		}
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function edit($id = null)
+    {
+        $studentEvalutionComment = $this->StudentEvalutionComments->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $studentEvalutionComment = $this->StudentEvalutionComments->patchEntity($studentEvalutionComment, $this->request->getData());
+            if ($this->StudentEvalutionComments->save($studentEvalutionComment)) {
+                $this->Flash->success(__('The student evalution comment has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The student evalution comment could not be saved. Please, try again.'));
+        }
+        $this->set(compact('studentEvalutionComment'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $studentEvalutionComment = $this->StudentEvalutionComments->get($id);
+        if ($this->StudentEvalutionComments->delete($studentEvalutionComment)) {
+            $this->Flash->success(__('The student evalution comment has been deleted.'));
+        } else {
+            $this->Flash->error(__('The student evalution comment could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

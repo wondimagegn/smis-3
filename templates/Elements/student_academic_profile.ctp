@@ -806,24 +806,50 @@
 						<!-- <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>One time password is only valid until you change the passoword on the specified web address, once changed, you will use the new password you set for the site.</div> -->
 						<?php
 						$otp_services_option = Configure::read('otp_services_option');
+						$changed_otp_password = false;
 						foreach ($otps as $key => $otp) { ?>
 							<div class="large-6 columns">
 								<fieldset style="padding-bottom: 15px; padding-top: 5px;">
 									<legend>&nbsp;&nbsp; <span class="fs15 text-black">One Time Password for <?= $otp_services_option[$otp['Otp']['service']]; ?></span> &nbsp;&nbsp;</legend>
 									<div class="row" style="line-height: 2;">
-										<div class="large-12 columns">
-											<br/>
-											<span class="fs15 text-black">Username: <strong id="copyOTPusername<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPusername<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP username"><?= $otp['Otp']['username']; ?></strong></span><br/>
-										</div>
-										<div class="large-12 columns">
-											<span class="fs15 text-black">Password: <strong id="copyOTPpassword<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPpassword<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP password"><?= $otp['Otp']['password']; ?></strong></span><br/>
-										</div>
-										<div class="large-12 columns">
-											<hr/>
-											<span class="fs15 text-black">Last Updated: &nbsp;<?= $this->Time->timeAgoInWords($otp['Otp']['modified'], array('format' => 'M j, Y', 'end' => '1 year', 'accuracy' => array('month' => 'month'))); ?></span><br/>
-										</div>
-
 										<?php
+										if ($otp['Otp']['service'] == 'Elearning' && empty($otp['Otp']['portal'])) { ?>
+											<div class="large-12 columns">
+												<br/>
+												<span class="fs15 text-black">Username: <strong id="copyOTPusername<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPusername<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP username"><?= $otp['Otp']['username']; ?></strong></span><br/>
+											</div>
+											<div class="large-12 columns">
+												<?php
+												if (!empty($moodleUserDetails['MoodleUser']['username']) && $moodleUserDetails['MoodleUser']['created'] == $moodleUserDetails['MoodleUser']['modified']) { ?>
+													<span class="fs15 text-black">Password: <strong id="copyOTPpassword<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPpassword<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP password"><?= $otp['Otp']['password']; ?></strong></span><br/>
+													<?php
+												} else { 
+													$changed_otp_password = true;
+													?>
+													<span class="fs15 text-black">Password: <i class="accepted">The same password used for SMiS</i></span><br/>
+													<?php
+												} ?>
+											</div>
+											<div class="large-12 columns">
+												<hr/>
+												<span class="fs15 text-black"><?= (!empty($moodleUserDetails['MoodleUser']['username']) && $moodleUserDetails['MoodleUser']['created'] == $moodleUserDetails['MoodleUser']['modified']) ? 'Last Updated' : 'Last Password Change'; ?>: &nbsp;<?= $this->Time->timeAgoInWords((isset($moodleUserDetails['MoodleUser']['modified']) && !empty($moodleUserDetails['MoodleUser']['modified']) ? $moodleUserDetails['MoodleUser']['modified'] : $otp['Otp']['modified']), array('format' => 'M j, Y', 'end' => '1 year', 'accuracy' => array('month' => 'month'))); ?></span><br/>
+											</div>
+											<?php
+										} else { ?>
+											<div class="large-12 columns">
+												<br/>
+												<span class="fs15 text-black">Username: <strong id="copyOTPusername<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPusername<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP username"><?= $otp['Otp']['username']; ?></strong></span><br/>
+											</div>
+											<div class="large-12 columns">
+												<span class="fs15 text-black">Password: <strong id="copyOTPpassword<?= $key ?>" class="copy-text" data-clipboard-target="#copyOTPpassword<?= $key ?>" title="Click here once to copy <?= $otp_services_option[$otp['Otp']['service']] ?> OTP password"><?= $otp['Otp']['password']; ?></strong></span><br/>
+											</div>
+											<div class="large-12 columns">
+												<hr/>
+												<span class="fs15 text-black">Last Updated: &nbsp;<?= $this->Time->timeAgoInWords($otp['Otp']['modified'], array('format' => 'M j, Y', 'end' => '1 year', 'accuracy' => array('month' => 'month'))); ?></span><br/>
+											</div>
+											<?php
+										}
+
 										if (isset($otp['Otp']['exam_center']) && !empty($otp['Otp']['exam_center'])) { ?>
 											<div class="large-12 columns">
 												<span class="fs15 text-black">Exam Center:  &nbsp;<?= $otp['Otp']['exam_center']; ?></span><br/>
@@ -838,11 +864,19 @@
 											<?php
 										}
 
-										if ($otp['Otp']['service'] == 'Elearning') {  ?>
-											<div class="large-12 columns">
-												<div class="info-box fs15" style="font-family: 'Times New Roman', Times, serif; font-weight: normal; text-align: justify;">If you never changed your SMiS password since you started using the E-learning portal, Please change your SMiS password to change the default initial OTP password (<?= $otp['Otp']['password']; ?>) which was set for <b><?= MOODLE_SITE_URL; ?></b> so that you can use the same password for both sites and secure your E-Learning account from being used by someone else. If you already done that, ignore this notification message.</div> 
-											</div>
+										if ($otp['Otp']['service'] == 'Elearning' && empty($otp['Otp']['portal'])) { ?>
 											<?php
+											if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && isset($moodleUserDetails) && !empty($moodleUserDetails['MoodleUser']['username']) && $moodleUserDetails['MoodleUser']['created'] == $moodleUserDetails['MoodleUser']['modified']) { ?>
+												<div class="large-12 columns">
+													<div class="warning-box fs15" style="font-family: 'Times New Roman', Times, serif; font-weight: normal; text-align: justify;">Change your SMiS  password to update the default OTP password set for <?= MOODLE_SITE_URL; ?>, <a href="/users/changePwd">Click here to update your SMiS Password</a> which will secure your elearning account and also sets the same password for both SMiS and elearning portal.</div>
+												</div>
+												<?php
+											} else if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && !$changed_otp_password) { ?>
+												<div class="large-12 columns">
+													<div class="info-box fs15" style="font-family: 'Times New Roman', Times, serif; font-weight: normal; text-align: justify;">If you never changed your SMiS password since you started using the E-learning portal, Please change your SMiS password to change the default initial OTP password (<?= $otp['Otp']['password']; ?>) which was set for <b><?= MOODLE_SITE_URL; ?></b> so that you can use the same password for both sites and secure your E-Learning account from being used by someone else. If you already done that, ignore this notification message.</div> 
+												</div>
+												<?php
+											}
 										} else { ?>
 											<div class="large-12 columns">
 												<div class="info-box fs15" style="font-family: 'Times New Roman', Times, serif; font-weight: normal; text-align: justify;">This One time password (OTP) is only valid until you change the password on the specified web address, once changed, you are required to remember the new password you set for the site and use that password afterwards. If you already done that, ignore this notification message.</div> 

@@ -1,71 +1,74 @@
 <?php
-class GradeScalePublishedCoursesController extends AppController {
+namespace App\Controller;
 
-	var $name = 'GradeScalePublishedCourses';
-	  var $menuOptions = array(
-	             'controllerButton' => false,
-                 'exclude'=>'*'
-            );
+use App\Controller\AppController;
 
-	function index() {
-		$this->GradeScalePublishedCourse->recursive = 0;
-		$this->set('gradeScalePublishedCourses', $this->paginate());
-	}
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid grade scale published course'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('gradeScalePublishedCourse', $this->GradeScalePublishedCourse->read(null, $id));
-	}
+class GradeScalePublishedCoursesController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->GradeScalePublishedCourse->create();
-			if ($this->GradeScalePublishedCourse->save($this->request->data)) {
-				$this->Session->setFlash(__('The grade scale published course has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The grade scale published course could not be saved. Please, try again.'));
-			}
-		}
-		$gradeScales = $this->GradeScalePublishedCourse->GradeScale->find('list');
-		$publishedCourses = $this->GradeScalePublishedCourse->PublishedCourse->find('list');
-		$this->set(compact('gradeScales', 'publishedCourses'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['GradeScales', 'PublishedCourses'],
+        ];
+        $gradeScalePublishedCourses = $this->paginate($this->GradeScalePublishedCourses);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid grade scale published course'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->GradeScalePublishedCourse->save($this->request->data)) {
-				$this->Session->setFlash(__('The grade scale published course has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The grade scale published course could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->GradeScalePublishedCourse->read(null, $id);
-		}
-		$gradeScales = $this->GradeScalePublishedCourse->GradeScale->find('list');
-		$publishedCourses = $this->GradeScalePublishedCourse->PublishedCourse->find('list');
-		$this->set(compact('gradeScales', 'publishedCourses'));
-	}
+        $this->set(compact('gradeScalePublishedCourses'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for grade scale published course'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->GradeScalePublishedCourse->delete($id)) {
-			$this->Session->setFlash(__('Grade scale published course deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Grade scale published course was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->get($id, [
+            'contain' => ['GradeScales', 'PublishedCourses'],
+        ]);
+
+        $this->set('gradeScalePublishedCourse', $gradeScalePublishedCourse);
+    }
+
+    public function add()
+    {
+        $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->newEntity();
+        if ($this->request->is('post')) {
+            $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->patchEntity($gradeScalePublishedCourse, $this->request->getData());
+            if ($this->GradeScalePublishedCourses->save($gradeScalePublishedCourse)) {
+                $this->Flash->success(__('The grade scale published course has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The grade scale published course could not be saved. Please, try again.'));
+        }
+        $this->set(compact('gradeScalePublishedCourse'));
+    }
+
+    public function edit($id = null)
+    {
+        $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->patchEntity($gradeScalePublishedCourse, $this->request->getData());
+            if ($this->GradeScalePublishedCourses->save($gradeScalePublishedCourse)) {
+                $this->Flash->success(__('The grade scale published course has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The grade scale published course could not be saved. Please, try again.'));
+        }
+       $this->set(compact('gradeScalePublishedCourse'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $gradeScalePublishedCourse = $this->GradeScalePublishedCourses->get($id);
+        if ($this->GradeScalePublishedCourses->delete($gradeScalePublishedCourse)) {
+            $this->Flash->success(__('The grade scale published course has been deleted.'));
+        } else {
+            $this->Flash->error(__('The grade scale published course could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

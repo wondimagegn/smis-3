@@ -1,67 +1,70 @@
 <?php
-class WeblinksController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Weblinks';
-    var $menuOptions = array(
-    'controllerButton' => false,
-);
-	function index() {
-		$this->Weblink->recursive = 0;
-		$this->set('weblinks', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid weblink'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('weblink', $this->Weblink->read(null, $id));
-	}
+class WeblinksController extends AppController
+{
+    public function index()
+    {
+        $weblinks = $this->paginate($this->Weblinks);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Weblink->create();
-			if ($this->Weblink->save($this->request->data)) {
-				$this->Session->setFlash(__('The weblink has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The weblink could not be saved. Please, try again.'));
-			}
-		}
-		$courses = $this->Weblink->Course->find('list');
-		$this->set(compact('courses'));
-	}
+        $this->set(compact('weblinks'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid weblink'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Weblink->save($this->request->data)) {
-				$this->Session->setFlash(__('The weblink has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The weblink could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Weblink->read(null, $id);
-		}
-		$courses = $this->Weblink->Course->find('list');
-		$this->set(compact('courses'));
-	}
+    public function view($id = null)
+    {
+        $weblink = $this->Weblinks->get($id, [
+            'contain' => ['Courses'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for weblink'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Weblink->delete($id)) {
-			$this->Session->setFlash(__('Weblink deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Weblink was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('weblink', $weblink);
+    }
+
+    public function add()
+    {
+        $weblink = $this->Weblinks->newEntity();
+        if ($this->request->is('post')) {
+            $weblink = $this->Weblinks->patchEntity($weblink, $this->request->getData());
+            if ($this->Weblinks->save($weblink)) {
+                $this->Flash->success(__('The weblink has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The weblink could not be saved. Please, try again.'));
+        }
+        $this->set(compact('weblink'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $weblink = $this->Weblinks->get($id, [
+            'contain' => ['Courses'],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $weblink = $this->Weblinks->patchEntity($weblink, $this->request->getData());
+            if ($this->Weblinks->save($weblink)) {
+                $this->Flash->success(__('The weblink has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The weblink could not be saved. Please, try again.'));
+        }
+        $this->set(compact('weblink'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $weblink = $this->Weblinks->get($id);
+        if ($this->Weblinks->delete($weblink)) {
+            $this->Flash->success(__('The weblink has been deleted.'));
+        } else {
+            $this->Flash->error(__('The weblink could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

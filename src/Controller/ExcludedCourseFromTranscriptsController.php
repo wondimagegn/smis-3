@@ -1,75 +1,75 @@
 <?php
-class ExcludedCourseFromTranscriptsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'ExcludedCourseFromTranscripts';
-	var $menuOptions = array(
-			'parent' => 'certificates',
-			'exclude' => array('edit', 'delete', 'view'),
-			'alias' => array(
-		       'index' => 'View Excluded Courses',
-		       'add' => 'Add Excluded Course'
-            )
-   );
+use App\Controller\AppController;
 
-	function index() {
-		$this->ExcludedCourseFromTranscript->recursive = 0;
-		$this->set('excludedCourseFromTranscripts', $this->paginate());
-	}
+class ExcludedCourseFromTranscriptsController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid excluded course from transcript'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('excludedCourseFromTranscript', $this->ExcludedCourseFromTranscript->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['CourseRegistrations', 'CourseExemptions'],
+        ];
+        $excludedCourseFromTranscripts = $this->paginate($this->ExcludedCourseFromTranscripts);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->ExcludedCourseFromTranscript->create();
-			if ($this->ExcludedCourseFromTranscript->save($this->request->data)) {
-				$this->Session->setFlash(__('The excluded course from transcript has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The excluded course from transcript could not be saved. Please, try again.'));
-			}
-		}
-		$courseRegistrations = $this->ExcludedCourseFromTranscript->CourseRegistration->find('list');
-		$courseExemptions = $this->ExcludedCourseFromTranscript->CourseExemption->find('list');
-		$this->set(compact('courseRegistrations', 'courseExemptions'));
-	}
+        $this->set(compact('excludedCourseFromTranscripts'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid excluded course from transcript'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->ExcludedCourseFromTranscript->save($this->request->data)) {
-				$this->Session->setFlash(__('The excluded course from transcript has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The excluded course from transcript could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->ExcludedCourseFromTranscript->read(null, $id);
-		}
-		$courseRegistrations = $this->ExcludedCourseFromTranscript->CourseRegistration->find('list');
-		$courseExemptions = $this->ExcludedCourseFromTranscript->CourseExemption->find('list');
-		$this->set(compact('courseRegistrations', 'courseExemptions'));
-	}
+    public function view($id = null)
+    {
+        $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->get($id, [
+            'contain' => ['CourseRegistrations', 'CourseExemptions'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for excluded course from transcript'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->ExcludedCourseFromTranscript->delete($id)) {
-			$this->Session->setFlash(__('Excluded course from transcript deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Excluded course from transcript was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('excludedCourseFromTranscript', $excludedCourseFromTranscript);
+    }
+
+    public function add()
+    {
+        $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->newEntity();
+        if ($this->request->is('post')) {
+            $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->patchEntity($excludedCourseFromTranscript, $this->request->getData());
+            if ($this->ExcludedCourseFromTranscripts->save($excludedCourseFromTranscript)) {
+                $this->Flash->success(__('The excluded course from transcript has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The excluded course from transcript could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('excludedCourseFromTranscript'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->patchEntity($excludedCourseFromTranscript, $this->request->getData());
+            if ($this->ExcludedCourseFromTranscripts->save($excludedCourseFromTranscript)) {
+                $this->Flash->success(__('The excluded course from transcript has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The excluded course from transcript could not be saved. Please, try again.'));
+        }
+       $this->set(compact('excludedCourseFromTranscript'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $excludedCourseFromTranscript = $this->ExcludedCourseFromTranscripts->get($id);
+        if ($this->ExcludedCourseFromTranscripts->delete($excludedCourseFromTranscript)) {
+            $this->Flash->success(__('The excluded course from transcript has been deleted.'));
+        } else {
+            $this->Flash->error(__('The excluded course from transcript could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

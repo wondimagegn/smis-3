@@ -2,21 +2,20 @@
 if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
     foreach ($studentListForExitExam as $program => $programType) {
         foreach ($programType as $programTypeName => $statDetail) { ?>
-            <br />
-            <hr />
+            <!-- <br /> -->
             <p class="fs16">
-                Showing <?= $this->data['Report']['top'] . ' ' . $this->data['Report']['gender']; ?> students as of
-                <strong><?= $this->data['Report']['acadamic_year']; ?></strong> Academic Year,
-                <strong>
+                <!-- Showing <?php //echo $this->data['Report']['top'] . ' ' . $this->data['Report']['gender']; ?> students as of -->
+                <!-- <strong><?php //echo $this->data['Report']['acadamic_year']; ?></strong> Academic Year, -->
+                <!-- <strong>
                     <?php
-                    if ($this->data['Report']['semester'] == 'I') {
+                    /* if ($this->data['Report']['semester'] == 'I') {
                         echo '1st ';
                     } else if ($this->data['Report']['semester'] == 'II') {
                         echo '2nd ';
                     } else if ($this->data['Report']['semester'] == 'III') {
                         echo '3rd ';
-                    } ?>
-                </strong> Semester <br />
+                    } */ ?>
+                </strong> Semester <br /> -->
                 <strong> Program : </strong>
                 <strong><?= $program; ?></strong><br />
                 <strong> Program Type: </strong>
@@ -31,36 +30,57 @@ if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
                             <th class="vcenter">First Name</th>
                             <th class="vcenter">Middle Name</th>
                             <th class="vcenter">Last Name</th>
+                            <!-- <th class="vcenter">Amharic Name</th> -->
                             <th class="center">Sex</th>
-                            <th class="center">Student ID</th>
-                            <th class="center">College</th>
-                            <th class="center">Department</th>
-                            <th class="center">Curriculum Name</th>
-                            <th class="center">Degree Nomenclature</th>
-                            <th class="center">Specialization</th>
-                            <th class="center">Cr. Type</th>
-                            <th class="center">Min Cr. Req.</th>
-                            <th class="center">Curriculum Courses</th>
-                            <th class="center">Taken courses</th>
-                            <th class="center">Taken Credit</th>
-                            <th class="center">Registered courses</th>
-                            <th class="center">Registered Credit</th>
-                            <th class="center">Added courses</th>
-                            <th class="center">Added Credit</th>
-                            <th class="center">Dropped courses</th>
-                            <th class="center">Dropped Credit</th>
-                            <th class="center">Exempted courses</th>
-                            <th class="center">Exempted Credit</th>
-                            <th class="center">Thesis Taken</th>
-                            <th class="center">Thesis Credit</th>
+                            <th class="vcenter">Student ID</th>
+                            <th class="vcenter">College</th>
+                            <th class="vcenter">Department</th>
+                            
+                            <th class="vcenter">Study Program</th>
+                            <th class="center">Study Program CODE</th>
+                            <th class="center">Band</th>
+
+                            <?php
+                            if ((isset($get_extended_report_for_exit_exam) && $get_extended_report_for_exit_exam) || (isset($this->request->data['Report']['get_extended_report_for_exit_exam']) && $this->request->data['Report']['get_extended_report_for_exit_exam'])) { ?>
+                                <!-- <th class="center">Curriculum Name</th> -->
+                                <th class="vcenter">Degree Nomenclature</th>
+                                <th class="vcenter">Specialization</th>
+                                <th class="center">Credit Type</th>
+                                <th class="center">Required Min Credit</th>
+                                <th class="center">Curriculum Courses</th>
+                                <th class="center">Taken courses</th>
+                                <th class="center">Taken Credit</th>
+                                <th class="center">Registered courses</th>
+                                <th class="center">Registered Credit</th>
+                                <th class="center">Added courses</th>
+                                <th class="center">Added Credit</th>
+                                <th class="center">Dropped courses</th>
+                                <th class="center">Dropped Credit</th>
+                                <th class="center">Exempted courses</th>
+                                <th class="center">Exempted Credit</th>
+                                <!-- <th class="center">Thesis Taken</th>
+                                <th class="center">Thesis Credit</th> -->
+                                <th class="center">Credit Remaining</th>
+                                <?php
+                            } else { ?>
+                                <th class="vcenter">Degree Nomenclature</th>
+                                <th class="center">Credit Type</th>
+                                <th class="center">Required Min Credit</th>
+                                <?php
+                            } ?>
+
                             <th class="center">Year</th>
-                            <th class="center">CrHr Sum</th>
+                            <!-- <th class="center">CHS</th> -->
                             <th class="center">SGPA</th>
                             <th class="center">CGPA</th>
-                            <th class="center">Rem Cr.</th>
-                            <th class="center">Email</th>
-                            <th class="center">Mobile</th>
-                            <th class="center">Graduated</th>
+                            <th class="vcenter">Status</th>
+                            <th class="vcenter">Region</th>
+                            <th class="vcenter">Zone</th>
+                            <th class="vcenter">woreda</th>
+                            <th class="vcenter">City</th>
+                            <th class="vcenter">Email</th>
+                            <th class="vcenter">Mobile</th>
+                            <!-- <th class="center">Graduated</th> -->
                             <!-- <th class="center">Photo</th> -->
                             <!-- <th class="center">Photo File Name</th> -->
                         </tr>
@@ -68,11 +88,11 @@ if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
                     <tbody>
                         <?php
                         $count = 0;
-                        //debug($statDetail);
+                        //debug($statDetail[0]);
                         //$row_style = '';
                         foreach ($statDetail as $in => $val) {
-                            $taken = ClassRegistry::init('StudentExamStatus')->getStudentTakenCreditsForExitExam($val['Student']['id']);
-                            if (!empty($val['Student']['Curriculum']['id'])) {
+                            //$taken = ClassRegistry::init('StudentExamStatus')->getStudentTakenCreditsForExitExam($val['Student']['id']);
+                            if (!empty($val['Curriculum']['id'])) {
                                 $row_style = ' ';
                             } else {
                                 $row_style = ' style="color: red;" ';
@@ -82,80 +102,75 @@ if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
                                 <td class="vcenter"><?= $val['Student']['first_name']; ?></td>
                                 <td class="vcenter"><?= $val['Student']['middle_name']; ?></td>
                                 <td class="vcenter"><?= $val['Student']['last_name']; ?></td>
+                                <!-- <td class="vcenter"><?php //echo (isset($val['Student']['full_am_name']) && !empty($val['Student']['full_am_name']) ? $val['Student']['full_am_name'] : ''); ?></td> -->
                                 <td <?= $row_style; ?> class="center"><?= ((strcasecmp(trim($val['Student']['gender']), 'male') == 0) ? 'M' : 'F'); ?></td>
-                                <td <?= $row_style; ?> class="center"><?= $val['Student']['studentnumber']; ?></td>
-                                <td <?= $row_style; ?> class="vcenter"><?= ((isset($val['Student']['College']['name']) && !empty($val['Student']['College']['name'])) ? $val['Student']['College']['name'] : ''); ?></td>
-                                <td class="vcenter"><?= ((isset($val['Student']['Department']['name']) && !empty($val['Student']['Department']['name'])) ? $val['Student']['Department']['name'] : 'Pre/Freshman'); ?></td>
-                                <td class="vcenter"><?= ((isset($val['Student']['Curriculum']['name']) && !empty($val['Student']['Curriculum']['name'])) ? $val['Student']['Curriculum']['name'] : '---'); ?></td>
-                                <td class="vcenter"><?= ((isset($val['Student']['Curriculum']['english_degree_nomenclature']) && !empty($val['Student']['Curriculum']['english_degree_nomenclature'])) ?  $val['Student']['Curriculum']['english_degree_nomenclature'] : '---'); ?></td>
-                                <td class="vcenter"><?= ((isset($val['Student']['Curriculum']['specialization_english_degree_nomenclature']) && !empty($val['Student']['Curriculum']['specialization_english_degree_nomenclature'])) ? $val['Student']['Curriculum']['specialization_english_degree_nomenclature'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($val['Student']['Curriculum']['type_credit']) && !empty($val['Student']['Curriculum']['type_credit'])) ? $val['Student']['Curriculum']['type_credit'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($val['Student']['Curriculum']['minimum_credit_points']) && !empty($val['Student']['Curriculum']['minimum_credit_points'])) ? $val['Student']['Curriculum']['minimum_credit_points'] : '---'); ?></td>
-                                <td class="center">
-                                    <?php
-                                    //$all_curriculum_courses = $taken['curriculum_major_course_count'] + $taken['curriculum_minor_course_count'];
-                                    echo $taken['curriculum_major_course_count'] + $taken['curriculum_minor_course_count'];
-                                    //echo ' ( Major: ' . $taken['curriculum_major_course_count']  . ' Minor: ' . $taken['curriculum_minor_course_count']. ' )';
-                                    ?>
-                                </td>
-                                <td class="center"><?= ((isset($taken['taken_course_count']) && $taken['taken_course_count'] != 0) ? $taken['taken_course_count'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['credit_sum']) && $taken['credit_sum'] != 0) ? $taken['credit_sum'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['course_count_registration']) && $taken['course_count_registration'] != 0) ? $taken['course_count_registration'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['credit_sum_registration']) && $taken['credit_sum_registration'] != 0) ? $taken['credit_sum_registration'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['course_count_add']) && $taken['course_count_add'] != 0) ? $taken['course_count_add'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['credit_sum_add']) && $taken['credit_sum_add'] != 0) ? $taken['credit_sum_add'] : '---'); ?></td>
-                                <td class="center"><?= (isset($taken['droped_courses_count']) && $taken['droped_courses_count'] != 0) ? $taken['droped_courses_count'] : '---'; ?></td>
-                                <td class="center"><?= ((isset($taken['droped_credit_sum']) && $taken['droped_credit_sum'] != 0) ? $taken['droped_credit_sum'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['exempted_course_count']) && $taken['exempted_course_count'] != 0) ? $taken['exempted_course_count'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['exempted_credit_sum']) && $taken['exempted_credit_sum'] != 0) ? $taken['exempted_credit_sum'] : '---'); ?></td>
-                                <td class="center"><?= ((isset($taken['thesis_taken']) && $taken['thesis_taken'] == 1) ? 'Yes' : 'No'); ?></td>
-                                <td class="center"><?= (($taken['thesis_taken'] == 1 && isset($taken['thesis_credit'])) ? $taken['thesis_credit'] : '---'); ?></td>
-                                <td class="center"><?= $val['Student']['yearLevel']; ?></td>
-                                <td class="center"><?= $val['StudentExamStatus']['credit_hour_sum']; ?></td>
-                                <td class="center"><?= $val['StudentExamStatus']['sgpa']; ?></td>
-                                <td class="center"><?= $val['StudentExamStatus']['cgpa']; ?></td>
-                                <td class="center">
-                                    <?php
-                                    if (isset($val['Student']['Curriculum']) && isset($val['Student']['Curriculum']['minimum_credit_points'])) {
-                                        if ($val['Student']['Curriculum']['minimum_credit_points'] != 0) {
-                                            $remaining_credits = ($taken['credit_sum'] + $taken['exempted_credit_sum']) - $val['Student']['Curriculum']['minimum_credit_points'];
-                                            echo $remaining_credits;
-                                        } else {
-                                            echo 'Invalid minimun credit point for the curriculum';
-                                        }
-                                    } else {
-                                        echo 'student not attached to curriculum';
-                                    }
-                                    /* if (isset($taken) && !empty($taken)) {
-                                            echo 'All: <b>'. $taken['credit_sum'] .' </b>( <b>' . $taken['taken_course_count']  .' </b> course(s) <br/>';
-                                                echo  '( Major: <b>' . $taken['taken_major_course_count']  . ' </b> credits: ' . $taken['taken_major_course_credit']. ' </b>)<br/>';
-                                                //echo '( Minor: <b>' . $taken['taken_minor_course_count']  . ' </b> credits: ' . $taken['taken_minor_course_credit']. ' </b>)<br/>';
-                                                echo  '( Registered for <b> ' . $taken['course_count_registration']  . ' </b>  Courses with <b>' . $taken['credit_sum_registration']. ' </b> credits total)<br/>';
-                                                echo  '( Added <b>' . $taken['course_count_add']  . ' </b>  Courses with <b>' . $taken['credit_sum_add']. ' </b> credits total)<br/>';
-                                                echo  '( Dropped <b>' . $taken['droped_courses_count']  . ' </b>  Courses with <b>' . $taken['droped_credit_sum']. ' </b> credits total)<br/>';
-                                                
-                                            echo 'Exempted: <b>'. $taken['exempted_credit_sum'] .'</b>  ( <b>' . $taken['exempted_course_count']  .' </b> course(s))' .'<br/>';
-                                            echo 'Thesis taken: ';
-                                            if ($taken['thesis_taken'] == 1) {
-                                                echo '<b>Yes</b> ';
+                                <td <?= $row_style; ?> class="vcenter"><?= $val['Student']['studentnumber']; ?></td>
+                                <td <?= $row_style; ?> class="vcenter"><?= ((isset($val['College']['name']) && !empty($val['College']['name'])) ? $val['College']['name'] : ''); ?></td>
+                                <td class="vcenter"><?= ((isset($val['Department']['name']) && !empty($val['Department']['name'])) ? $val['Department']['name'] : 'N/A'); ?></td>
+                                
+                                <td class="vcenter"><?= ((isset($val['Curriculum']['DepartmentStudyProgram']['id']) && !empty($val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['study_program_name'])) ? $val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['study_program_name'] : 'N/A'); ?></td>
+                                <td class="center"><?= ((isset($val['Curriculum']['DepartmentStudyProgram']['id']) && !empty($val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['code'])) ? $val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['code'] : 'N/A'); ?></td>
+                                <td class="center"><?= ((isset($val['Curriculum']['DepartmentStudyProgram']['id']) && !empty($val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['local_band'])) ? $val['Curriculum']['DepartmentStudyProgram']['StudyProgram']['local_band'] : 'N/A'); ?></td>
+
+                                <?php
+                                if ((isset($get_extended_report_for_exit_exam) && $get_extended_report_for_exit_exam) || (isset($this->request->data['Report']['get_extended_report_for_exit_exam']) && $this->request->data['Report']['get_extended_report_for_exit_exam'])) { ?>
+                                    <!-- <td class="vcenter"><?php //echo ((isset($val['Curriculum']['name']) && !empty($val['Curriculum']['name'])) ? $val['Curriculum']['name'] : 'N/A'); ?></td> -->
+                                    <td class="vcenter"><?= ((isset($val['Curriculum']['english_degree_nomenclature']) && !empty($val['Curriculum']['english_degree_nomenclature'])) ?  $val['Curriculum']['english_degree_nomenclature'] : '---'); ?></td>
+                                    <td class="vcenter"><?= ((isset($val['Curriculum']['specialization_english_degree_nomenclature']) && !empty($val['Curriculum']['specialization_english_degree_nomenclature'])) ? $val['Curriculum']['specialization_english_degree_nomenclature'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Curriculum']['type_credit']) && !empty($val['Curriculum']['type_credit'])) ? $val['Curriculum']['type_credit'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Curriculum']['minimum_credit_points']) && !empty($val['Curriculum']['minimum_credit_points'])) ? $val['Curriculum']['minimum_credit_points'] : '---'); ?></td>
+                                    <td class="center"><?= (isset($val['Student']['taken']['curriculum_major_course_count']) ? $val['Student']['taken']['curriculum_major_course_count'] + $val['Student']['taken']['curriculum_minor_course_count'] : 0); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['taken_course_count']) && $val['Student']['taken']['taken_course_count'] != 0) ? $val['Student']['taken']['taken_course_count'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['credit_sum']) && $val['Student']['taken']['credit_sum'] != 0) ? $val['Student']['taken']['credit_sum'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['course_count_registration']) && $val['Student']['taken']['course_count_registration'] != 0) ? $val['Student']['taken']['course_count_registration'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['credit_sum_registration']) && $val['Student']['taken']['credit_sum_registration'] != 0) ? $val['Student']['taken']['credit_sum_registration'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['course_count_add']) && $val['Student']['taken']['course_count_add'] != 0) ? $val['Student']['taken']['course_count_add'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['credit_sum_add']) && $val['Student']['taken']['credit_sum_add'] != 0) ? $val['Student']['taken']['credit_sum_add'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['droped_courses_count']) && $val['Student']['taken']['droped_courses_count'] != 0) ? $val['Student']['taken']['droped_courses_count'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['droped_credit_sum']) && $val['Student']['taken']['droped_credit_sum'] != 0) ? $val['Student']['taken']['droped_credit_sum'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['exempted_course_count']) && $val['Student']['taken']['exempted_course_count'] != 0) ? $val['Student']['taken']['exempted_course_count'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Student']['taken']['exempted_credit_sum']) && $val['Student']['taken']['exempted_credit_sum'] != 0) ? $val['Student']['taken']['exempted_credit_sum'] : '---'); ?></td>
+                                    <!-- <td class="center"><?php //echo ((isset($val['Student']['taken']['thesis_taken']) && $val['Student']['taken']['thesis_taken'] == 1) ? 'Yes' : 'No'); ?></td>
+                                    <td class="center"><?php //echo (($val['Student']['taken']['thesis_taken'] == 1 && isset($val['Student']['taken']['thesis_credit'])) ? $val['Student']['taken']['thesis_credit'] : '---'); ?></td> -->
+                                    <td class="center">
+                                        <?php
+                                        if (isset($val['Curriculum']) && isset($val['Curriculum']['minimum_credit_points'])) {
+                                            if ($val['Curriculum']['minimum_credit_points'] != 0) {
+                                                $remaining_credits = ($val['Student']['taken']['credit_sum'] + $val['Student']['taken']['exempted_credit_sum']) - $val['Curriculum']['minimum_credit_points'];
+                                                echo $remaining_credits;
                                             } else {
-                                                echo '<b> No</b> ';
+                                                echo 'Invalid minimun credit point for the curriculum';
                                             }
-                                            
                                         } else {
-                                            echo ' ---';
-                                        } */
-                                    ?>
-                                </td>
+                                            echo 'student not attached to curriculum';
+                                        } ?>
+                                    </td>
+                                    <?php
+                                } else { ?>
+                                    <td class="vcenter"><?= ((isset($val['Curriculum']['english_degree_nomenclature']) && !empty($val['Curriculum']['english_degree_nomenclature'])) ?  $val['Curriculum']['english_degree_nomenclature'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Curriculum']['type_credit']) && !empty($val['Curriculum']['type_credit'])) ? $val['Curriculum']['type_credit'] : '---'); ?></td>
+                                    <td class="center"><?= ((isset($val['Curriculum']['minimum_credit_points']) && !empty($val['Curriculum']['minimum_credit_points'])) ? $val['Curriculum']['minimum_credit_points'] : '---'); ?></td>
+                                    <?php
+                                } ?>
+                                
+                                <td class="center"><?= $val['Student']['yearLevel']; ?></td>
+                                <!-- <td class="center"><?php //echo $val['StudentExamStatus'][0]['credit_hour_sum']; ?></td> -->
+                                <td class="center"><?= $val['StudentExamStatus'][0]['sgpa']; ?></td>
+                                <td class="center"><?= $val['StudentExamStatus'][0]['cgpa']; ?></td>
+                                <td class="vcenter"><?= (isset($val['StudentExamStatus'][0]['AcademicStatus']['id']) && !empty($val['StudentExamStatus'][0]['AcademicStatus']['name']) ? $val['StudentExamStatus'][0]['AcademicStatus']['name'] : ''); ?></td>
+                                <td class="vcenter"><?= ((isset($val['Region']['id']) && !empty($val['Region']['name'])) ? $val['Region']['name'] : 'N/A'); ?></td>
+                                <td class="vcenter"><?= ((isset($val['Zone']['id']) && !empty($val['Zone']['name'])) ? $val['Zone']['name'] : ''); ?></td>
+                                <td class="vcenter"><?= ((isset($val['Woreda']['id']) && !empty($val['Woreda']['name'])) ? $val['Woreda']['name'] : ''); ?></td>
+                                <td class="vcenter"><?= ((isset($val['City']['id']) && !empty($val['City']['name'])) ? $val['City']['name'] : ''); ?></td>
                                 <td class="vcenter"><?= $val['Student']['email']; ?></td>
                                 <td  class="vcenter"><?= $val['Student']['phone_mobile']; ?></td>
-                                <td class="center"><?= (($val['Student']['graduated'] == 1) ? 'Yes' : 'No'); ?></td>
+                                <!-- <td class="center"><?php //echo (($val['Student']['graduated'] == 1) ? 'Yes' : 'No'); ?></td> -->
 
                                 <!-- <td class="center">
                                     <?php
-                                    /*  if (isset($taken['photo_dirname']) && !empty($taken['photo_dirname'])) {
-                                            if (!empty($taken['photo_basename']) && !empty($taken['photo_basename'])) {
-                                                echo $this->Media->embed($this->Media->file($taken['photo_dirname'] . DS . $taken['photo_basename']), array('width' => '100'));
+                                    /*  if (isset($val['Student']['taken']['photo_dirname']) && !empty($val['Student']['taken']['photo_dirname'])) {
+                                            if (!empty($val['Student']['taken']['photo_basename']) && !empty($val['Student']['taken']['photo_basename'])) {
+                                                echo $this->Media->embed($this->Media->file($val['Student']['taken']['photo_dirname'] . DS . $val['Student']['taken']['photo_basename']), array('width' => '100'));
                                             }
                                         } else {
                                             echo '<img src="/img/noimage.jpg" width="100" class="profile-picture">';
@@ -165,9 +180,9 @@ if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
 
                                 <!-- <td class="center">
                                     <?php
-                                    /*  if (isset($taken['photo_dirname']) && !empty($taken['photo_dirname'])) {
-                                            if (!empty($taken['photo_basename']) && !empty($taken['photo_basename'])) {
-                                                echo $taken['photo_basename'];
+                                    /*  if (isset($val['Student']['taken']['photo_dirname']) && !empty($val['Student']['taken']['photo_dirname'])) {
+                                            if (!empty($val['Student']['taken']['photo_basename']) && !empty($val['Student']['taken']['photo_basename'])) {
+                                                echo $val['Student']['taken']['photo_basename'];
                                             }
                                         } else {
                                             echo '---';
@@ -180,6 +195,7 @@ if (isset($studentListForExitExam) && !empty($studentListForExitExam)) {
                     </tbody>
                 </table>
             </div>
+            <hr>
             <?php
         } ?>
         <?php

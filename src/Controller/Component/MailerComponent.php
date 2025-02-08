@@ -1,8 +1,12 @@
 <?php
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+
 class MailerComponent extends Component
 {
     var $components = array('RequestHandler', 'Email');
-    public function __construct(ComponentCollection $collection, $settings = array())
+    public function __construct(ComponentRegistry $collection, $settings = array())
     {
         parent::__construct($collection, $settings);
     }

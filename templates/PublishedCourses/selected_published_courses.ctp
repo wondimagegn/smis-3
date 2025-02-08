@@ -37,7 +37,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                 <th colspan="10"><?= "Select the course you want to publish."; ?></td>
                             </tr>
                             <tr>
-                                <th class="center">&nbsp;</th>
+                                <th class="center" style="width: 4%;">&nbsp;</th>
                                 <th class="center">#</th>
                                 <th class="center">Year</th>
                                 <th class="center">SEM</th>
@@ -46,7 +46,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                 <th class="center">Prerequisite </th>
                                 <th class="center">Credit </th>
                                 <th class="center">L T L</th>
-                                <th class="center">Elective</th>
+                                <th class="center" style="width:7%;">Elective</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -58,7 +58,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                     if (isset($published_courses_disable_not_to_published[$section_id]) && in_array($vc['Course']['id'], $published_courses_disable_not_to_published[$section_id])) {
                                         echo '<td class="center">**</td>';
                                     } else {
-                                        echo '<td class="center">' . $this->Form->checkbox('Course.' . $section_id . '.' . $vc['Course']['id']) . '</td>';
+                                        echo '<td class="center"><div style="padding-left: 25%;">' . $this->Form->checkbox('Course.' . $section_id . '.' . $vc['Course']['id']) . '</div></td>';
                                     } ?>
                                     <td class="center"><?= $count; ?></td>
                                     <td class="center"><?= $vc['YearLevel']['name']; ?></td>
@@ -109,7 +109,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                         echo '<td class="center">**</td>';
                                     } else {
                                         //echo "<td class="center">".$this->Form->input('Course.'.$section_id.'.elective.'.$vc['Course']['id'].'', array('type' => 'checkbox', 'label' => false))."</td>";
-                                        echo '<td> <div style="padding-left: 25px;">' . $this->Form->checkbox('Elective.' . $section_id . '.' . $vc['Course']['id'], array('checked' => (isset($vc['Course']['elective']) && $vc['Course']['elective'] == 1 ? 'checked': false))) . '</div></td>';
+                                        echo '<td><div style="padding-left: 40%;">' . $this->Form->checkbox('Elective.' . $section_id . '.' . $vc['Course']['id'], array('checked' => (isset($vc['Course']['elective']) && $vc['Course']['elective'] == 1 ? 'checked': false))) . '</div></td>';
                                     } ?>
 
                                 </tr>
@@ -166,7 +166,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                     <th colspan="8"><?php echo "Section: " . $selected_section[$section_id]; ?></td>
                                 </tr>
                                 <tr>
-                                    <th class="center">&nbsp;</th>
+                                    <th class="center" style="width: 4%;">&nbsp;</th>
                                     <th class="center">#</th>
                                     <th class="center">Year </th>
                                     <th class="center">SEM</th>
@@ -175,7 +175,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                     <th class="center">Prerequisite</th>
                                     <th class="center">Credit</th>
                                     <th class="center">L T L</th>
-                                    <th class="center">Elective</th>
+                                    <th class="center" style="width: 7%;">Elective</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -183,7 +183,7 @@ if ($this->Session->read('candidate_publish_courses')) {
                                 $count = 1;
                                 foreach ($coursss as $kc => $vc) { ?>
                                     <tr>
-                                        <td class="center"><?= $this->Form->checkbox('Course.' . $section_id . '.' . $vc['Course']['id']); ?></td>
+                                        <td class="center"><div style="padding-left: 15%;"><?= $this->Form->checkbox('Course.' . $section_id . '.' . $vc['Course']['id']); ?></div></td>
                                         <td class="center"><?= $count; ?></td>
                                         <td class="center"><?= $vc['YearLevel']['name']; ?></td>
                                         <td class="center"><?= $vc['Course']['semester']; ?></td>

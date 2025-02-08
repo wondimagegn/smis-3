@@ -1,98 +1,74 @@
 <?php
-class PositionsController extends AppController {
-	var $name = 'Positions';
-	var $menuOptions = array(
-		'parent' => 'mainDatas',
-		'alias' => array(
-			'index' => 'View Position',
-			'add' => 'Add Position',
-		)
-	);
-	function index() 
-	{
-		$this->Position->recursive = 0;
-		$this->set('positions', $this->paginate());
-	}
+namespace App\Controller;
 
-	function view($id = null)
-	{
-		if (!$id) {
-			$this->Flash->error(__('Invalid position'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('position', $this->Position->read(null, $id));
-	}
+use App\Controller\AppController;
 
-	function add()
-	{
-		if (!empty($this->request->data)) {
+class PositionsController extends AppController
+{
 
-			if (!empty($this->request->data['Position']['applicable_educations'])) {
-				$this->request->data['Position']['applicable_educations'] = serialize($this->request->data['Position']['applicable_educations']);
-			}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => [],
+        ];
+        $positions = $this->paginate($this->Positions);
 
-			$this->Position->create();
+        $this->set(compact('positions'));
+    }
 
-			if ($this->Position->save($this->request->data)) {
-				$this->Flash->success(__('The position has been saved') .' '. $this->Position->name);
-				$this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error(__('The position could not be saved. Please, try again.'));
-			}
-		}
-		
-		$serviceWings = $this->Position->ServiceWing->find('list', array('conditions' => array('ServiceWing.active' => 1)));
-		$applicableEducations = ClassRegistry::init('Education')->find('list', array('conditions' => array('Education.active' => 1)));
+    public function view($id = null)
+    {
+        $position = $this->Positions->get($id, [
+            'contain' => ['ServiceWings', 'Staffs'],
+        ]);
 
-		$this->set(compact('applicableEducations', 'serviceWings'));
-	}
+        $this->set('position', $position);
+    }
 
-	function edit($id = null) 
-	{
-		if (!$id && empty($this->request->data)) {
-			$this->Flash->error(__('Invalid position'));
-			return $this->redirect(array('action' => 'index'));
-		}
+    public function add()
+    {
+        $position = $this->Positions->newEntity();
+        if ($this->request->is('post')) {
+            $position = $this->Positions->patchEntity($position, $this->request->getData());
+            if ($this->Positions->save($position)) {
+                $this->Flash->success(__('The position has been saved.'));
 
-		if (!empty($this->request->data)) {
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The position could not be saved. Please, try again.'));
+        }
 
-			if (!empty($this->request->data['Position']['applicable_educations'])) {
-				$this->request->data['Position']['applicable_educations'] = serialize($this->request->data['Position']['applicable_educations']);
-			}
+        $this->set(compact('position', 'serviceWings'));
+    }
 
-			if ($this->Position->save($this->request->data)) {
-				$this->Flash->success(__('The position has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error(__('The position could not be saved. Please, try again.'));
-			}
-		}
+    public function edit($id = null)
+    {
+        $position = $this->Positions->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $position = $this->Positions->patchEntity($position, $this->request->getData());
+            if ($this->Positions->save($position)) {
+                $this->Flash->success(__('The position has been saved.'));
 
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Position->read(null, $id);
-			if (!empty($this->request->data['Position']['applicable_educations'])) {
-				$this->request->data['Position']['applicable_educations'] = unserialize($this->request->data['Position']['applicable_educations']);
-			}
-		}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The position could not be saved. Please, try again.'));
+        }
+        $this->set(compact('position'));
+    }
 
-		$serviceWings = $this->Position->ServiceWing->find('list', array('conditions' => array('ServiceWing.active' => 1)));
-		$applicableEducations = ClassRegistry::init('Education')->find('list', array('conditions' => array('Education.active' => 1)));
-		$this->set(compact('applicableEducations', 'serviceWings'));
-	}
 
-	function delete($id = null) 
-	{
-		if (!$id) {
-			$this->Flash->error(__('Invalid id for position'));
-			return $this->redirect(array('action'=>'index'));
-		}
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $position = $this->Positions->get($id);
+        if ($this->Positions->delete($position)) {
+            $this->Flash->success(__('The position has been deleted.'));
+        } else {
+            $this->Flash->error(__('The position could not be deleted. Please, try again.'));
+        }
 
-		if ($this->Position->delete($id)) {
-			$this->Flash->success(__('Position deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-
-		$this->Flash->error(__('Position was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        return $this->redirect(['action' => 'index']);
+    }
 }

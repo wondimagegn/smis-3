@@ -1,60 +1,69 @@
 <?php
+namespace App\Controller;
+
+use App\Controller\AppController;
+
 class StudyProgramsController extends AppController
 {
-	var $name = 'StudyPrograms';
-	//var $helpers = array('Xls', 'Media.Media');
-	//var $components = array('AcademicYear', 'EthiopicDateTime');
 
-	public $menuOptions = array(
-		'parent' => 'curriculums',
-		'exclude' => array(
-			//'index',
-		),
-		'alias' => array(
-			'index' => 'List Study Programs',
-            'add' => 'Add Study Program',
-		)
-	);
+    public function index()
+    {
+        $studyPrograms = $this->paginate($this->StudyPrograms);
 
-	public $paginate = array();
+        $this->set(compact('studyPrograms'));
+    }
 
-	public function beforeFilter()
-	{
-		parent::beforeFilter();
-		$this->Auth->Allow('index');
-	}
+    public function view($id = null)
+    {
+        $studyProgram = $this->StudyPrograms->get($id, [
+            'contain' => ['DepartmentStudyPrograms'],
+        ]);
 
-	public function beforeRender()
-	{
-		//$thisacademicyear = $this->AcademicYear->current_academicyear();
-	}
+        $this->set('studyProgram', $studyProgram);
+    }
 
-	public function index()
-	{
-		//$this->StudyProgram->recursive = 0;
+    public function add()
+    {
+        $studyProgram = $this->StudyPrograms->newEntity();
+        if ($this->request->is('post')) {
+            $studyProgram = $this->StudyPrograms->patchEntity($studyProgram, $this->request->getData());
+            if ($this->StudyPrograms->save($studyProgram)) {
+                $this->Flash->success(__('The study program has been saved.'));
 
-		$this->Paginator->settings =  array('limit' => 100, 'maxLimit' => 1000, 'order' => array('StudyProgram.study_program_name' => 'ASC', 'StudyProgram.code', 'Section.ISCED_band'), 'recursive' => 0);
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The study program could not be saved. Please, try again.'));
+        }
+        $this->set(compact('studyProgram'));
+    }
 
-		$this->set('studyPrograms', $this->paginate('StudyProgram'));
-	}
+    public function edit($id = null)
+    {
+        $studyProgram = $this->StudyPrograms->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $studyProgram = $this->StudyPrograms->patchEntity($studyProgram, $this->request->getData());
+            if ($this->StudyPrograms->save($studyProgram)) {
+                $this->Flash->success(__('The study program has been saved.'));
 
-	public function view($id = null)
-	{
-		
-	}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The study program could not be saved. Please, try again.'));
+        }
+        $this->set(compact('studyProgram'));
+    }
 
-	public function add()
-	{
-		
-	}
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $studyProgram = $this->StudyPrograms->get($id);
+        if ($this->StudyPrograms->delete($studyProgram)) {
+            $this->Flash->success(__('The study program has been deleted.'));
+        } else {
+            $this->Flash->error(__('The study program could not be deleted. Please, try again.'));
+        }
 
-	public function edit($id = null)
-	{
-		
-	}
-
-	public function delete($id = null)
-	{
-		
-	}
+        return $this->redirect(['action' => 'index']);
+    }
 }

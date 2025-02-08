@@ -1,72 +1,76 @@
 <?php
-class ExamSplitSectionsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'ExamSplitSections';
-	/*
-	function index() {
-		$this->ExamSplitSection->recursive = 0;
-		$this->set('examSplitSections', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid exam split section'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('examSplitSection', $this->ExamSplitSection->read(null, $id));
-	}
+class ExamSplitSectionsController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->ExamSplitSection->create();
-			if ($this->ExamSplitSection->save($this->request->data)) {
-				$this->Session->setFlash(__('The exam split section has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The exam split section could not be saved. Please, try again.'));
-			}
-		}
-		$sectionSplitForExams = $this->ExamSplitSection->SectionSplitForExam->find('list');
-		
-		$this->set(compact('sectionSplitForExams', 'students'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['SectionSplitForExams'],
+        ];
+        $examSplitSections = $this->paginate($this->ExamSplitSections);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid exam split section'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->ExamSplitSection->save($this->request->data)) {
-				$this->Session->setFlash(__('The exam split section has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The exam split section could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->ExamSplitSection->read(null, $id);
-		}
-		$sectionSplitForExams = $this->ExamSplitSection->SectionSplitForExam->find('list');
-		$students = $this->ExamSplitSection->Student->find('list');
-		$this->set(compact('sectionSplitForExams', 'students'));
-	}
-  */
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for exam split section'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->ExamSplitSection->delete($id)) {
-			
-			$this->Session->setFlash(__('<span></span> Exam split section deleted.',true),'default',array('class'=>'success-box success-message'));
+        $this->set(compact('examSplitSections'));
+    }
 
-			return $this->redirect(array('controller'=>'sectionSplitForExams','action'=>'index'));
-		}
-		
-		$this->Session->setFlash(__('<span></span> Exam split section was not deleted.',true),'default',array('class'=>'error-box error-message'));
 
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $examSplitSection = $this->ExamSplitSections->get($id, [
+            'contain' => ['SectionSplitForExams', 'Students', 'ExamSchedules'],
+        ]);
+
+        $this->set('examSplitSection', $examSplitSection);
+    }
+
+    public function add()
+    {
+        $examSplitSection = $this->ExamSplitSections->newEntity();
+        if ($this->request->is('post')) {
+            $examSplitSection = $this->ExamSplitSections->patchEntity($examSplitSection, $this->request->getData());
+            if ($this->ExamSplitSections->save($examSplitSection)) {
+                $this->Flash->success(__('The exam split section has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The exam split section could not be saved. Please, try again.'));
+        }
+         $this->set(compact('examSplitSection'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $examSplitSection = $this->ExamSplitSections->get($id, [
+            'contain' => ['Students'],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $examSplitSection = $this->ExamSplitSections->patchEntity($examSplitSection, $this->request->getData());
+            if ($this->ExamSplitSections->save($examSplitSection)) {
+                $this->Flash->success(__('The exam split section has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The exam split section could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('examSplitSection'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $examSplitSection = $this->ExamSplitSections->get($id);
+        if ($this->ExamSplitSections->delete($examSplitSection)) {
+            $this->Flash->success(__('The exam split section has been deleted.'));
+        } else {
+            $this->Flash->error(__('The exam split section could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }
-?>

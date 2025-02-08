@@ -1,12 +1,16 @@
 <?php
-App::uses('Component', 'Controller');
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Core\Configure;
 class TicketmasterComponent extends Component{
 	public $sitename='Arba Minch University Student Management Information System.';
 	//var $linkdomain='smis.dev';
 	//how many hours to honor token
 	public $hours=24;
 
-	public function __construct(ComponentCollection $collection,$settings = array()) {
+	public function __construct(ComponentRegistry $collection,$settings = array()) {
 		parent::__construct($collection, $settings);
 	}
 	public function initialize(Controller $controller) {

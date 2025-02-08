@@ -10,9 +10,12 @@
  * @package app
  * @subpackage app.controllers.components
  **/
-App::uses('Component', 'Controller');
-App::uses('Router', 'Routing');
-App::uses('CakeSession', 'Model/Datasource');
+namespace app\Controller\Component;
+
+use App\Model\Datasource\Session;
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Routing\Router;
 
 class AttemptComponent extends Component
 {
@@ -25,7 +28,7 @@ class AttemptComponent extends Component
 	// function initialize(&$controller, $options) {
 	// }
 
-	public function __construct(ComponentCollection $collection, $settings = array())
+	public function __construct(ComponentRegistry $collection, $settings = array())
 	{
 		parent::__construct($collection, $settings);
 	}

@@ -10,6 +10,11 @@
  * @license			http://www.opensource.org/licenses/mit-license.php The MIT License
  * @link            http://jamienay.com/code/math-captcha-component
  */
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+
 class MathCaptchaComponent extends Component {
 
     /**

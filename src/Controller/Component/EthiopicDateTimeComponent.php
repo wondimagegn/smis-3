@@ -1,5 +1,8 @@
 <?php
-App::uses('Component', 'Controller');
+namespace app\Controller\Component;
+
+use Cake\Controller\Controller;
+use Cake\Controller\Component;
 class EthiopicDateTimeComponent extends Component {
     public $Day=null;
     public $Month=null;
@@ -7,7 +10,7 @@ class EthiopicDateTimeComponent extends Component {
     public $EthTime=null;
     public $ErrorMessage=null;
 	
-    /* public function __construct(ComponentCollection $collection,$settings = array()) 
+    /* public function __construct(ComponentRegistry $collection,$settings = array()) 
     {
         parent::__construct($collection, $settings);
     } */

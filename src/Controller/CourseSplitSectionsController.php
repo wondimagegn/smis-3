@@ -1,68 +1,74 @@
 <?php
-class CourseSplitSectionsController extends AppController {
+namespace App\Controller;
 
-    var $name = 'CourseSplitSections';
-     var $menuOptions = array(
-	             'controllerButton' => false,
-                 'exclude'=>'*'
-    );
-	public function index() {
-		$this->CourseSplitSection->recursive = 0;
-		$this->set('courseSplitSections', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	public function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid course split section'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('courseSplitSection', $this->CourseSplitSection->read(null, $id));
-	}
+class CourseSplitSectionsController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->CourseSplitSection->create();
-			if ($this->CourseSplitSection->save($this->request->data)) {
-				$this->Session->setFlash(__('The course split section has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The course split section could not be saved. Please, try again.'));
-			}
-		}
-		$sectionSplitForPublishedCourses = $this->CourseSplitSection->SectionSplitForPublishedCourse->find('list');
-		$this->set(compact('sectionSplitForPublishedCourses'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['SectionSplitForPublishedCourses'],
+        ];
+        $courseSplitSections = $this->paginate($this->CourseSplitSections);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid course split section'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->CourseSplitSection->save($this->request->data)) {
-				$this->Session->setFlash(__('The course split section has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The course split section could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->CourseSplitSection->read(null, $id);
-		}
-		$sectionSplitForPublishedCourses = $this->CourseSplitSection->SectionSplitForPublishedCourse->find('list');
-		$this->set(compact('sectionSplitForPublishedCourses'));
-	}
+        $this->set(compact('courseSplitSections'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for course split section'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->CourseSplitSection->delete($id)) {
-			$this->Session->setFlash(__('Course split section deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Course split section was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+
+    public function view($id = null)
+    {
+        $courseSplitSection = $this->CourseSplitSections->get($id, [
+            'contain' => ['SectionSplitForPublishedCourses', 'Students', 'CourseInstructorAssignments', 'CourseSchedules', 'UnschedulePublishedCourses'],
+        ]);
+
+        $this->set('courseSplitSection', $courseSplitSection);
+    }
+
+    public function add()
+    {
+        $courseSplitSection = $this->CourseSplitSections->newEntity();
+        if ($this->request->is('post')) {
+            $courseSplitSection = $this->CourseSplitSections->patchEntity($courseSplitSection, $this->request->getData());
+            if ($this->CourseSplitSections->save($courseSplitSection)) {
+                $this->Flash->success(__('The course split section has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The course split section could not be saved. Please, try again.'));
+        }
+        $this->set(compact('courseSplitSection'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $courseSplitSection = $this->CourseSplitSections->get($id, [
+            'contain' => ['Students'],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $courseSplitSection = $this->CourseSplitSections->patchEntity($courseSplitSection, $this->request->getData());
+            if ($this->CourseSplitSections->save($courseSplitSection)) {
+                $this->Flash->success(__('The course split section has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The course split section could not be saved. Please, try again.'));
+        }
+        $this->set(compact('courseSplitSection'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $courseSplitSection = $this->CourseSplitSections->get($id);
+        if ($this->CourseSplitSections->delete($courseSplitSection)) {
+            $this->Flash->success(__('The course split section has been deleted.'));
+        } else {
+            $this->Flash->error(__('The course split section could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

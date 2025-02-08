@@ -1,67 +1,74 @@
 <?php
-class OffersController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Offers';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Offer->recursive = 0;
-		$this->set('offers', $this->paginate());
-	}
+class OffersController extends AppController
+{
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Departments', 'ProgramTypes'],
+        ];
+        $offers = $this->paginate($this->Offers);
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid offer'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('offer', $this->Offer->read(null, $id));
-	}
+        $this->set(compact('offers'));
+    }
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Offer->create();
-			if ($this->Offer->save($this->request->data)) {
-				$this->Session->setFlash(__('The offer has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The offer could not be saved. Please, try again.'));
-			}
-		}
-		$departments = $this->Offer->Department->find('list');
-		$programTypes = $this->Offer->ProgramType->find('list');
-		$this->set(compact('departments', 'programTypes'));
-	}
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid offer'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Offer->save($this->request->data)) {
-				$this->Session->setFlash(__('The offer has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The offer could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Offer->read(null, $id);
-		}
-		$departments = $this->Offer->Department->find('list');
-		$programTypes = $this->Offer->ProgramType->find('list');
-		$this->set(compact('departments', 'programTypes'));
-	}
+    public function view($id = null)
+    {
+        $offer = $this->Offers->get($id, [
+            'contain' => ['Departments', 'ProgramTypes'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for offer'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Offer->delete($id)) {
-			$this->Session->setFlash(__('Offer deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Offer was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('offer', $offer);
+    }
+
+    public function add()
+    {
+        $offer = $this->Offers->newEntity();
+        if ($this->request->is('post')) {
+            $offer = $this->Offers->patchEntity($offer, $this->request->getData());
+            if ($this->Offers->save($offer)) {
+                $this->Flash->success(__('The offer has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The offer could not be saved. Please, try again.'));
+        }
+        $this->set(compact('offer'));
+    }
+
+    public function edit($id = null)
+    {
+        $offer = $this->Offers->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $offer = $this->Offers->patchEntity($offer, $this->request->getData());
+            if ($this->Offers->save($offer)) {
+                $this->Flash->success(__('The offer has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The offer could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('offer'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $offer = $this->Offers->get($id);
+        if ($this->Offers->delete($offer)) {
+            $this->Flash->success(__('The offer has been deleted.'));
+        } else {
+            $this->Flash->error(__('The offer could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

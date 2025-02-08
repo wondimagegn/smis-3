@@ -132,8 +132,7 @@
 							if (sizeof($vch['children']) == 0) {
 								$string .= $this->Html->link($vch['title'] . '', '/' . $vch['url']['controller'] . '/' . $vch['url']['action']);
 							} else {
-								$string .= '<a href="#" style="color:white;" title=' . $vch['title'] . '> <span>' .
-									$vch['title'] . '</span></a>';
+								$string .= '<a href="#" style="color:white;" title=' . $vch['title'] . '> <span>' . $vch['title'] . '</span></a>';
 								if (sizeof($vch['children']) != 0) {
 									$string .= '<ul style="border-radius: 0px;">';
 									$string .= '<li style="text-align: left;">' . $this->Html->link(

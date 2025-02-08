@@ -1,61 +1,75 @@
 <?php
-class HigherEducationBackgroundsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'HigherEducationBackgrounds';
+use App\Controller\AppController;
 
-	function index() {
-		$this->HigherEducationBackground->recursive = 0;
-		$this->set('higherEducationBackgrounds', $this->paginate());
-	}
+class HigherEducationBackgroundsController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid higher education background'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('higherEducationBackground', $this->HigherEducationBackground->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Students'],
+        ];
+        $higherEducationBackgrounds = $this->paginate($this->HigherEducationBackgrounds);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->HigherEducationBackground->create();
-			if ($this->HigherEducationBackground->save($this->request->data)) {
-				$this->Session->setFlash(__('The higher education background has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The higher education background could not be saved. Please, try again.'));
-			}
-		}
-	}
+        $this->set(compact('higherEducationBackgrounds'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid higher education background'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->HigherEducationBackground->save($this->request->data)) {
-				$this->Session->setFlash(__('The higher education background has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The higher education background could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->HigherEducationBackground->read(null, $id);
-		}
-	}
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for higher education background'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->HigherEducationBackground->delete($id)) {
-			$this->Session->setFlash(__('Higher education background deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Higher education background was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $higherEducationBackground = $this->HigherEducationBackgrounds->get($id, [
+            'contain' => ['Students'],
+        ]);
+
+        $this->set('higherEducationBackground', $higherEducationBackground);
+    }
+
+    public function add()
+    {
+        $higherEducationBackground = $this->HigherEducationBackgrounds->newEntity();
+        if ($this->request->is('post')) {
+            $higherEducationBackground = $this->HigherEducationBackgrounds->patchEntity($higherEducationBackground, $this->request->getData());
+            if ($this->HigherEducationBackgrounds->save($higherEducationBackground)) {
+                $this->Flash->success(__('The higher education background has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The higher education background could not be saved. Please, try again.'));
+        }
+        $this->set(compact('higherEducationBackground'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $higherEducationBackground = $this->HigherEducationBackgrounds->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $higherEducationBackground = $this->HigherEducationBackgrounds->patchEntity($higherEducationBackground, $this->request->getData());
+            if ($this->HigherEducationBackgrounds->save($higherEducationBackground)) {
+                $this->Flash->success(__('The higher education background has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The higher education background could not be saved. Please, try again.'));
+        }
+        $this->set(compact('higherEducationBackground'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $higherEducationBackground = $this->HigherEducationBackgrounds->get($id);
+        if ($this->HigherEducationBackgrounds->delete($higherEducationBackground)) {
+            $this->Flash->success(__('The higher education background has been deleted.'));
+        } else {
+            $this->Flash->error(__('The higher education background could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

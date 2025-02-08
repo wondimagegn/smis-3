@@ -1,65 +1,73 @@
 <?php
-class WithdrawalsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Withdrawals';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Withdrawal->recursive = 0;
-		$this->set('withdrawals', $this->paginate());
-	}
+class WithdrawalsController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid withdrawal'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('withdrawal', $this->Withdrawal->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Students'],
+        ];
+        $withdrawals = $this->paginate($this->Withdrawals);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Withdrawal->create();
-			if ($this->Withdrawal->save($this->request->data)) {
-				$this->Session->setFlash(__('The withdrawal has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The withdrawal could not be saved. Please, try again.'));
-			}
-		}
-		$students = $this->Withdrawal->Student->find('list');
-		$this->set(compact('students'));
-	}
+        $this->set(compact('withdrawals'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid withdrawal'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Withdrawal->save($this->request->data)) {
-				$this->Session->setFlash(__('The withdrawal has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The withdrawal could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Withdrawal->read(null, $id);
-		}
-		$students = $this->Withdrawal->Student->find('list');
-		$this->set(compact('students'));
-	}
+    public function view($id = null)
+    {
+        $withdrawal = $this->Withdrawals->get($id, [
+            'contain' => ['Students'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for withdrawal'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Withdrawal->delete($id)) {
-			$this->Session->setFlash(__('Withdrawal deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Withdrawal was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('withdrawal', $withdrawal);
+    }
+
+    public function add()
+    {
+        $withdrawal = $this->Withdrawals->newEntity();
+        if ($this->request->is('post')) {
+            $withdrawal = $this->Withdrawals->patchEntity($withdrawal, $this->request->getData());
+            if ($this->Withdrawals->save($withdrawal)) {
+                $this->Flash->success(__('The withdrawal has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The withdrawal could not be saved. Please, try again.'));
+        }
+        $this->set(compact('withdrawal'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $withdrawal = $this->Withdrawals->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $withdrawal = $this->Withdrawals->patchEntity($withdrawal, $this->request->getData());
+            if ($this->Withdrawals->save($withdrawal)) {
+                $this->Flash->success(__('The withdrawal has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The withdrawal could not be saved. Please, try again.'));
+        }
+        $this->set(compact('withdrawal'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $withdrawal = $this->Withdrawals->get($id);
+        if ($this->Withdrawals->delete($withdrawal)) {
+            $this->Flash->success(__('The withdrawal has been deleted.'));
+        } else {
+            $this->Flash->error(__('The withdrawal could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

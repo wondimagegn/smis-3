@@ -15,12 +15,19 @@
  * @author Mark Story <mark@mark-story.com>
  * @license http://www.opensource.org/licenses/mit-license.php The MIT License
  */
+namespace app\Controller\Component;
 
-App::uses('Component', 'Controller');
-App::uses('Folder', 'Utility');
+use App\Utility\Folder;
+use Cake\Cache\Cache;
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Core\App;
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+
 class MenuOptimizedComponent extends Component
 {
-	public function __construct(ComponentCollection $collection, $settings = array())
+	public function __construct(ComponentRegistry $collection, $settings = array())
 	{
 		parent::__construct($collection, $settings);
 	}

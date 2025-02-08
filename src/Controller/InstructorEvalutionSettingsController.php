@@ -1,56 +1,71 @@
 <?php
-App::uses('AppController', 'Controller');
+namespace App\Controller;
+
+use App\Controller\AppController;
+
 class InstructorEvalutionSettingsController extends AppController
 {
-	var $menuOptions = array(
-		'parent' => 'evalution',
-		'exclude' => array('index'),
-		'alias' => array(
-			'view_ss' => 'Instructor Evaluation Settings',
-		)
-	);
 
-	public $components = array('AcademicYear');
+    public function index()
+    {
+        $instructorEvalutionSettings = $this->paginate($this->InstructorEvalutionSettings);
 
-	public function beforeFilter()
-	{
-		parent::beforeFilter();
-		//$this->Auth->Allow();
-	}
+        $this->set(compact('instructorEvalutionSettings'));
+    }
 
-	function beforeRender()
-	{
-		$acyear_array_data = $this->AcademicYear->acyear_array();
-		//To diplay current academic year as default in drop down list
-		$defaultacademicyear = $this->AcademicYear->current_academicyear();
-		$this->set(compact('acyear_array_data', 'defaultacademicyear'));
-		unset($this->request->data['User']['password']);
-	}
+    public function view($id = null)
+    {
+        $instructorEvalutionSetting = $this->InstructorEvalutionSettings->get($id, [
+            'contain' => [],
+        ]);
 
-	public function index()
-	{
-		return $this->redirect(array('action' => 'view_ss'));
-	}
+        $this->set('instructorEvalutionSetting', $instructorEvalutionSetting);
+    }
 
-	function view_ss()
-	{
-		$this->set('instructorEvalutionSetting', $this->InstructorEvalutionSetting->find('first', array('order' => array('InstructorEvalutionSetting.academic_year' => 'DESC'))));
-	}
+    public function add()
+    {
+        $instructorEvalutionSetting = $this->InstructorEvalutionSettings->newEntity();
+        if ($this->request->is('post')) {
+            $instructorEvalutionSetting = $this->InstructorEvalutionSettings->patchEntity($instructorEvalutionSetting, $this->request->getData());
+            if ($this->InstructorEvalutionSettings->save($instructorEvalutionSetting)) {
+                $this->Flash->success(__('The instructor evalution setting has been saved.'));
 
-	public function edit()
-	{
-		if (!empty($this->request->data)) {
-			if ($this->InstructorEvalutionSetting->save($this->request->data)) {
-				$this->Flash->success( __('Instructor Evaluation setting has been updated.'));
-				return $this->redirect(array('action' => 'view_ss'));
-			} else {
-				$this->Flash->error(__('Instructor evaluation setting could not be updated. Please, try again.'));
-			}
-		}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The instructor evalution setting could not be saved. Please, try again.'));
+        }
+        $this->set(compact('instructorEvalutionSetting'));
+    }
 
-		if (empty($this->request->data)) {
-			$this->request->data = $this->InstructorEvalutionSetting->find('first', array('order' => array('InstructorEvalutionSetting.academic_year DESC')));
-		}
-	}
 
+    public function edit($id = null)
+    {
+        $instructorEvalutionSetting = $this->InstructorEvalutionSettings->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $instructorEvalutionSetting = $this->InstructorEvalutionSettings->patchEntity($instructorEvalutionSetting, $this->request->getData());
+            if ($this->InstructorEvalutionSettings->save($instructorEvalutionSetting)) {
+                $this->Flash->success(__('The instructor evalution setting has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The instructor evalution setting could not be saved. Please, try again.'));
+        }
+        $this->set(compact('instructorEvalutionSetting'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $instructorEvalutionSetting = $this->InstructorEvalutionSettings->get($id);
+        if ($this->InstructorEvalutionSettings->delete($instructorEvalutionSetting)) {
+            $this->Flash->success(__('The instructor evalution setting has been deleted.'));
+        } else {
+            $this->Flash->error(__('The instructor evalution setting could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

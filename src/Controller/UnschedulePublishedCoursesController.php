@@ -1,70 +1,73 @@
 <?php
-class UnschedulePublishedCoursesController extends AppController {
+namespace App\Controller;
 
-	var $name = 'UnschedulePublishedCourses';
-      var $menuOptions = array(
-	             'controllerButton' => false,
-                 'exclude'=>'*'
-            );
-	function index() {
-		$this->UnschedulePublishedCourse->recursive = 0;
-		$this->set('unschedulePublishedCourses', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid unschedule published course'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('unschedulePublishedCourse', $this->UnschedulePublishedCourse->read(null, $id));
-	}
+class UnschedulePublishedCoursesController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->UnschedulePublishedCourse->create();
-			if ($this->UnschedulePublishedCourse->save($this->request->data)) {
-				$this->Session->setFlash(__('The unschedule published course has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The unschedule published course could not be saved. Please, try again.'));
-			}
-		}
-		$publishedCourses = $this->UnschedulePublishedCourse->PublishedCourse->find('list');
-		$courseSplitSections = $this->UnschedulePublishedCourse->CourseSplitSection->find('list');
-		$this->set(compact('publishedCourses', 'courseSplitSections'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['PublishedCourses', 'CourseSplitSections'],
+        ];
+        $unschedulePublishedCourses = $this->paginate($this->UnschedulePublishedCourses);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid unschedule published course'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->UnschedulePublishedCourse->save($this->request->data)) {
-				$this->Session->setFlash(__('The unschedule published course has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The unschedule published course could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->UnschedulePublishedCourse->read(null, $id);
-		}
-		$publishedCourses = $this->UnschedulePublishedCourse->PublishedCourse->find('list');
-		$courseSplitSections = $this->UnschedulePublishedCourse->CourseSplitSection->find('list');
-		$this->set(compact('publishedCourses', 'courseSplitSections'));
-	}
+        $this->set(compact('unschedulePublishedCourses'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for unschedule published course'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->UnschedulePublishedCourse->delete($id)) {
-			$this->Session->setFlash(__('Unschedule published course deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Unschedule published course was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $unschedulePublishedCourse = $this->UnschedulePublishedCourses->get($id, [
+            'contain' => ['PublishedCourses', 'CourseSplitSections'],
+        ]);
+
+        $this->set('unschedulePublishedCourse', $unschedulePublishedCourse);
+    }
+
+
+    public function add()
+    {
+        $unschedulePublishedCourse = $this->UnschedulePublishedCourses->newEntity();
+        if ($this->request->is('post')) {
+            $unschedulePublishedCourse = $this->UnschedulePublishedCourses->patchEntity($unschedulePublishedCourse, $this->request->getData());
+            if ($this->UnschedulePublishedCourses->save($unschedulePublishedCourse)) {
+                $this->Flash->success(__('The unschedule published course has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The unschedule published course could not be saved. Please, try again.'));
+        }
+       $this->set(compact('unschedulePublishedCourse'));
+    }
+
+    public function edit($id = null)
+    {
+        $unschedulePublishedCourse = $this->UnschedulePublishedCourses->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $unschedulePublishedCourse = $this->UnschedulePublishedCourses->patchEntity($unschedulePublishedCourse, $this->request->getData());
+            if ($this->UnschedulePublishedCourses->save($unschedulePublishedCourse)) {
+                $this->Flash->success(__('The unschedule published course has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The unschedule published course could not be saved. Please, try again.'));
+        }
+        $this->set(compact('unschedulePublishedCourse'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $unschedulePublishedCourse = $this->UnschedulePublishedCourses->get($id);
+        if ($this->UnschedulePublishedCourses->delete($unschedulePublishedCourse)) {
+            $this->Flash->success(__('The unschedule published course has been deleted.'));
+        } else {
+            $this->Flash->error(__('The unschedule published course could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

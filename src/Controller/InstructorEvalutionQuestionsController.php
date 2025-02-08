@@ -1,150 +1,69 @@
 <?php
-App::uses('AppController', 'Controller');
-/**
- * InstructorEvalutionQuestions Controller
- *
- * @property InstructorEvalutionQuestion $InstructorEvalutionQuestion
- * @property PaginatorComponent $Paginator
- */
-class InstructorEvalutionQuestionsController extends AppController {
-	  public $menuOptions = array(
+namespace App\Controller;
 
-			'parent' => 'evalution',
-	
-			'alias' => array(
-			    'add'=>'Add Evalution Question',
-			    'index'=>'View Evalution Questions'
-			)
+use App\Controller\AppController;
 
-		);
-			
-	  public $paginate=array();
-/**
- * Components
- *
- * @var array
- */
-	public $components = array('Paginator');
+class InstructorEvalutionQuestionsController extends AppController
+{
 
-	 public function beforeFilter() {
-	     parent::beforeFilter();
-	    // $this->Auth->Allow();
-	
-     }
+    public function index()
+    {
+        $instructorEvalutionQuestions = $this->paginate($this->InstructorEvalutionQuestions);
 
-/**
- * index method
- *
- * @return void
- */
-	public function index() {
-		$options=array();
-		$this->InstructorEvalutionQuestion->recursive = 0;
-	
-		if(!empty($this->request->data['InstructorEvalutionQuestion']['for'])){
-			$options['conditions']['InstructorEvalutionQuestion.for']=$this->request->data['InstructorEvalutionQuestion']['for'];
-		}
-		if(!empty($this->request->data['InstructorEvalutionQuestion']['type'])){
-			$options['conditions']['InstructorEvalutionQuestion.type']=$this->request->data['InstructorEvalutionQuestion']['type'];
-		}
-		if(!empty($this->request->data['search'])){
-			debug($options);
-			if(!empty($options)){
-				$this->paginate['conditions']=$options['conditions'];
-				$this->Paginator->settings=$this->paginate;
-		  		$instructorEvalutionQuestions=$this->Paginator->paginate();
-			}
-		  	
-		} else {
-				$instructorEvalutionQuestions=$this->Paginator->paginate();
-		} 
-		$this->set('instructorEvalutionQuestions', $instructorEvalutionQuestions);
-	}
+        $this->set(compact('instructorEvalutionQuestions'));
+    }
 
-/**
- * view method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function view($id = null) {
-		if (!$this->InstructorEvalutionQuestion->exists($id)) {
-			throw new NotFoundException(__('Invalid instructor evalution question'));
-		}
-		$options = array('conditions' => array('InstructorEvalutionQuestion.' . $this->InstructorEvalutionQuestion->primaryKey => $id));
-		$this->set('instructorEvalutionQuestion', $this->InstructorEvalutionQuestion->find('first', $options));
-	}
+    public function view($id = null)
+    {
+        $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->get($id, [
+            'contain' => ['ColleagueEvalutionRates', 'StudentEvalutionComments', 'StudentEvalutionRates'],
+        ]);
 
-/**
- * add method
- *
- * @return void
- */
-	public function add() {
-		if ($this->request->is('post')) {
-			$this->InstructorEvalutionQuestion->create();
-			if ($this->InstructorEvalutionQuestion->save($this->request->data)) {
-				
-				$this->Session->setFlash('<span></span>'.__('The instructor evalution question has been saved.'),'default',array('class'=>'success-box success-message'));
+        $this->set('instructorEvalutionQuestion', $instructorEvalutionQuestion);
+    }
 
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				
-				$this->Session->setFlash('<span></span>'.__('The instructor evalution question could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
-			}
-		}
-	}
+    public function add()
+    {
+        $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->newEntity();
+        if ($this->request->is('post')) {
+            $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->patchEntity($instructorEvalutionQuestion, $this->request->getData());
+            if ($this->InstructorEvalutionQuestions->save($instructorEvalutionQuestion)) {
+                $this->Flash->success(__('The instructor evalution question has been saved.'));
 
-/**
- * edit method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function edit($id = null) {
-		if (!$this->InstructorEvalutionQuestion->exists($id)) {
-			throw new NotFoundException(__('Invalid instructor evalution question'));
-		}
-		if ($this->request->is(array('post', 'put'))) {
-			if ($this->InstructorEvalutionQuestion->save($this->request->data)) {
-			
-				$this->Session->setFlash('<span></span>'.__('The instructor evalution question has been saved.'),'default',array('class'=>'success-box success-message'));
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The instructor evalution question could not be saved. Please, try again.'));
+        }
+        $this->set(compact('instructorEvalutionQuestion'));
+    }
 
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				
-				$this->Session->setFlash('<span></span>'.__('The instructor evalution question could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
+    public function edit($id = null)
+    {
+        $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->patchEntity($instructorEvalutionQuestion, $this->request->getData());
+            if ($this->InstructorEvalutionQuestions->save($instructorEvalutionQuestion)) {
+                $this->Flash->success(__('The instructor evalution question has been saved.'));
 
-			}
-		} else {
-			$options = array('conditions' => array('InstructorEvalutionQuestion.' . $this->InstructorEvalutionQuestion->primaryKey => $id));
-			$this->request->data = $this->InstructorEvalutionQuestion->find('first', $options);
-		}
-	}
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The instructor evalution question could not be saved. Please, try again.'));
+        }
+        $this->set(compact('instructorEvalutionQuestion'));
+    }
 
-/**
- * delete method
- *
- * @throws NotFoundException
- * @param string $id
- * @return void
- */
-	public function delete($id = null) {
-		$this->InstructorEvalutionQuestion->id = $id;
-		if (!$this->InstructorEvalutionQuestion->exists()) {
-			throw new NotFoundException(__('Invalid instructor evalution question'));
-		}
-		$this->request->allowMethod('post', 'delete');
-		if ($this->InstructorEvalutionQuestion->delete()) {
-			
-			$this->Session->setFlash('<span></span>'.__('The instructor evalution question has been deleted.'),'default',array('class'=>'success-box success-message'));
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $instructorEvalutionQuestion = $this->InstructorEvalutionQuestions->get($id);
+        if ($this->InstructorEvalutionQuestions->delete($instructorEvalutionQuestion)) {
+            $this->Flash->success(__('The instructor evalution question has been deleted.'));
+        } else {
+            $this->Flash->error(__('The instructor evalution question could not be deleted. Please, try again.'));
+        }
 
-
-		} else {
-			$this->Session->setFlash('<span></span>'.__('The instructor evalution question could not be deleted. Please, try again.'),'default',array('class'=>'error-box error-message'));
-		}
-		return $this->redirect(array('action' => 'index'));
-	}
+        return $this->redirect(['action' => 'index']);
+    }
 }

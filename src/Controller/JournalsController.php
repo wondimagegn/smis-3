@@ -1,65 +1,72 @@
 <?php
-class JournalsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Journals';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Journal->recursive = 0;
-		$this->set('journals', $this->paginate());
-	}
+class JournalsController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid journal'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('journal', $this->Journal->read(null, $id));
-	}
+    public function index()
+    {
+        $journals = $this->paginate($this->Journals);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Journal->create();
-			if ($this->Journal->save($this->request->data)) {
-				$this->Session->setFlash(__('The journal has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The journal could not be saved. Please, try again.'));
-			}
-		}
-		$courses = $this->Journal->Course->find('list');
-		$this->set(compact('courses'));
-	}
+        $this->set(compact('journals'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid journal'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Journal->save($this->request->data)) {
-				$this->Session->setFlash(__('The journal has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The journal could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Journal->read(null, $id);
-		}
-		$courses = $this->Journal->Course->find('list');
-		$this->set(compact('courses'));
-	}
+    public function view($id = null)
+    {
+        $journal = $this->Journals->get($id, [
+            'contain' => ['Courses'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for journal'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Journal->delete($id)) {
-			$this->Session->setFlash(__('Journal deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Journal was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('journal', $journal);
+    }
+
+    public function add()
+    {
+        $journal = $this->Journals->newEntity();
+        if ($this->request->is('post')) {
+            $journal = $this->Journals->patchEntity($journal, $this->request->getData());
+            if ($this->Journals->save($journal)) {
+                $this->Flash->success(__('The journal has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The journal could not be saved. Please, try again.'));
+        }
+        $this->set(compact('journal'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $journal = $this->Journals->get($id, [
+            'contain' => ['Courses'],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $journal = $this->Journals->patchEntity($journal, $this->request->getData());
+            if ($this->Journals->save($journal)) {
+                $this->Flash->success(__('The journal has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The journal could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('journal'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $journal = $this->Journals->get($id);
+        if ($this->Journals->delete($journal)) {
+            $this->Flash->success(__('The journal has been deleted.'));
+        } else {
+            $this->Flash->error(__('The journal could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

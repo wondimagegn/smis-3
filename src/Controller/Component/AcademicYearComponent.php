@@ -1,5 +1,9 @@
 <?php
-App::uses('Component', 'Controller');
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Core\Configure;
 class AcademicYearComponent extends Component
 {
     var $acyear;
@@ -13,7 +17,7 @@ class AcademicYearComponent extends Component
     {
     }
 
-    public function __construct(ComponentCollection $collection = null, $settings = array())
+    public function __construct(ComponentRegistry $collection = null, $settings = array())
     {
         parent::__construct($collection, $settings);
     }

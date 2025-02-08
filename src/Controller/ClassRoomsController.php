@@ -1,78 +1,75 @@
 <?php
-class ClassRoomsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'ClassRooms';
-	var $menuOptions = array(
-		'controllerButton' => false,
-	);
-	function index() {
-		$this->ClassRoom->recursive = 0;
-		$this->set('classRooms', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid class room'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('classRoom', $this->ClassRoom->read(null, $id));
-	}
+class ClassRoomsController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->ClassRoom->create();
-			if ($this->ClassRoom->save($this->request->data)) {
-				$this->Session->setFlash(__('The class room has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The class room could not be saved. Please, try again.'));
-			}
-		}
-		$classRoomBlocks = $this->ClassRoom->ClassRoomBlock->find('list');
-		$this->set(compact('classRoomBlocks'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['ClassRoomBlocks'],
+        ];
+        $classRooms = $this->paginate($this->ClassRooms);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid class room'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->ClassRoom->save($this->request->data)) {
-				$this->Session->setFlash(__('The class room has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The class room could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->ClassRoom->read(null, $id);
-		}
-		$classRoomBlocks = $this->ClassRoom->ClassRoomBlock->find('list');
-		$this->set(compact('classRoomBlocks'));
-	}
+        $this->set(compact('classRooms'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for class room'));
-			return $this->redirect(array('controller'=>'class_room_blocks','action'=>'view',$id));
-		}
-		//Before delete class room check this class room is not used in any constranint or schedule
-		$is_ever_used = $this->ClassRoom->is_this_class_room_used_in_others_related_table($id);
-		if($is_ever_used == false){
-			if ($this->ClassRoom->delete($id)) {
-				$this->Session->setFlash(__('Class room deleted'));
-				return $this->redirect(array('controller'=>'class_room_blocks','action'=>'view',$id));
-			}
-			$this->Session->setFlash(__('Class room was not deleted'));
-			return $this->redirect(array('controller'=>'class_room_blocks','action'=>'view',$id));
-		} else {
-			$error=$this->ClassRoom->invalidFields();
-             if(isset($error['delete_class_rom'])){
-				$this->Session->setFlash('<span></span>'.__('You can not delete this class room, Since '.$error['delete_class_rom'][0]),'default',array('class'=>'error-box error-message'));
-				return $this->redirect(array('controller'=>'classRoomBlocks','action'=>'view',$id));
-			}
-		}
-	}
+
+    public function view($id = null)
+    {
+        $classRoom = $this->ClassRooms->get($id, [
+            'contain' => ['ClassRoomBlocks', 'ClassRoomClassPeriodConstraints', 'ClassRoomCourseConstraints', 'CourseSchedules', 'ExamRoomConstraints', 'ExamRoomCourseConstraints', 'ExamRoomNumberOfInvigilators', 'ExamSchedules', 'ProgramProgramTypeClassRooms'],
+        ]);
+
+        $this->set('classRoom', $classRoom);
+    }
+
+    public function add()
+    {
+        $classRoom = $this->ClassRooms->newEntity();
+        if ($this->request->is('post')) {
+            $classRoom = $this->ClassRooms->patchEntity($classRoom, $this->request->getData());
+            if ($this->ClassRooms->save($classRoom)) {
+                $this->Flash->success(__('The class room has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The class room could not be saved. Please, try again.'));
+        }
+        $classRoomBlocks = $this->ClassRooms->ClassRoomBlocks->find('list', ['limit' => 200]);
+        $this->set(compact('classRoom', 'classRoomBlocks'));
+    }
+
+    public function edit($id = null)
+    {
+        $classRoom = $this->ClassRooms->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $classRoom = $this->ClassRooms->patchEntity($classRoom, $this->request->getData());
+            if ($this->ClassRooms->save($classRoom)) {
+                $this->Flash->success(__('The class room has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The class room could not be saved. Please, try again.'));
+        }
+        $classRoomBlocks = $this->ClassRooms->ClassRoomBlocks->find('list', ['limit' => 200]);
+        $this->set(compact('classRoom', 'classRoomBlocks'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $classRoom = $this->ClassRooms->get($id);
+        if ($this->ClassRooms->delete($classRoom)) {
+            $this->Flash->success(__('The class room has been deleted.'));
+        } else {
+            $this->Flash->error(__('The class room could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }
-?>

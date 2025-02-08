@@ -142,8 +142,7 @@
 														<td class="center">
 															<?php
 															if (isset($publishedCourse['CourseInstructorAssignment']) && !empty($publishedCourse['CourseInstructorAssignment'])) {
-																if (isset($publishedCourse['PublishedCourse']['given_by_department_id']) 
-                                                                    && !empty($publishedCourse['PublishedCourse']['given_by_department_id'])) {
+																if (isset($publishedCourse['PublishedCourse']['given_by_department_id']) && !empty($publishedCourse['PublishedCourse']['given_by_department_id'])) {
 																	echo $departmentsAll[$publishedCourse['PublishedCourse']['given_by_department_id']];
 																	if ($publishedCourse['CourseInstructorAssignment'][0]['isprimary']) {
 																		//debug($publishedCourse['CourseInstructorAssignment'][0]['Staff']['full_name']);

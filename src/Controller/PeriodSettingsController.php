@@ -1,148 +1,82 @@
 <?php
-class PeriodSettingsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'PeriodSettings';
-	var $menuOptions = array(
-             'parent' => 'scheduleSetting',
-             'exclude' => array(),
-             'alias' => array(
-                    'index' =>'List Period Setting',
-					'add' =>'Add Period Setting '
-            )
-	);
-	function index() {
-		$this->PeriodSetting->recursive = 0;
-		$this->paginate = array('conditions'=>array('PeriodSetting.college_id'=>$this->college_id), 'order'=>array('PeriodSetting.period'));
-		$this->set('periodSettings', $this->paginate());
-	}
+use App\Controller\AppController;
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid period setting'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('periodSetting', $this->PeriodSetting->read(null, $id));
-	}
+/**
+ * PeriodSettings Controller
+ *
+ * @property \App\Model\Table\PeriodSettingsTable $PeriodSettings
+ *
+ * @method \App\Model\Entity\PeriodSetting[]|\Cake\Datasource\ResultSetInterface paginate($object = null, array $settings = [])
+ */
+class PeriodSettingsController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$is_this_pariod_already_exist = $this->PeriodSetting->find('count',array('conditions'=>array(
-				'PeriodSetting.period'=>$this->request->data['PeriodSetting']['period'],'PeriodSetting.college_id'=>$this->college_id)));
-			if($is_this_pariod_already_exist ==0){
-				$hour=null;
-				if($this->request->data['PeriodSetting']['hour']['meridian'] == "am"){
-					$hour = $this->request->data['PeriodSetting']['hour']['hour'];
-				} else {
-					$hour = ($this->request->data['PeriodSetting']['hour']['hour'] + 12);
-				}
-				$is_this_startingTime_already_exist = $this->PeriodSetting->field('PeriodSetting.period',
-					array('PeriodSetting.hour LIKE'=>$hour.'%','PeriodSetting.college_id'=>$this->college_id));
-				if(empty($is_this_startingTime_already_exist)) {
-					$this->PeriodSetting->create();
-					if ($this->PeriodSetting->save($this->request->data)) {
-						$this->Session->setFlash('<span></span> '.__('Period '.$this->request->data['PeriodSetting']['period'].' has been saved.'),'default',array('class'=>'success-box success-message'));     
-						//$this->redirect(array('action' => 'index'));
-					} else {
-						$this->Session->setFlash('<span></span> '.__('The period '.$this->request->data['PeriodSetting']['period'].' could not be saved. Please, try again.'),'default',array('class'=>'error-box error-box'));
-					}
-				} else {
-					$this->Session->setFlash('<span></span> '.__('The period starting time is overlap with period '.$is_this_startingTime_already_exist.', Please proved unique starting time for this period or edit period '.$is_this_startingTime_already_exist.' starting time.'),'default',array('class'=>'error-box error-message'));
-				}
-			} else {
-				$this->Session->setFlash('<span></span> '.__('Period '.$this->request->data['PeriodSetting']['period'].' is already exist, Please proved unique period or edit period '.$this->request->data['PeriodSetting']['period'].' starting time.'),'default',array('class'=>'error-box error-message'));  
-			}
-		}
-		$colleges = $this->PeriodSetting->College->find('list');
-		$periodSettings = $this->PeriodSetting->find('all',array('conditions'=>array('PeriodSetting.college_id'=>
-			$this->college_id),'order'=>array('PeriodSetting.period')));
-		//debug($periodSettings);
-		$this->set(compact('colleges','periodSettings'));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Colleges'],
+        ];
+        $periodSettings = $this->paginate($this->PeriodSettings);
 
-	function edit($id = null, $from=null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash('<span></span> '.__('Invalid period setting.'),'default',
-						array('class'=>'error-box error-message')); 
-			if(empty($from)){
-				return $this->redirect(array('action'=>'index'));
-			} else {
-				return $this->redirect(array('action'=>'add'));
-			}
-		}
-		if (!empty($this->request->data)) {
-			$hour=null;
-			if($this->request->data['PeriodSetting']['hour']['meridian'] == "am"){
-				$hour = $this->request->data['PeriodSetting']['hour']['hour'];
-			} else {
-				$hour = ($this->request->data['PeriodSetting']['hour']['hour'] + 12);
-			}
-			$is_this_startingTime_already_exist = $this->PeriodSetting->field('PeriodSetting.period',
-				array('PeriodSetting.hour LIKE'=>$hour.'%'));
-			if(empty($is_this_startingTime_already_exist)) {
-				if ($this->PeriodSetting->save($this->request->data)) {
-					$this->Session->setFlash('<span></span> '.__('Period '.$this->request->data['PeriodSetting']['period']
-					.' starting time has been updated.', true),'default',array('class'=>'success-box success-message')); 
-					if(empty($from)){
-						return $this->redirect(array('action'=>'index'));
-					} else {
-						return $this->redirect(array('action'=>'add'));
-					}
-				} else {
-					$this->Session->setFlash('<span></span> '.__('The period '.$this->request->data['PeriodSetting']['period']
-					.' could not be saved. Please, try again.', true),'default',array('class'=>'error-box error-box'));
-				}
-			} else {
-				$this->Session->setFlash('<span></span> '.__('The period starting time is overlap with period 
-					'.$is_this_startingTime_already_exist.', Please proved unique starting time for this period.' 
-					, true),'default',
-					array('class'=>'error-box error-message'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->PeriodSetting->read(null, $id);
-		}
-		//debug($this->request->data);
-		$colleges = $this->PeriodSetting->College->find('list');
-		$this->set(compact('colleges'));
-	}
+        $this->set(compact('periodSettings'));
+    }
 
-	function delete($id = null, $from=null) {
-		if (!$id) {
-			$this->Session->setFlash('<span></span> '.__('Invalid id for period setting.'),'default',
-						array('class'=>'error-box error-message')); 
-			if(empty($from)){
-				return $this->redirect(array('action'=>'index'));
-			} else {
-				return $this->redirect(array('action'=>'add'));
-			}
-		}
-		$is_period_used_in_class_period = $this->PeriodSetting->ClassPeriod->find('count',array('conditions'=>array('ClassPeriod.period_setting_id'=>$id,'ClassPeriod.college_id'=>$this->college_id)));
-		if(empty($is_period_used_in_class_period)){
-			$Dperiod = $this->PeriodSetting->field('PeriodSetting.period',array('PeriodSetting.id'=>$id));
-			if ($this->PeriodSetting->delete($id)) {
-				$this->Session->setFlash('<span></span> '.__('Period '.$Dperiod.' has been deleted.'),'default',
-					array('class'=>'success-box success-message'));  
-				if(empty($from)){
-					return $this->redirect(array('action'=>'index'));
-				} else {
-					return $this->redirect(array('action'=>'add'));
-				}
-			}
-			$this->Session->setFlash('<span></span> '.__('Period was not deleted.'),'default',
-				array('class'=>'error-box error-message')); 
-			if(empty($from)){
-				return $this->redirect(array('action'=>'index'));
-			} else {
-				return $this->redirect(array('action'=>'add'));
-			}
-		} else {
-			$this->Session->setFlash('<span></span> '.__('You can not delete this period since it used in class period. So please delete the class period first.'),'default',array('class'=>'error-box error-message')); 
-			if(empty($from)){
-				return $this->redirect(array('action'=>'index'));
-			} else {
-				return $this->redirect(array('action'=>'add'));
-			}
-		}
-	}
+    public function view($id = null)
+    {
+        $periodSetting = $this->PeriodSettings->get($id, [
+            'contain' => ['Colleges', 'ClassPeriods'],
+        ]);
+
+        $this->set('periodSetting', $periodSetting);
+    }
+
+
+    public function add()
+    {
+        $periodSetting = $this->PeriodSettings->newEntity();
+        if ($this->request->is('post')) {
+            $periodSetting = $this->PeriodSettings->patchEntity($periodSetting, $this->request->getData());
+            if ($this->PeriodSettings->save($periodSetting)) {
+                $this->Flash->success(__('The period setting has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The period setting could not be saved. Please, try again.'));
+        }
+        $colleges = $this->PeriodSettings->Colleges->find('list', ['limit' => 200]);
+        $this->set(compact('periodSetting', 'colleges'));
+    }
+
+    public function edit($id = null)
+    {
+        $periodSetting = $this->PeriodSettings->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $periodSetting = $this->PeriodSettings->patchEntity($periodSetting, $this->request->getData());
+            if ($this->PeriodSettings->save($periodSetting)) {
+                $this->Flash->success(__('The period setting has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The period setting could not be saved. Please, try again.'));
+        }
+        $this->set(compact('periodSetting'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $periodSetting = $this->PeriodSettings->get($id);
+        if ($this->PeriodSettings->delete($periodSetting)) {
+            $this->Flash->success(__('The period setting has been deleted.'));
+        } else {
+            $this->Flash->error(__('The period setting could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }
-?>

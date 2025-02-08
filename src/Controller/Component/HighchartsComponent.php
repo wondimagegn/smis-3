@@ -12,7 +12,11 @@
  *      GPL <http://www.gnu.org/licenses/gpl.html>
  *      Apache License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.html>
  */
-App::uses('Component', 'Controller');
+namespace app\Controller\Component;
+
+use Cake\Controller\Component;
+use Cake\Controller\Controller;
+use Cake\Core\App;
 
 App::import('Vendor', 'Highcharts.HighRoller', true, array(), 'lib/HighRoller.php');
 
@@ -56,10 +60,10 @@ class HighchartsComponent extends Component {
 /**
  * Constructor
  *
- * @param ComponentCollection $collection A ComponentCollection this component can use to lazy load its components
+ * @param ComponentRegistry $collection A ComponentRegistry this component can use to lazy load its components
  * @param array $settings Array of configuration settings
  */
-        public function __construct(ComponentCollection $collection, $settings = array()) {
+        public function __construct(ComponentRegistry $collection, $settings = array()) {
                 parent::__construct($collection, $settings);
                 $this->controller = $collection->getController();
                 $this->settings = $settings;
@@ -92,7 +96,7 @@ class HighchartsComponent extends Component {
  */
         public function create($name, $type) {
                 if (!isset($type)) {
-                        $this->log(sprintf(__('Please provide a type for chart %s!', true), $name));
+                        $this->log(sprintf(__('Please provide a type for chart {0}!', true), $name));
                         return false;
                 }                
                 $chart = null;

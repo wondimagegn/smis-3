@@ -1,73 +1,78 @@
 <?php
-class ContactsController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Contacts';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Contact->recursive = 0;
-		$this->set('contacts', $this->paginate());
-	}
+class ContactsController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid contact'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('contact', $this->Contact->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['Students', 'Staffs', 'Countries', 'Regions', 'Zones', 'Woredas', 'Cities'],
+        ];
+        $contacts = $this->paginate($this->Contacts);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Contact->create();
-			if ($this->Contact->save($this->request->data)) {
-				$this->Session->setFlash(__('The contact has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The contact could not be saved. Please, try again.'));
-			}
-		}
-		$students = $this->Contact->Student->find('list');
-		$staffs = $this->Contact->Staff->find('list');
-		$countries = $this->Contact->Country->find('list');
-		$regions = $this->Contact->Region->find('list');
-		$cities = $this->Contact->City->find('list');
-		$this->set(compact('students', 'staffs', 'countries', 'regions', 'cities'));
-	}
+        $this->set(compact('contacts'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid contact'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Contact->save($this->request->data)) {
-				$this->Session->setFlash(__('The contact has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The contact could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Contact->read(null, $id);
-		}
-		$students = $this->Contact->Student->find('list');
-		$staffs = $this->Contact->Staff->find('list');
-		$countries = $this->Contact->Country->find('list');
-		$regions = $this->Contact->Region->find('list');
-		$cities = $this->Contact->City->find('list');
-		$this->set(compact('students', 'staffs', 'countries', 'regions', 'cities'));
-	}
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for contact'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Contact->delete($id)) {
-			$this->Session->setFlash(__('Contact deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Contact was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $contact = $this->Contacts->get($id, [
+            'contain' => ['Students', 'Staffs', 'Countries', 'Regions', 'Zones', 'Woredas', 'Cities'],
+        ]);
+
+        $this->set('contact', $contact);
+    }
+
+
+    public function add()
+    {
+        $contact = $this->Contacts->newEntity();
+        if ($this->request->is('post')) {
+            $contact = $this->Contacts->patchEntity($contact, $this->request->getData());
+            if ($this->Contacts->save($contact)) {
+                $this->Flash->success(__('The contact has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The contact could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('contact'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $contact = $this->Contacts->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $contact = $this->Contacts->patchEntity($contact, $this->request->getData());
+            if ($this->Contacts->save($contact)) {
+                $this->Flash->success(__('The contact has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The contact could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('contact'));
+    }
+
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $contact = $this->Contacts->get($id);
+        if ($this->Contacts->delete($contact)) {
+            $this->Flash->success(__('The contact has been deleted.'));
+        } else {
+            $this->Flash->error(__('The contact could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

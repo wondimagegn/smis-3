@@ -1,61 +1,73 @@
 <?php
-class VotesController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Votes';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Vote->recursive = 0;
-		$this->set('votes', $this->paginate());
-	}
+class VotesController extends AppController
+{
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid vote'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('vote', $this->Vote->read(null, $id));
-	}
+    public function index()
+    {
+        $this->paginate = [
+            'contain' => ['RequesterUsers', 'ApplicableOnUsers'],
+        ];
+        $votes = $this->paginate($this->Votes);
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Vote->create();
-			if ($this->Vote->save($this->request->data)) {
-				$this->Session->setFlash(__('The vote has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The vote could not be saved. Please, try again.'));
-			}
-		}
-	}
+        $this->set(compact('votes'));
+    }
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid vote'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Vote->save($this->request->data)) {
-				$this->Session->setFlash(__('The vote has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The vote could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Vote->read(null, $id);
-		}
-	}
+    public function view($id = null)
+    {
+        $vote = $this->Votes->get($id, [
+            'contain' => ['RequesterUsers', 'ApplicableOnUsers'],
+        ]);
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for vote'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Vote->delete($id)) {
-			$this->Session->setFlash(__('Vote deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Vote was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+        $this->set('vote', $vote);
+    }
+
+    public function add()
+    {
+        $vote = $this->Votes->newEntity();
+        if ($this->request->is('post')) {
+            $vote = $this->Votes->patchEntity($vote, $this->request->getData());
+            if ($this->Votes->save($vote)) {
+                $this->Flash->success(__('The vote has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The vote could not be saved. Please, try again.'));
+        }
+        $this->set(compact('vote'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $vote = $this->Votes->get($id, [
+            'contain' => [],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $vote = $this->Votes->patchEntity($vote, $this->request->getData());
+            if ($this->Votes->save($vote)) {
+                $this->Flash->success(__('The vote has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The vote could not be saved. Please, try again.'));
+        }
+        $this->set(compact('vote'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $vote = $this->Votes->get($id);
+        if ($this->Votes->delete($vote)) {
+            $this->Flash->success(__('The vote has been deleted.'));
+        } else {
+            $this->Flash->error(__('The vote could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }

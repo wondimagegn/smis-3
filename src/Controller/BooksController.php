@@ -1,65 +1,73 @@
 <?php
-class BooksController extends AppController {
+namespace App\Controller;
 
-	var $name = 'Books';
+use App\Controller\AppController;
 
-	function index() {
-		$this->Book->recursive = 0;
-		$this->set('books', $this->paginate());
-	}
 
-	function view($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid book'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		$this->set('book', $this->Book->read(null, $id));
-	}
+class BooksController extends AppController
+{
 
-	function add() {
-		if (!empty($this->request->data)) {
-			$this->Book->create();
-			if ($this->Book->save($this->request->data)) {
-				$this->Session->setFlash(__('The book has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The book could not be saved. Please, try again.'));
-			}
-		}
-		$courses = $this->Book->Course->find('list');
-		$this->set(compact('courses'));
-	}
+    public function index()
+    {
+        $books = $this->paginate($this->Books);
 
-	function edit($id = null) {
-		if (!$id && empty($this->request->data)) {
-			$this->Session->setFlash(__('Invalid book'));
-			return $this->redirect(array('action' => 'index'));
-		}
-		if (!empty($this->request->data)) {
-			if ($this->Book->save($this->request->data)) {
-				$this->Session->setFlash(__('The book has been saved'));
-				return $this->redirect(array('action' => 'index'));
-			} else {
-				$this->Session->setFlash(__('The book could not be saved. Please, try again.'));
-			}
-		}
-		if (empty($this->request->data)) {
-			$this->request->data = $this->Book->read(null, $id);
-		}
-		$courses = $this->Book->Course->find('list');
-		$this->set(compact('courses'));
-	}
+        $this->set(compact('books'));
+    }
 
-	function delete($id = null) {
-		if (!$id) {
-			$this->Session->setFlash(__('Invalid id for book'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		if ($this->Book->delete($id)) {
-			$this->Session->setFlash(__('Book deleted'));
-			return $this->redirect(array('action'=>'index'));
-		}
-		$this->Session->setFlash(__('Book was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	}
+    public function view($id = null)
+    {
+        $book = $this->Books->get($id, [
+            'contain' => ['Courses'],
+        ]);
+
+        $this->set('book', $book);
+    }
+
+    public function add()
+    {
+        $book = $this->Books->newEntity();
+        if ($this->request->is('post')) {
+            $book = $this->Books->patchEntity($book, $this->request->getData());
+            if ($this->Books->save($book)) {
+                $this->Flash->success(__('The book has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The book could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('book'));
+    }
+
+
+    public function edit($id = null)
+    {
+        $book = $this->Books->get($id, [
+            'contain' => ['Courses'],
+        ]);
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $book = $this->Books->patchEntity($book, $this->request->getData());
+            if ($this->Books->save($book)) {
+                $this->Flash->success(__('The book has been saved.'));
+
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The book could not be saved. Please, try again.'));
+        }
+
+        $this->set(compact('book', 'courses'));
+    }
+
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['post', 'delete']);
+        $book = $this->Books->get($id);
+        if ($this->Books->delete($book)) {
+            $this->Flash->success(__('The book has been deleted.'));
+        } else {
+            $this->Flash->error(__('The book could not be deleted. Please, try again.'));
+        }
+
+        return $this->redirect(['action' => 'index']);
+    }
 }
