@@ -1,68 +1,52 @@
 <?php
-/**
- * Attempt Component Class
- * 
- * Based on http://bakery.cakephp.org/articles/aep_/2006/11/04/brute-force-protection
- * 
- * @author Thomas Heymann
- * @version	0.1
- * @license	http://www.opensource.org/licenses/mit-license.php The MIT License
- * @package app
- * @subpackage app.controllers.components
- **/
-namespace app\Controller\Component;
 
-use App\Model\Datasource\Session;
+namespace App\Controller\Component;
+
 use Cake\Controller\Component;
-use Cake\Controller\Controller;
-use Cake\Routing\Router;
+use Cake\Controller\ComponentRegistry;
+use Cake\ORM\TableRegistry;
+use Cake\Http\ServerRequest;
 
 class AttemptComponent extends Component
 {
+    protected $_defaultConfig = [];
+    protected $AttemptsTable;
+    public $request;
 
-	var $components = array(
-		'RequestHandler'
-	);
+    public function __construct(ComponentRegistry $registry, array $config = [])
+    {
+        parent::__construct($registry, $config);
+        $this->AttemptsTable = TableRegistry::getTableLocator()->get('Attempts');
+        $this->request = $this->getController()->getRequest();
+    }
 
-	// Called before the Controller::beforeFilter().
-	// function initialize(&$controller, $options) {
-	// }
+    public function count($username, $action)
+    {
+        return $this->AttemptsTable->countAttempts($this->getClientIP(), $username, $action);
+    }
 
-	public function __construct(ComponentRegistry $collection, $settings = array())
-	{
-		parent::__construct($collection, $settings);
-	}
+    public function limit($username, $action, $limit = 5)
+    {
+        return $this->AttemptsTable->isLimitReached($this->getClientIP(), $username, $action, $limit);
+    }
 
-	// Called after the Controller::beforeFilter() and before the controller action
-	function startup(Controller $controller)
-	{
-		$this->controller = $controller;
-		$this->Attempt = ClassRegistry::init('Attempt');
-	}
+    public function fail($username, $action, $duration = '+10 minutes')
+    {
+        return $this->AttemptsTable->recordFailure($this->getClientIP(), $username, $action, $duration);
+    }
 
-	public function count($username, $action)
-	{
-		return $this->Attempt->count($this->RequestHandler->getClientIP(), $username, $action);
-	}
+    public function reset($username, $action)
+    {
+        return $this->AttemptsTable->resetAttempts($this->getClientIP(), $username, $action);
+    }
 
-	public function limit($username, $action, $limit = 5)
-	{
-		return $this->Attempt->limit($this->RequestHandler->getClientIP(), $username, $action, $limit);
-	}
+    public function cleanup()
+    {
+        return $this->AttemptsTable->cleanupOldAttempts();
+    }
 
-	public function fail($username, $action, $duration = '+10 minutes')
-	{
-		return $this->Attempt->fail($this->RequestHandler->getClientIP(), $username, $action, $duration);
-	}
-
-	public function reset($action, $username)
-	{
-		return $this->Attempt->reset($this->RequestHandler->getClientIP(), $username, $action);
-	}
-
-	public function cleanup()
-	{
-		return $this->Attempt->cleanup();
-	}
+    private function getClientIP()
+    {
+        return $this->request->clientIp();
+    }
 }
-?>

@@ -1,58 +1,134 @@
-<?php
-/**
- * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
- *
- * Licensed under The MIT License
- * For full copyright and license information, please see the LICENSE.txt
- * Redistributions of files must retain the above copyright notice.
- *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
- * @link          https://cakephp.org CakePHP(tm) Project
- * @since         0.10.0
- * @license       https://opensource.org/licenses/mit-license.php MIT License
- * @var \App\View\AppView $this
- */
-
-$cakeDescription = 'CakePHP: the rapid development php framework';
-?>
 <!DOCTYPE html>
-<html>
+<html class="no-js" lang="en">
 <head>
-    <?= $this->Html->charset() ?>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>
-        <?= $cakeDescription ?>:
-        <?= $this->fetch('title') ?>
-    </title>
-    <?= $this->Html->meta('icon') ?>
+    <?= $this->Html->charset(); ?>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><?= h(Configure::read('ApplicationShortName') . ' ' . Configure::read('ApplicationVersionShort')) . (!empty($this->fetch('title_details')) ? ' | ' . h($this->fetch('title_details')) : ''); ?></title>
 
-    <?= $this->Html->css('base.css') ?>
-    <?= $this->Html->css('style.css') ?>
+    <?= $this->Html->css(['foundation', 'dashboard', 'style', 'dripicon', 'typicons', 'font-awesome', 'theme', 'pace-theme-flash', 'slicknav', 'common1', 'responsive-tables']); ?>
+    <?= $this->Html->script(['jquery', 'vendor/modernizr', 'jquery-customselect-1.9.1.min']); ?>
+    <?= $this->Html->css('jquery-customselect-1.9.1'); ?>
 
-    <?= $this->fetch('meta') ?>
-    <?= $this->fetch('css') ?>
-    <?= $this->fetch('script') ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var isLoggedIn = <?= json_encode($this->request->getSession()->read('User.is_logged_in')); ?>;
+            if (isLoggedIn) {
+                setInterval(function() {
+                    fetch('/users/check_session')
+                        .then(response => response.json())
+                        .then(data => { if (!data.is_logged_in) window.location.reload(); });
+                }, 10000);
+            }
+        });
+    </script>
 </head>
+
 <body>
-    <nav class="top-bar expanded" data-topbar role="navigation">
-        <ul class="title-area large-3 medium-4 columns">
-            <li class="name">
-                <h1><a href=""><?= $this->fetch('title') ?></a></h1>
-            </li>
-        </ul>
-        <div class="top-bar-section">
-            <ul class="right">
-                <li><a target="_blank" href="https://book.cakephp.org/3/">Documentation</a></li>
-                <li><a target="_blank" href="https://api.cakephp.org/3.0/">API</a></li>
-            </ul>
+<?= $this->Flash->render(); ?>
+<?= $this->fetch('content'); ?>
+
+<?= $this->Html->script(['waypoints.min', 'preloader-script', 'foundation.min', 'foundation/foundation.abide', 'slimscroll/jquery.slimscroll', 'slicknav/jquery.slicknav', 'sliding-menu', 'scriptbreaker-multiple-accordion-1', 'number/jquery.counterup.min', 'circle-progress/jquery.circliful', 'number-progress-bar/jquery.velocity.min', 'number-progress-bar/number-pb', 'app', 'loader/loader', 'loader/demo']); ?>
+
+<script>
+    $(document).ready(function() {
+        $('#select-all').click(function() {
+            $('.checkbox1').prop('checked', this.checked);
+        });
+        $('.checkbox1').click(function() {
+            if (!this.checked) $('#select-all').prop('checked', false);
+        });
+    });
+</script>
+<!-- Preloader -->
+<div id="preloader">
+    <div id="status">&nbsp;</div>
+</div>
+<!-- End of Preloader -->
+
+<div id="myModal" class="reveal-modal" data-reveal></div>
+
+<div id="busy_indicator">
+    <img src="<?= $this->Url->image('busy.gif'); ?>" alt="Loading..." class="displayed" />
+</div>
+
+<div class="off-canvas-wrap" data-offcanvas>
+    <!-- Right sidebar wrapper -->
+    <div class="inner-wrap">
+        <!-- Right sidemenu -->
+        <div id="skin-select">
+            <!-- Toggle sidemenu icon button -->
+            <a id="toggle">
+                <span class="fa icon-menu"></span>
+            </a>
+            <!-- End of Toggle sidemenu icon button -->
+
+            <div class="skin-part">
+                <div id="tree-wrap">
+                    <!-- Profile -->
+                    <div class="profile">
+                        <a href="<?= $this->Url->build('/'); ?>">
+                            <img alt="" class="" src="<?= $this->Url->image(Configure::read('logo')); ?>">
+                            <h3>
+                                <?= Configure::read('ApplicationShortName'); ?>
+                                <small><?= Configure::read('ApplicationVersionShort'); ?></small>
+                            </h3>
+                        </a>
+                    </div>
+                    <!-- End of Profile -->
+
+                    <!-- Menu Sidebar Begin -->
+                    <div class="side-bar">
+                        <?= $this->element('mainmenu/mainmenuOptimized'); ?>
+                    </div>
+                </div>
+            </div>
         </div>
-    </nav>
-    <?= $this->Flash->render() ?>
-    <div class="container clearfix">
-        <?= $this->fetch('content') ?>
     </div>
-    <footer>
-    </footer>
+    <!-- End Right Sidebar Wrapper -->
+
+    <div class="wrap-fluid" id="paper-bg">
+        <!-- Top Nav -->
+        <div class="top-bar-nest">
+            <nav class="top-bar" data-topbar role="navigation" data-options="is_hover: false">
+                <ul class="title-area left">
+                    <li class="toggle-topbar menu-icon"><a href="#"><span></span></a></li>
+                </ul>
+                <section class="top-bar-section">
+                    <?= $this->element('mainmenu/top-menu'); ?>
+                </section>
+            </nav>
+        </div>
+
+        <!-- Container Begin -->
+        <div class="row" style="margin-top:-20px;">
+            <div class="large-12 columns">
+                <div class="row">
+                    <div class="large-12 columns">
+                        <div class="box">
+                            <?php if ($this->Flash->render('auth')): ?>
+                                <div style="margin-top: 40px;">
+                                    <?= $this->Flash->render('auth'); ?>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($this->Flash->render()): ?>
+                                <div style="margin-top: 40px;">
+                                    <?= $this->Flash->render(); ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?= $this->fetch('content'); ?>
+            </div>
+        </div>
+        <footer>
+            <div id="footer">
+                Copyright &copy;
+                <?= Configure::read('Calendar.applicationStartYear') . ' - ' . date('Y'); ?>
+                <?= Configure::read('CopyRightCompany'); ?>
+            </div>
+        </footer>
+    </div>
+</div>
 </body>
 </html>

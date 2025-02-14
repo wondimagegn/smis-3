@@ -1,15 +1,2 @@
-<?php
-/**
- * @var \App\View\AppView $this
- * @var array $params
- * @var string $message
- */
-$class = 'message';
-if (!empty($params['class'])) {
-    $class .= ' ' . $params['class'];
-}
-if (!isset($params['escape']) || $params['escape'] !== false) {
-    $message = h($message);
-}
-?>
-<div class="<?= h($class) ?>" onclick="this.classList.add('hidden');"><?= $message ?></div>
+<div id="<?= (isset($params) && !empty($params['type'])? $params['type'] : 'Info'); ?>Message" class="<?= (isset($params) && !empty($params['class']) ? $params['class'] : 'info-box info-message'); ?>" style="font-family: 'Times New Roman', Times, serif; font-size: 16px;"><span style="margin-right: 15px;"></span><?= $message; ?></div>
+<?php //echo $message; ?>

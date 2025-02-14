@@ -1,11 +1,1 @@
-<?php
-/**
- * @var \App\View\AppView $this
- * @var array $params
- * @var string $message
- */
-if (!isset($params['escape']) || $params['escape'] !== false) {
-    $message = h($message);
-}
-?>
-<div class="message error" onclick="this.classList.add('hidden');"><?= $message ?></div>
+<div id="ErrorMessage" class="error-box error-message" style="font-family: 'Times New Roman', Times, serif; font-size: 16px;"><span style="margin-right: 15px;"></span><?= h($message); ?></div>

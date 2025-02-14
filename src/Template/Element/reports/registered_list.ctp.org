@@ -1,0 +1,58 @@
+<?php
+if (isset($registeredList) && !empty($registeredList)) {
+
+	$totalStudents = 0;
+    $totalMaleStudents = 0;
+	$totalFemaleStudents = 0;
+
+	foreach ($registeredList as $programD => $list) {
+		$headerExplode = explode('~', $programD);  ?>
+		<p class="fs16">
+			<strong>College: </strong> <?= $headerExplode[0]; ?> <br />
+			<strong>Department: </strong> <?= $headerExplode[1]; ?> <br />
+			<strong>Program: </strong> <?= $headerExplode[2]; ?> <br />
+			<strong>Program Type: </strong> <?= $headerExplode[3]; ?> <br />
+			<strong>Year Level: </strong> <?= $headerExplode[4]; ?> <br />
+		</p>
+		<table cellpadding="0" cellspacing="0" class="table">
+			<thead>
+				<tr>
+					<th>#</th>
+					<th>Full Name</th>
+					<th class="center">Student ID </th>
+					<th class="center">Sex</th>
+					<th class="center">Section</th>
+					<th class="center">Credit Hour</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php
+				$count = 0;
+				foreach ($list as $ko => $val) {  ?>
+					<?php $totalStudents++; ?>
+					<tr class='jsView' data-animation="fade" data-reveal-id="myModal" data-reveal-ajax="/students/get_modal_box/<?= $val['Student']['id']; ?>">
+						<td><?= ++$count; ?> </td>
+						<td><?= $val['Student']['full_name']; ?></td>
+						<td class="center"><?= $val['Student']['studentnumber']; ?></td>
+						<td class="center"><?php if (strcasecmp(trim($val['Student']['gender']), 'male') == 0) { echo 'M'; $totalMaleStudents++; } else { echo 'F'; $totalFemaleStudents++; } ?></td>
+						<td class="center"> <?= $val['Student']['sectionName']; ?> </td>
+						<td class="center"> <?= $val['Student']['credithour']; ?> </td>
+					</tr>
+					<?php
+				} ?>
+			</tbody>
+		</table>
+		<?php
+	} ?>
+	<br />
+	<span class="text-black fs14">
+		<hr />
+		<strong>Stats for selected Active List: </strong><br />
+		Total: <?= ($totalStudents) ?> <br />
+		Male: <?= ($totalMaleStudents) . ($totalMaleStudents != 0 && $totalStudents != 0 ? '&nbsp; (' . ($this->Number->precision((($totalMaleStudents / $totalStudents) * 100), 2) . '%)') : ''); ?><br />
+		Female: <?= ($totalFemaleStudents) . ($totalFemaleStudents != 0 && $totalStudents != 0 ? '&nbsp; (' . ($this->Number->precision((($totalFemaleStudents / $totalStudents) * 100), 2) . '%)') : ''); ?><br />
+		With Unknown Status: <?= ($withUnknowntatus) . ($withUnknowntatus != 0 && $totalStudents != 0 ? '&nbsp; (' . ($this->Number->precision((($withUnknowntatus / $totalStudents) * 100), 2) . '%)') : ''); ?><br />
+		<hr />
+	</span>
+	<?php
+} ?>

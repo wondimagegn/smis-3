@@ -1,48 +1,38 @@
-<?php
-/**
- * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
- *
- * Licensed under The MIT License
- * For full copyright and license information, please see the LICENSE.txt
- * Redistributions of files must retain the above copyright notice.
- *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
- * @link          https://cakephp.org CakePHP(tm) Project
- * @since         0.10.0
- * @license       https://opensource.org/licenses/mit-license.php MIT License
- * @var \App\View\AppView $this
- */
-?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <?= $this->Html->charset() ?>
-    <title>
-        <?= $this->fetch('title') ?>
-    </title>
-    <?= $this->Html->meta('icon') ?>
+    <?= $this->Html->charset(); ?>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 Error Page</title>
 
-    <?= $this->Html->css('base.css') ?>
-    <?= $this->Html->css('style.css') ?>
+    <?= $this->Html->css([
+        'reset', 'datePicker', 'common1', 'text', '960', 'layout', 'nav'
+    ]); ?>
 
-    <?= $this->fetch('meta') ?>
-    <?= $this->fetch('css') ?>
-    <?= $this->fetch('script') ?>
+    <!--[if IE 6]><?= $this->Html->css('ie6'); ?><![endif]-->
+    <!--[if IE 7]><?= $this->Html->css('ie'); ?><![endif]-->
 </head>
-<body>
-    <div id="container">
-        <div id="header">
-            <h1><?= __('Error') ?></h1>
-        </div>
-        <div id="content">
-            <?= $this->Flash->render() ?>
 
-            <?= $this->fetch('content') ?>
-        </div>
-        <div id="footer">
-            <?= $this->Html->link(__('Back'), 'javascript:history.back()') ?>
+<body>
+
+<div class="container_16">
+    <div id="ajax_div" class="grid_16" style="text-align:center">
+        <?= $this->Flash->render(); ?>
+        <?= $this->fetch('content'); ?>
+    </div>
+
+    <div class="grid_16" id="site_info">
+        <div class="footerbox">
+            <p style="margin:0px; padding:0px">
+                <strong>&copy; <?= date("Y"); ?> Arba Minch University</strong><br />
+                Designed and Developed By IT and T Solutions PLC
+                <a href="http://www.itandts.com" style="color:#ebad05">itandts.com</a>
+            </p>
         </div>
     </div>
+</div>
+
 </body>
+
 </html>

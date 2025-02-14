@@ -401,4 +401,7 @@ return [
     'Session' => [
         'defaults' => 'php',
     ],
+    'Roles' => [
+        'registrar' => 3 // Replace with actual role ID
+    ],
 ];
