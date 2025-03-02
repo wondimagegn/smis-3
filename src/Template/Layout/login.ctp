@@ -1,6 +1,11 @@
+<?php $this->assign('title', __('Forget Password'));
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+?>
+
+
 <!DOCTYPE html>
 <html class="no-js" lang="en">
-
 <head>
     <?= $this->Html->charset(); ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,7 +60,7 @@
 <div class="inner-wrap">
     <div class="wrap-fluid">
         <br><br>
-        <?php if ($this->request->getSession()->check('Message.flash')): ?>
+        <?php if ($this->request->getSession()->check('Flash.flash')): ?>
             <?= $this->Flash->render(); ?>
         <?php endif; ?>
 

@@ -42,4 +42,13 @@ class Role extends Entity
         'child_roles' => true,
         'users' => true,
     ];
+    /**
+     * ACL Behavior parentNode method
+     */
+
+    public function parentNode()
+    {
+        return null;
+    }
+
 }

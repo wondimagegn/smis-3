@@ -1,11 +1,11 @@
 <?php
 namespace App\Model\Table;
-
+use Acl\Controller\Component\AclComponent;
+use Cake\Core\Configure;
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-
 use Cake\Event\EventInterface;
 use ArrayObject;
 use Cake\Auth\DefaultPasswordHasher;
@@ -14,6 +14,15 @@ use Cake\Network\Request;
 use Detection\MobileDetect;
 use Cake\ORM\TableRegistry;
 use Cake\Log\Log;
+use Cake\Http\ServerRequest;
+use Cake\Datasource\EntityInterface; // Correct Interface for Entity
+
+use Cake\Controller\ComponentRegistry;
+use Cake\Acl;
+use Cake\Utility\Inflector; // Import Inflector from the correct namespace
+
+
+
 
 class UsersTable extends Table
 {
@@ -97,6 +106,16 @@ class UsersTable extends Table
         $this->hasMany('UserMealAssignments', [
             'foreignKey' => 'user_id',
         ]);
+
+
+
+        //  $this->addBehavior('Acl.Acl', ['type' => 'requester']);
+
+      //  $this->addBehavior('Acl.Acl', ['requester']);
+        $this->addBehavior('Acl.Acl', ['type' => 'requester']);
+
+
+
     }
 
 
@@ -117,12 +136,15 @@ class UsersTable extends Table
         return $validator;
     }
 
-    public function beforeSave(EventInterface $event, $entity, ArrayObject $options)
+    public function beforeSave(EventInterface $event, EntityInterface $entity)
     {
-        if ($entity->isNew() && !empty($entity->password)) {
+
+        // Only hash the password if it's a new one
+        if ($entity->isDirty('password')) {
             $entity->password = (new DefaultPasswordHasher())->hash($entity->password);
         }
         return true;
+
     }
 
     /**
@@ -135,7 +157,6 @@ class UsersTable extends Table
     public function buildRules(RulesChecker $rules)
     {
         $rules->add($rules->isUnique(['username']));
-        $rules->add($rules->isUnique(['email']));
         $rules->add($rules->existsIn(['role_id'], 'Roles'));
 
         return $rules;
@@ -392,102 +413,275 @@ class UsersTable extends Table
     }
 
 
+    /**
+     * Retrieve permitted actions for a user from both user-specific and role-based ACL.
+     *
+     * @param int $userId The user id.
+     * @return array An array with keys 'UserLevel' and 'RoleLevel', each containing permitted ACO paths.
+     */
     public function getAllPermissions($userId)
     {
+
         if (!$userId) {
             return [];
         }
 
+        // Load ACL component
+        $registry = new ComponentRegistry();
+        $acl = new AclComponent($registry);
+
+        // Load the Aros table
+        $ArosTable = TableRegistry::getTableLocator()->get('Aros');
+
+        // Get user and role AROs
+        $aroUser = $ArosTable->find()
+            ->where(['model' => 'Users', 'foreign_key' => $userId])
+            ->first();
+
+        $user = $this->get($userId, ['contain' => ['Roles']]);
+        $aroRole = $ArosTable->find()
+            ->where(['model' => 'Roles', 'foreign_key' => $user->role_id])
+            ->first();
+
+        // Create user ARO if it doesn’t exist and role ARO is present
+        if (!$aroUser && $aroRole) {
+            $aroUser = $ArosTable->newEntity([
+                'parent_id' => $aroRole->id,
+                'model' => 'Users',
+                'foreign_key' => $userId,
+                'alias' => 'User-' . $userId
+            ]);
+            if (!$ArosTable->save($aroUser)) {
+                $this->log('Failed to save user ARO for user ID ' . $userId, 'error');
+                return ['UserLevel' => [], 'RoleLevel' => []];
+            }
+        }
+
+
+        // Get all controllers and actions
+        $controllers = $this->getAllControllers();
         $permissions = [];
-        $permissionAggregated = [];
+        $reformatePermission = [];
 
-        // Get User Details
-        $userDetail = $this->find()
-            ->where(['User.id' => $userId])
-            ->contain(['AcceptedStudent', 'Student.AcceptedStudent'])
-            ->first();
+        foreach ($controllers as $controller) {
+            $actions = $this->getControllerActions($controller);
 
-        if (!$userDetail) {
-            return [];
-        }
+            foreach ($actions as $action) {
+                $acoPath = "controllers/" . Inflector::camelize($controller) . "/{$action}";
+                if ($aroUser && $acl->check(
+                        ['model' => 'Users', 'foreign_key' => $userId],
+                        $acoPath
+                    )) {
+                    $permissions[] = $acoPath;
+                }
+                if ($aroRole && $acl->check(
+                        ['model' => 'Roles', 'foreign_key' => $user->role_id],
+                        $acoPath
+                    )) {
+                    $permissions[] = $acoPath;
+                }
 
-        $roleId = $userDetail->role_id;
-        $isAdmin = $userDetail->is_admin;
 
-        // Get ARO Node for the User
-        $aroNode = TableRegistry::getTableLocator()->get('Aros')
-            ->find()
-            ->where(['foreign_key' => $userId, 'model' => 'User'])
-            ->first();
-
-        // Get ARO Node for the Role
-        $aroRoleNode = TableRegistry::getTableLocator()->get('Aros')
-            ->find()
-            ->where(['foreign_key' => $roleId, 'model' => 'Role'])
-            ->first();
-
-        $nodes = [];
-        if ($aroNode) {
-            $nodes[] = $aroNode;
-        }
-        if ($aroRoleNode) {
-            $nodes[] = $aroRoleNode;
-        }
-
-        // If no nodes exist, create ARO node for the user
-        if (empty($nodes)) {
-            $this->createAroNodeForUser($userId, $roleId);
-            $aroNode = TableRegistry::getTableLocator()->get('Aros')
-                ->find()
-                ->where(['foreign_key' => $userId, 'model' => 'User'])
-                ->first();
-            if ($aroNode) {
-                $nodes[] = $aroNode;
             }
         }
 
-        // Retrieve User or Role-based Permissions
-        foreach ($nodes as $node) {
-            $aroId = $node->id;
-            $isUserNode = ($node->model === 'User');
+        // Special permissions for admin/sysadmin
+        if ($user->is_admin || $user->role_id === ROLE_SYSADMIN) {
+            $adminPermissions = [
+                'controllers/Securitysettings/permission_management',
+                'controllers/Securitysettings/index',
+                'controllers/Acls/Permissions/add',
+                'controllers/Acls/Permissions/delete',
+                'controllers/Acls/Permissions/index',
+                'controllers/Acls/Permissions/edit',
+                'controllers/Acls/Acos/index',
+                'controllers/Acls/Acls/index',
+                'controllers/Users/index'
+            ];
 
-            // Fetch permissions from ARO_ACOS table
-            $tmpPermissions = TableRegistry::getTableLocator()->get('ArosAcos')
-                ->find()
-                ->select(['Aco.alias'])
-                ->join([
-                    'Aco' => [
-                        'table' => 'acos',
-                        'type' => 'INNER',
-                        'conditions' => ['ArosAcos.aco_id = Aco.id']
-                    ]
-                ])
-                ->where(['ArosAcos.aro_id' => $aroId, 'ArosAcos._create' => 1])
-                ->all()
-                ->extract('Aco.alias')
-                ->toArray();
 
-            if ($isUserNode) {
-                $permissionAggregated['UserLevel'] = $tmpPermissions;
-            } else {
-                $permissionAggregated['RoleLevel'] = $tmpPermissions;
+            if ($user->role_id === Configure::read('Roles.REGISTRAR') ||
+                $user->role_id === Configure::read('Roles.SYSADMIN')) {
+                $adminPermissions[] = 'controllers/Users/responsible';
             }
-
-            $permissions = array_merge($permissions, $tmpPermissions);
+            if ($user->role_id === Configure::read('Roles.DEPARTMENT') ) {
+                $adminPermissions[] = 'controllers/Users/department_create_user_account';
+            }
+            if ($user->role_id === Configure::read('Roles.SYSADMIN') ) {
+                $adminPermissions[] = 'controllers/Users/add';
+            }
+            if (Configure::read('Developer')) {
+                $adminPermissions = array_merge($adminPermissions, [
+                    'controllers/Acls/Acos/add',
+                    'controllers/Acls/Acos/edit',
+                    'controllers/Acls/Acos/delete',
+                    'controllers/Acls/Acos/rebuild'
+                ]);
+            }
+            $permissions = array_merge($permissions, $adminPermissions);
         }
 
-        // Ensure Unique Permissions
+        $permissions[] = 'controllers/Dashboard/index';
+
         $permissions = array_unique($permissions);
 
-        // Apply Role-Based Custom Restrictions
-        $permissions = $this->applyRoleBasedRestrictions($userDetail, $permissions, $permissionAggregated);
+        // Reformat permissions for menu construction with no duplicates and conditional index
+        foreach ($permissions as $perm) {
+            $parts = explode('/', $perm);
+            if (count($parts) <= 2 || $parts[0] !== 'controllers') {
+                continue;
+            }
+
+            $controllerName = $parts[1];
+            $actionName = $parts[2];
+
+            // Skip Acls controller actions from reformatting
+            if ($controllerName === 'Acls') {
+                continue;
+            }
+
+            // Handle student-specific restrictions
+            if ($user->role_id === Configure::read('Roles.STUDENT')) {
+                $student = $user->students[0] ?? null;
+                $acceptedStudent = $student->accepted_students[0] ?? null;
+                if ($acceptedStudent && $acceptedStudent->placementtype === 'REGISTRAR PLACED' &&
+                    in_array($controllerName, ['Preferences', 'AcceptedStudents'])) {
+                    continue;
+                }
+                if ($acceptedStudent && empty($acceptedStudent->placementtype) &&
+                    $acceptedStudent->placement_approved_by_department && $controllerName === 'Preferences') {
+                    continue;
+                }
+            }
+
+            // Initialize controller actions if not set
+            if (!isset($reformatePermission[$controllerName]['action'])) {
+                $reformatePermission[$controllerName]['action'] = [];
+            }
+
+            // Add action only if not already present
+            if (!in_array($actionName, $reformatePermission[$controllerName]['action'])) {
+                $reformatePermission[$controllerName]['action'][] = $actionName;
+            }
+        }
+
+        // Add 'index' automatically only if other actions exist (excluding Acls)
+
+        foreach ($reformatePermission as $controller => &$data) {
+            $actions = array_filter($data['action'], function ($action) {
+                return $action !== 'index';
+            });
+            if (!empty($actions) && !in_array('index', $data['action']) && $controller !== 'Acls') {
+                $data['action'][] = 'index';
+                $permissions[] = "controllers/$controller/index";
+            }
+        }
+
+
+
+        // Handle equivalent ACLs
+        $equivalentACL = Configure::read('ACL.equivalentACL');
+        if (is_array($equivalentACL)) {
+            foreach ($equivalentACL as $parent => $childAcls) {
+                foreach ($childAcls as $childAcl) {
+                    $checking = explode('/', $childAcl);
+                    $parentParts = explode('/', $parent);
+
+                    if ($checking[1] === '*' && isset($reformatePermission[$checking[0]]['action'])) {
+                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
+                    } elseif (isset($reformatePermission[$checking[0]]['action']) && in_array($checking[1], $reformatePermission[$checking[0]]['action'])) {
+                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
+                    }
+                }
+            }
+        }
+
+        // Handle equivalent ACLs
+        $equivalentACL = Configure::read('ACL.equivalentACL');
+        if (is_array($equivalentACL)) {
+            foreach ($equivalentACL as $parent => $childAcls) {
+                foreach ($childAcls as $childAcl) {
+                    $checking = explode('/', $childAcl);
+                    $parentParts = explode('/', $parent);
+
+                    if ($checking[1] === '*' && isset($reformatePermission[$checking[0]]['action'])) {
+                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
+                    } elseif (isset($reformatePermission[$checking[0]]['action']) && in_array($checking[1], $reformatePermission[$checking[0]]['action'])) {
+                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
+                    }
+                }
+            }
+        }
 
         return [
-            'permission' => $permissions,
-            'permissionAggregated' => $permissionAggregated
+            'permission' => array_unique($permissions),
+            'reformatePermission' => $reformatePermission
         ];
+
     }
 
+    /**
+     * Helper to add equivalent permissions.
+     */
+    private function addEquivalentPermissions($sourceController, $targetController, &$reformatePermission, &$permissions)
+    {
+        if (!isset($reformatePermission[$targetController]['action'])) {
+            $reformatePermission[$targetController]['action'] = ['index'];
+        } elseif (!in_array('index', $reformatePermission[$targetController]['action'])) {
+            $reformatePermission[$targetController]['action'][] = 'index';
+        }
+        if (!in_array("controllers/$targetController/index", $permissions)) {
+            $permissions[] = "controllers/$targetController/index";
+        }
+        if (!in_array("controllers/$sourceController/index", $permissions)) {
+            $permissions[] = "controllers/$sourceController/index";
+            $reformatePermission[$sourceController]['action'][] = 'index';
+        }
+    }
+
+
+    /**
+     * Retrieve a list of all controller names from the application's Controller directory.
+     *
+     * @return array List of controller names (without "Controller" suffix).
+     */
+    private function getAllControllers()
+    {
+        $controllers = [];
+        $dir = APP . 'Controller' . DS;
+        foreach (glob($dir . '*Controller.php') as $file) {
+            $filename = basename($file, 'Controller.php');
+            if ($filename !== 'App') {
+                $controllers[] = $filename;
+            }
+        }
+        return $controllers;
+    }
+
+    /**
+     * Retrieve all public action methods for a given controller.
+     *
+     * @param string $controller The controller name.
+     * @return array List of actions.
+     */
+    private function getControllerActions($controller)
+    {
+        $controllerClass = "App\\Controller\\{$controller}Controller";
+        if (!class_exists($controllerClass)) {
+            return [];
+        }
+        $methods = get_class_methods($controllerClass);
+        $baseMethods = get_class_methods('Cake\\Controller\\Controller');
+        $actions = [];
+        foreach ($methods as $method) {
+            // Skip private/protected methods and framework methods
+            if (strpos($method, '_') === 0 || in_array($method, $baseMethods)) {
+                continue;
+            }
+            $actions[] = $method;
+        }
+        return $actions;
+    }
     /**
      * Create ARO Node for User if missing
      */
@@ -865,10 +1059,8 @@ class UsersTable extends Table
     }
 
 
-    public function afterSave($event, $entity, $options)
+    public function afterSave(Event $event, EntityInterface $entity, \ArrayObject $options)
     {
-        parent::afterSave($event, $entity, $options);
-
         $eventManager = $this->getEventManager();
         $isNew = $entity->isNew();
 
@@ -879,12 +1071,13 @@ class UsersTable extends Table
             ]);
             $eventManager->dispatch($userEvent);
         } else {
-            // Use MobileDetect for accurate device info
+            // Initialize MobileDetect
             $detect = new MobileDetect();
-            $browser = ($detect->isMobile() ? 'Mobile' : 'Desktop');
-            $os = ($detect->isTablet() ? 'Tablet' : php_uname('s'));
+            $browser = $detect->isMobile() ? 'Mobile' : 'Desktop';
+            $os = $detect->isTablet() ? 'Tablet' : php_uname('s');
 
-            $request = ServerRequest::createFromGlobals();
+            // Get request from CakePHP
+            $request = \Cake\Http\ServerRequestFactory::fromGlobals();
             $ipAddress = $request->clientIp();
 
             $loginEvent = new Event('Model.User.login', $this, [
@@ -896,7 +1089,6 @@ class UsersTable extends Table
             $eventManager->dispatch($loginEvent);
         }
     }
-
 
     public function syncAccount($isStudent = false)
     {
@@ -1161,6 +1353,148 @@ class UsersTable extends Table
         return true;
     }
 
+
+    public function getUserDetails($userId)
+    {
+        if (!$userId) {
+            return [];
+        }
+
+        // Fetch user details with role
+        $user = $this->find()
+            ->where(['Users.id' => $userId])
+            ->contain(['Roles'])
+            ->select(['id', 'role_id', 'username', 'is_admin', 'email_verified'])
+            ->first();
+
+        if (!$user) {
+            return [];
+        }
+
+        $userDetails = ['User' => $user->toArray(), 'ApplicableAssignments' => []];
+
+        if ($user->role_id == Configure::read('Roles.STUDENT')) {
+            $userDetails += $this->getStudentDetails($userId);
+        } else {
+            $userDetails += $this->getStaffDetails($userId, $user->role_id, $user->is_admin);
+        }
+
+        return $userDetails;
+    }
+
+    private function getStudentDetails($userId)
+    {
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+
+        $student = $studentsTable->find()
+            ->where(['Students.user_id' => $userId])
+            ->contain([
+                'Colleges' => ['fields' => ['id', 'name', 'campus_id', 'stream']],
+                'Departments' => ['fields' => ['id', 'name']],
+                'Programs' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name']]
+            ])
+            ->first();
+
+        if (!$student) {
+            return [];
+        }
+
+        $applicableAssignments = [
+            'college_ids' => [$student->college->id => $student->college->id ?? null],
+            'department_ids' => [$student->department->id => $student->department->id ?? null],
+            'program_ids' => [$student->program->id => $student->program->id ?? null],
+            'program_type_ids' => $this->getEquivalentProgramTypes($student->program_type->id ?? null),
+            'college_permission' => empty($student->department->id) ? 1 : 0,
+            'year_level_names' => ['1st' => '1st'],
+            'last_section' => null
+        ];
+
+        $studentSection = $studentsTable->get($student->id, ['contain' => ['Sections.YearLevels']]);
+        if (!empty($studentSection->section)) {
+            $applicableAssignments['year_level_names'] = [
+                    $studentSection->section->year_level->name ?? 'Pre' => $studentSection->section->year_level->name ?? 'Pre'
+            ];
+            $applicableAssignments['last_section'] = $studentSection->section;
+        }
+
+        return ['ApplicableAssignments' => $applicableAssignments];
+    }
+
+    private function getStaffDetails($userId, $roleId, $isAdmin)
+    {
+        $staffTable = TableRegistry::getTableLocator()->get('Staffs');
+        debug($staffTable);
+
+        $staff = $staffTable->find()
+            ->where(['Staffs.user_id' => $userId])
+            ->contain([
+                'Colleges' => ['fields' => ['id', 'name']],
+                'Departments' => ['fields' => ['id', 'name']]
+            ])
+            ->first();
+
+        if (!$staff) {
+            return [];
+        }
+
+        $activePrograms = TableRegistry::getTableLocator()->get('Programs')
+            ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+            ->toArray();
+
+        $activeProgramTypes = TableRegistry::getTableLocator()->get('ProgramTypes')
+            ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+            ->toArray();
+
+        $applicableAssignments = [
+            'college_ids' => [],
+            'department_ids' => [],
+            'college_permission' => 0,
+            'year_level_names' => []
+        ];
+
+        if (in_array($roleId, [
+            Configure::read('Roles.REGISTRAR'),
+            Configure::read('Roles.MEAL'),
+            Configure::read('Roles.ACCOMODATION')
+        ])) {
+            if ($isAdmin) {
+                $applicableAssignments['program_ids'] = $activePrograms;
+                $applicableAssignments['program_type_ids'] = $activeProgramTypes;
+                $applicableAssignments['college_ids'] = TableRegistry::getTableLocator()->get('Colleges')
+                    ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+                    ->toArray();
+                $applicableAssignments['department_ids'] = TableRegistry::getTableLocator()->get('Departments')
+                    ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+                    ->toArray();
+                $applicableAssignments['year_level_names'] = [0 => 'Pre'];
+            }
+        } else if ($roleId == Configure::read('Roles.COLLEGE')) {
+            $applicableAssignments['college_ids'] = [$staff->college->id => $staff->college->id];
+
+            if (!$isAdmin) {
+                $applicableAssignments['program_ids'] = Configure::read('programs_available_for_registrar_college_level_permissions');
+                $applicableAssignments['program_type_ids'] = Configure::read('program_types_available_for_registrar_college_level_permissions');
+                $applicableAssignments['college_permission'] = 1;
+                $applicableAssignments['year_level_names'] = [0 => 'Pre'];
+            }
+        } else if ($roleId == Configure::read('Roles.DEPARTMENT')) {
+            $applicableAssignments['department_ids'] = [$staff->department->id => $staff->department->id];
+            $applicableAssignments['program_ids'] = $activePrograms;
+            $applicableAssignments['program_type_ids'] = $activeProgramTypes;
+        } else {
+            $applicableAssignments['program_ids'] = $activePrograms;
+            $applicableAssignments['program_type_ids'] = $activeProgramTypes;
+            $applicableAssignments['college_ids'] = TableRegistry::getTableLocator()->get('Colleges')
+                ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+                ->toArray();
+            $applicableAssignments['department_ids'] = TableRegistry::getTableLocator()->get('Departments')
+                ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
+                ->toArray();
+        }
+
+        return ['ApplicableAssignments' => $applicableAssignments];
+    }
     public function getEquivalentProgramTypes($program_type_id = 0)
     {
         $programTypesToLook = [$program_type_id];

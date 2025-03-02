@@ -1,53 +1,26 @@
 <?php
-namespace app\Controller\Component;
+namespace App\Controller\Component;
 
-use Cake\Controller\Controller;
 use Cake\Controller\Component;
+use Cake\Controller\ComponentRegistry;
+
 class EthiopicDateTimeComponent extends Component {
     public $Day=null;
     public $Month=null;
     public $Year=null;
     public $EthTime=null;
     public $ErrorMessage=null;
-	
-    /* public function __construct(ComponentRegistry $collection,$settings = array()) 
-    {
-        parent::__construct($collection, $settings);
-    } */
 
-    public function __construct() 
+    public function __construct(ComponentRegistry $registry, array $config = [])
     {
-        
+        parent::__construct($registry, $config);
     }
-    
-    public function initialize(Controller $controller) 
+    public function initialize(array $config): void
     {
-        //$this->controller = $controller;
-        if (!empty($settings)) {
-			$this->_set($settings);
-		}
-		return true;
+        parent::initialize($config);
     }
 
-	/* public function initialize(Controller $Controller) {
-		if (!empty($settings)) {
-			$this->_set($settings);
-		}
-		return true;
-	} */
 
-    /* function IsValidRange($value, $intMin, $intMax)
-    {
-        if (intMax == -1) {
-            if (value >= intMin)
-                return true;
-        } else {
-            if (value >= intMin && value <= intMax)
-                return true;
-        }
-        return false;
-    } */
-        
     function _IsETLeapYear($intEthYear=null)
     {
         if ((abs(1999 - $intEthYear) % 4) == 0) {
@@ -57,75 +30,12 @@ class EthiopicDateTimeComponent extends Component {
         }
     }
 
-    /* public static function IsValidEthiopicDate($intEthDay, $intEthMonth, $intEthYear)
-    {
-        if (EthiopicDateTime . IsValidRange(intEthDay, 1, 30) == true) {
-            if (EthiopicDateTime . IsValidRange(intEthMonth, 1, 13) == true) {
-                if (EthiopicDateTime . IsValidRange(intEthYear, 1900, 9991)) {
-                    if (EthiopicDateTime . IsETLeapYear(intEthYear) == true) {
-                        if (intEthMonth == 13) {
-                            if (EthiopicDateTime . IsValidRange(intEthDay, 1, 6) == true) {
-                            } else {
-                                //EthiopicDateTime.ErrorMessage = ?? ?1 ??? 6 ??? ??? ????";
-                                return false;
-                            }
-                        }
-                    } else {
-                        if (intEthMonth == 13) {
-                            if (EthiopicDateTime . IsValidRange(intEthDay, 1, 5) == true) {
-                            } else {
-                                //EthiopicDateTime.ErrorMessage = "?? ?1 ??? 5 ??? ??? ????";
-                                return false;
-                            }
-                        }
-                    }
-                } else {
-                    //EthiopicDateTime.ErrorMessage = "??? ?1900 ??? 9991 ??? ??? ????";
-                    return false;
-                }
-            } else {
-                //EthiopicDateTime.ErrorMessage = "?? ?1 ??? 13 ??? ??? ????";
-                return false;
-            }
-        } else {
-            //EthiopicDateTime.ErrorMessage = "?? ?1 ??? 30 ??? ??? ????";
-            return false;
-        }
-        return true;
-    } */
-
-    /* public static function IsValidGregorianDate($intGCDay, $intGCMonth, $intGCYear)
-    {
-        if (EthiopicDateTime . IsValidRange($intGCYear, 1900, 9998) == true) {
-            if (EthiopicDateTime . IsValidRange($intGCMonth, 1, 12) == true) {
-                if (EthiopicDateTime . IsValidRange($intGCDay, 1, DateTime . DaysInMonth($intGCYear, $intGCMonth)) == true) {
-                    return true;
-                } else {
-                    //EthiopicDateTime.ErrorMessage = "?? ?1 ??? " + DateTime.DaysInMonth(intGCYear, intGCMonth) + " ??? ??? ????";
-                    return false;
-                }
-            } else {
-                //EthiopicDateTime.ErrorMessage = "?? ?1 ??? 12 ??? ??? ????";
-                return false;
-            }
-        } else {
-            //EthiopicDateTime.ErrorMessage = "???????? ??? ?1900 ??? 9998 ??? ??? ????";
-            return false;
-        }
-
-    } */
-     
-	function GetEthiopicDate($intGCDay=null, $intGCMonth=null, $intGCYear=null)
+    function GetEthiopicDate($intGCDay=null, $intGCMonth=null, $intGCYear=null)
     {
         $this->_SetEThiopicDate($intGCDay, $intGCMonth, $intGCYear);
         return $this->Day. "/" .$this->Month. "/".$this->Year;
     }
 
-    /* public static function GetGregorianStringFormatedDate($intEthDay, $intEthMonth, $intEthYear)
-    {
-        SetGCDate(intEthDay, intEthMonth, intEthYear);
-        return Convert.ToString(Day) + "/" + Convert.ToString(Month) + "/" + Convert.ToString(Year);
-    } */
 
     function GetGregorianDate($intEthDay = null, $intEthMonth = null, $intEthYear = null)
     {
@@ -163,7 +73,7 @@ class EthiopicDateTimeComponent extends Component {
         return $this->Month;
     }
 
-    function GetEthiopicMonthName($intGCDay = null, $intGCMonth = null, $intGCYear = null) 
+    function GetEthiopicMonthName($intGCDay = null, $intGCMonth = null, $intGCYear = null)
     {
         $e_month = $this->GetEthiopicMonth($intGCDay, $intGCMonth, $intGCYear);
         if ($e_month == 1) {
@@ -540,7 +450,7 @@ class EthiopicDateTimeComponent extends Component {
     }
 
     function _isLeapYear($Iyear = null)
-	{
-		return date('L', mktime(0, 0, 0, 1, 1, $Iyear)) == 1 ? TRUE : FALSE;
-	} 
+    {
+        return date('L', mktime(0, 0, 0, 1, 1, $Iyear)) == 1 ? TRUE : FALSE;
+    }
 }

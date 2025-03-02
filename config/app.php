@@ -75,9 +75,14 @@ return [
      *   The salt value is also used as the encryption key.
      *   You should treat it as extremely sensitive data.
      */
+
     'Security' => [
-        'salt' => env('SECURITY_SALT'),
+        'salt' => env('SECURITY_SALT') ?: 'DasdfjkjklljkWwvniR2G0FgaC67khjsadfjkmi',
+
+        'cipherSeed' => "768593096574535389496749683645"
     ],
+
+
 
     /*
      * Apply timestamps with the last modified time to static assets (js, css, images).
@@ -348,6 +353,8 @@ return [
             'url' => env('LOG_ERROR_URL', null),
             'scopes' => false,
             'levels' => ['warning', 'error', 'critical', 'alert', 'emergency'],
+            'errorLevel' => E_ALL & ~E_USER_DEPRECATED
+
         ],
         // To enable this dedicated query log, you need set your datasource's log flag to true
         'queries' => [

@@ -30,8 +30,13 @@ class RolesTable extends Table
             'foreignKey' => 'role_id',
         ]);
 
-        // Enable ACL Behavior
+        // ✅ Load AclBehavior
         $this->addBehavior('Acl.Acl', ['type' => 'requester']);
+
+
+
+
+
     }
     public function validationDefault(Validator $validator)
     {
@@ -50,8 +55,14 @@ class RolesTable extends Table
         return $rules;
     }
 
+    /**
+     * ACL Behavior parentNode method
+     */
+
     public function parentNode(EntityInterface $entity = null)
     {
         return null;
     }
+
+
 }

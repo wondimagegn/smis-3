@@ -3,6 +3,7 @@ namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
+
 class User extends Entity
 {
     /**
@@ -71,4 +72,12 @@ class User extends Entity
         'password',
         'token',
     ];
+
+    public function parentNode()
+    {
+        if (!$this->role_id) {
+            return null;
+        }
+        return ['Roles' => ['id' => $this->role_id]];
+    }
 }

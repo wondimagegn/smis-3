@@ -43,6 +43,8 @@ use Cake\Mailer\TransportFactory;
 use Cake\Utility\Inflector;
 use Cake\Utility\Security;
 
+use Cake\Core\Plugin;
+
 /*
  * Uncomment block of code below if you want to use `.env` file during development.
  * You should copy `config/.env.example` to `config/.env` and set/modify the
@@ -75,6 +77,8 @@ try {
     exit($e->getMessage() . "\n");
 }
 
+
+
 /*
  * Load an environment local configuration file to provide overrides to your configuration.
  * Notice: For security reasons app_local.php will not be included in your git repo.
@@ -93,6 +97,9 @@ if (Configure::read('debug')) {
     // disable router cache during development
     Configure::write('Cache._cake_routes_.duration', '+2 seconds');
 }
+
+
+
 
 /*
  * Set the default server timezone. Using UTC makes time calculations / conversions easier.
@@ -192,6 +199,8 @@ Type::build('datetime')
 Type::build('timestamp')
     ->useImmutable();
 
+
+
 /*
  * Custom Inflector rules, can be set to correctly pluralize or singularize
  * table, model, controller names or whatever other string is passed to the
@@ -202,6 +211,19 @@ Type::build('timestamp')
 //Inflector::rules('uninflected', ['dontinflectme']);
 //Inflector::rules('transliteration', ['/å/' => 'aa']);
 
+
+
+// Ensure Security.salt is set
+if (!Configure::check('Security.salt')) {
+    Configure::write('Security.salt', 'DasdfjkjklljkWwvniR2G0FgaC67khjsadfjkmi');
+}
+
+
+Log::debug('Security.salt = ' . Configure::read('Security.salt'));
+
+Log::debug('Security.cipherSeed = ' . Configure::read('Security.cipherSeed'));
+
+Log::debug('Security.Datasources = ' . Configure::read('Security.Datasources.default.host'));
 
 
 
@@ -1179,7 +1201,6 @@ define( 'EMAIL_DEFAULT_RETURN_PATH', $email_default_return_path);
 define( 'EMAIL_DEFAULT_TO', $email_default_to);
 define( 'EMAIL_TEST_TO', $email_test_to);
 
-/** End Default email headers */
 
 /** Statuses for the request communications and system modules. */
 define( 'STATUS_CREATED', 'STATUS_CREATED');
@@ -1202,22 +1223,6 @@ define('ROLE_GENERAL', 11);
 define('ROLE_CLEARANCE', 12);
 define('ROLE_MANAGEMENT', 14);
 
-
-Configure::write('ROLE_SYSADMIN', 1 );
-Configure::write('ROLE_INSTRUCTOR', 2);
-Configure::write('ROLE_STUDENT', 3);
-Configure::write('ROLE_REGISTRAR', 4);
-Configure::write('ROLE_COLLEGE', 5);
-Configure::write('ROLE_DEPARTMENT', 6);
-Configure::write('ROLE_MEAL', 7);
-Configure::write('ROLE_HEALTH', 8);
-Configure::write('ROLE_ACCOMODATION', 9);
-Configure::write('ROLE_CONTINUINGANDDISTANCEEDUCTIONPROGRAM', 10);
-Configure::write('ROLE_GENERAL', 11);
-Configure::write('ROLE_CLEARANCE', 12);
-Configure::write('ROLE_MANAGEMENT', 14);
-
-
 /**Program Types ***/
 define('PROGRAM_TYPE_REGULAR', 1);
 define('PROGRAM_TYPE_EVENING', 2);
@@ -1235,6 +1240,60 @@ define('PROGRAM_POST_GRADUATE',2);
 define('PROGRAM_PhD',3);
 define('PROGRAM_PGDT',4);
 define('PROGRAM_REMEDIAL',5);
+
+/** End Default email headers */
+
+/** Statuses for the request communications and system modules. */
+
+Configure::write('Status', [
+    'STATUS_CREATED' => 'STATUS_CREATED',
+    'STATUS_UPDATED' => 'STATUS_UPDATED',
+    'STATUS_SENT' => 'STATUS_SENT'
+]);
+
+
+/**Roles ID can be used for quick reference in the code ***/
+
+Configure::write('Roles', [
+    'SYSADMIN' => 1,
+    'INSTRUCTOR' => 2,
+    'STUDENT' => 3,
+    'REGISTRAR' => 4,
+    'COLLEGE' => 5,
+    'DEPARTMENT' => 6,
+    'MEAL' => 7,
+    'ACCOMODATION' => 9,
+    'CONTINUINGANDDISTANCEEDUCTIONPROGRAM' => 10,
+    'GENERAL' => 11,
+    'CLEARANCE' => 12,
+    'MANAGEMENT' => 13,
+]);
+
+
+
+/**Program Types ***/
+Configure::write('ProgramType', [
+    'REGULAR' => 1,
+    'EVENING' => 2,
+    'SUMMER' => 3,
+    'ADVANCE_STANDING'=>4,
+    'PART_TIME'=>5,
+    'DISTANCE'=>6,
+    'ON_LINE'=>7,
+    'WEEKEND'=>8
+]);
+
+/**Program  ***/
+
+Configure::write('Program', [
+    'UNDEGRADUATE' => 1,
+    'GRADUATE' => 2,
+    'PhD'=>3,
+    'PROGRAM_PGDT' => 4,
+    'PROGRAM_REMEDIAL'=>5
+]);
+
+
 
 /**PLACEMENT ASSIGMENT VARIABLES*/
 define('AUTO_PLACEMENT','AUTO PLACED');

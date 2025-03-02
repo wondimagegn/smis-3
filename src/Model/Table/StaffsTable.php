@@ -12,7 +12,7 @@ class StaffsTable extends Table
     {
         parent::initialize($config);
 
-        $this->setTable('staff');
+        $this->setTable('staffs');
         $this->setPrimaryKey('id');
         $this->setDisplayField('full_name');
 

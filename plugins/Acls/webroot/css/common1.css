@@ -1,0 +1,542 @@
+@utf-8
+.bold {
+font-weight:bold
+}
+
+.user_info {
+    font-weight:bold;
+    padding:17px 22px 0px 0px;
+    color:black;
+
+}
+.message {
+    font-weight:bold;
+	font-size:23px;
+    color:red;
+
+}
+.banner {
+       /* background-image:url(../img/topbar.jpg);
+        background-repeat:no-repeat;*/
+        height:68px;
+       
+}
+.strike_trought_script {
+	background-image:url(../img/sc-diagonal-line.gif);
+}
+
+
+/**
+*Tab menu
+*/
+.TabToggles {
+
+    font-size: 90%;
+    margin-bottom: -1px;
+
+}
+
+.TabToggles:hover {
+    background-color : #ffffff;
+}
+
+.TabToggles a {
+    display: inline-block;
+	color: #003d4c;
+	text-decoration: none;
+    border-top: 1px solid #f0f0f0;
+    border-left: 1px solid #f0f0f0;
+    border-right: 1px solid #f0f0f0;
+    padding: .5em;
+}
+
+.TabToggles a:hover {
+    background: #f1faf0;
+	color: #f73;
+}
+
+.TabToggles a.selected {
+    background: #eef5ee;
+    border-top: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+	color: #b33;
+}
+
+.AddTab {
+    margin: 0;
+    padding: 1em;
+    padding-top: 2em;
+
+    border: 1px solid #ddd;
+}
+
+/*td,p,div { font-family:Arial, Helvetica, sans-serif; font-size:11px;margin:5px 0 0;
+padding:1px 3px}
+
+*/
+/*
+form div label {
+    display: block;
+    float: left;
+    margin: 0 0 5px;
+   
+    text-align: left;
+	
+}
+form td.auto-width label {
+    display: block;
+    float: left;
+    margin: 0 0 5px;
+    padding: 3px 1em;
+    text-align: right;
+    width: auto;
+}
+form div.checkbox label, td.auto-width {
+	width:auto;
+}
+
+label {
+    color: #555555;
+    font-size: 85%;
+    font-weight: normal;
+    padding-right: 1em;
+}
+*/
+
+.date .select {
+    width: auto;
+}
+
+
+/**
+* Profile picture div
+*/
+.profile-picture {
+    border:4px solid white;
+    margin-bottom:4px;
+    outline: 1px solid #C6C6C6
+}
+
+
+input[type=checkbox] {
+	clear: left;
+	float: left;
+	/*margin: 0px 6px 7px 2px;*/
+	margin:0px 2px;
+	width: auto;
+	text-align:left
+}
+div.checkbox label {
+	display: inline; 
+}
+.font {
+    font-size:13px;
+    font-weight:bold
+}
+.basic_data {
+      /*font-size:20px;
+      font-weight:bold;*/
+  
+    font-size: 15px;
+    font-weight: normal;
+    line-height: 1.2em;
+    margin-bottom: 0;
+    text-align: left;
+    vertical-align: top;
+}
+.basic_data_title {
+    color: #888;
+    font-size: 15px;
+    font-weight: normal;
+    line-height: 1.2em;
+    margin-bottom: 0;
+    text-align: left;
+    vertical-align: top;
+    
+}
+.basic_data_value {
+    width: 382px;
+    vertical-align: top;
+    line-height: 1.39em;
+}
+.headerfont {
+    font-size:30px;
+    font-weight:bold;
+}
+.smallheading {
+font-size:20px;
+font-weight:bold;
+}
+
+.largeheading {
+    font-size:30px;
+    font-weight:bold;
+}
+.centeralign_smallheading{
+font-size:20px;
+font-weight:bold;
+text-align: center;
+}
+
+
+/** Tables **/
+table {
+	background: #fff;
+	/*
+	border-right:0;
+	*/
+	clear: both;
+	color: #333;
+	margin-bottom: 10px;
+	width: 100%;
+}
+th {
+	border:0;
+	border-bottom:2px solid #555;
+	text-align: left;
+	padding:4px;
+}
+th a {
+	display: block;
+	padding: 2px 4px;
+	text-decoration: none;
+}
+th a.asc:after {
+	content: ' ⇣';
+}
+th a.desc:after {
+	content: ' ⇡';
+}
+table tr td {
+	background: #fff;
+	padding: 6px;
+	text-align: left;
+	vertical-align: top;
+	border-bottom:1px solid #ddd;
+}
+
+table tr:nth-child(2n) td {
+	background: #f5f5f5;
+}
+table .altrow td {
+	background: #f5f5f5;
+}
+table .small_font td {
+	font-size:6px;
+}
+
+td.actions {
+	text-align: center;
+	white-space: nowrap;
+}
+
+
+table .accepted td {
+	color: green;
+}
+
+table .rejected td {
+	color: red;
+}
+table .exempted td {
+	color: blue;
+}
+
+table .redrow td {
+	color: red;
+}
+
+.font_color {
+	font-weight: bold;
+	color: blue;
+}
+table td.actions a {
+	margin: 0px 6px;
+	padding:2px 5px;
+}
+.cake-sql-log table {
+	background: #f4f4f4;
+}
+.cake-sql-log td {
+	padding: 4px 8px;
+	text-align: left;
+	font-family: Monaco, Consolas, "Courier New", monospaced;
+}
+.cake-sql-log caption {
+	color:#fff;
+}
+/** Scaffold View **/
+dl {
+	
+	line-height: 2em;
+	margin: 0em 0em;
+	width: auto;
+	
+}
+dl .altrow {
+	background: #f4f4f4;
+}
+dt {
+	font-weight: bold;
+	padding-left: 4px;
+	vertical-align: top;
+}
+dd {
+	margin-left: 20em;
+	margin-top: -2em;
+	vertical-align: top;
+}
+#busy-indicator { display:none; }
+
+.flash { border:3px solid #0288D8; background:#689FD8; padding:10px; font-weight:bold; margin:15px 0;font-size:20px;color:white;}
+.flash_success { border:3px solid #bedf5d; background:#e2f1a8; padding:10px; font-weight:bold; margin:15px 0;}
+.flash_failure { border:3px solid #990000; background:#f97d88; padding:10px; font-weight:bold; margin:15px 0;}
+
+.centeralignment {
+    text-align:center;
+}
+/***********************Please use the standard error and 
+success message css which is below for every session message*****************/
+.error-box {
+    background-color:#fff7dd;
+    color:#A31919;
+    font: bold 15px Verdana;
+    line-height:120%;
+    padding:0.8em;
+    margin:1em 0;
+    border:1px solid #A31919;
+    width:auto;
+}
+
+.error-message span {
+    background:url(../img/error-icon.gif) no-repeat 0 0;
+    float:left;
+    width:25px;
+    height:25px;
+    display:block;
+    padding-right:5px;
+}
+
+.success-message span {
+    background:url(../img/success-icon.gif) no-repeat 0 0;
+    float:left;
+    width:25px;
+    height:25px;
+    display:block;
+    padding-right:5px;
+}
+.success-box {
+    background-color:#d5f9d5;
+    border:1px solid #9ae89a;
+
+
+
+    color:#333;
+    font: bold 15px Verdana;
+    line-height:120%;
+    padding:0.8em;
+    margin:1em 0;
+}
+
+.error {
+   
+    color:red;
+    font-family: Verdana;
+   
+}
+
+
+.info-message span {
+    background:url(../img/info-icon.gif) no-repeat 0 0;
+    float:left;
+    width:25px;
+    height:25px;
+    display:block;
+    padding-right:5px;
+}
+.info-box {
+    background-color:#d7e8f1;
+    border:1px solid #91cae8;
+    color:#333;
+    font: bold 15px Verdana;
+    line-height:120%;
+
+    padding:0.8em;
+    margin:1em 0;
+}
+
+.warning-message span {
+    background:url(../img/warning-icon.gif) no-repeat 0 0;
+    float:left;
+    width:25px;
+    height:25px;
+    display:block;
+    padding-right:5px;
+}
+.warning-box {
+    background-color:#f9efcf;
+    border:1px solid #f9dc83;
+    color:#333;
+    font: bold 15px Verdana;
+    line-height:120%;
+    padding:0.8em;
+    margin:1em 0;
+}
+
+/*********************************end*******************************/
+
+
+/******************************dahsboard**********************************/
+
+.dashboard {
+    color:white;
+    font: bold 15px Verdana;    
+}
+
+.footerbox {
+	background:#CCE7F7;
+    background-image:url(/img/mereb-logo-footer.gif);
+    background-position:110px 4px;
+    background-repeat:no-repeat;
+	margin-bottom:20px;
+	padding:10px 10px 1px 10px; 
+	margin-top:20px;
+	font-family:verdana;
+	text-align:center;
+}
+
+/*the basics, and works for FF*/
+#busy_indicator {
+	  display: none;
+    margin:0px 0px 0px 0px;
+	position:fixed;
+	height: 100%;
+	z-index:9999;
+	padding-top:200px;
+	padding-left:50px;
+	width:100%;
+	clear:none;
+	background:url(/img/transbg2.png);
+	
+}
+
+img.displayed {
+    display: block;
+    margin-left: auto;
+    margin-right: auto 
+    
+}
+
+option {
+	font-size: 120%;
+	padding: 0 3px;
+}
+.oneLineRadioButtons {
+  margin: 0;
+  padding: 0;
+  padding-left: 0.5em;
+  display: inline-block;
+  float: none;
+  clear: none;
+}
+
+.oneLineRadioButtons input[type=radio] {
+  margin: 0;
+  padding: 0;
+  clear: none;
+  display: inline-block;
+}
+
+.oneLineRadioButtons label {
+  clear: none;
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+ /* padding-right: 1.5em;
+  padding-left: 0.5em; */
+  display: inline-block;
+}
+
+
+
+/*IE will need an 'adjustment'*/
+* html #busy_indicator {
+     position: absolute;
+     height: expression(document.body.scrollHeight &gt; 
+     document.body.offsetHeight ? document.body.scrollHeight : document.body.offsetHeight + 'px');
+}
+
+#loading { position:relative; width:Xpx; height:Ypx }
+#loadingColor {
+    position:absolute; top:0; left:0;
+    width:100%; height:100%;
+    opacity:.25; filter:alpha(opacity=25)
+}
+
+tr.linethough td {
+        text-decoration:line-through;
+}
+
+.checkboxTable div {
+    background-color: #FFFFFF;
+    clear: none;
+    float: left;
+    margin: 0;
+    padding: 0;
+    width: 22em;
+}
+
+.fs15 {
+font-size:15px
+}
+
+.fs14 {
+font-size:14px
+}
+
+.fs13 {
+font-size:13px
+}
+
+.fs12 {
+font-size:12px
+}
+
+.fs16 {
+font-size:16px
+}
+
+.on-process {
+color:#fcb819
+}
+
+.accepted{
+color:green
+}
+
+.rejected {
+color:red
+}
+.exempted {
+ color:blue;
+}
+
+form .required label:after {
+	color: #e32;
+	content: '*';
+	display:inline;
+}
+
+.tabs dd, .tabs .tab-title {
+    position: relative;
+    margin-bottom: 0px !important;
+    list-style: outside none none;
+    float: left;
+    border-right: 2px solid #ddd;
+}
+
+select {
+    width: auto;
+}

@@ -1,10 +1,13 @@
 <?php
 namespace App\Controller;
-
 use Cake\Controller\Controller;
 use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
 use Cake\Core\Configure;
+use Cake\Auth\DefaultPasswordHasher;
+use App\Auth\LegacyPasswordHasher;
+
+use Cake\Utility\Inflector; // Import Inflector from the correct namespace
 
 class AppController extends Controller
 {
@@ -37,34 +40,24 @@ class AppController extends Controller
     public function initialize()
     {
         parent::initialize();
-        $this->loadComponent('RequestHandler');
+        $this->loadComponent('Acl', [
+            'className' => 'Acl.Acl'
+        ]);
+
         // Load Auth only once
         $this->loadComponent('Auth', [
+            //'authorize' => ['Acl'],
+            // 'Acl.Actions' => ['actionPath' => 'controllers/'],
+            'authorize' => ['Acl'],
             'authenticate' => [
                 'Form' => [
                     'fields' => [
-                        'username' => 'email', // OR 'username' depending on your login field
+                        'username' => 'username', // OR 'username' depending on your login field
                         'password' => 'password'
-                    ]
+                    ],
+                    'passwordHasher' => LegacyPasswordHasher::class // Use Legacy Hasher
                 ]
             ],
-            'loginAction' => [
-                'controller' => 'Users',
-                'action' => 'login'
-            ],
-            'logoutRedirect' => [
-                'controller' => 'Users',
-                'action' => 'login'
-            ],
-            'authError' => 'You are not authorized to access that page.',
-            'storage' => 'Session'
-        ]);
-        $this->loadComponent('Flash');
-
-
-        /*
-        $this->loadComponent('Auth', [
-            'authorize' => ['Controller'],
             'loginAction' => [
                 'controller' => 'Users',
                 'action' => 'login',
@@ -78,9 +71,15 @@ class AppController extends Controller
                 'controller' => 'Dashboard',
                 'action' => 'index'
             ],
-            'authError' => 'You do not have permission to access this page.'
+
+            'authError' => 'You are not authorized to access that page.',
+            'storage' => 'Session'
         ]);
-        */
+
+        $this->loadComponent('RequestHandler');
+        $this->loadComponent('Flash');
+        $this->loadComponent('MenuOptimized');
+
     }
 
     protected function _findIp()
@@ -93,14 +92,15 @@ class AppController extends Controller
         parent::beforeFilter($event);
 
         $session = $this->request->getSession();
+        debug($session);
 
         if ($session->check('Auth.User')) {
             $auth = $session->read('Auth.User');
-
             if (!empty($auth)) {
                 $this->set('username', $auth['username']);
                 $this->set('last_login', $auth['last_login']);
                 $this->set('user_id', $auth['id']);
+
 
                 $userTable = TableRegistry::getTableLocator()->get('Users');
                 $permissionLists = $userTable->getAllPermissions($auth['id']);
@@ -190,6 +190,22 @@ class AppController extends Controller
                         return $this->redirect(['controller' => 'Alumni', 'action' => 'add']);
                     }
                 }
+            }
+        }
+
+        $user = $this->Auth->user();
+        if ($user) {
+
+            //$aco = "controllers/{$this->name}/{$this->request->getParam('action')}";
+            $acoPath = "controllers/" . Inflector::camelize($this->name) . "/{$this->request->getParam('action')}";
+
+            if (!$this->Acl->check(
+                ['model' => 'Users', 'foreign_key' =>  $user['id']],
+                $acoPath
+            )) {
+
+                $this->Flash->error('You are not authorized to access that location.');
+                return $this->redirect(['controller' => 'Pages', 'action' => 'home']);
             }
         }
     }

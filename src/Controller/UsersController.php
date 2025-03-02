@@ -1,23 +1,46 @@
 <?php
 namespace App\Controller;
-
-use Cake\Controller\Controller;
 use Cake\Event\Event;
-use Cake\ORM\TableRegistry;
 use Cake\Mailer\Email;
-use Cake\Network\Exception\NotFoundException;
 use Cake\Utility\Security;
-use Cake\Validation\Validator;
+use Cake\Core\Configure;
+use Cake\Log\Log;
+
 
 class UsersController extends AppController
 {
+    public $name = 'Users';
+
+    public $menuOptions = array(
+        //'parent' => 'dashboard',
+        'parent' => 'security',
+        'exclude' => array(
+            'resetpassword',
+            'assign',
+            'assign_user_dorm_block',
+            'assign_user_meal_hall',
+            'cancel_task_confirmation',
+            'build_user_menu',
+            'confirm_task',
+            'editprofile'
+        ),
+        'alias' => array(
+            'index' => 'List All Users',
+            'add' => 'Create User',
+            'changePwd' => 'Change Your Password',
+            'department_create_user_account' => 'Create User Account'
+        ),
+        'weight' => -2,
+    );
+
     public function initialize()
     {
         parent::initialize();
-
+        $this->loadComponent('Attempt');
+        $this->loadComponent('MathCaptcha');
         $this->loadComponent('Paginator');
         $this->loadComponent('Flash');
-        $this->Auth->allow(['login', 'logout', 'search', 'resetpassword']);
+        $this->Auth->allow(['login', 'logout','forget', 'search', 'resetpassword']);
     }
 
     public $loginAttemptLimit = 3;
@@ -26,8 +49,7 @@ class UsersController extends AppController
     public function beforeRender(Event $event)
     {
         parent::beforeRender($event);
-        // Ensure passwords are not sent to views
-        unset($this->request->data['password']);
+
     }
 
     public function beforeFilter(Event $event)
@@ -127,15 +149,34 @@ class UsersController extends AppController
                 $failedLogins = $user->failed_login;
 
                 if ($this->Attempt->limit($username, 'login', $number_of_login_attempt)) {
+                    $user = $this->Auth->identify();
+                    debug($user['active']);
+
                     if ($this->Auth->identify()) {
-                        if ($user->active) {
+                        if ($user['active']) {
+
                             $this->Auth->setUser($user);
-                            $user->failed_login = 0;
-                            $user->last_login = date('Y-m-d H:i:s');
-                            $this->Users->save($user);
+                            // Ensure $user is an entity before saving
+                            $userEntity = $this->Users->get($user['id']);  // Retrieve the existing user entity
+                            $userEntity = $this->Users->patchEntity($userEntity, ['last_login' => date('Y-m-d H:i:s')]);
+                            // Save the updated user entity
+                            $this->Users->save($userEntity);
                             $session->write('User.is_logged_in', true);
 
-                            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
+                            if ($user) {
+                                // Automatically update old passwords to new hashing method
+                                if (strlen($user['password']) < 60) { // SHA1 is shorter than Bcrypt
+                                    $userEntity = $this->Users->get($user['id']);
+                                    $userEntity->password = $this->request->getData('password');
+                                    $this->Users->save($userEntity);
+                                    Log::info("User password updated to Bcrypt: " . $user['username']);
+                                }
+
+                                $this->Auth->setUser($user);
+                             //   $this->redirect('/');
+                            }
+                            return $this->redirect($this->Auth->redirectUrl());
+
                         } else {
                             // Redirect graduated students
                             if ($user->role_id == ROLE_STUDENT) {
@@ -152,8 +193,8 @@ class UsersController extends AppController
                         }
                     } else {
                         // Failed login attempt
-                        $user->failed_login++;
-                        $this->Users->save($user);
+                        //$user->failed_login++;
+                        //$this->Users->save($user);
                         $this->Flash->error(__('Your password is incorrect. Please try again.'));
                         $this->Attempt->fail($username, 'login', $this->loginAttemptDuration);
                     }
@@ -163,10 +204,12 @@ class UsersController extends AppController
 
                     if (!empty($data['security_code']) && $this->MathCaptcha->validates($data['security_code'])) {
                         if ($this->Auth->identify()) {
-                            $this->Auth->setUser($user);
-                            $user->last_login = date('Y-m-d H:i:s');
-                            $this->Users->save($user);
-                            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
+
+                            $userEntity = $this->Users->get($user['id']);  // Retrieve the existing user entity
+                            $userEntity = $this->Users->patchEntity($userEntity, ['last_login' => date('Y-m-d H:i:s')]);
+                            // Save the updated user entity
+                            $this->Users->save($userEntity);
+                            return $this->redirect($this->Auth->redirectUrl());
                         } else {
                             $this->Attempt->fail($username, 'login', $this->loginAttemptDuration);
                             $this->Flash->error(__('Invalid password. Too many failed attempts will lock your account.'));
@@ -181,6 +224,101 @@ class UsersController extends AppController
             }
         }
     }
+    public function forget()
+    {
+        // Redirect logged-in users to change password
+        if ($this->Auth->user()) {
+            $this->Flash->error('You do not need to use forget password while you are logged in. Please use the change password form instead!');
+            return $this->redirect(['action' => 'changePwd']);
+        }
+
+        // Set layout
+        $this->viewBuilder()->setLayout('login');
+
+        if ($this->request->is('post')) {
+            $email = strtolower(trim($this->request->getData('email')));
+
+            if (empty($email)) {
+                $this->Flash->error('Please enter an email address.');
+            } else {
+                // Validate math captcha
+                if ($this->MathCaptcha->validates($this->request->getData('security_code'))) {
+                    $this->loadModel('Users');
+
+                    // Find users with the given email
+                    $userCount = $this->Users->find()->where(['email' => $email])->count();
+
+                    if ($userCount == 0) {
+                        $this->Flash->error('Sorry, the system couldn\'t find your email address.');
+                        return $this->redirect('/');
+                    }
+
+                    if ($userCount >= 1) {
+                        $user = $this->Users->find()
+                            ->contain(['Students', 'Staffs'])
+                            ->where(['Users.email' => $email, 'Users.active' => 1])
+                            ->order(['Users.created' => 'DESC'])
+                            ->first();
+
+                        if (!$user) {
+                            $this->Flash->error('There are accounts registered with your email, but none of them are active!');
+                            return $this->redirect('/');
+                        }
+
+                        if (!isset($user->email)) {
+                            $this->Flash->error('Sorry, the system couldn\'t find your email address. Make sure you are using the email you provided when your account was created.');
+                            return $this->redirect('/');
+                        }
+
+                        if (!$user->active) {
+                            $this->Flash->error('This account is deactivated. Please contact your system administrator.');
+                            return $this->redirect('/');
+                        }
+
+                        // Generate reset token
+                        $hashyToken = Security::hash(date('mdY') . rand(4000000, 4999999), 'sha256', true);
+                        $message = $this->Ticketmaster->createMessage($hashyToken);
+
+                        // Send email using CakePHP Email class
+                        $emailInstance = new Email('default');
+                        $emailInstance->setTemplate('password_reset')
+                            ->setEmailFormat('html')
+                            ->setTo($email)
+                            ->setSubject('SMiS Password Reset')
+                            ->setViewVars(['message' => $message]);
+
+                        if ($emailInstance->send()) {
+                            $this->Flash->success('Check your email. The password reset email has been sent successfully to ' . $email);
+                        } else {
+                            $this->Flash->error('Email not sent. Please check your email SMTP settings and ensure the email server is running.');
+                        }
+
+                        // Save ticket
+                        $this->loadModel('Tickets');
+                        $ticket = $this->Tickets->newEntity([
+                            'hash' => $hashyToken,
+                            'data' => $email,
+                            'expires' => $this->Ticketmaster->getExpirationDate()
+                        ]);
+
+                        if ($this->Tickets->save($ticket)) {
+                            $this->Flash->success('An email has been sent to "' . $email . '" with instructions to reset your SMiS password. Please check your email!');
+                            return $this->redirect('/');
+                        } else {
+                            $this->Flash->error('Ticket could not be issued. Please try again later.');
+                            return $this->redirect('/');
+                        }
+                    }
+                } else {
+                    $this->Flash->error('Please enter the correct answer to the math question.');
+                }
+            }
+        }
+
+        // Generate math captcha
+        $this->set('mathCaptcha', $this->MathCaptcha->generateEquation());
+    }
+
     public function logout()
     {
         $session = $this->getRequest()->getSession();
@@ -190,3 +328,4 @@ class UsersController extends AppController
     }
 
 }
+
