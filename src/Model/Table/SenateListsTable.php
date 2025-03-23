@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -72,7 +73,7 @@ class SenateListsTable extends Table
             $options['conditions']['Student.program_type_id'] = $program_type_id;
         } else {
             App::import('Component', 'Auth');
-            $Auth = new AuthComponent(new ComponentRegistry);
+            $Auth = new AuthComponent(new ComponentRegistry());
             if ($Auth->user('role_id') == ROLE_REGISTRAR && $Auth->user('is_admin') != 1) {
                 if ($program_type_id == 0) {
                     $userPermissions = ClassRegistry::init('User')->getUserDetails($Auth->user('id'));
@@ -157,7 +158,7 @@ class SenateListsTable extends Table
         debug($exptionPoint);
 
         if (isset($studentnumber) && !empty($studentnumber)) {
-            $studentnumberQuoted = "'" . trim($studentnumber). "%'";
+            $studentnumberQuoted = "'" . trim($studentnumber) . "%'";
             $studentLists = $this->query(
                 "SELECT student_id, SUM(credit_hour_sum) FROM  student_exam_statuses
 				WHERE student_id IN (select id from students where graduated = 0 and department_id = $department_id and studentnumber LIKE $studentnumberQuoted and program_id = $program_id)
@@ -165,7 +166,7 @@ class SenateListsTable extends Table
 				and student_id NOT IN (SELECT student_id FROM graduate_lists where student_id IN (select id from students where studentnumber LIKE $studentnumberQuoted))
 				GROUP BY student_id HAVING SUM(credit_hour_sum) >= " . ($minimumPointofCurriculum['Curriculum']['minimum_credit_points'] - $exptionPoint - $notUsedInCGPACreditSum) * ($percentCompletedCredit) . ""
             );
-        } else if (isset($program_type_id) && !empty($program_type_id)) {
+        } elseif (isset($program_type_id) && !empty($program_type_id)) {
             $studentLists = $this->query(
                 "SELECT student_id, SUM(credit_hour_sum) FROM  student_exam_statuses
 				WHERE student_id in (select id from students where graduated = 0 and department_id = $department_id and program_id = $program_id and program_type_id = $program_type_id)
@@ -263,11 +264,8 @@ class SenateListsTable extends Table
         $filtered_students = array();
 
         if (!empty($students)) {
-
             foreach ($students as $key => $student) {
-
                 if (isset($student['Curriculum']['id'])) {
-
                     $credit_sum = 0;
 
                     $donot_consider_cgpa = false;
@@ -298,11 +296,9 @@ class SenateListsTable extends Table
                             $justsummedandtaken += $course_registration['PublishedCourse']['Course']['credit'];
 
                             if (!$this->Student->CourseRegistration->isCourseDroped($course_registration['id']) && $course_registration['PublishedCourse']['drop'] == 0 && $this->Student->CourseRegistration->ExamGrade->isRegistrationAddForFirstTime($course_registration['id'], 1, 1)) {
-
                                 $credit_sum += $course_registration['PublishedCourse']['Course']['credit'];
 
                                 if ($student['Curriculum']['id'] != $course_registration['PublishedCourse']['Course']['curriculum_id']) {
-
                                     $course_ids = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse($course_registration['PublishedCourse']['course_id'], $student['Curriculum']['id']);
                                     $course_cat_mapped = ClassRegistry::init('EquivalentCourse')->courseEquivalentCategory($course_registration['PublishedCourse']['course_id'], $student['Curriculum']['id']);
 
@@ -314,7 +310,6 @@ class SenateListsTable extends Table
                                     }
                                 } else {
                                     if (isset($course_registration['PublishedCourse']['Course']['CourseCategory']['name']) && !isset($course_categories[$course_registration['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'])) {
-
                                         $course_ids = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse($course_registration['PublishedCourse']['course_id'], $student['Curriculum']['id']);
                                         $course_cat_mapped = ClassRegistry::init('EquivalentCourse')->courseEquivalentCategory($course_registration['PublishedCourse']['course_id'], $student['Curriculum']['id']);
                                         //debug($course_cat_mapped);
@@ -324,7 +319,7 @@ class SenateListsTable extends Table
                                         } else {
                                             $course_categories[$course_registration['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'] = 0;
                                         }
-                                    } else if (isset($course_registration['PublishedCourse']['Course']['CourseCategory']['name'])) {
+                                    } elseif (isset($course_registration['PublishedCourse']['Course']['CourseCategory']['name'])) {
                                         $course_categories[$course_registration['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'] += $course_registration['PublishedCourse']['Course']['credit'];
                                     }
                                 }
@@ -353,17 +348,14 @@ class SenateListsTable extends Table
 
                     if (isset($student['CourseAdd']) && !empty($student['CourseAdd'])) {
                         foreach ($student['CourseAdd'] as $key => $course_add) {
-
                             //debug($this->Student->CourseRegistration->ExamGrade->isRegistrationAddForFirstTime($course_add['id'], 0, 1));
                             //debug($course_add);
 
                             if ($course_add['registrar_confirmation'] && $this->Student->CourseRegistration->ExamGrade->isRegistrationAddForFirstTime($course_add['id'], 0, 1)) {
-
                                 $credit_sum += $course_add['PublishedCourse']['Course']['credit'];
                                 $addSum += $course_add['PublishedCourse']['Course']['credit'];
 
                                 if ($student['Curriculum']['id'] != $course_add['PublishedCourse']['Course']['curriculum_id']) {
-
                                     //debug($course_add['PublishedCourse']['Course']);
 
                                     $course_ids = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse($course_add['PublishedCourse']['course_id'], $student['Curriculum']['id']);
@@ -376,9 +368,7 @@ class SenateListsTable extends Table
                                         $course_categories[$course_cat_mapped]['taken_credit'] += $course_add['PublishedCourse']['Course']['credit'];
                                     }
                                 } else {
-
                                     if (isset($course_add['PublishedCourse']['Course']['CourseCategory']['name']) && !isset($course_categories[$course_add['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'])) {
-
                                         //debug($course_add['PublishedCourse']['Course']['CourseCategory']['name']);
                                         $course_ids = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse($course_add['PublishedCourse']['course_id'], $student['Curriculum']['id']);
 
@@ -391,8 +381,7 @@ class SenateListsTable extends Table
                                         } else {
                                             $course_categories[$course_add['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'] = 0;
                                         }
-
-                                    } else if (isset($course_add['PublishedCourse']['Course']['CourseCategory']['name'])) {
+                                    } elseif (isset($course_add['PublishedCourse']['Course']['CourseCategory']['name'])) {
                                         //debug($course_add['PublishedCourse']['Course']['CourseCategory']['name']);
                                         $course_categories[$course_add['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'] += $course_add['PublishedCourse']['Course']['credit'];
                                     }
@@ -444,7 +433,6 @@ class SenateListsTable extends Table
                     $student_curriculum_course_id_list = array();
 
                     if (!empty($studentAttachedCurriculumIds)) {
-
                         $student_curriculum_course_list = $this->Student->Curriculum->Course->find('list', array(
                             'conditions' => array(
                                 'Course.curriculum_id' => $studentAttachedCurriculumIds,
@@ -525,7 +513,6 @@ class SenateListsTable extends Table
 
 
                                     if (!empty($grade_detail) && isset($grade_detail['ExamGrade']['grade']) && !empty($grade_detail['ExamGrade']['grade'])) {
-
                                         $latestApprovedGrade = $this->Student->CourseRegistration->ExamGrade->getApprovedGrade($course_registration['id'], 1);
 
                                         // fix invalid grades NG, I, F, Fx, Fail in exam_grades if they have a valid grade changes
@@ -536,7 +523,7 @@ class SenateListsTable extends Table
                                                 $grade_detail['ExamGrade']['grade'] = $latestApprovedGrade['grade'];
                                             }
                                             //debug($grade_detail);
-                                        } else if (isset($latestApprovedGrade['grade_change_id']) && !empty($latestApprovedGrade['grade_change_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
+                                        } elseif (isset($latestApprovedGrade['grade_change_id']) && !empty($latestApprovedGrade['grade_change_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
                                             // for repeated courses that have a grade change through supplementary exam grade change
                                             //debug($grade_detail);
                                             //debug($latestApprovedGrade);
@@ -545,9 +532,30 @@ class SenateListsTable extends Table
 
                                         if (isset($grade_detail['ExamGrade']['course_registration_id']) && $course_registration['id'] == $grade_detail['ExamGrade']['course_registration_id'] && isset($latestApprovedGrade['pass_grade']) && !$latestApprovedGrade['pass_grade'] && empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
                                             $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_registration['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_registration['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_registration['PublishedCourse']['academic_year'] . ', ' . ($course_registration['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_registration['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_registration['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_registration['PublishedCourse']['semester'])))  . ' semester. (Course Registration)';
-                                        } else if (isset($grade_detail['ExamGrade']['course_registration_id']) && $course_registration['id'] == $grade_detail['ExamGrade']['course_registration_id'] && isset($latestApprovedGrade['point_value']) && $latestApprovedGrade['point_value'] >= 0 && !$latestApprovedGrade['pass_grade'] && !empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
+                                        } elseif (isset($grade_detail['ExamGrade']['course_registration_id']) && $course_registration['id'] == $grade_detail['ExamGrade']['course_registration_id'] && isset($latestApprovedGrade['point_value']) && $latestApprovedGrade['point_value'] >= 0 && !$latestApprovedGrade['pass_grade'] && !empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
                                             $courses_with_failed_grade[] = 'Failed Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_registration['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_registration['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_registration['PublishedCourse']['academic_year'] . ', ' . ($course_registration['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_registration['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_registration['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_registration['PublishedCourse']['semester'])))  . ' semester. (Course Registration)';
-                                        } else if (isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                                        } elseif (isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'NG'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'DO'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'I'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'F'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'W'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'Fx'
+                                                ) == 0 || strcasecmp(
+                                                    $grade_detail['ExamGrade']['grade'],
+                                                    'Fail'
+                                                ) == 0)) {
                                             $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_registration['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_registration['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_registration['PublishedCourse']['academic_year'] . ', ' . ($course_registration['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_registration['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_registration['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_registration['PublishedCourse']['semester'])))  . ' semester. (Course Registration)';
                                         }
                                     }
@@ -555,7 +563,7 @@ class SenateListsTable extends Table
 
                                     /// add exam grade pass and fail check, recently students with the fail grade( like D set as fail grade) appear in seenate list.
 
-                                    if (empty($grade_detail) && !$incomplete_grade ) {
+                                    if (empty($grade_detail) && !$incomplete_grade) {
                                         //debug($grade_detail);
                                         //debug($course_registration['id']);
                                         if (isset($course_registration['ExamGrade']) && !empty($course_registration['ExamGrade']) && count($course_registration['ExamGrade']) > 1) {
@@ -575,7 +583,25 @@ class SenateListsTable extends Table
                                         //debug($incomplete_grade);
                                         //$incomplete_grade = true;
                                         //$donot_consider_cgpa = true;
-                                    } else if (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                                    } elseif (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'NG'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'DO'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'I'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'F'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'W'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'Fx'
+                                            ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
                                         //debug($invalid_grade);
                                         //debug($grade_detail['ExamGrade']);
                                         //$filtered_students[$cid][$index]['disqualification'][] = 'Student has invalid grade. Any of the student grade should not contain NG, I, DO, W, FAIL, Fx/F.';
@@ -594,7 +620,7 @@ class SenateListsTable extends Table
                                     if (($student['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student['Student']['program_id'] == PROGRAM_PhD) && isset($grade_detail['ExamGrade']['grade']) && !empty($grade_detail['ExamGrade']['grade']) && isset($grade_detail['ExamGrade']['course_registration_id']) && $course_registration['id'] == $grade_detail['ExamGrade']['course_registration_id']) {
                                         if (strcasecmp($grade_detail['ExamGrade']['grade'], 'C+') == 0) {
                                             $courses_with_c_plus[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_registration['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_registration['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_registration['PublishedCourse']['academic_year'] . ', ' . ($course_registration['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_registration['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_registration['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_registration['PublishedCourse']['semester'])))  . ' semester. (Course Registration)';
-                                        } else if (strcasecmp($grade_detail['ExamGrade']['grade'], 'C') == 0) {
+                                        } elseif (strcasecmp($grade_detail['ExamGrade']['grade'], 'C') == 0) {
                                             $courses_with_c[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_registration['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_registration['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_registration['PublishedCourse']['academic_year'] . ', ' . ($course_registration['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_registration['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_registration['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_registration['PublishedCourse']['semester'])))  . ' semester. (Course Registration)';
                                         }
                                     }
@@ -622,7 +648,6 @@ class SenateListsTable extends Table
 
 
                                 if (!empty($grade_detail) && isset($grade_detail['ExamGrade']['grade']) && !empty($grade_detail['ExamGrade']['grade'])) {
-
                                     $latestApprovedGrade = $this->Student->CourseRegistration->ExamGrade->getApprovedGrade($course_add['id'], 0);
 
                                     // fix invalid grades NG, I, F, Fx, Fail in exam_grades if they have a valid grade changes
@@ -633,7 +658,7 @@ class SenateListsTable extends Table
                                             $grade_detail['ExamGrade']['grade'] = $latestApprovedGrade['grade'];
                                         }
                                         //debug($grade_detail);
-                                    } else if (isset($latestApprovedGrade['grade_change_id']) && !empty($latestApprovedGrade['grade_change_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
+                                    } elseif (isset($latestApprovedGrade['grade_change_id']) && !empty($latestApprovedGrade['grade_change_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
                                         // for repeated courses that have a grade change through supplementary exam grade change
                                         //debug($grade_detail);
                                         //debug($latestApprovedGrade);
@@ -641,11 +666,41 @@ class SenateListsTable extends Table
                                     }
 
                                     if (isset($grade_detail['ExamGrade']['course_add_id']) && $course_add['id'] == $grade_detail['ExamGrade']['course_add_id'] && isset($latestApprovedGrade['pass_grade']) && !$latestApprovedGrade['pass_grade'] && empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
-                                        $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st': ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester. (Course Add)';
-                                    } else if (isset($grade_detail['ExamGrade']['course_add_id']) && $course_add['id'] == $grade_detail['ExamGrade']['course_add_id'] && isset($latestApprovedGrade['point_value']) && !empty($latestApprovedGrade['point_value']) && $latestApprovedGrade['point_value'] >= 0 && !$latestApprovedGrade['pass_grade'] && !empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
-                                        $courses_with_failed_grade[] = 'Failed Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st': ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester. (Course Add)';
-                                    } else if (isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
-                                        $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) . ' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st': ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester. (Course Add)';
+                                        $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_title']
+                                            )) . ' (' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_code']
+                                            )) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester']))) . ' semester. (Course Add)';
+                                    } elseif (isset($grade_detail['ExamGrade']['course_add_id']) && $course_add['id'] == $grade_detail['ExamGrade']['course_add_id'] && isset($latestApprovedGrade['point_value']) && !empty($latestApprovedGrade['point_value']) && $latestApprovedGrade['point_value'] >= 0 && !$latestApprovedGrade['pass_grade'] && !empty($latestApprovedGrade['grade_scale_id']) && $grade_detail['ExamGrade']['id'] == $latestApprovedGrade['grade_id']) {
+                                        $courses_with_failed_grade[] = 'Failed Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_title']
+                                            )) . ' (' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_code']
+                                            )) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester']))) . ' semester. (Course Add)';
+                                    } elseif (isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'NG'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'DO'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'I'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'F'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'W'
+                                            ) == 0 || strcasecmp(
+                                                $grade_detail['ExamGrade']['grade'],
+                                                'Fx'
+                                            ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                                        $courses_with_failed_grade[] = 'Invalid Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_title']
+                                            )) . ' (' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_code']
+                                            )) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester']))) . ' semester. (Course Add)';
                                     }
                                 }
 
@@ -657,7 +712,25 @@ class SenateListsTable extends Table
                                     //debug($course_add['id']);
                                     $incomplete_grade = true;
                                     $donot_consider_cgpa = true;
-                                } else if (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                                } elseif (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'NG'
+                                        ) == 0 || strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'DO'
+                                        ) == 0 || strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'I'
+                                        ) == 0 || strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'F'
+                                        ) == 0 || strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'W'
+                                        ) == 0 || strcasecmp(
+                                            $grade_detail['ExamGrade']['grade'],
+                                            'Fx'
+                                        ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
                                     /* if (isset($grade_detail['ExamGrade']['course_add_id']) && $course_add['id'] == $grade_detail['ExamGrade']['course_add_id']) {
                                         $filtered_students[$cid][$index]['disqualification'][] = 'The student have invalid grade (' . $grade_detail['ExamGrade']['grade'] . ') from course add in '. $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester for ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) .' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) .'). Any of the student grade should not contain NG, I, DO, W, FAIL, Fx/F.';
                                     } else {
@@ -671,9 +744,17 @@ class SenateListsTable extends Table
 
                                 if (($student['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student['Student']['program_id'] == PROGRAM_PhD) && isset($grade_detail['ExamGrade']['grade']) && !empty($grade_detail['ExamGrade']['grade']) && isset($grade_detail['ExamGrade']['course_add_id']) && $course_add['id'] == $grade_detail['ExamGrade']['course_add_id']) {
                                     if (strcasecmp($grade_detail['ExamGrade']['grade'], 'C+') == 0) {
-                                        $courses_with_c_plus[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) .' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester. (Course Add)';
-                                    } else if (strcasecmp($grade_detail['ExamGrade']['grade'], 'C') == 0) {
-                                        $courses_with_c[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim($course_add['PublishedCourse']['Course']['course_title'])) .' (' . (trim($course_add['PublishedCourse']['Course']['course_code'])) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester'])))  . ' semester. (Course Add)';
+                                        $courses_with_c_plus[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_title']
+                                            )) . ' (' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_code']
+                                            )) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester']))) . ' semester. (Course Add)';
+                                    } elseif (strcasecmp($grade_detail['ExamGrade']['grade'], 'C') == 0) {
+                                        $courses_with_c[] = 'Grade (' . $grade_detail['ExamGrade']['grade'] . ') : ' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_title']
+                                            )) . ' (' . (trim(
+                                                $course_add['PublishedCourse']['Course']['course_code']
+                                            )) . ') in ' . $course_add['PublishedCourse']['academic_year'] . ', ' . ($course_add['PublishedCourse']['semester'] == 'I' ? '1st' : ($course_add['PublishedCourse']['semester'] == 'II' ? '2nd' : ($course_add['PublishedCourse']['semester'] == 'III' ? '3rd' : $course_add['PublishedCourse']['semester']))) . ' semester. (Course Add)';
                                     }
                                 }
                             }
@@ -685,34 +766,49 @@ class SenateListsTable extends Table
                         if (isset($course_categories) && !empty($course_categories)) {
                             foreach ($course_categories as $category_name => $course_category) {
                                 if ($course_category['taken_credit'] < $course_category['mandatory_credit']) {
-                                    $filtered_students[$cid][$index]['disqualification'][] = 'According to student attached curriculum, the student is expected to take a minimum of ' . $course_category['mandatory_credit'] . ' credits from ' . $category_name . ' course category. ' . (!empty($course_category['taken_credit']) ? 'Currently, the student only took ' . $course_category['taken_credit'] . ' credits.' : 'The student doesn\'t took any course from ' . $category_name .' course category');
+                                    $filtered_students[$cid][$index]['disqualification'][] = 'According to student attached curriculum, the student is expected to take a minimum of ' . $course_category['mandatory_credit'] . ' credits from ' . $category_name . ' course category. ' . (!empty($course_category['taken_credit']) ? 'Currently, the student only took ' . $course_category['taken_credit'] . ' credits.' : 'The student doesn\'t took any course from ' . $category_name . ' course category');
                                     $donot_consider_cgpa = true;
                                 }
                             }
                         }
 
                         if (!empty($courses_with_c) || !empty($courses_with_c_plus)) {
-
                             if (count($courses_with_c) == 1 && count($courses_with_c_plus) == 0) {
                                 // only 1 C, allowed
-                            } else if (count($courses_with_c_plus) <= 2 && count($courses_with_c) == 0) {
+                            } elseif (count($courses_with_c_plus) <= 2 && count($courses_with_c) == 0) {
                                 // 1 or 2 C+ grades with out any C grade, allowed
-
                             } /* else if (count($courses_with_c) <= MAXIMUM_C_GRADES_ALLOWED_FOR_POST_GRADUATE && count($courses_with_c_plus) <= MAXIMUM_C_PLUS_GRADES_ALLOWED_FOR_POST_GRADUATE) {
 
-							} else if (count($courses_with_c) >= MAXIMUM_C_GRADES_ALLOWED_FOR_POST_GRADUATE || count($courses_with_c_plus) >= MAXIMUM_C_PLUS_GRADES_ALLOWED_FOR_POST_GRADUATE) {
+                            } else if (count($courses_with_c) >= MAXIMUM_C_GRADES_ALLOWED_FOR_POST_GRADUATE || count($courses_with_c_plus) >= MAXIMUM_C_PLUS_GRADES_ALLOWED_FOR_POST_GRADUATE) {
 
-							}  */ else  {
-                                $filtered_students[$cid][$index]['disqualification'][] = 'Only one C/C+ or two C+ grades without any C grade is allowed for graduate studies for graduation. <span class="rejected">The student got ' . (!empty($courses_with_c_plus) ? (count($courses_with_c_plus) == 1 ? ' 1 C+ grade' :  count($courses_with_c_plus) . ' C+ grades')  : '') . (!empty($courses_with_c) ? ((!empty($courses_with_c_plus) ? ' and ' : '') . (count($courses_with_c) == 1 ? ' 1 C grade' :  count($courses_with_c) . ' C grades'))  : '') .'</span>' . (!empty($courses_with_c_plus) ? '<br>'. (implode('<br>' , $courses_with_c_plus)) : '') . (!empty($courses_with_c) ? '<br>'. (implode('<br/>' , $courses_with_c)) : '');
+                            }  */ else {
+                                $filtered_students[$cid][$index]['disqualification'][] = 'Only one C/C+ or two C+ grades without any C grade is allowed for graduate studies for graduation. <span class="rejected">The student got ' . (!empty($courses_with_c_plus) ? (count(
+                                        $courses_with_c_plus
+                                    ) == 1 ? ' 1 C+ grade' : count(
+                                            $courses_with_c_plus
+                                        ) . ' C+ grades') : '') . (!empty($courses_with_c) ? ((!empty($courses_with_c_plus) ? ' and ' : '') . (count(
+                                            $courses_with_c
+                                        ) == 1 ? ' 1 C grade' : count(
+                                                $courses_with_c
+                                            ) . ' C grades')) : '') . '</span>' . (!empty($courses_with_c_plus) ? '<br>' . (implode(
+                                            '<br>',
+                                            $courses_with_c_plus
+                                        )) : '') . (!empty($courses_with_c) ? '<br>' . (implode(
+                                            '<br/>',
+                                            $courses_with_c
+                                        )) : '');
                                 $donot_consider_cgpa = true;
                             }
-
                         }
 
                         debug($courses_with_failed_grade);
 
                         if (!empty($courses_with_failed_grade)) {
-                            $filtered_students[$cid][$index]['disqualification'][] = (!empty($courses_with_failed_grade) ? (count($courses_with_failed_grade) == 1 ? 'Invalid/Failed grade (1)' : 'Invalid/Failed Grades List: (' . count($courses_with_failed_grade) . ')') . '<br>'. (implode('<br>' , $courses_with_failed_grade))  : '');
+                            $filtered_students[$cid][$index]['disqualification'][] = (!empty($courses_with_failed_grade) ? (count(
+                                    $courses_with_failed_grade
+                                ) == 1 ? 'Invalid/Failed grade (1)' : 'Invalid/Failed Grades List: (' . count(
+                                        $courses_with_failed_grade
+                                    ) . ')') . '<br>' . (implode('<br>', $courses_with_failed_grade)) : '');
                         }
 
                         //Check: A minimum cgpa is achieved
@@ -731,11 +827,11 @@ class SenateListsTable extends Table
                             $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                             $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                             $filtered_students[$cid][$index]['disqualification'][] = 'The student need to achieve a minimum CGPA of ' . $minimum_cgpa . '. Currently, the student got CGPA of ' . $last_status['StudentExamStatus']['cgpa'] . '.';
-                        } else if (!empty($last_status) && $last_status['StudentExamStatus']['cgpa'] < $minimum_cgpa) {
+                        } elseif (!empty($last_status) && $last_status['StudentExamStatus']['cgpa'] < $minimum_cgpa) {
                             $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                             $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                             $filtered_students[$cid][$index]['disqualification'][] = 'The student need to achieve a minimum CGPA of ' . $minimum_cgpa . '. Currently, the student got CGPA of ' . $last_status['StudentExamStatus']['cgpa'] . '.';
-                        } else if (!empty($last_status)) {
+                        } elseif (!empty($last_status)) {
                             $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                             $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                         } else {
@@ -838,14 +934,13 @@ class SenateListsTable extends Table
                 // figure out why isRegistrationAddForFirstTime return false sometimes?
                 if (
                     !$this->Student->CourseRegistration->isCourseDroped($course_registration['id'])
-                    && $course_registration['PublishedCourse']['drop'] == 0 &&
-                    $this->Student->CourseRegistration->ExamGrade->isRegistrationAddForFirstTime(
+                    && $course_registration['PublishedCourse']['drop'] == 0
+                    && $this->Student->CourseRegistration->ExamGrade->isRegistrationAddForFirstTime(
                         $course_registration['id'],
                         1,
                         1
                     )
                 ) {
-
                     $credit_sum += $course_registration['PublishedCourse']['Course']['credit'];
 
                     if (!isset($course_categories[$course_registration['PublishedCourse']['Course']['CourseCategory']['name']]['taken_credit'])) {
@@ -922,7 +1017,6 @@ class SenateListsTable extends Table
                 //Check: 1) All registered course grade is submitted and 2) A valid grade for each registration
                 foreach ($student['CourseRegistration'] as $key => $course_registration) {
                     if (!$this->Student->CourseRegistration->isCourseDroped($course_registration['id']) && $course_registration['PublishedCourse']['drop'] == 0) {
-
                         $grade_detail = $this->Student->CourseRegistration->getCourseRegistrationLatestApprovedGradeDetail($course_registration['id']);
                         $courseRepeated = $this->Student->CourseRegistration->ExamGrade->getCourseRepetation($course_registration['id'], $course_registration['student_id'], 0);
 
@@ -935,7 +1029,19 @@ class SenateListsTable extends Table
                             debug($course_registration['id']);
                             $incomplete_grade = true;
                             $donot_consider_cgpa = true;
-                        } else if (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                        } elseif (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                    $grade_detail['ExamGrade']['grade'],
+                                    'NG'
+                                ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp(
+                                    $grade_detail['ExamGrade']['grade'],
+                                    'I'
+                                ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp(
+                                    $grade_detail['ExamGrade']['grade'],
+                                    'W'
+                                ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp(
+                                    $grade_detail['ExamGrade']['grade'],
+                                    'Fail'
+                                ) == 0)) {
                             $filtered_students[$cid][$index]['disqualification'][] = 'Student has invalid grade. Any of the student grade should not contain NG, I, DO, W, FAIL, Fx and/or F.';
                             $invalid_grade = true;
                             $donot_consider_cgpa = true;
@@ -946,7 +1052,6 @@ class SenateListsTable extends Table
 
                 //Check: 1) All added course grade is submitted and 2) A valid grade for each add
                 foreach ($student['CourseAdd'] as $key => $course_add) {
-
                     $grade_detail = $this->Student->CourseAdd->getCourseAddLatestApprovedGradeDetail($course_add['id']);
                     $courseRepeated = $this->Student->CourseRegistration->ExamGrade->getCourseRepetation($course_add['id'], $course_add['student_id'], 0);
 
@@ -960,7 +1065,19 @@ class SenateListsTable extends Table
                         debug($course_registration['id']);
                         $incomplete_grade = true;
                         $donot_consider_cgpa = true;
-                    } else if (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp($grade_detail['ExamGrade']['grade'], 'NG') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'I') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'W') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fail') == 0)) {
+                    } elseif (!$invalid_grade && isset($grade_detail['ExamGrade']['grade']) && (strcasecmp(
+                                $grade_detail['ExamGrade']['grade'],
+                                'NG'
+                            ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'DO') == 0 || strcasecmp(
+                                $grade_detail['ExamGrade']['grade'],
+                                'I'
+                            ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'F') == 0 || strcasecmp(
+                                $grade_detail['ExamGrade']['grade'],
+                                'W'
+                            ) == 0 || strcasecmp($grade_detail['ExamGrade']['grade'], 'Fx') == 0 || strcasecmp(
+                                $grade_detail['ExamGrade']['grade'],
+                                'Fail'
+                            ) == 0)) {
                         $filtered_students[$cid][$index]['disqualification'][] = 'Student has invalid grade. Any of the student grade should not contain NG, I, DO, W, FAIL, Fx and/or F.';
                         $invalid_grade = true;
                         $donot_consider_cgpa = true;
@@ -996,7 +1113,7 @@ class SenateListsTable extends Table
                     $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                     $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                     $filtered_students[$cid][$index]['disqualification'][] = 'The student need to achieve a minimum of ' . $minimum_cgpa . ' CGPA point. Currently the student has ' . $last_status['StudentExamStatus']['cgpa'] . ' CGPA point.';
-                } else if (!empty($last_status)) {
+                } elseif (!empty($last_status)) {
                     $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                     $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                 } else {
@@ -1007,6 +1124,4 @@ class SenateListsTable extends Table
         }
         return $filtered_students;
     }
-
-
 }

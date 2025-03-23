@@ -1,11 +1,14 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
+use Cake\Event\EventInterface;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class CourseSchedulesClassPeriodsController extends AppController
 {
-
     public function index()
     {
         $this->paginate = [

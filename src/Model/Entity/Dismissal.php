@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
 class Dismissal extends Entity
 {
-
     protected $_accessible = [
         'student_id' => true,
         'reason' => true,

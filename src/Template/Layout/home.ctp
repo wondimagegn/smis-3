@@ -2,7 +2,9 @@
 /**
  * Default CakePHP 3.8 Layout
  */
+
 use Cake\Core\Configure;
+
 ?>
 <!DOCTYPE html>
 <html lang="en">

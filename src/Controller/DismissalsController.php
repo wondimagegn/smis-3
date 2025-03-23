@@ -1,76 +1,86 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
 
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
+
 class DismissalsController extends AppController
 {
 
+    public $name = 'Dismissals';
+
+
     public function index()
     {
-        $this->paginate = [
-            'contain' => ['Students'],
-        ];
-        $dismissals = $this->paginate($this->Dismissals);
 
-        $this->set(compact('dismissals'));
+        $this->Dismissal->recursive = 0;
+        $this->set('dismissals', $this->paginate());
     }
-
 
     public function view($id = null)
     {
-        $dismissal = $this->Dismissals->get($id, [
-            'contain' => ['Students'],
-        ]);
 
-        $this->set('dismissal', $dismissal);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid dismissal'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('dismissal', $this->Dismissal->read(null, $id));
     }
 
     public function add()
     {
-        $dismissal = $this->Dismissals->newEntity();
-        if ($this->request->is('post')) {
-            $dismissal = $this->Dismissals->patchEntity($dismissal, $this->request->getData());
-            if ($this->Dismissals->save($dismissal)) {
-                $this->Flash->success(__('The dismissal has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->Dismissal->create();
+            if ($this->Dismissal->save($this->request->data)) {
+                $this->Session->setFlash(__('The dismissal has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The dismissal could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The dismissal could not be saved. Please, try again.'));
         }
-
-        $this->set(compact('dismissal'));
+        $students = $this->Dismissal->Student->find('list');
+        $this->set(compact('students'));
     }
 
     public function edit($id = null)
     {
-        $dismissal = $this->Dismissals->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $dismissal = $this->Dismissals->patchEntity($dismissal, $this->request->getData());
-            if ($this->Dismissals->save($dismissal)) {
-                $this->Flash->success(__('The dismissal has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The dismissal could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(__('Invalid dismissal'));
+            return $this->redirect(array('action' => 'index'));
         }
-
-        $this->set(compact('dismissal'));
+        if (!empty($this->request->data)) {
+            if ($this->Dismissal->save($this->request->data)) {
+                $this->Session->setFlash(__('The dismissal has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The dismissal could not be saved. Please, try again.'));
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Dismissal->read(null, $id);
+        }
+        $students = $this->Dismissal->Student->find('list');
+        $this->set(compact('students'));
     }
-
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $dismissal = $this->Dismissals->get($id);
-        if ($this->Dismissals->delete($dismissal)) {
-            $this->Flash->success(__('The dismissal has been deleted.'));
-        } else {
-            $this->Flash->error(__('The dismissal could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid id for dismissal'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->Dismissal->delete($id)) {
+            $this->Session->setFlash(__('Dismissal deleted'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->Session->setFlash(__('Dismissal was not deleted'));
+        return $this->redirect(array('action' => 'index'));
     }
 }

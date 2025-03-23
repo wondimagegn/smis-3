@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -185,7 +185,6 @@ class EquivalentCoursesTable extends Table
             //debug($equivalentCourseIds);
 
             if (!empty($equivalentCourseIds)) {
-
                 if ($studentAttachedCurriculum) {
                     $doesItExistInAttachedCurriculum = ClassRegistry::init('Course')->field('id', array(
                         'Course.curriculum_id' => $studentAttachedCurriculum,
@@ -218,7 +217,6 @@ class EquivalentCoursesTable extends Table
 
         // does it have equivalence
         if ($doesItExistInAttachedCurriculum) {
-
             $equivalentCourseIds1 = $this->find('list', array(
                 'conditions' => array(
                     'EquivalentCourse.course_for_substitued_id' => $course_id
@@ -239,7 +237,6 @@ class EquivalentCoursesTable extends Table
                 return $courseLists;
             }
         } else {
-
             $equivalentCourseIds1 = $this->find('list', array(
                 'conditions' => array(
                     'EquivalentCourse.course_be_substitued_id' => $course_id
@@ -337,5 +334,4 @@ class EquivalentCoursesTable extends Table
 
         return 0;
     }
-
 }

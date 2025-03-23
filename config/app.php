@@ -150,6 +150,7 @@ return [
             'duration' => '+1 years',
             'url' => env('CACHE_CAKEROUTES_URL', null),
         ],
+
     ],
 
     /*
@@ -405,10 +406,11 @@ return [
      *
      * To use database sessions, load the SQL file located at config/schema/sessions.sql
      */
-    'Session' => [
-        'defaults' => 'php',
-    ],
+
     'Roles' => [
         'registrar' => 3 // Replace with actual role ID
+    ],
+    'Session' => [
+        'defaults' => 'php' // Switch from 'database' to 'php'
     ],
 ];

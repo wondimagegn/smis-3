@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -45,13 +46,16 @@ class AlumniResponsesTable extends Table
         $this->belongsTo('Alumnis', [
             'foreignKey' => 'alumni_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Alumnus'
         ]);
         $this->belongsTo('SurveyQuestions', [
             'foreignKey' => 'survey_question_id',
             'joinType' => 'INNER',
+            'propertyName' => 'SurveyQuestion'
         ]);
         $this->belongsTo('SurveyQuestionAnswers', [
             'foreignKey' => 'survey_question_answer_id',
+            'propertyName' => 'SurveyQuestionAnswer',
         ]);
     }
 

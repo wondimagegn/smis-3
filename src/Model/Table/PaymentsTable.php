@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -6,9 +7,9 @@ use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
-
 class PaymentsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -17,6 +18,7 @@ class PaymentsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('payments');
@@ -95,38 +97,53 @@ class PaymentsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
         return $rules;
     }
 
-    function duplication ($data=null) {
-        if (empty($data['Payment']['semester']) || empty($data['Payment']['academic_year'])
-            || empty($data['Payment']['reference_number']) || empty($data['Payment']['fee_amount']) ) {
+    public function duplication($data = null)
+    {
+
+        if (
+            empty($data['Payment']['semester']) || empty($data['Payment']['academic_year'])
+            || empty($data['Payment']['reference_number']) || empty($data['Payment']['fee_amount'])
+        ) {
             return 0;
         }
         //fee_amount
 
-        $count=$this->find('count',array('conditions'=>
-            array('Payment.student_id'=>$data['Payment']['student_id'],
-                'Payment.semester'=>$data['Payment']['semester'],
-                'Payment.academic_year'=>$data['Payment']['academic_year'])));
+        $count = $this->find('count', array(
+            'conditions' =>
+                array(
+                    'Payment.student_id' => $data['Payment']['student_id'],
+                    'Payment.semester' => $data['Payment']['semester'],
+                    'Payment.academic_year' => $data['Payment']['academic_year']
+                )
+        ));
 
         return $count;
     }
-    public function paidPayment($student_id,$latestAcSemester){
-        $allow=ClassRegistry::init('GeneralSetting')->allowRegistrationWithoutPayment($student_id);
-        if($allow==1){
+
+    public function paidPayment($student_id, $latestAcSemester)
+    {
+
+        $allow = ClassRegistry::init('GeneralSetting')->allowRegistrationWithoutPayment($student_id);
+        if ($allow == 1) {
             return 1;
         } else {
-            $pcount=$this->find('count',array('conditions'=>
-                array('Payment.student_id'=>$student_id,
-                    'Payment.semester'=>$latestAcSemester['semester'],
-                    'Payment.academic_year'=>$latestAcSemester['academic_year'])));
-            if($pcount>0){
+            $pcount = $this->find('count', array(
+                'conditions' =>
+                    array(
+                        'Payment.student_id' => $student_id,
+                        'Payment.semester' => $latestAcSemester['semester'],
+                        'Payment.academic_year' => $latestAcSemester['academic_year']
+                    )
+            ));
+            if ($pcount > 0) {
                 return 1;
             }
-
         }
         return 0;
     }

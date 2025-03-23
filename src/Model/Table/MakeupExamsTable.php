@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -47,7 +48,6 @@ class MakeupExamsTable extends Table
         $this->hasMany('ExamResults', [
             'foreignKey' => 'makeup_exam_id',
         ]);
-
     }
 
     /**
@@ -75,10 +75,12 @@ class MakeupExamsTable extends Table
             $conditions['PublishedCourse.department_id'] = $department_id;
             $conditions['PublishedCourse.academic_year'] = $acadamic_year;
             $conditions['PublishedCourse.program_id'] = $program_id;
-            if ($program_type_id != "0")
+            if ($program_type_id != "0") {
                 $conditions['PublishedCourse.program_type_id'] = $program_type_id;
-            if ($semester != "0")
+            }
+            if ($semester != "0") {
                 $conditions['PublishedCourse.semester'] = $semester;
+            }
 
             //Makeup exams which are assigned to the instructor
             $all_makeup_exams = $this->PublishedCourse->find(
@@ -222,10 +224,12 @@ class MakeupExamsTable extends Table
             $conditions['PublishedCourse.department_id'] = $department_id;
             $conditions['PublishedCourse.academic_year'] = $acadamic_year;
             $conditions['PublishedCourse.program_id'] = $program_id;
-            if ($program_type_id != "0")
+            if ($program_type_id != "0") {
                 $conditions['PublishedCourse.program_type_id'] = $program_type_id;
-            if ($semester != "0")
+            }
+            if ($semester != "0") {
                 $conditions['PublishedCourse.semester'] = $semester;
+            }
 
             $all_makeup_exams = $this->PublishedCourse->find(
                 'all',
@@ -304,10 +308,13 @@ class MakeupExamsTable extends Table
                 )
             );
 
-            if (count($result_and_grade['ExamResult']) > 0 || count($result_and_grade['ExamGrade']) > 0 || count($result_and_grade['ExamGradeChange']))
+            if (count($result_and_grade['ExamResult']) > 0 || count($result_and_grade['ExamGrade']) > 0 || count(
+                    $result_and_grade['ExamGradeChange']
+                )) {
                 return false;
-            else
+            } else {
                 return true;
+            }
         }
         return false;
     }
@@ -327,8 +334,7 @@ class MakeupExamsTable extends Table
                     'recursive' => -1
                 )
             );
-        } else if ($reg == 0) {
-
+        } elseif ($reg == 0) {
             $return = $this->find(
                 'first',
                 array(
@@ -341,7 +347,6 @@ class MakeupExamsTable extends Table
                     'recursive' => -1
                 )
             );
-
         }
         if (
             isset($return['MakeupExam']['id'])

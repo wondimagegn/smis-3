@@ -1,17 +1,29 @@
 <?php
 namespace App\Controller;
 
+
 use App\Controller\AppController;
-use Cake\Event\EventInterface;
+use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
-
 use Cake\Core\Configure;
-
-
-
 class AcademicCalendarsController extends AppController
 {
+
+    public $name = 'AcademicCalendars';
     public $paginate = [];
+    public $menuOptions = [
+        'parent' => 'dashboard',
+        'exclude' => [
+            'autoSaveExtension',
+            'getDepartmentsThatHaveTheSelectedProgram'
+        ],
+        'alias' => [
+            'index' => 'View All Academic Calendars',
+            'add' => 'Set Academic Calendar',
+            'extending_calendar' => 'Extend Academic Calendar',
+        ]
+    ];
+
     public function initialize()
     {
         parent::initialize();
@@ -21,42 +33,42 @@ class AcademicCalendarsController extends AppController
         $this->viewBuilder()->setHelpers(['DatePicker']);
     }
 
-
-
-    public function beforeFilter(EventInterface $event)
+    public function beforeFilter(Event $event)
     {
         parent::beforeFilter($event);
-        /*
-        $this->Authentication->allowUnauthenticated([
+        $this->Auth->allow([
             'autoSaveExtension',
-            'extendingCalendar',
-            'getDepartmentsThatHaveTheSelectedProgram'
+            'extending_calendar',
+            'get_departments_that_have_the_selected_program'
         ]);
-        */
+
     }
 
-    public function beforeRender(EventInterface $event)
+    public function beforeRender(Event $event)
     {
         parent::beforeRender($event);
 
         $acyearArrayData = $this->AcademicYear->academicYearInArray(date('Y') - 10, date('Y'));
-        $defaultAcademicYear = $this->AcademicYear->current_academicyear();
+        $defaultAcademicYear = $this->AcademicYear->currentAcademicYear();
 
-        foreach ($acyearArrayData as $key => $value) {
-            if ($value == $defaultAcademicYear) {
-                $defaultAcademicYear = $key;
-                break;
+        if (!empty($acyearArrayData)) {
+            foreach ($acyearArrayData as $key => $value) {
+                if ($value == $defaultAcademicYear) {
+                    $defaultAcademicYear = $key;
+                    break;
+                }
             }
         }
 
         $this->set(compact('acyearArrayData', 'defaultAcademicYear'));
+        unset($this->request->getData()['User']['password']);
     }
-
     public function index()
     {
 
+        $this->loadModel('AcademicCalendars');
         $currentAcyAndSemester = $this->AcademicYear->currentAcyAndSemester();
-        $this->_initSearchCalendar();
+        $this->initSearchCalendar();
 
         $paginationConfig = [
             'contain' => ['Programs', 'ProgramTypes','ExtendingAcademicCalendars.Departments',
@@ -79,8 +91,8 @@ class AcademicCalendarsController extends AppController
         $requestData = $this->request->getData();
 
         if ($this->request->is('post') && isset($requestData['viewAcademicCalendar'])) {
-            $this->_initClearSessionFilters();
-            $this->_initSearchCalendar();
+            $this->initClearSessionFilters();
+            $this->initSearchCalendar();
         }
 
         foreach (['program_id', 'program_type_id', 'academic_year', 'semester'] as $filter) {
@@ -179,80 +191,328 @@ class AcademicCalendarsController extends AppController
 
     public function view($id = null)
     {
-        $academicCalendar = $this->AcademicCalendars->get($id, [
-            'contain' => [ 'Programs', 'ProgramTypes', 'ExtendingAcademicCalendars'],
-        ]);
 
-        $this->set('academicCalendar', $academicCalendar);
+        if (!$id) {
+            $this->Flash->error(__('Invalid academic calendar ID'));
+            return $this->redirect(['action' => 'index']);
+        }
+
+        $academicCalendar = $this->AcademicCalendar->get($id, ['contain' => ['Departments', 'Colleges', 'YearLevels']]);
+        $academicCalendar['college_id'] = unserialize($academicCalendar['college_id']);
+        $academicCalendar['department_id'] = unserialize($academicCalendar['department_id']);
+        $academicCalendar['year_level_id'] = unserialize($academicCalendar['year_level_id']);
+
+        $this->set(compact('academicCalendar'));
     }
 
     public function add()
     {
-        $academicCalendar = $this->AcademicCalendars->newEntity();
         if ($this->request->is('post')) {
-            $academicCalendar = $this->AcademicCalendars->patchEntity($academicCalendar, $this->request->getData());
-            if ($this->AcademicCalendars->save($academicCalendar)) {
-                $this->Flash->success(__('The academic calendar has been saved.'));
+            $academicCalendar = $this->AcademicCalendar->newEntity($this->request->getData());
 
-                return $this->redirect(['action' => 'index']);
+            if (!empty($this->request->getData('academic_year')) && !empty($this->request->getData('semester'))) {
+                if (!empty($this->request->getData('year_level_id')) && !empty(
+                    $this->request->getData(
+                        'department_id'
+                    )
+                    )) {
+                    if ($this->AcademicCalendar->checkDuplicateEntry($this->request->getData())) {
+                        $academicCalendar->department_id = serialize($this->request->getData('department_id'));
+                        $academicCalendar->year_level_id = serialize($this->request->getData('year_level_id'));
+
+                        if ($this->AcademicCalendar->save($academicCalendar)) {
+                            $this->Flash->success(__('The Academic Calendar has been saved.'));
+                            return $this->redirect(['action' => 'index']);
+                        }
+                        $this->Flash->error(__('The Academic Calendar could not be saved. Please, try again.'));
+                    } else {
+                        $this->Flash->error(__('Duplicate entry detected. Please check the existing records.'));
+                    }
+                } else {
+                    $this->Flash->error(__('Please select year level and department.'));
+                }
+            } else {
+                $this->Flash->error(__('Please provide academic year and semester.'));
             }
-            $this->Flash->error(__('The academic calendar could not be saved. Please, try again.'));
         }
-        $programs = $this->AcademicCalendars->Programs->find('list', ['limit' => 200]);
-        $programTypes = $this->AcademicCalendars->ProgramTypes->find('list', ['limit' => 200]);
-        $this->set(compact('academicCalendar',
-            'programs', 'programTypes'));
-    }
 
+        $yearLevels = $this->AcademicCalendar->YearLevel->find('list');
+        $programs = $this->AcademicCalendar->Program->find('list', ['conditions' => ['Program.active' => 1]]);
+        $programTypes = $this->AcademicCalendar->ProgramType->find('list', ['conditions' => ['ProgramType.active' => 1]]
+        );
+
+        unset($programTypes[PROGRAM_TYPE_PART_TIME], $programTypes[PROGRAM_TYPE_ADVANCE_STANDING]);
+
+        $this->set(compact('programs', 'programTypes', 'yearLevels'));
+    }
 
     public function edit($id = null)
     {
-        $academicCalendar = $this->AcademicCalendars->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $academicCalendar = $this->AcademicCalendars->patchEntity($academicCalendar, $this->request->getData());
-            if ($this->AcademicCalendars->save($academicCalendar)) {
-                $this->Flash->success(__('The academic calendar has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        $academicCalendar = $this->AcademicCalendar->get($id);
+
+        if ($this->request->is(['post', 'put'])) {
+            $academicCalendar = $this->AcademicCalendar->patchEntity($academicCalendar, $this->request->getData());
+            $academicCalendar->department_id = serialize($this->request->getData('department_id'));
+            $academicCalendar->year_level_id = serialize($this->request->getData('year_level_id'));
+
+            if ($this->AcademicCalendar->checkDuplicateEntry($this->request->getData())) {
+                if ($this->AcademicCalendar->save($academicCalendar)) {
+                    $this->Flash->success(__('The Academic Calendar has been updated.'));
+                    return $this->redirect(['action' => 'index']);
+                }
+                $this->Flash->error(__('The Academic Calendar could not be saved. Please, try again.'));
+            } else {
+                $this->Flash->error(__('Duplicate entry detected. Please check the existing records.'));
             }
-            $this->Flash->error(__('The academic calendar could not be saved. Please, try again.'));
         }
-        $programs = $this->AcademicCalendars->Programs->find('list', ['limit' => 200]);
-        $programTypes = $this->AcademicCalendars->ProgramTypes->find('list', ['limit' => 200]);
-        $this->set(compact('academicCalendar', 'programs', 'programTypes'));
-    }
 
+        $yearLevels = $this->AcademicCalendar->YearLevel->find('list');
+        $programs = $this->AcademicCalendar->Program->find('list', ['conditions' => ['Program.active' => 1]]);
+        $programTypes = $this->AcademicCalendar->ProgramType->find('list', ['conditions' => ['ProgramType.active' => 1]]
+        );
+        unset($programTypes[PROGRAM_TYPE_PART_TIME], $programTypes[PROGRAM_TYPE_ADVANCE_STANDING]);
+
+        $this->set(compact('academicCalendar', 'programs', 'programTypes', 'yearLevels'));
+    }
 
     public function delete($id = null)
     {
         $this->request->allowMethod(['post', 'delete']);
-        $academicCalendar = $this->AcademicCalendars->get($id);
-        if ($this->AcademicCalendars->delete($academicCalendar)) {
-            $this->Flash->success(__('The academic calendar has been deleted.'));
+        $academicCalendar = $this->AcademicCalendar->get($id);
+
+        if ($this->AcademicCalendar->delete($academicCalendar)) {
+            $this->Flash->success(__('Academic calendar deleted.'));
         } else {
-            $this->Flash->error(__('The academic calendar could not be deleted. Please, try again.'));
+            $this->Flash->error(__('Academic calendar could not be deleted.'));
         }
 
         return $this->redirect(['action' => 'index']);
     }
 
-
-    private function _initSearchDefineCalendar()
+    public function extendingCalendar()
     {
-        $session = $this->getRequest()->getSession();
 
-        if (!empty($this->request->getData('AcademicCalendar'))) {
-            $session->write('search_define_calendar', $this->request->getData('AcademicCalendar'));
-        } elseif ($session->check('search_define_calendar')) {
-            $this->request = $this->request->withData('AcademicCalendar', $session->read('search_define_calendar'));
+        $academicCalendars = [];
+
+        if ($this->request->is('post')) {
+            if ($this->request->getData('searchbutton')) {
+                $options = [];
+
+                foreach (['program_id', 'program_type_id', 'academic_year', 'semester'] as $field) {
+                    if (!empty($this->request->getData('Search.' . $field))) {
+                        $options['AcademicCalendar.' . $field] = $this->request->getData('Search.' . $field);
+                    }
+                }
+
+                $xacademicCalendars = $this->AcademicCalendar->find()
+                    ->where($options)
+                    ->contain(['Program', 'ProgramType'])
+                    ->all();
+
+                foreach ($xacademicCalendars as $acV) {
+                    $departments = unserialize($acV->department_id);
+                    $list = [];
+
+                    if (!empty($departments)) {
+                        foreach ($departments as $deptv) {
+                            $list[] = $this->AcademicCalendar->Department->find()
+                                ->select(['name'])
+                                ->where(['id' => $deptv])
+                                ->first()
+                                ->name;
+                        }
+                    }
+
+                    $listStr = implode(' ', $list);
+                    $academicCalendars[$listStr][$acV->id] = $acV->full_year . ' ' . $acV->program->name . ' ' . $acV->program_type->name;
+                }
+            }
+
+            if ($this->request->getData('extend')) {
+                $saveAllExtension = [];
+
+                foreach ($this->request->getData('ExtendingAcademicCalendar.department_id') as $dpv) {
+                    foreach ($this->request->getData('ExtendingAcademicCalendar.year_level_id') as $ylv) {
+                        $saveAllExtension[] = [
+                            'academic_calendar_id' => $this->request->getData(
+                                'ExtendingAcademicCalendar.academic_calendar_id'
+                            ),
+                            'department_id' => $dpv,
+                            'year_level_id' => $ylv,
+                            'program_id' => $this->request->getData('Search.program_id'),
+                            'program_type_id' => $this->request->getData('Search.program_type_id'),
+                            'activity_type' => $this->request->getData('ExtendingAcademicCalendar.activity_type'),
+                            'days' => $this->request->getData('ExtendingAcademicCalendar.days')
+                        ];
+                    }
+                }
+
+                if (!empty($saveAllExtension)) {
+                    if ($this->AcademicCalendar->ExtendingAcademicCalendar->saveMany($saveAllExtension)) {
+                        $this->Flash->success(__('The Academic Calendar Extension has been updated.'));
+                        return $this->redirect(['action' => 'index']);
+                    }
+                    $this->Flash->error(__('The Academic Calendar Extension could not be saved. Please, try again.'));
+                }
+            }
+        }
+
+        $departments = $this->AcademicCalendar->Department->find('list', ['conditions' => ['Department.active' => 1]]);
+        $programs = $this->AcademicCalendar->Program->find('list');
+        $programTypes = $this->AcademicCalendar->ProgramType->find('list');
+
+        $activity_types = [
+            'registration' => 'Registration',
+            'add' => 'Add',
+            'drop' => 'Drop',
+            'grade_submission' => 'Grade Submission',
+            'fx_grade_submission' => 'Fx Grade Submission',
+            'graduation_date' => 'Graduation Day',
+            'senate_meeting' => 'University Senate Meeting'
+        ];
+
+        $this->set(compact('departments', 'programs', 'programTypes', 'activity_types', 'academicCalendars'));
+    }
+
+    public function autoSaveExtension()
+    {
+
+        $this->autoRender = false;
+        $userRoleId = $this->request->getSession()->read('Auth.User.role_id');
+        $userParentRole = $this->request->getSession()->read('Auth.User.Role.parent_id');
+
+        if ($userRoleId == ROLE_REGISTRAR || $userParentRole == ROLE_REGISTRAR) {
+            if ($this->request->is('ajax') && !empty($this->request->getData('ExtendingAcademicCalendar'))) {
+                $saveData = [];
+
+                foreach ($this->request->getData('ExtendingAcademicCalendar') as $ev) {
+                    $saveData[] = $ev;
+                }
+
+                if (!empty($saveData)) {
+                    if ($this->AcademicCalendar->ExtendingAcademicCalendar->saveMany($saveData)) {
+                        return $this->response->withType('application/json')
+                            ->withStringBody(
+                                json_encode(
+                                    [
+                                        'status' => 'success',
+                                        'message' => 'Academic Calendar Extension saved successfully.'
+                                    ]
+                                )
+                            );
+                    }
+                }
+
+                return $this->response->withType('application/json')
+                    ->withStringBody(
+                        json_encode(['status' => 'error', 'message' => 'Failed to save Academic Calendar Extension.'])
+                    );
+            }
         }
     }
 
-    private function _initSearchCalendar()
+    public function getDepartmentsThatHaveTheSelectedProgram()
     {
-        $session = $this->getRequest()->getSession();
+
+        $this->request->allowMethod(['ajax']);
+
+        $colleges = $this->AcademicCalendar->Colleges->find('list', ['conditions' => ['active' => 1]])->toArray();
+        $departments = $this->AcademicCalendar->Departments->find('list', ['conditions' => ['active' => 1]])->toArray();
+
+        $collegeDepartment = [];
+        $preFreshmanRemedialCollegeIds = array_merge(
+            Configure::read('preengineering_college_ids') ?? [],
+            Configure::read('social_stream_college_ids') ?? [],
+            Configure::read('natural_stream_college_ids') ?? []
+        );
+
+        $programId = $this->request->getData('AcademicCalendar.program_id');
+        $programTypeId = $this->request->getData('AcademicCalendar.program_type_id');
+
+        if (!empty($colleges) && !empty($programId)) {
+            $curriculumTable = $this->fetchTable('Curriculum');
+            $departmentsThatHaveSelectedProgramCurriculum = $curriculumTable->find('list', [
+                'keyField' => 'department_id',
+                'valueField' => 'department_id',
+                'conditions' => ['program_id' => $programId, 'active' => 1],
+                'group' => 'department_id'
+            ])->toArray();
+
+            if (defined(
+                    'CHECK_STUDY_PROGRAMS_FOR_ACADEMIC_CALENDAR_DEFINITION'
+                ) && CHECK_STUDY_PROGRAMS_FOR_ACADEMIC_CALENDAR_DEFINITION) {
+                if (!empty($programTypeId) && $programTypeId != PROGRAM_TYPE_REGULAR) {
+                    $programModalityIds = $this->fetchTable('ProgramType')->find('list', [
+                        'keyField' => 'program_modality_id',
+                        'valueField' => 'program_modality_id',
+                        'conditions' => ['id' => $programTypeId]
+                    ])->toArray();
+
+                    if (!empty($programModalityIds)) {
+                        $departmentsThatHaveSelectedProgramCurriculum = $curriculumTable->find('list', [
+                            'keyField' => 'department_id',
+                            'valueField' => 'department_id',
+                            'conditions' => [
+                                'department_id IN' => $departmentsThatHaveSelectedProgramCurriculum,
+                                'program_id' => $programId,
+                                'active' => 1,
+                                'department_study_program_id IN (SELECT id FROM department_study_programs WHERE department_id IN (:departments) AND program_modality_id IN (:modalities))'
+                            ],
+                            'bind' => [
+                                'departments' => implode(',', $departmentsThatHaveSelectedProgramCurriculum),
+                                'modalities' => implode(',', $programModalityIds)
+                            ],
+                            'group' => 'department_id'
+                        ])->toArray();
+                    }
+                }
+            }
+
+            foreach ($colleges as $collegeId => $collegeName) {
+                $departmentsList = $this->AcademicCalendar->Departments->find('list', [
+                    'keyField' => 'id',
+                    'valueField' => 'name',
+                    'conditions' => [
+                        'college_id' => $collegeId,
+                        'id IN' => $departmentsThatHaveSelectedProgramCurriculum,
+                        'active' => 1
+                    ],
+                    'order' => ['name' => 'ASC']
+                ])->toArray();
+
+                if (!empty($departmentsList)) {
+                    $collegeDepartment[$collegeId] = $departmentsList;
+                }
+
+                if (!empty($this->request->getData('AcademicCalendar.year_level_id')) && in_array(
+                        '1st',
+                        (array)$this->request->getData('AcademicCalendar.year_level_id')
+                    )
+                    && in_array(
+                        $this->request->getData('AcademicCalendar.program_id'),
+                        [PROGRAM_UNDEGRADUATE, PROGRAM_REMEDIAL]
+                    )
+                    && $this->request->getData('AcademicCalendar.program_type_id') == PROGRAM_TYPE_REGULAR) {
+                    if (!empty($preFreshmanRemedialCollegeIds) && in_array(
+                            $collegeId,
+                            $preFreshmanRemedialCollegeIds
+                        )) {
+                        $collegeDepartment[$collegeId]['pre_' . $collegeId] = 'Pre/Freshman';
+                    }
+                }
+            }
+        }
+
+        return $this->response->withType('application/json')->withStringBody(
+            json_encode(compact('collegeDepartment', 'colleges'))
+        );
+    }
+
+    private function initSearchCalendar()
+    {
+
+        $session = $this->request->getSession();
 
         if (!empty($this->request->getData('Search'))) {
             $session->write('search_calendar', $this->request->getData('Search'));
@@ -261,9 +521,10 @@ class AcademicCalendarsController extends AppController
         }
     }
 
-    private function _initClearSessionFilters()
+    private function initClearSessionFilters()
     {
-        $session = $this->getRequest()->getSession();
+
+        $session = $this->request->getSession();
 
         if ($session->check('search_calendar')) {
             $session->delete('search_calendar');
@@ -273,4 +534,18 @@ class AcademicCalendarsController extends AppController
             $session->delete('search_define_calendar');
         }
     }
+
+    private function initSearchDefineCalendar()
+    {
+
+        $session = $this->request->getSession();
+
+        if (!empty($this->request->getData('AcademicCalendar'))) {
+            $session->write('search_define_calendar', $this->request->getData('AcademicCalendar'));
+        } elseif ($session->check('search_define_calendar')) {
+            $this->request = $this->request->withData('AcademicCalendar', $session->read('search_define_calendar'));
+        }
+    }
+
+
 }

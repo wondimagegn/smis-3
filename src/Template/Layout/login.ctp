@@ -68,16 +68,12 @@ use Cake\Utility\Inflector;
     </div>
 </div>
 
-<?php if (Configure::read('debug') || true): ?>
     <?= $this->Html->script([
         'jquery', 'waypoints.min', 'preloader-script',
         'pace/pace', 'foundation.min',
         'foundation/foundation.abide', 'inputMask/jquery.maskedinput',
         'date-dropdown/jquery.date-dropdowns.min', 'date-dropdown/jquery.datetimepicker'
     ]) ?>
-<?php else: ?>
-    <?= $this->AssetCompress->script('login.js', ['full' => true]) ?>
-<?php endif; ?>
 
 <script type="text/javascript">
     $(document).ready(function() {

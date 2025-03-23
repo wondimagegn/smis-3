@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class ExamPeriodsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class ExamPeriodsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('exam_periods');
@@ -52,6 +55,7 @@ class ExamPeriodsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -89,6 +93,7 @@ class ExamPeriodsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['college_id'], 'Colleges'));
         $rules->add($rules->existsIn(['program_id'], 'Programs'));
         $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
@@ -97,59 +102,98 @@ class ExamPeriodsTable extends Table
         return $rules;
     }
 
-    function compareenddatewithtoday(){
-        if($this->data['ExamPeriod']['end_date']>=date("Y-m-d")) {
+    public function compareenddatewithtoday()
+    {
+
+        if ($this->data['ExamPeriod']['end_date'] >= date("Y-m-d")) {
             return true;
         }
         return false;
     }
 
-    function comparestartdatewithtoday(){
-        if($this->data['ExamPeriod']['start_date']>=date("Y-m-d")) {
+    public function comparestartdatewithtoday()
+    {
+
+        if ($this->data['ExamPeriod']['start_date'] >= date("Y-m-d")) {
             return true;
         }
         return false;
     }
 
-    function field_comparison($check1, $operator, $field2) {
-        foreach($check1 as $key=>$value1) {
+    public function field_comparison($check1, $operator, $field2)
+    {
+
+        foreach ($check1 as $key => $value1) {
             $value2 = $this->data[$this->alias][$field2];
-            if (!Validation::comparison($value1, $operator, $value2))
+            if (!Validation::comparison($value1, $operator, $value2)) {
                 return false;
+            }
         }
         return true;
     }
-    function get_maximum_year_levels_of_college($college_id=null){
-        $departments = $this->College->Department->find('list',array('conditions'=>array('Department.college_id'=>$college_id),'fields'=>array('Department.id')));
+
+    public function get_maximum_year_levels_of_college($college_id = null)
+    {
+
+        $departments = $this->College->Department->find(
+            'list',
+            array('conditions' => array('Department.college_id' => $college_id), 'fields' => array('Department.id'))
+        );
         $largest_yearLevel_department_id = null;
         $yearLevel_count = 0;
-        foreach($departments as $department_id){
-            $yearLevel_count_latest = $this->College->Department->YearLevel->find('count',array('conditions'=>array('YearLevel.department_id'=>$department_id)));
-            if($yearLevel_count_latest > $yearLevel_count){
+        foreach ($departments as $department_id) {
+            $yearLevel_count_latest = $this->College->Department->YearLevel->find(
+                'count',
+                array('conditions' => array('YearLevel.department_id' => $department_id))
+            );
+            if ($yearLevel_count_latest > $yearLevel_count) {
                 $yearLevel_count = $yearLevel_count_latest;
                 $largest_yearLevel_department_id = $department_id;
             }
         }
 
         $yearLevels = null;
-        if(!empty($largest_yearLevel_department_id)){
-            $yearLevels = $this->College->Department->YearLevel->find('list',array('conditions'=>array('YearLevel.department_id'=>$largest_yearLevel_department_id),'fields'=>array('name','name')));
+        if (!empty($largest_yearLevel_department_id)) {
+            $yearLevels = $this->College->Department->YearLevel->find(
+                'list',
+                array(
+                    'conditions' => array('YearLevel.department_id' => $largest_yearLevel_department_id),
+                    'fields' => array('name', 'name')
+                )
+            );
         }
         return $yearLevels;
     }
 
-    function alreadyRecorded($data=null) {
+    public function alreadyRecorded($data = null)
+    {
+
         // validation of repeation
         $selected_college_id = $data['ExamPeriod']['college_id'];
         $selected_academic_year = $data['ExamPeriod']['academic_year'];
         $selected_program_id = $data['ExamPeriod']['program_id'];
         $selected_semester = $data['ExamPeriod']['semester'];
-        foreach($data['ExamPeriod']['program_type_id'] as $ptk=>$ptv){
-            foreach($data['ExamPeriod']['year_level_id'] as $ylk=>$ylv){
-                $repeation =$this->find('count',array('conditions'=>array('ExamPeriod.college_id'=>$selected_college_id,'ExamPeriod.academic_year'=>$selected_academic_year,'ExamPeriod.program_id'=>$selected_program_id, 'ExamPeriod.program_type_id'=>$ptv,'ExamPeriod.year_level_id'=>$ylv, 'ExamPeriod.semester'=>$selected_semester)));
-                if ($repeation>0) {
-                    $program_type_name = $this->ProgramType->field('ProgramType.name', array('ProgramType.id'=>$ptv));
-                    $this->invalidate('already_recorded_exam_perid','The exam period is already recorded for '.$program_type_name.' '.$ylv. ' year students');
+        foreach ($data['ExamPeriod']['program_type_id'] as $ptk => $ptv) {
+            foreach ($data['ExamPeriod']['year_level_id'] as $ylk => $ylv) {
+                $repeation = $this->find(
+                    'count',
+                    array(
+                        'conditions' => array(
+                            'ExamPeriod.college_id' => $selected_college_id,
+                            'ExamPeriod.academic_year' => $selected_academic_year,
+                            'ExamPeriod.program_id' => $selected_program_id,
+                            'ExamPeriod.program_type_id' => $ptv,
+                            'ExamPeriod.year_level_id' => $ylv,
+                            'ExamPeriod.semester' => $selected_semester
+                        )
+                    )
+                );
+                if ($repeation > 0) {
+                    $program_type_name = $this->ProgramType->field('ProgramType.name', array('ProgramType.id' => $ptv));
+                    $this->invalidate(
+                        'already_recorded_exam_perid',
+                        'The exam period is already recorded for ' . $program_type_name . ' ' . $ylv . ' year students'
+                    );
                     return false;
                 }
             }
@@ -157,11 +201,16 @@ class ExamPeriodsTable extends Table
         return true;
     }
 
-    function beforeDeleteCheckEligibility($id=null,$college_id=null){
-        $count = $this->find('count',array('conditions'=>array('ExamPeriod.college_id'=>$college_id, 'ExamPeriod.id'=>$id)));
-        if($count >0){
+    public function beforeDeleteCheckEligibility($id = null, $college_id = null)
+    {
+
+        $count = $this->find(
+            'count',
+            array('conditions' => array('ExamPeriod.college_id' => $college_id, 'ExamPeriod.id' => $id))
+        );
+        if ($count > 0) {
             return true;
-        } else{
+        } else {
             return false;
         }
     }

@@ -1,13 +1,13 @@
 <?php
+
 /**
  * Math Captcha Component class.
- *
  * Generates a simple, plain text math equation as an alternative to image-based CAPTCHAs.
  *
  * @filesource
- * @author			Jamie Nay
+ * @author          Jamie Nay
  * @copyright       Jamie Nay
- * @license			http://www.opensource.org/licenses/mit-license.php The MIT License
+ * @license         http://www.opensource.org/licenses/mit-license.php The MIT License
  * @link            http://jamienay.com/code/math-captcha-component
  */
 
@@ -142,4 +142,3 @@ class MathCaptchaComponent extends Component
         return $data == $this->session->read('MathCaptcha.answer');
     }
 }
-?>

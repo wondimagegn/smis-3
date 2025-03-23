@@ -1,71 +1,173 @@
 <?php
+
 namespace App\Controller;
 
+
 use App\Controller\AppController;
+
+
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class AcademicStatusesController extends AppController
 {
 
-    public function index()
-    {
-        $academicStatuses = $this->paginate($this->AcademicStatuses);
+    public $name = 'AcademicStatuses';
+    public $menuOptions = array(
 
-        $this->set(compact('academicStatuses'));
+        'parent' => 'dashboard',
+        'exclude' => array('index'),
+        'alias' => array(
+            'index' => 'View All Status',
+            'add' => 'Set Academic Status'
+        )
+    );
+    public $paginate = array();
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
     }
 
+    public function index()
+    {
+
+        $this->AcademicStatus->recursive = 0;
+        $this->paginate = array('order' => 'AcademicStatus.order DESC');
+        $this->set('academicStatuses', $this->paginate());
+    }
 
     public function view($id = null)
     {
-        $academicStatus = $this->AcademicStatuses->get($id, [
-            'contain' => ['AcademicStands', 'HistoricalStudentExamStatuses', 'OtherAcademicRules', 'StudentExamStatuses'],
-        ]);
+
+        if (!$id) {
+            $this->Session->setFlash(
+                __('Invalid academic status'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
+        }
+
+        $academicStatus = $this->AcademicStatus->read(null, $id);
+
+        foreach ($academicStatus['AcademicStand'] as $k => &$v) {
+            $year_level_ids = array();
+            $semester = array();
+            if (!empty($v['year_level_id'])) {
+                $year_level_ids = unserialize($v['year_level_id']);
+                $v['year_level_id'] = implode(',', $year_level_ids);
+            }
+            if (!empty($v['semester'])) {
+                $semester = unserialize($v['semester']);
+                if (!empty($semester)) {
+                    $v['semester'] = implode(',', $semester);
+                } else {
+                    $v['semester'] = null;
+                }
+            }
+            if (!empty($v['program_id'])) {
+                $v['program_name'] = $this->AcademicStatus->AcademicStand->Program->field(
+                    'Program.name',
+                    array('Program.id' => $v['program_id'])
+                );
+            }
+        }
 
         $this->set('academicStatus', $academicStatus);
     }
 
-
     public function add()
     {
-        $academicStatus = $this->AcademicStatuses->newEntity();
-        if ($this->request->is('post')) {
-            $academicStatus = $this->AcademicStatuses->patchEntity($academicStatus, $this->request->getData());
-            if ($this->AcademicStatuses->save($academicStatus)) {
-                $this->Flash->success(__('The academic status has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->AcademicStatus->create();
+            if ($this->AcademicStatus->save($this->request->data)) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The academic status has been saved'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The academic status could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
             }
-            $this->Flash->error(__('The academic status could not be saved. Please, try again.'));
         }
-        $this->set(compact('academicStatus'));
     }
 
     public function edit($id = null)
     {
-        $academicStatus = $this->AcademicStatuses->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $academicStatus = $this->AcademicStatuses->patchEntity($academicStatus, $this->request->getData());
-            if ($this->AcademicStatuses->save($academicStatus)) {
-                $this->Flash->success(__('The academic status has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The academic status could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(
+                __('Invalid academic status'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
         }
-        $this->set(compact('academicStatus'));
+        if (!empty($this->request->data)) {
+            if ($this->AcademicStatus->save($this->request->data)) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The academic status has been saved'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The academic status could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->AcademicStatus->read(null, $id);
+        }
     }
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $academicStatus = $this->AcademicStatuses->get($id);
-        if ($this->AcademicStatuses->delete($academicStatus)) {
-            $this->Flash->success(__('The academic status has been deleted.'));
-        } else {
-            $this->Flash->error(__('The academic status could not be deleted. Please, try again.'));
+
+        if (!$id || !$this->AcademicStatus->exists($id)) {
+            $this->Session->setFlash(
+                '<span></span>' . __('Invalid id for academic status'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
         }
 
-        return $this->redirect(['action' => 'index']);
+        if ($this->AcademicStatus->canItBeDeleted($id)) {
+            if ($this->AcademicStatus->delete($id)) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('Academic status deleted'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('Academic status was not deleted'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            }
+        } else {
+            $this->Session->setFlash(
+                '<span></span>' . __('Academic status is on use and can not be deleted.'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
+        }
     }
 }

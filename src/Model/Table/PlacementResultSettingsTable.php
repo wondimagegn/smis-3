@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -105,9 +106,8 @@ class PlacementResultSettingsTable extends Table
     {
 
         $reformatedData = array();
-        //	$group_identifier = strtotime(date('Y-m-d h:i:sa'));
+        //  $group_identifier = strtotime(date('Y-m-d h:i:sa'));
         if (isset($data) && !empty($data)) {
-
             $firstData = $data['PlacementResultSetting'][1];
 
             $findSettingGroup = classRegistry::init('PlacementRoundParticipant')->find("first", array(

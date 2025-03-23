@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -10,6 +11,7 @@ use Cake\ORM\TableRegistry;
 
 class AcademicCalendarsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -18,6 +20,7 @@ class AcademicCalendarsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('academic_calendars');
@@ -30,17 +33,19 @@ class AcademicCalendarsTable extends Table
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
             'joinType' => 'LEFT',
+            'propertyName'=>'Program'
         ]);
 
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
             'joinType' => 'LEFT',
+            'propertyName'=>'ProgramType'
         ]);
 
         $this->hasMany('ExtendingAcademicCalendars', [
             'foreignKey' => 'academic_calendar_id',
+            'propertyName'=>'ExtendingAcademicCalendar'
         ]);
-
     }
 
     /**
@@ -51,6 +56,7 @@ class AcademicCalendarsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -139,6 +145,7 @@ class AcademicCalendarsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['college_id'], 'Colleges'));
         $rules->add($rules->existsIn(['department_id'], 'Departments'));
         $rules->add($rules->existsIn(['program_id'], 'Programs'));
@@ -147,8 +154,16 @@ class AcademicCalendarsTable extends Table
 
         return $rules;
     }
-    function check_registration($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null, $programId = null, $programTypeId = null)
-    {
+
+    function check_registration(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null,
+        $programId = null,
+        $programTypeId = null
+    ) {
+
         $courseRegistrationStartDate = null;
         $yearLevelForSearch = ($yearLevelId == 0 ? '1st' : $yearLevelId);
 
@@ -189,11 +204,17 @@ class AcademicCalendarsTable extends Table
 
                 $courseRegistrationStartDate = $acv['course_registration_start_date'];
 
-                if (in_array($departmentCollegeId, json_decode($acv['department_id'], true)) &&
-                    in_array($yearLevelForSearch, json_decode($acv['year_level_id'], true))) {
-
-                    if ((date('Y-m-d') >= $acv['course_registration_start_date']) &&
-                        (date('Y-m-d') <= date('Y-m-d', strtotime($acv['course_registration_end_date'] . " +$daysAdded days")))) {
+                if (
+                    in_array($departmentCollegeId, json_decode($acv['department_id'], true)) &&
+                    in_array($yearLevelForSearch, json_decode($acv['year_level_id'], true))
+                ) {
+                    if (
+                        (date('Y-m-d') >= $acv['course_registration_start_date']) &&
+                        (date('Y-m-d') <= date(
+                                'Y-m-d',
+                                strtotime($acv['course_registration_end_date'] . " +$daysAdded days")
+                            ))
+                    ) {
                         return 1; // Registration is allowed
                     }
                 }
@@ -205,11 +226,17 @@ class AcademicCalendarsTable extends Table
         }
 
         return false;
-
     }
 
-    function check_add_date_end($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null, $programId = null, $programTypeId = null )
-    {
+    public function check_add_date_end(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null,
+        $programId = null,
+        $programTypeId = null
+    ) {
+
         $yearLevelForSearch = ($yearLevelId == 0 ? '1st' : $yearLevelId);
 
         $query = $this->find()
@@ -255,11 +282,14 @@ class AcademicCalendarsTable extends Table
                 $courseAddEndDate = $acv['course_add_end_date'];
                 $courseRegistrationEndDate = $acv['course_registration_end_date'];
 
-                if (in_array($departmentCollegeId, json_decode($acv['department_id'], true)) &&
-                    in_array($yearLevelForSearch, json_decode($acv['year_level_id'], true))) {
-
-                    if ((date('Y-m-d') >= $acv['course_add_start_date']) &&
-                        (date('Y-m-d') <= date('Y-m-d', strtotime($acv['course_add_end_date'] . " +$daysAdded days")))) {
+                if (
+                    in_array($departmentCollegeId, json_decode($acv['department_id'], true)) &&
+                    in_array($yearLevelForSearch, json_decode($acv['year_level_id'], true))
+                ) {
+                    if (
+                        (date('Y-m-d') >= $acv['course_add_start_date']) &&
+                        (date('Y-m-d') <= date('Y-m-d', strtotime($acv['course_add_end_date'] . " +$daysAdded days")))
+                    ) {
                         return 1; // Course add is possible
                     }
                 }
@@ -273,8 +303,13 @@ class AcademicCalendarsTable extends Table
         return false;
     }
 
-    function check_add_date_start($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null)
-    {
+    function check_add_date_start(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null
+    ) {
+
         $academicCalendar = $this->find()
             ->where([
                 'academic_year' => $academicYear,
@@ -302,8 +337,15 @@ class AcademicCalendarsTable extends Table
     }
 
 
-    function check_add_drop_end($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null, $programId = null, $programTypeId = null)
-    {
+    function check_add_drop_end(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null,
+        $programId = null,
+        $programTypeId = null
+    ) {
+
         $courseDropStartDate = null;
 
         // Build query conditions dynamically
@@ -343,7 +385,10 @@ class AcademicCalendarsTable extends Table
 
                 // Check if course drop period is within the deadline
                 if (in_array($departmentCollegeId, $departmentIds) && in_array($yearLevelId, $yearLevelIds)) {
-                    if ((date('Y-m-d') >= $acv['course_drop_start_date']) && (date('Y-m-d') <= date('Y-m-d', strtotime($acv['course_drop_end_date'] . ' +' . $daysAdded . ' days ')))) {
+                    if ((date('Y-m-d') >= $acv['course_drop_start_date']) && (date('Y-m-d') <= date(
+                                'Y-m-d',
+                                strtotime($acv['course_drop_end_date'] . ' +' . $daysAdded . ' days ')
+                            ))) {
                         return 1;
                     }
                 }
@@ -351,7 +396,10 @@ class AcademicCalendarsTable extends Table
                 // Freshman check
                 if (empty($yearLevelId) || $yearLevelId == 0) {
                     if (in_array('pre_' . $departmentCollegeId, $departmentIds) && in_array('1st', $yearLevelIds)) {
-                        if ((date('Y-m-d') >= $acv['course_drop_start_date']) && (date('Y-m-d') <= date('Y-m-d', strtotime($acv['course_drop_end_date'] . ' +' . $daysAdded . ' days ')))) {
+                        if ((date('Y-m-d') >= $acv['course_drop_start_date']) && (date('Y-m-d') <= date(
+                                    'Y-m-d',
+                                    strtotime($acv['course_drop_end_date'] . ' +' . $daysAdded . ' days ')
+                                ))) {
                             return 1;
                         }
                     }
@@ -360,11 +408,18 @@ class AcademicCalendarsTable extends Table
         }
 
         return (!empty($courseDropStartDate) && date('Y-m-d') < $courseDropStartDate) ? $courseDropStartDate : false;
-
     }
 
-    function check_registration_add_drop_start_end($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null, $programId = null, $programTypeId = null, $type = '')
-    {
+    function check_registration_add_drop_start_end(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null,
+        $programId = null,
+        $programTypeId = null,
+        $type = ''
+    ) {
+
         $activityStartDate = null;
         $activityEndDate = null;
 
@@ -397,8 +452,12 @@ class AcademicCalendarsTable extends Table
                     switch ($type) {
                         case 'registration':
                             $daysAdded = $this->ExtendingAcademicCalendar->getExtendedDays(
-                                $acv['id'], $yearLevelId, $departmentCollegeId,
-                                $acv['program_id'], $acv['program_type_id'], 'registration'
+                                $acv['id'],
+                                $yearLevelId,
+                                $departmentCollegeId,
+                                $acv['program_id'],
+                                $acv['program_type_id'],
+                                'registration'
                             );
                             $activityStartDate = $acv['course_registration_start_date'];
                             $activityEndDate = $acv['course_registration_end_date'];
@@ -406,8 +465,12 @@ class AcademicCalendarsTable extends Table
 
                         case 'add':
                             $daysAdded = $this->ExtendingAcademicCalendar->getExtendedDays(
-                                $acv['id'], $yearLevelId, $departmentCollegeId,
-                                $acv['program_id'], $acv['program_type_id'], 'add'
+                                $acv['id'],
+                                $yearLevelId,
+                                $departmentCollegeId,
+                                $acv['program_id'],
+                                $acv['program_type_id'],
+                                'add'
                             );
                             $activityStartDate = $acv['course_add_start_date'];
                             $activityEndDate = $acv['course_add_end_date'];
@@ -415,8 +478,12 @@ class AcademicCalendarsTable extends Table
 
                         case 'drop':
                             $daysAdded = $this->ExtendingAcademicCalendar->getExtendedDays(
-                                $acv['id'], $yearLevelId, $departmentCollegeId,
-                                $acv['program_id'], $acv['program_type_id'], 'drop'
+                                $acv['id'],
+                                $yearLevelId,
+                                $departmentCollegeId,
+                                $acv['program_id'],
+                                $acv['program_type_id'],
+                                'drop'
                             );
                             $activityStartDate = $acv['course_drop_start_date'];
                             $activityEndDate = $acv['course_drop_end_date'];
@@ -426,7 +493,10 @@ class AcademicCalendarsTable extends Table
                     // Check if activity is within allowed dates
                     if (in_array($departmentCollegeId, $departmentIds) && in_array($yearLevelId, $yearLevelIds)) {
                         if (!empty($activityStartDate) && !empty($activityEndDate)) {
-                            if ((date('Y-m-d') >= $activityStartDate) && (date('Y-m-d') <= date('Y-m-d', strtotime($activityEndDate . ' +' . $daysAdded . ' days ')))) {
+                            if ((date('Y-m-d') >= $activityStartDate) && (date('Y-m-d') <= date(
+                                        'Y-m-d',
+                                        strtotime($activityEndDate . ' +' . $daysAdded . ' days ')
+                                    ))) {
                                 return 1;
                             }
                         }
@@ -435,7 +505,10 @@ class AcademicCalendarsTable extends Table
                     // Freshman check
                     if (empty($yearLevelId) || $yearLevelId == 0) {
                         if (in_array('pre_' . $departmentCollegeId, $departmentIds) && in_array('1st', $yearLevelIds)) {
-                            if ((date('Y-m-d') >= $activityStartDate) && (date('Y-m-d') <= date('Y-m-d', strtotime($activityEndDate . ' +' . $daysAdded . ' days ')))) {
+                            if ((date('Y-m-d') >= $activityStartDate) && (date('Y-m-d') <= date(
+                                        'Y-m-d',
+                                        strtotime($activityEndDate . ' +' . $daysAdded . ' days ')
+                                    ))) {
                                 return 1;
                             }
                         }
@@ -447,11 +520,15 @@ class AcademicCalendarsTable extends Table
         }
 
         return false;
-
     }
 
-    function check_grade_submission_end($academicYear = null, $semester = null, $departmentCollegeId = null, $yearLevelId = null)
-    {
+    function check_grade_submission_end(
+        $academicYear = null,
+        $semester = null,
+        $departmentCollegeId = null,
+        $yearLevelId = null
+    ) {
+
         // Fetch academic calendar records
         $academicCalendar = $this->find()
             ->where([
@@ -471,14 +548,21 @@ class AcademicCalendarsTable extends Table
 
                 // Get any extended grade submission deadlines
                 $daysAdded = $this->ExtendingAcademicCalendar->getExtendedDays(
-                    $acv['id'], $yearLevelId, $departmentCollegeId,
-                    $acv['program_id'], $acv['program_type_id'], 'grade_submission'
+                    $acv['id'],
+                    $yearLevelId,
+                    $departmentCollegeId,
+                    $acv['program_id'],
+                    $acv['program_type_id'],
+                    'grade_submission'
                 );
 
                 // Check if department & year level match
                 if (in_array($departmentCollegeId, $departmentIds) && in_array($yearLevelId, $yearLevelIds)) {
                     // Validate if the grade submission period is still open
-                    $extendedDeadline = date('Y-m-d', strtotime($acv['grade_submission_end_date'] . ' +' . $daysAdded . ' days '));
+                    $extendedDeadline = date(
+                        'Y-m-d',
+                        strtotime($acv['grade_submission_end_date'] . ' +' . $daysAdded . ' days ')
+                    );
 
                     if ($extendedDeadline >= date('Y-m-d')) {
                         return $acv['id'];
@@ -492,6 +576,7 @@ class AcademicCalendarsTable extends Table
 
     function check_duplicate_entry($data = null)
     {
+
         $existedDept = [];
 
         if (empty($data['AcademicCalendar'])) {
@@ -553,7 +638,10 @@ class AcademicCalendarsTable extends Table
             }
 
             if (!empty($alreadyExistedYearLevel)) {
-                $this->invalidate('duplicate', $alreadyExistedYearLevel[0] . ' and ' . (count($departments) - 1) . ' others.');
+                $this->invalidate(
+                    'duplicate',
+                    $alreadyExistedYearLevel[0] . ' and ' . (count($departments) - 1) . ' others.'
+                );
                 $this->invalidate('departmentduplicate', $departments);
                 $this->invalidate('yearlevelduplicate', $alreadyExistedYearLevel);
                 return false;
@@ -563,14 +651,19 @@ class AcademicCalendarsTable extends Table
         return true;
     }
 
-    function daysAvaiableForGradeChange( $programId = null,  $programTypeId = null)
+    public function daysAvaiableForGradeChange($programId = null, $programTypeId = null)
     {
+
         if (!empty($programId) && !empty($programTypeId)) {
             $settings = $this->GeneralSettings
                 ->find()
                 ->where([
                     "JSON_CONTAINS(GeneralSettings.program_id, :programId)" => ['programId' => json_encode($programId)],
-                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => ['programTypeId' => json_encode($programTypeId)]
+                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => [
+                        'programTypeId' => json_encode(
+                            $programTypeId
+                        )
+                    ]
                 ])
                 ->select(['daysAvailableForGradeChange'])
                 ->first();
@@ -581,8 +674,9 @@ class AcademicCalendarsTable extends Table
         return DEFAULT_DAYS_AVAILABLE_FOR_GRADE_CHANGE;
     }
 
-    function daysAvaiableForNgToF( $programId = null, $programTypeId = null)
+    public function daysAvaiableForNgToF($programId = null, $programTypeId = null)
     {
+
         $maxAllowedDays = 120; // Maximum 4 months
 
         if (!empty($programId) && !empty($programTypeId)) {
@@ -590,7 +684,11 @@ class AcademicCalendarsTable extends Table
                 ->find()
                 ->where([
                     "JSON_CONTAINS(GeneralSettings.program_id, :programId)" => ['programId' => json_encode($programId)],
-                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => ['programTypeId' => json_encode($programTypeId)]
+                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => [
+                        'programTypeId' => json_encode(
+                            $programTypeId
+                        )
+                    ]
                 ])
                 ->select(['daysAvailableForNgToF'])
                 ->first();
@@ -601,11 +699,12 @@ class AcademicCalendarsTable extends Table
         }
 
         return min(DEFAULT_DAYS_AVAILABLE_FOR_NG_TO_F, $maxAllowedDays);
-	}
+    }
 
 
-    function daysAvaiableForDoToF($programId = null,  $programTypeId = null)
+    public function daysAvaiableForDoToF($programId = null, $programTypeId = null)
     {
+
         $maxAllowedDays = 120; // Maximum 4 months
 
         if (!empty($programId) && !empty($programTypeId)) {
@@ -613,7 +712,11 @@ class AcademicCalendarsTable extends Table
                 ->find()
                 ->where([
                     "JSON_CONTAINS(GeneralSettings.program_id, :programId)" => ['programId' => json_encode($programId)],
-                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => ['programTypeId' => json_encode($programTypeId)]
+                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => [
+                        'programTypeId' => json_encode(
+                            $programTypeId
+                        )
+                    ]
                 ])
                 ->select(['daysAvailableForDoToF'])
                 ->first();
@@ -628,6 +731,7 @@ class AcademicCalendarsTable extends Table
 
     function daysAvailableForFxToF($programId = null, $programTypeId = null)
     {
+
         $maxAllowedDays = 120; // Maximum 4 months
 
         if (!empty($programId) && !empty($programTypeId)) {
@@ -635,7 +739,11 @@ class AcademicCalendarsTable extends Table
                 ->find()
                 ->where([
                     "JSON_CONTAINS(GeneralSettings.program_id, :programId)" => ['programId' => json_encode($programId)],
-                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => ['programTypeId' => json_encode($programTypeId)]
+                    "JSON_CONTAINS(GeneralSettings.program_type_id, :programTypeId)" => [
+                        'programTypeId' => json_encode(
+                            $programTypeId
+                        )
+                    ]
                 ])
                 ->select(['daysAvailableForFxToF'])
                 ->first();
@@ -650,6 +758,7 @@ class AcademicCalendarsTable extends Table
 
     function isFxConversionDate($academicCalendar, $departmentId, $publishedDetail)
     {
+
         $calendar = $this->getAcademicCalenderDepartment($academicCalendar, $departmentId);
 
         // Fetch Year Level Name safely using CakePHP ORM
@@ -683,16 +792,17 @@ class AcademicCalendarsTable extends Table
         }
 
         return false;
-
     }
 
     function weekCountForAcademicYearAndSemester()
     {
+
         return DEFAULT_WEEK_COUNT_FOR_ONE_SEMESTER;
     }
 
     function weekCountForAcademicYear($programId = null, $programTypeId = null)
     {
+
         if (!empty($programId) && !empty($programTypeId)) {
             $generalSettingsTable = TableRegistry::getTableLocator()->get('GeneralSettings');
 
@@ -713,6 +823,7 @@ class AcademicCalendarsTable extends Table
 
     public function weekCountForOneSemester($programId = null, $programTypeId = null)
     {
+
         if (!empty($programId) && !empty($programTypeId)) {
             // Fetch GeneralSettingsTable manually
             $generalSettingsTable = TableRegistry::getTableLocator()->get('GeneralSettings');
@@ -734,6 +845,7 @@ class AcademicCalendarsTable extends Table
 
     public function semesterCountForAcademicYear($programId = null, $programTypeId = null)
     {
+
         if (!empty($programId) && !empty($programTypeId)) {
             // Fetch GeneralSettingsTable using TableRegistry
             $generalSettingsTable = TableRegistry::getTableLocator()->get('GeneralSettings');
@@ -755,6 +867,7 @@ class AcademicCalendarsTable extends Table
 
     public function currentSemesterInTheDefinedAcademicCalender($academicYear)
     {
+
         // Fetch AcademicCalendarsTable
         $academicCalendarsTable = TableRegistry::getTableLocator()->get('AcademicCalendars');
 
@@ -779,10 +892,21 @@ class AcademicCalendarsTable extends Table
 
     public function semesterStartAndEndMonth($semester, $academicYear)
     {
+
         // Initialize months array with zero values
         $months = [
-            'Jan' => 0, 'Feb' => 0, 'Mar' => 0, 'Apr' => 0, 'May' => 0, 'Jun' => 0,
-            'Jul' => 0, 'Aug' => 0, 'Sep' => 0, 'Oct' => 0, 'Nov' => 0, 'Dec' => 0
+            'Jan' => 0,
+            'Feb' => 0,
+            'Mar' => 0,
+            'Apr' => 0,
+            'May' => 0,
+            'Jun' => 0,
+            'Jul' => 0,
+            'Aug' => 0,
+            'Sep' => 0,
+            'Oct' => 0,
+            'Nov' => 0,
+            'Dec' => 0
         ];
 
         // Fetch AcademicCalendarsTable instance
@@ -816,6 +940,7 @@ class AcademicCalendarsTable extends Table
 
     public function getAcademicCalendar($currentAcademicYear)
     {
+
         $calendar = [];
 
         // Fetch AcademicCalendarsTable instance
@@ -864,6 +989,7 @@ class AcademicCalendarsTable extends Table
 
     public function getAcademicCalendarDepartment($currentAcademicYear, $departmentId)
     {
+
         $calendar = [];
 
         // Fetch Table Instances
@@ -915,6 +1041,7 @@ class AcademicCalendarsTable extends Table
 
     public function getComingAcademicCalendarsDeadlines($currentAcademicYear, $departmentId)
     {
+
         // Fetch Table Instance
         $academicCalendarsTable = TableRegistry::getTableLocator()->get('AcademicCalendars');
 
@@ -937,9 +1064,13 @@ class AcademicCalendarsTable extends Table
                 $gradeSubmissionEndDate = FrozenTime::parse($academicCalendar->grade_submission_end_date)->subDays(5);
 
                 if ($gradeSubmissionEndDate->gt($today)) {
-                    $deadlines[$count]['GradeSubmissionDeadline'] = $gradeSubmissionEndDate->i18nFormat('MMMM d, Y, h:mm a');
+                    $deadlines[$count]['GradeSubmissionDeadline'] = $gradeSubmissionEndDate->i18nFormat(
+                        'MMMM d, Y, h:mm a'
+                    );
                 } elseif (!empty($gradeSubmissionEndDate)) {
-                    $deadlines[$count]['GradeSubmissionDeadline'] = $gradeSubmissionEndDate->i18nFormat('MMMM d, Y, h:mm a');
+                    $deadlines[$count]['GradeSubmissionDeadline'] = $gradeSubmissionEndDate->i18nFormat(
+                        'MMMM d, Y, h:mm a'
+                    );
                 }
 
                 $count++;
@@ -951,6 +1082,7 @@ class AcademicCalendarsTable extends Table
 
     public function minimumCreditForStatus($studentId)
     {
+
         // Load required tables
         $studentsTable = TableRegistry::getTableLocator()->get('Students');
         $generalSettingsTable = TableRegistry::getTableLocator()->get('GeneralSettings');
@@ -980,7 +1112,7 @@ class AcademicCalendarsTable extends Table
         // Determine credit system
         if (!empty($studentDetail->curriculum) && is_numeric($studentDetail->curriculum->id)) {
             if (strpos($studentDetail->curriculum->type_credit, 'ECTS') !== false) {
-                return (int) round($settings->minimumCreditForStatus * CREDIT_TO_ECTS);
+                return (int)round($settings->minimumCreditForStatus * CREDIT_TO_ECTS);
             } else {
                 return $settings->minimumCreditForStatus;
             }
@@ -991,6 +1123,7 @@ class AcademicCalendarsTable extends Table
 
     public function maximumCreditPerSemester($studentId)
     {
+
         // Load required tables
         $studentsTable = TableRegistry::getTableLocator()->get('Students');
         $generalSettingsTable = TableRegistry::getTableLocator()->get('GeneralSettings');
@@ -998,10 +1131,15 @@ class AcademicCalendarsTable extends Table
         // Fetch student details with associated Curriculum
         $studentDetail = $studentsTable->find()
             ->where(['Students.id' => $studentId])
-            ->contain(['Curriculums' => function ($q) {
-                return $q->select(['id', 'name', 'type_credit']);
-            }])
-            ->select(['id', 'full_name', 'program_id', 'program_type_id', 'curriculum_id', 'department_id', 'college_id'])
+            ->contain([
+                'Curriculums' => function ($q) {
+
+                    return $q->select(['id', 'name', 'type_credit']);
+                }
+            ])
+            ->select(
+                ['id', 'full_name', 'program_id', 'program_type_id', 'curriculum_id', 'department_id', 'college_id']
+            )
             ->first();
 
         if (!$studentDetail) {
@@ -1024,7 +1162,7 @@ class AcademicCalendarsTable extends Table
         if (!empty($studentDetail->curriculum) && is_numeric($studentDetail->curriculum->id)) {
             if ($settings->maximumCreditPerSemester != 0) {
                 if (strpos($studentDetail->curriculum->type_credit, 'ECTS') !== false) {
-                    return (int) round($settings->maximumCreditPerSemester * CREDIT_TO_ECTS);
+                    return (int)round($settings->maximumCreditPerSemester * CREDIT_TO_ECTS);
                 } else {
                     return $settings->maximumCreditPerSemester;
                 }
@@ -1039,6 +1177,7 @@ class AcademicCalendarsTable extends Table
 
     public function getMostRecentAcademicCalenderForSMS($phonenumber)
     {
+
         // Load required tables
         $studentsTable = TableRegistry::getTableLocator()->get('Students');
         $sectionsTable = TableRegistry::getTableLocator()->get('Sections');
@@ -1078,22 +1217,38 @@ class AcademicCalendarsTable extends Table
 
     public function formateAcademicCalendarForSMS($academicCalender)
     {
+
         // Format the SMS message with correct academic calendar details
         $message =
             "Academic Year: " . $academicCalender->academic_year .
             " Semester: " . $academicCalender->semester .
-            "\nRegistration Start: " . date("F j,Y,g:i a", strtotime($academicCalender->course_registration_start_date)) .
+            "\nRegistration Start: " . date(
+                "F j,Y,g:i a",
+                strtotime($academicCalender->course_registration_start_date)
+            ) .
             "\nRegistration End: " . date("F j,Y,g:i a", strtotime($academicCalender->course_registration_end_date)) .
             "\nAdd Start: " . date("F j,Y,g:i a", strtotime($academicCalender->course_add_start_date)) .
-            "\nAdd End: " . date("F j,Y,g:i a", strtotime($academicCalender->course_add_end_date)) . // Fixed the end date
+            "\nAdd End: " . date(
+                "F j,Y,g:i a",
+                strtotime($academicCalender->course_add_end_date)
+            ) . // Fixed the end date
             "\nDrop Start: " . date("F j,Y,g:i a", strtotime($academicCalender->course_drop_start_date)) .
             "\nDrop End: " . date("F j,Y,g:i a", strtotime($academicCalender->course_drop_end_date));
 
         return $message;
     }
 
-    public function recentAcademicYearSchedule($academicyear, $semester, $program_id, $program_type_id, $department_id, $year, $freshman = 0, $college_id = null)
-    {
+    public function recentAcademicYearSchedule(
+        $academicyear,
+        $semester,
+        $program_id,
+        $program_type_id,
+        $department_id,
+        $year,
+        $freshman = 0,
+        $college_id = null
+    ) {
+
         // Handle for freshman students
         if ($freshman == 0) {
             $conditions = array(
@@ -1128,8 +1283,10 @@ class AcademicCalendarsTable extends Table
 
         return $recentAcademicCalendar;
     }
+
     public function getPublishedCourseGradeSubmissionDate($pid)
     {
+
         // Get PublishedCourse details
         $publishedCourseDetail = ClassRegistry::init('PublishedCourse')->find('first', array(
             'conditions' => array('PublishedCourse.id' => $pid),
@@ -1170,10 +1327,13 @@ class AcademicCalendarsTable extends Table
 
         // If no grade submission date found, compute from the current academic year and semester
         App::import('Component', 'AcademicYear');
-        $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
+        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
         $current_acy_and_semester = $AcademicYear->current_acy_and_semester();
 
-        $gradeSubmissionEnd = $AcademicYear->getAcademicYearBegainingDate($current_acy_and_semester['academic_year'], $current_acy_and_semester['semester']);
+        $gradeSubmissionEnd = $AcademicYear->getAcademicYearBegainingDate(
+            $current_acy_and_semester['academic_year'],
+            $current_acy_and_semester['semester']
+        );
         $days_to_add = DEFAULT_WEEK_COUNT_FOR_ONE_SEMESTER * 7;
         $deadlineConverted = date('Y-m-d', strtotime($gradeSubmissionEnd . ' + ' . $days_to_add . ' days'));
 
@@ -1182,6 +1342,7 @@ class AcademicCalendarsTable extends Table
 
     public function getFxPublishedCourseGradeSubmissionDate($pid)
     {
+
         // Get PublishedCourse details
         $publishedCourseDetail = ClassRegistry::init('PublishedCourse')->find('first', array(
             'conditions' => array('PublishedCourse.id' => $pid),
@@ -1225,11 +1386,14 @@ class AcademicCalendarsTable extends Table
         } else {
             // If PublishedCourse not found, compute fallback deadline using current academic year
             App::import('Component', 'AcademicYear');
-            $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
+            $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
             $current_acy_and_semester = $AcademicYear->current_acy_and_semester();
 
             // Calculate default grade submission date
-            $gradeSubmissionEnd = $AcademicYear->getAcademicYearBegainingDate($current_acy_and_semester['academic_year'], $current_acy_and_semester['semester']);
+            $gradeSubmissionEnd = $AcademicYear->getAcademicYearBegainingDate(
+                $current_acy_and_semester['academic_year'],
+                $current_acy_and_semester['semester']
+            );
             $deadlineConverted = date('Y-m-d', strtotime($gradeSubmissionEnd . ' + 4 months'));
 
             return $deadlineConverted;
@@ -1237,8 +1401,15 @@ class AcademicCalendarsTable extends Table
     }
 
     // the below two function not converted to CakePHP 3.8
-    public function getGradeSubmissionDate($academicyear, $semester, $program_id, $program_type_id, $department_id, $year)
-    {
+    public function getGradeSubmissionDate(
+        $academicyear,
+        $semester,
+        $program_id,
+        $program_type_id,
+        $department_id,
+        $year
+    ) {
+
         $programID = null;
         $programTypeID = null;
         $departments = array();
@@ -1313,7 +1484,7 @@ class AcademicCalendarsTable extends Table
                             $yearLevel[$yykey] = $yyvalue;
                         }
                     }
-                } else if (empty($year)) {
+                } elseif (empty($year)) {
                     $yearLevel = $value['YearLevel'];
                 }
 
@@ -1345,8 +1516,13 @@ class AcademicCalendarsTable extends Table
                                 'grade_submission'
                             );
 
-                            if ($daysAdded){
-                                return date('Y-m-d', strtotime($gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'] . ' +' . $daysAdded . ' days '));
+                            if ($daysAdded) {
+                                return date(
+                                    'Y-m-d',
+                                    strtotime(
+                                        $gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'] . ' +' . $daysAdded . ' days '
+                                    )
+                                );
                             }
                             return $gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'];
                         }
@@ -1358,7 +1534,6 @@ class AcademicCalendarsTable extends Table
         if (!empty($colleges)) {
             $yvalue_fresh = '1st';
             foreach ($colleges as $key => $value) {
-
                 $fresh = 'pre_' . $value['College']['id'];
 
                 $gradeSubmissionDate = $this->find('first', array(
@@ -1389,8 +1564,13 @@ class AcademicCalendarsTable extends Table
                         'grade_submission'
                     );
 
-                    if ($daysAdded){
-                        return date('Y-m-d', strtotime($gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'] . ' +' . $daysAdded . ' days '));
+                    if ($daysAdded) {
+                        return date(
+                            'Y-m-d',
+                            strtotime(
+                                $gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'] . ' +' . $daysAdded . ' days '
+                            )
+                        );
                     }
 
                     return $gradeSubmissionDate['AcademicCalendar']['grade_submission_end_date'];
@@ -1399,7 +1579,7 @@ class AcademicCalendarsTable extends Table
         }
 
         App::import('Component', 'AcademicYear');
-        $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
+        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
 
         $gradeSumissionEnd = $AcademicYear->getAcademicYearBegainingDate($academicyear, $semester);
         $deadlineConverted = date('Y-m-d', strtotime($gradeSumissionEnd . ' + 4 months'));
@@ -1408,20 +1588,30 @@ class AcademicCalendarsTable extends Table
 
     public function getLastGradeChangeDate($pid)
     {
+
         $gradeSubmissionEndDate = null;
 
-        $publishedCourseDetail = ClassRegistry::init('PublishedCourse')->find('first', array('conditions' => array('PublishedCourse.id' => $pid), 'contain' => array('YearLevel', 'Course')));
-        $nextAcademicYear = ClassRegistry::init('StudentExamStatus')->getNextSemster($publishedCourseDetail['PublishedCourse']['academic_year'], $publishedCourseDetail['PublishedCourse']['semester']);
+        $publishedCourseDetail = ClassRegistry::init('PublishedCourse')->find(
+            'first',
+            array('conditions' => array('PublishedCourse.id' => $pid), 'contain' => array('YearLevel', 'Course'))
+        );
+        $nextAcademicYear = ClassRegistry::init('StudentExamStatus')->getNextSemster(
+            $publishedCourseDetail['PublishedCourse']['academic_year'],
+            $publishedCourseDetail['PublishedCourse']['semester']
+        );
 
         $publishedCourseAcademicYear['academic_year'] = $publishedCourseDetail['PublishedCourse']['academic_year'];
         $publishedCourseAcademicYear['semester'] = $publishedCourseDetail['PublishedCourse']['semester'];
 
         $listofAcademicYearToCheck[] = $nextAcademicYear;
 
-        $listofAcademicYearToCheck[] = ClassRegistry::init('StudentExamStatus')->getNextSemster($nextAcademicYear['academic_year'], $nextAcademicYear['semester']);
+        $listofAcademicYearToCheck[] = ClassRegistry::init('StudentExamStatus')->getNextSemster(
+            $nextAcademicYear['academic_year'],
+            $nextAcademicYear['semester']
+        );
 
 
-        if (isset($publishedCourseDetail['PublishedCourse']) && !empty($publishedCourseDetail['PublishedCourse']) && $publishedCourseDetail['Course']['thesis'] == 1 ) {
+        if (isset($publishedCourseDetail['PublishedCourse']) && !empty($publishedCourseDetail['PublishedCourse']) && $publishedCourseDetail['Course']['thesis'] == 1) {
             return date('Y-m-d', strtotime("+5 days"));
             //return date('Y-m-d H:i:s');
         }
@@ -1471,15 +1661,15 @@ class AcademicCalendarsTable extends Table
                     if (!empty($gradeSubmissionDate['AcademicCalendar'])) {
                         return $gradeSubmissionDate['AcademicCalendar']['course_registration_start_date'];
                     }
-
                 } else {
-
                     App::import('Component', 'AcademicYear');
-                    $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
+                    $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
 
-                    $gradeSumissionEnd = $AcademicYear->getAcademicYearBegainingDate($kpv['academic_year'], $kpv['semester']);
+                    $gradeSumissionEnd = $AcademicYear->getAcademicYearBegainingDate(
+                        $kpv['academic_year'],
+                        $kpv['semester']
+                    );
                     $deadlineConverted = date('Y-m-d', strtotime($gradeSumissionEnd . ' + 4 months'));
-
                     //return $deadlineConverted;
                 }
             }
@@ -1505,7 +1695,6 @@ class AcademicCalendarsTable extends Table
                             ),
                             'recursive' => -1
                         ));
-
                     } else {
                         if (!isset($publishedCourseDetail['YearLevel']['name'])) {
                             $year_level = '1st';
@@ -1523,7 +1712,8 @@ class AcademicCalendarsTable extends Table
                             ),
                             'order' => array(
                                 'AcademicCalendar.created DESC'
-                            ), 'recursive' => -1
+                            ),
+                            'recursive' => -1
                         ));
                     }
 

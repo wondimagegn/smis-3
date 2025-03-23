@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
@@ -38,5 +39,4 @@ class OfficialTranscriptRequest extends Entity
     {
         return $this->first_name . ' ' . $this->father_name . ' ' . $this->grand_father;
     }
-
 }

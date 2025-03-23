@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -32,5 +33,4 @@ class MergedSectionsCoursesTable extends Table
             'joinTable' => 'merged_sections_courses_sections',
         ]);
     }
-
 }

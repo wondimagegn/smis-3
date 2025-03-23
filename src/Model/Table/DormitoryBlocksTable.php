@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class DormitoryBlocksTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class DormitoryBlocksTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('dormitory_blocks');
@@ -44,6 +47,7 @@ class DormitoryBlocksTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -87,40 +91,48 @@ class DormitoryBlocksTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['campus_id'], 'Campuses'));
 
         return $rules;
     }
-    function get_floor_data($number=null){
+
+    public function get_floor_data($number = null)
+    {
+
         $floor_data = array();
-        if($number >=1){
+        if ($number >= 1) {
             $floor_data[1] = "Ground Floor";
-            for($i=2;$i<=$number;$i++){
-                if($i==2){
-                    $floor_data[$i] = ($i-1)."st Floor";
-                } else if($i==3){
-                    $floor_data[$i] = ($i-1)."nd Floor";
-                } else if($i==4){
-                    $floor_data[$i] = ($i-1)."rd Floor";
+            for ($i = 2; $i <= $number; $i++) {
+                if ($i == 2) {
+                    $floor_data[$i] = ($i - 1) . "st Floor";
+                } elseif ($i == 3) {
+                    $floor_data[$i] = ($i - 1) . "nd Floor";
+                } elseif ($i == 4) {
+                    $floor_data[$i] = ($i - 1) . "rd Floor";
                 } else {
-                    $floor_data[$i] = ($i-1)."th Floor";
+                    $floor_data[$i] = ($i - 1) . "th Floor";
                 }
             }
             return $floor_data;
         }
     }
-    function send_dormitory_block_data(){
+
+    public function send_dormitory_block_data()
+    {
+
         return $this->data;
     }
 
-    function getDormitoryBlock () {
+    public function getDormitoryBlock()
+    {
 
-        $dormitoryBlocks = $this->find('all',array('contain'=>array('Campus')));
+        $dormitoryBlocks = $this->find('all', array('contain' => array('Campus')));
 
-        $reformateBlocks=array();
+        $reformateBlocks = array();
 
-        foreach ($dormitoryBlocks as $in=>$name) {
-            $reformateBlocks[$name['Campus']['name']][$name['DormitoryBlock']['id']]=$name['DormitoryBlock']['block_name'].'-'.
+        foreach ($dormitoryBlocks as $in => $name) {
+            $reformateBlocks[$name['Campus']['name']][$name['DormitoryBlock']['id']] = $name['DormitoryBlock']['block_name'] . '-' .
                 $name['DormitoryBlock']['type'];
         }
         return $reformateBlocks;

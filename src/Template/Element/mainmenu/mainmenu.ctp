@@ -1,4 +1,10 @@
-<div class="grid_16"> 
+<?php
+
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+
+?>
+<div class="grid_16">
 <?php
 $rename_menu_title = Configure::read('Menu.title_rename');
 renameControllerTitle($menu, $rename_menu_title);
@@ -27,17 +33,17 @@ foreach($menu as $key =>$value){
 
 foreach($menu as $key =>$value) {
 
-				
+
 				if (($parent_exists == false && $key == 0) || isActiveMenu($value,$controller,$action)) {
 				        echo '<li class="cat-item current-cat">';
 				        //debug($value.','.$controller.','.$action);
 				        $parent=$key;
 				        //$this->Session->write('active_menu_parent',$key);
-				        
-				
-				} else {
+
+
+                } else {
 				   echo '<li class="cat-item">';
-				
+
 				}
 				$ctrlCamel = Inflector::variable($value['url']['controller']);
 				if(!array_key_exists($value['id'], $rename_menu_title))
@@ -46,16 +52,15 @@ foreach($menu as $key =>$value) {
 				    {
 				    $ctrlHuman = $rename_menu_title[$value['id']];
 				    }
-				echo $this->Html->link($ctrlHuman, '/'.$value['url']['controller'].'/'.$value['url']['action']);	
-									
-	}
+    echo $this->Html->link($ctrlHuman, '/' . $value['url']['controller'] . '/' . $value['url']['action']);
+}
 echo "</ul>";
 
 function isActiveMenu($submenu=null,$controller=null,$action=null) {
      if(!empty($submenu)) {
             $keys = array_keys($submenu);
             if(strcasecmp($keys[0], '0') != 0) {
-                    if((strcasecmp($submenu['url']['controller'],$controller) == 0 
+                if ((strcasecmp($submenu['url']['controller'], $controller) == 0
                     || strcasecmp(Inflector::variable($submenu['url']['controller']),$controller) == 0)
                     && strcasecmp($submenu['url']['action'],$action) == 0
                     ){
@@ -77,16 +82,15 @@ function isActiveMenu($submenu=null,$controller=null,$action=null) {
                 }
             }
      }
-     
-     return false;       
- 
+
+    return false;
 }
 
 
 function getChildren($children,$html){
         $str=null;
         foreach($children as $k =>$v){
-             $str.=$html->link($v['url']['controller'], '/'.$v['url']['controller'].'/'.$v['url']['action']);	 
+            $str .= $html->link($v['url']['controller'], '/' . $v['url']['controller'] . '/' . $v['url']['action']);
         }
 }
 
@@ -96,14 +100,14 @@ $urlexplode=strtok($urlexplode,'/');
 //debug($urlexplode);
 $parent=null;
 foreach($menu as $mk=>$mv){
-       
+
         foreach ($mv['children'] as $k => $v) {
-               
+
                if($v['id'] == $urlexplode){
                     $parent=$v['parent'];
                     break 2;
                }
-            
+
         }
 }
 */
@@ -114,27 +118,26 @@ foreach($menu as $mk=>$mv){
 //     debug($parent);
 
 ?>
-<div class="grid_16"> 
+<div class="grid_16">
 <div id="submenu">
-<?php 
+    <?php
 //debug($menu);
   //   debug($parent);
         foreach($menu[$parent]['children'] as $m =>$f){
                     echo "<ul class='dropdown'>";
 					echo '<li>';
 
-					/*echo $this->Js->link($f['title'], '/'.$f['url']['controller'].'/'.$f['url']['action'], 
-					array('update'=>'#ajax_div','evalScripts'=>true,'before'=>
-					$this->Js->get('#busy-indicator')->effect('fadeOut',array('buffer'=>false)),
-					'complete'=>$this->Js->get('#busy-indicator')->effect('fadeOut',
-					array('buffer'=>false))
-					));*/
-					
-					
-					
-                   echo $this->Html->link(__($f['title'], true), array('controller'=>$f['url']['controller'],'action' =>$f['url']['action']));
-                    
-					if(sizeof($f['children'])!=0){
+            /*echo $this->Js->link($f['title'], '/'.$f['url']['controller'].'/'.$f['url']['action'],
+            array('update'=>'#ajax_div','evalScripts'=>true,'before'=>
+            $this->Js->get('#busy-indicator')->effect('fadeOut',array('buffer'=>false)),
+            'complete'=>$this->Js->get('#busy-indicator')->effect('fadeOut',
+            array('buffer'=>false))
+            ));*/
+
+
+            echo $this->Html->link(__($f['title'], true), array('controller'=>$f['url']['controller'],'action' =>$f['url']['action']));
+
+            if(sizeof($f['children'])!=0){
 							    //echo grandchildrenmenu($children);
 							    //echo grandchildrenmenu($f['children']);
 							    $children=$f['children'];
@@ -142,10 +145,9 @@ foreach($menu as $mk=>$mv){
 							$string = null;
 		                    $string.='<ul>';
 							    foreach($children as $ch=>$vch) {
-							     
-							                $string.="<li>";
-							            
-					 $string .=$this->Html->link($vch['title'], '/'.$vch['url']['controller'].'/'.$vch['url']['action']);
+                                    $string.="<li>";
+
+                                    $string .=$this->Html->link($vch['title'], '/'.$vch['url']['controller'].'/'.$vch['url']['action']);
 											/* $string .=$this->Js->link($vch['title'], '/'.$vch['url']['controller'].'/'.$vch['url']['action'],array('update'=>'#ajax_div','evalScripts'=>true,'before'=>
 					$this->Js->get('#busy-indicator')->effect('fadeOut',array('buffer'=>false)),
 					'complete'=>$this->Js->get('#busy-indicator')->effect('fadeOut',
@@ -162,19 +164,18 @@ array('buffer'=>false))
 ));*/
 					       $string.=$this->Html->link($v['title'], '/'.$v['url']['controller'].'/'.$v['url']['action']);
 					       $string .='</li>';
-					        
-					    }
+                        }
 					    $string .='</ul>';
 					}
-	                   						
-							                $string.= "</li>";
+
+                                    $string.= "</li>";
 						}
-							   
-							$string.="</ul>";
+
+                $string.="</ul>";
 							echo $string;
 						}
-					
-					echo '</li>'; 
+
+            echo '</li>';
 					echo "</ul>";
         }
 ?>

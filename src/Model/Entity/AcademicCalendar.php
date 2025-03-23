@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
 class AcademicCalendar extends Entity
 {
-
     protected $_accessible = [
         'academic_year' => true,
         'semester' => true,
@@ -41,6 +41,4 @@ class AcademicCalendar extends Entity
     {
         return $this->academic_year . '-' . $this->semester;
     }
-
-
 }

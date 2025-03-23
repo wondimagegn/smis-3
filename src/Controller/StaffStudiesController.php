@@ -1,73 +1,174 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
 
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
+
 class StaffStudiesController extends AppController
 {
+
+    public $helpers = array('Media.Media');
+    public $menuOptions = array(
+        'parent' => 'security',
+        'exclude' => array('*'),
+    );
+
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+        $this->Auth->allow('add_staff_study');
+    }
+
+    /**
+     * index method
+     *
+     * @return void
+     */
     public function index()
     {
-        $this->paginate = [
-            'contain' => ['Staffs', 'Countries'],
-        ];
-        $staffStudies = $this->paginate($this->StaffStudies);
 
-        $this->set(compact('staffStudies'));
+        $this->StaffStudy->recursive = 0;
+        $this->set('staffStudies', $this->Paginator->paginate());
     }
 
-    public function view($id = null)
-    {
-        $staffStudy = $this->StaffStudies->get($id, [
-            'contain' => ['Staffs', 'Countries'],
-        ]);
 
-        $this->set('staffStudy', $staffStudy);
-    }
-
+    /**
+     * add method
+     *
+     * @return void
+     */
     public function add()
     {
-        $staffStudy = $this->StaffStudies->newEntity();
-        if ($this->request->is('post')) {
-            $staffStudy = $this->StaffStudies->patchEntity($staffStudy, $this->request->getData());
-            if ($this->StaffStudies->save($staffStudy)) {
-                $this->Flash->success(__('The staff study has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if ($this->request->is('post')) {
+            $this->StaffStudy->create();
+            if ($this->StaffStudy->save($this->request->data)) {
+                $this->Flash->success(__('The staff study has been saved.'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Flash->error(__('The staff study could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The staff study could not be saved. Please, try again.'));
         }
-        $this->set(compact('staffStudy'));
+        //$staffs = $this->StaffStudy->Staff->find('list');
+        $countries = $this->StaffStudy->Country->find('list');
+        $this->set(compact('staffs', 'countries'));
     }
 
-
+    /**
+     * edit method
+     *
+     * @param string $id
+     * @return void
+     * @throws NotFoundException
+     */
     public function edit($id = null)
     {
-        $staffStudy = $this->StaffStudies->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $staffStudy = $this->StaffStudies->patchEntity($staffStudy, $this->request->getData());
-            if ($this->StaffStudies->save($staffStudy)) {
-                $this->Flash->success(__('The staff study has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The staff study could not be saved. Please, try again.'));
+        if (!$this->StaffStudy->exists($id)) {
+            throw new NotFoundException(__('Invalid staff study'));
         }
-        $this->set(compact('staffStudy'));
+        if ($this->request->is(array('post', 'put'))) {
+            if ($this->StaffStudy->save($this->request->data)) {
+                $this->Flash->success(__('The staff study has been saved.'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Flash->error(__('The staff study could not be saved. Please, try again.'));
+            }
+        } else {
+            $options = array('conditions' => array('StaffStudy.' . $this->StaffStudy->primaryKey => $id));
+            $this->request->data = $this->StaffStudy->find('first', $options);
+        }
+        $staffs = $this->StaffStudy->Staff->find('list');
+        $countries = $this->StaffStudy->Country->find('list');
+        $this->set(compact('staffs', 'countries'));
     }
 
-
+/**
+ * delete method
+ *
+ * @throws NotFoundException
+ * @param string $id
+ * @return void
+ */
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $staffStudy = $this->StaffStudies->get($id);
-        if ($this->StaffStudies->delete($staffStudy)) {
+
+        $this->StaffStudy->id = $id;
+        if (!$this->StaffStudy->exists()) {
+            throw new NotFoundException(__('Invalid staff study'));
+        }
+        $this->request->allowMethod('post', 'delete');
+        if ($this->StaffStudy->delete()) {
             $this->Flash->success(__('The staff study has been deleted.'));
         } else {
             $this->Flash->error(__('The staff study could not be deleted. Please, try again.'));
         }
+        return $this->redirect(array('action' => 'index'));
+    }
 
-        return $this->redirect(['action' => 'index']);
+    public function add_staff_study($staff_id = null)
+    {
+
+        if ($this->request->is('post')) {
+            $this->request->data = $this->StaffStudy->preparedAttachment($this->request->data, 'Commitement');
+            if (!isset($this->request->data['StaffStudy']['staff_id']) && empty($this->request->data['StaffStudy']['staff_id'])) {
+                $this->StaffStudy->create();
+            }
+            debug($this->request->data);
+
+            if ($this->StaffStudy->saveAll(
+                $this->request->data,
+                array('validate' => 'first')
+            )) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The staff study has been saved.'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                //return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The staff study could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
+        }
+        $this->redirect(
+            array('controller' => 'staffs', 'action' => 'staff_profile', $this->request->data['StaffStudy']['staff_id'])
+        );
+    }
+
+    /**
+     * view method
+     *
+     * @param string $id
+     * @return void
+     * @throws NotFoundException
+     */
+    public function view($id = null)
+    {
+
+        if (!$this->StaffStudy->exists($id)) {
+            throw new NotFoundException(__('Invalid staff study'));
+        }
+        $options = array('conditions' => array('StaffStudy.' . $this->StaffStudy->primaryKey => $id));
+        debug($this->StaffStudy->find('first', $options));
+        $this->set('staffStudy', $this->StaffStudy->find('first', $options));
     }
 }

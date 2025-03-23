@@ -1,8 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
@@ -36,7 +35,6 @@ class GradeTypesTable extends Table
             'foreignKey' => 'grade_type_id',
             'dependent' => true, // Cascade delete related records
         ]);
-
     }
 
     /**
@@ -83,7 +81,6 @@ class GradeTypesTable extends Table
         if (!empty($grade['Grade'])) {
             //
         }
-
     }
 
     function unset_empty_rows($data = null)
@@ -108,7 +105,7 @@ class GradeTypesTable extends Table
     {
         $grade_scale_options = array();
 
-        if ($active !== ""){
+        if ($active !== "") {
             $grade_scale_options['GradeScale.active'] = $active;
         }
 

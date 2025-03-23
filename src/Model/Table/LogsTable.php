@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -28,5 +29,4 @@ class LogsTable extends Table
             'foreignKey' => 'user_id',
         ]);
     }
-
 }

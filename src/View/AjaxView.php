@@ -1,4 +1,5 @@
 <?php
+
 /**
  * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
  * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
@@ -12,6 +13,7 @@
  * @since         3.0.4
  * @license       https://opensource.org/licenses/mit-license.php MIT License
  */
+
 namespace App\View;
 
 use Cake\Event\EventManager;
@@ -25,7 +27,6 @@ use Cake\Http\ServerRequest;
  */
 class AjaxView extends AppView
 {
-
     /**
      * The name of the layout file to render the view inside of. The name
      * specified is the filename of the layout in /src/Template/Layout without

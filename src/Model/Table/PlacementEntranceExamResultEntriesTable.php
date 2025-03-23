@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -86,7 +87,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
         }
 
         if (isset($data['Search']['applied_for']) && !empty($data['Search']['applied_for'])) {
-
             $options = array(
                 'order' => array('Section.id' => 'ASC', 'Section.name' => 'ASC'),
                 'contain' => array(
@@ -102,7 +102,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                     'Section.college_id' => $currentUnitClg[1],
                     'Section.department_id is null'
                 );
-            } else if (isset($currentUnitDept[1]) && !empty($currentUnitDept[1])) {
+            } elseif (isset($currentUnitDept[1]) && !empty($currentUnitDept[1])) {
                 $options['conditions'][] = array('Section.department_id' => $currentUnitDept[1]);
             } else {
                 if (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
@@ -110,7 +110,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                         'Section.college_id' => $appliedUnitClg[1],
                         'Section.department_id is null'
                     );
-                } else if (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
+                } elseif (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
                     $options['conditions'][] = array('Section.department_id' => $appliedUnitDept[1]);
                 }
             }
@@ -118,7 +118,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
             $options['conditions'][] = array('Section.program_id' => $data['Search']['program_id']);
             $options['conditions'][] = array('Section.program_type_id' => $data['Search']['program_type_id']);
             $options['conditions'][] = array('Section.academicyear' => $data['Search']['academic_year']);
-
         }
         //debug($options);
 
@@ -177,12 +176,11 @@ class PlacementEntranceExamResultEntriesTable extends Table
             if (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
                 $foreignKey = $appliedUnitDept[1];
             }
-        } else if (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
+        } elseif (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
             $foreignKey = $appliedUnitClg[1];
         }
 
         if (isset($data['Search']['placement_round_participant_id']) && !empty($data['Search']['placement_round_participant_id'])) {
-
             $placementRoundParticipantSelected = ClassRegistry::init('PlacementRoundParticipant')->find("first", array(
                 'conditions' => array(
                     'PlacementRoundParticipant.id' => $data['Search']['placement_round_participant_id'],
@@ -276,15 +274,14 @@ class PlacementEntranceExamResultEntriesTable extends Table
             if (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
                 $foreignKey = $appliedUnitDept[1];
             }
-        } else if (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
+        } elseif (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
             $foreignKey = $appliedUnitClg[1];
         }
 
         if (isset($data['Search']['applied_for']) && !empty($data['Search']['applied_for'])) {
-
             $placementRoundParticipantSelected = ClassRegistry::init('PlacementRoundParticipant')->find("first", array(
                 'conditions' => array(
-                    //	'PlacementRoundParticipant.id' => $data['Search']['placement_round_participant_id'],
+                    //  'PlacementRoundParticipant.id' => $data['Search']['placement_round_participant_id'],
                     'PlacementRoundParticipant.applied_for' => $data['Search']['applied_for'],
                     'PlacementRoundParticipant.program_id' => $data['Search']['program_id'],
                     //'PlacementRoundParticipant.program_type_id' => $data['Search']['program_type_id'],
@@ -318,7 +315,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
             if (!isset($semester)) {
                 if ($data['Search']['placement_round'] == 1) {
                     $semester = 'I';
-                } else if ($data['Search']['placement_round'] == 2 || $data['Search']['placement_round'] == 3) {
+                } elseif ($data['Search']['placement_round'] == 2 || $data['Search']['placement_round'] == 3) {
                     $semester = 'II';
                 } else {
                     $semester = 'I';
@@ -328,7 +325,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
             debug($semester);
 
             if (isset($placementRoundParticipantUnitsList) && !empty($placementRoundParticipantUnitsList)) {
-
                 $listIds = array_keys($placementRoundParticipantUnitsList);
 
                 $isPlacementDone = ClassRegistry::init('PlacementParticipatingStudent')->find("count", array(
@@ -359,7 +355,12 @@ class PlacementEntranceExamResultEntriesTable extends Table
                     $deadline = $preferenceDeadline['PlacementDeadline']['deadline'];
 
                     if (is_numeric(DAYS_ALLOWED_TO_ADD_PREFERENCE_ON_BEHALF_OF_STUDENTS_AFTER_DEADLINE) && DAYS_ALLOWED_TO_ADD_PREFERENCE_ON_BEHALF_OF_STUDENTS_AFTER_DEADLINE > 0) {
-                        $date_now =	date("Y-m-d H:i:s", strtotime("-".DAYS_ALLOWED_TO_ADD_PREFERENCE_ON_BEHALF_OF_STUDENTS_AFTER_DEADLINE." day"));
+                        $date_now = date(
+                            "Y-m-d H:i:s",
+                            strtotime(
+                                "-" . DAYS_ALLOWED_TO_ADD_PREFERENCE_ON_BEHALF_OF_STUDENTS_AFTER_DEADLINE . " day"
+                            )
+                        );
                     } else {
                         $date_now = date("Y-m-d H:i:s");
                     }
@@ -405,7 +406,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                 'Section.archive' => 0,
                             ),
                             'order' => array('Section.id' => 'ASC', 'Section.name' => 'ASC'),
-                            'fields' =>array('Section.id', 'Section.id'),
+                            'fields' => array('Section.id', 'Section.id'),
                         ));
 
                         if (!empty($collegeSectionIDs)) {
@@ -413,9 +414,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                         } else {
                             $options['conditions'][] = array('StudentsSection.section_id' => $this->get_all_section_ids($data), 'StudentsSection.archive' => 0);
                         }
-
-                    } else if (isset($appliedUnitDpt[1]) && is_numeric($appliedUnitDpt[1])) {
-
+                    } elseif (isset($appliedUnitDpt[1]) && is_numeric($appliedUnitDpt[1])) {
                         $deptSectionIDs = ClassRegistry::init('Section')->find('list', array(
                             'conditions' => array(
                                 'Section.department_id' => $appliedUnitDpt[1],
@@ -425,7 +424,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                 'Section.archive' => 0,
                             ),
                             'order' => array('Section.id' => 'ASC', 'Section.name' => 'ASC'),
-                            'fields' =>array('Section.id', 'Section.id'),
+                            'fields' => array('Section.id', 'Section.id'),
                         ));
 
                         if (!empty($deptSectionIDs)) {
@@ -433,11 +432,9 @@ class PlacementEntranceExamResultEntriesTable extends Table
                         } else {
                             $options['conditions'][] = array('StudentsSection.section_id' => $this->get_all_section_ids($data), 'StudentsSection.archive' => 0);
                         }
-
                     } else {
                         $options['conditions'][] = array('StudentsSection.section_id' => $this->get_all_section_ids($data));
                     }
-
                 } else {
                     $options['conditions'][] = array('StudentsSection.section_id' => $data['Search']['section_id'], 'StudentsSection.archive' => 0);
                 }
@@ -465,7 +462,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
                 if (isset($placementSettings) && !empty($placementSettings)) {
                     foreach ($placementSettings as $pl => $pv) {
                         if (isset($pv['PlacementResultSetting']['percent']) && is_numeric($pv['PlacementResultSetting']['percent']) && ((int) $pv['PlacementResultSetting']['percent'])) {
-
                             $resultType[$pv['PlacementResultSetting']['result_type']] = $pv['PlacementResultSetting']['percent'];
 
                             if ($pv['PlacementResultSetting']['result_type'] == 'entrance_result') {
@@ -473,12 +469,12 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                     $entranceMax = $pv['PlacementResultSetting']['max_result'];
                                     $isEntranceSet = true;
                                 }
-                            } else if ($pv['PlacementResultSetting']['result_type'] == 'freshman_result') {
+                            } elseif ($pv['PlacementResultSetting']['result_type'] == 'freshman_result') {
                                 if (is_numeric($pv['PlacementResultSetting']['max_result']) && $pv['PlacementResultSetting']['max_result'] >= 0) {
                                     $freshmanMax = $pv['PlacementResultSetting']['max_result'];
                                     $isFreshmanSet = true;
                                 }
-                            } else if ($pv['PlacementResultSetting']['result_type'] == 'EHEECE_total_results') {
+                            } elseif ($pv['PlacementResultSetting']['result_type'] == 'EHEECE_total_results') {
                                 if (is_numeric($pv['PlacementResultSetting']['max_result']) && $pv['PlacementResultSetting']['max_result'] >= 0) {
                                     $preparatoryMax = $pv['PlacementResultSetting']['max_result'];
                                     $isPreparatorySet = true;
@@ -511,7 +507,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
 
                 if (!empty($students)) {
                     foreach ($students as $k => &$v) {
-
                         // find the result if exists
                         $freshManresult = ClassRegistry::init('StudentExamStatus')->find('first', array(
                             'conditions' => array(
@@ -532,7 +527,9 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                     $v['Student']['AcceptedStudent']['freshman_result'] = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT * $freshManresult['StudentExamStatus']['cgpa']) / $freshmanMax;
                                 }
                             }
-                        } else if (!empty($freshManresult) && isset($freshManresult['StudentExamStatus']['cgpa']) && is_numeric($freshManresult['StudentExamStatus']['cgpa']) && $freshManresult['StudentExamStatus']['cgpa'] > DEFAULT_MINIMUM_CGPA_FOR_PLACEMENT) {
+                        } elseif (!empty($freshManresult) && isset($freshManresult['StudentExamStatus']['cgpa']) && is_numeric(
+                                $freshManresult['StudentExamStatus']['cgpa']
+                            ) && $freshManresult['StudentExamStatus']['cgpa'] > DEFAULT_MINIMUM_CGPA_FOR_PLACEMENT) {
                             $v['Student']['AcceptedStudent']['freshman_result'] = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT * $freshManresult['StudentExamStatus']['cgpa']) / $freshmanMax;
                         }
 
@@ -540,7 +537,9 @@ class PlacementEntranceExamResultEntriesTable extends Table
                             if (is_numeric($resultType['EHEECE_total_results']) && $resultType['EHEECE_total_results'] >= 0) {
                                 $v['Student']['AcceptedStudent']['EHEECE_total_results'] = ($resultType['EHEECE_total_results'] * $v['Student']['AcceptedStudent']['EHEECE_total_results']) / $preparatoryMax;
                             }
-                        } else if (is_numeric($v['Student']['AcceptedStudent']['EHEECE_total_results']) && $v['Student']['AcceptedStudent']['EHEECE_total_results'] >= 0) {
+                        } elseif (is_numeric(
+                                $v['Student']['AcceptedStudent']['EHEECE_total_results']
+                            ) && $v['Student']['AcceptedStudent']['EHEECE_total_results'] >= 0) {
                             $v['Student']['AcceptedStudent']['EHEECE_total_results'] = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT * $v['Student']['AcceptedStudent']['EHEECE_total_results']) / $preparatoryMax;
                         }
 
@@ -562,7 +561,9 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                     $v['Student']['AcceptedStudent']['entrance_result'] = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT * $resultExisted['PlacementEntranceExamResultEntry']['result']) / $entranceMax;
                                 }
                             }
-                        } else if (isset($resultExisted['PlacementEntranceExamResultEntry']) && is_numeric($resultExisted['PlacementEntranceExamResultEntry']['result']) && $resultExisted['PlacementEntranceExamResultEntry']['result'] >= 0) {
+                        } elseif (isset($resultExisted['PlacementEntranceExamResultEntry']) && is_numeric(
+                                $resultExisted['PlacementEntranceExamResultEntry']['result']
+                            ) && $resultExisted['PlacementEntranceExamResultEntry']['result'] >= 0) {
                             $v['Student']['AcceptedStudent']['entrance_result'] = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT * $resultExisted['PlacementEntranceExamResultEntry']['result']) / $entranceMax;
                         }
 
@@ -591,7 +592,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                     $processedStudents['Student'][$count]['DeadlinePassed']  = $isDeadlinePassed;
                                 }
                             } else {
-
                                 $processedStudents['Student'][$count]['Student'] = $v['Student'];
                                 $processedStudents['Student'][$count]['PlacementPreference'] = $preferenceDetails;
 
@@ -605,10 +605,8 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                 $processedStudents['Student'][$count]['PlacementStatus'] = $isPlacementDone;
                                 $processedStudents['Student'][$count]['Deadline']  = $deadline;
                                 $processedStudents['Student'][$count]['DeadlinePassed']  = $isDeadlinePassed;
-
                             }
-                        } else if ($data['Search']['include'] == 0) {
-
+                        } elseif ($data['Search']['include'] == 0) {
                             if ($data['Search']['only_with_status'] == 1) {
                                 if (isset($freshManresult) && !empty($freshManresult['StudentExamStatus'])) {
                                     $processedStudents['Student'][$count]['Student'] = $v['Student'];
@@ -626,7 +624,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
                                     $processedStudents['Student'][$count]['DeadlinePassed']  = $isDeadlinePassed;
                                 }
                             } else {
-
                                 $processedStudents['Student'][$count]['Student'] = $v['Student'];
                                 $processedStudents['Student'][$count]['PlacementPreference'] = $preferenceDetails;
 
@@ -674,7 +671,6 @@ class PlacementEntranceExamResultEntriesTable extends Table
         }
 
         if (isset($data['Search']['applied_for']) && !empty($data['Search']['applied_for'])) {
-
             $options = array(
                 'order' => array('Section.id' => 'ASC', 'Section.name' => 'ASC'),
                 'contain' => array('YearLevel', 'College', 'Department'),
@@ -686,7 +682,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                     'Section.college_id' => $currentUnitClg[1],
                     'Section.department_id is null or Section.department_id = 0 or Section.department_id = "" '
                 );
-            } else if (isset($currentUnitDept[1]) && !empty($currentUnitDept[1])) {
+            } elseif (isset($currentUnitDept[1]) && !empty($currentUnitDept[1])) {
                 $options['conditions'][] = array('Section.department_id' => $currentUnitDept[1]);
             } else {
                 if (isset($appliedUnitClg[1]) && !empty($appliedUnitClg[1])) {
@@ -694,7 +690,7 @@ class PlacementEntranceExamResultEntriesTable extends Table
                         'Section.college_id' => $appliedUnitClg[1],
                         'Section.department_id is null or Section.department_id = 0 or Section.department_id = ""'
                     );
-                } else if (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
+                } elseif (isset($appliedUnitDept[1]) && !empty($appliedUnitDept[1])) {
                     $options['conditions'][] = array('Section.department_id' => $appliedUnitDept[1]);
                 }
             }

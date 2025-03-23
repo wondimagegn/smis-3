@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -27,85 +27,112 @@ class CollegesTable extends Table
         $this->belongsTo('Campuses', [
             'foreignKey' => 'campus_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Campuse',
         ]);
         $this->belongsTo('MoodleCategories', [
             'foreignKey' => 'moodle_category_id',
             'joinType' => 'INNER',
+            'propertyName' => 'MoodleCategory',
         ]);
         $this->hasMany('AcademicCalendars', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'AcademicCalendar',
         ]);
         $this->hasMany('AcceptedStudents', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'AcceptedStudent',
         ]);
         $this->hasMany('ClassPeriods', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'ClassPeriod',
         ]);
         $this->hasMany('ClassRoomBlocks', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'ClassRoomBlock',
         ]);
         $this->hasMany('Departments', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Department',
         ]);
         $this->hasMany('ExamPeriods', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'ExamPeriod',
         ]);
         $this->hasMany('InstructorClassPeriodCourseConstraints', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'InstructorClassPeriodCourseConstraint',
         ]);
         $this->hasMany('InstructorNumberOfExamConstraints', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'InstructorNumberOfExamConstraint',
         ]);
         $this->hasMany('Notes', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Note',
         ]);
         $this->hasMany('OnlineApplicants', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'OnlineApplicant',
         ]);
         $this->hasMany('ParticipatingDepartments', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'ParticipatingDepartment',
         ]);
         $this->hasMany('PeriodSettings', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'PeriodSetting',
         ]);
         $this->hasMany('PlacementLocks', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'PlacementLock',
         ]);
         $this->hasMany('PlacementsResultsCriterias', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'PlacementsResultsCriteria',
         ]);
         $this->hasMany('PreferenceDeadlines', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'PreferenceDeadline',
         ]);
         $this->hasMany('Preferences', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Preference',
         ]);
         $this->hasMany('PublishedCourses', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'PublishedCourse',
         ]);
         $this->hasMany('Quotas', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Quota',
         ]);
         $this->hasMany('ReservedPlaces', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'ReservedPlace',
         ]);
         $this->hasMany('Sections', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Section',
         ]);
         $this->hasMany('StaffAssignes', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'StaffAssignee',
         ]);
         $this->hasMany('StaffForExams', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'StaffForExam',
         ]);
         $this->hasMany('Staffs', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Staff',
         ]);
         $this->hasMany('Students', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'Student',
         ]);
         $this->hasMany('TakenProperties', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'TakenProperty',
         ]);
     }
 
@@ -257,9 +284,13 @@ class CollegesTable extends Table
         }
         if ($this->Student->find('count', array('conditions' => array('Student.college_id' => $college_id))) > 0) {
             return false;
-        } else if ($this->Section->find('count', array('conditions' => array('Section.college_id' => $college_id))) > 0) {
+        } elseif ($this->Section->find('count', array('conditions' => array('Section.college_id' => $college_id))
+            ) > 0) {
             return false;
-        } else if ($this->GradeScale->find('count', array('conditions' => array('GradeScale.model' => 'College', 'GradeScale.foreign_key' => $college_id))) > 0) {
+        } elseif ($this->GradeScale->find(
+                'count',
+                array('conditions' => array('GradeScale.model' => 'College', 'GradeScale.foreign_key' => $college_id))
+            ) > 0) {
             return false;
         } else {
             return true;

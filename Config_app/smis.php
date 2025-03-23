@@ -6,8 +6,6 @@ namespace app\Config_app;
 use Cake\Core\Configure;
 
 namespace app\Config_app;
-
-use Cake\Core\Configure;
 use Composer\Config;
 
 // This file contains configuration parameters of the smis application that  are common to all installations.  */
@@ -18,17 +16,7 @@ Configure::write('Utility.backupPath', '/home/wonde/code/sis/smis-3-migration/ap
 Configure::write('Utility.cache', '/home/wonde/code/sis/smis-3-migration/app/tmp/cache');
 Configure::write('Utility.command',"/home/wonde/code/sis/smis-3-migration/lib/Cake/Console/cake -app /home/wonde/code/sis/smis-3-migration/app backup");
 
-/*
-	The following equivalentACL is used to automatically give privilege for false controllers index or other action if any of sub menu privilege is enabled.
-	Even if it is primarily designed for false controllers, it can be used for other controllers.
-	The checking is taken place @ cake/libs/controller/components/acl.php line 268 - 310 (DbAcl class check() function).
-	Make sure that you use capitalized controller name.
-*/
 
-// To give privilege if any of the given controller action is enabled, use
-// 		Controller/*    syntax
-// To give privilege if only specific action is granted, use
-// 		Controller/action     syntax
 
 $equivalentACL =  array(
 	'Graduation/index' => array(
@@ -1051,9 +1039,6 @@ define('DIRECT_PLACEMENT','DIRECT PLACED');
 define('MANUAL_PLACEMENT','MANUAL PLACED');
 define('REGISTRAR_ASSIGNED','REGISTRAR PLACED');
 define('CANCELLED_PLACEMENT','CANCELLED PLACEMENT');
-
-// include(APP.'Plugin/media/config/core.php');
-//Configure::write('e', '2016-10-28');
 
 //// PLACEMENT RELATED SETTINGS
 

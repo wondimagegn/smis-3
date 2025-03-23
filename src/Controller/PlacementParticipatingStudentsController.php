@@ -1,72 +1,92 @@
 <?php
+
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
 
 class PlacementParticipatingStudentsController extends AppController
 {
-    public function index()
-    {
-        $this->paginate = [
-            'contain' => ['AcceptedStudents', 'Students', 'Programs', 'ProgramTypes', 'PlacementRoundParticipants'],
-        ];
-        $placementParticipatingStudents = $this->paginate($this->PlacementParticipatingStudents);
 
-        $this->set(compact('placementParticipatingStudents'));
+    public $name = 'PlacementParticipatingStudents';
+    public $menuOptions = array(
+        'parent' => 'placement',
+        'alias' => array(//'index' => 'List Placement Participant Student',
+        ),
+        'exclude' => array(
+            'delete_ajax',
+            'index'
+        ),
+    );
+
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('AcademicYear');
+        $this->loadComponent('EthiopicDateTime');
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
     }
 
-
-    public function view($id = null)
+    public function beforeFilter(Event $event)
     {
-        $placementParticipatingStudent = $this->PlacementParticipatingStudents->get($id, [
-            'contain' => ['AcceptedStudents', 'Students', 'Programs', 'ProgramTypes', 'PlacementRoundParticipants'],
-        ]);
 
-        $this->set('placementParticipatingStudent', $placementParticipatingStudent);
+        parent::beforeFilter($event);
     }
 
-    public function add()
+    public function beforeRender(Event $event)
     {
-        $placementParticipatingStudent = $this->PlacementParticipatingStudents->newEntity();
-        if ($this->request->is('post')) {
-            $placementParticipatingStudent = $this->PlacementParticipatingStudents->patchEntity($placementParticipatingStudent, $this->request->getData());
-            if ($this->PlacementParticipatingStudents->save($placementParticipatingStudent)) {
-                $this->Flash->success(__('The placement participating student has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The placement participating student could not be saved. Please, try again.'));
-        }
-       $this->set(compact('placementParticipatingStudent'));
-    }
+        parent::beforeRender($event);
+        ////////////////////////////// BLOCK: DONT REMOVE ANY VARIABLE /////////////////////////////////////
 
-    public function edit($id = null)
-    {
-        $placementParticipatingStudent = $this->PlacementParticipatingStudents->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $placementParticipatingStudent = $this->PlacementParticipatingStudents->patchEntity($placementParticipatingStudent, $this->request->getData());
-            if ($this->PlacementParticipatingStudents->save($placementParticipatingStudent)) {
-                $this->Flash->success(__('The placement participating student has been saved.'));
+        $defaultacademicyear = $this->AcademicYear->currentAcademicYear();
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The placement participating student could not be saved. Please, try again.'));
-        }
-      $this->set(compact('placementParticipatingStudent'));
-    }
-
-    public function delete($id = null)
-    {
-        $this->request->allowMethod(['post', 'delete']);
-        $placementParticipatingStudent = $this->PlacementParticipatingStudents->get($id);
-        if ($this->PlacementParticipatingStudents->delete($placementParticipatingStudent)) {
-            $this->Flash->success(__('The placement participating student has been deleted.'));
+        if (is_numeric(ACY_BACK_FOR_PLACEMENT) && ACY_BACK_FOR_PLACEMENT) {
+            $acyear_array_data = $this->AcademicYear->academicYearInArray(
+                ((explode('/', $defaultacademicyear)[0]) - ACY_BACK_FOR_PLACEMENT),
+                (explode('/', $defaultacademicyear)[0])
+            );
         } else {
-            $this->Flash->error(__('The placement participating student could not be deleted. Please, try again.'));
+            $acyear_array_data[$defaultacademicyear] = $defaultacademicyear;
         }
 
-        return $this->redirect(['action' => 'index']);
+        $this->set(compact('acyear_array_data', 'defaultacademicyear'));
+        //////////////////////////////////// END BLOCK ///////////////////////////////////////////////////
+    }
+
+
+    public function delete_ajax($id = null)
+    {
+
+        $this->autoRender = false;
+        $this->layout = 'ajax';
+
+        //check if placement is already run
+        $placementParticpatingStu = $this->PlacementParticipatingStudent->find(
+            'first',
+            array('conditions' => array('PlacementParticipatingStudent.id' => $id), 'recursive' => -1)
+        );
+
+        $isPlaced = $this->PlacementParticipatingStudent->find('count', array(
+            'conditions' => array(
+                'PlacementParticipatingStudent.program_id' => $placementParticpatingStu['PlacementParticipatingStudent']['program_id'],
+                'PlacementParticipatingStudent.program_type_id' => $placementParticpatingStu['PlacementParticipatingStudent']['program_type_id'],
+                'PlacementParticipatingStudent.applied_for' => $placementParticpatingStu['PlacementParticipatingStudent']['applied_for'],
+                'PlacementParticipatingStudent.round' => $placementParticpatingStu['PlacementParticipatingStudent']['round'],
+                'PlacementParticipatingStudent.academic_year' => $placementParticpatingStu['PlacementParticipatingStudent']['academic_year'],
+                'PlacementParticipatingStudent.placement_round_participant_id is not null'
+            ),
+            'recursive' => -1
+        ));
+
+        if ($isPlaced == 0) {
+            $this->PlacementParticipatingStudent->id = $id;
+            $this->request->allowMethod('post', 'delete');
+            if ($this->PlacementParticipatingStudent->delete()) {
+            }
+        }
     }
 }

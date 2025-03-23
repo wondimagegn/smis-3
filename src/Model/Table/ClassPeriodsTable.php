@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -46,32 +46,40 @@ class ClassPeriodsTable extends Table
         $this->belongsTo('PeriodSettings', [
             'foreignKey' => 'period_setting_id',
             'joinType' => 'INNER',
+            'propertyName' => 'PeriodSetting',
         ]);
         $this->belongsTo('Colleges', [
             'foreignKey' => 'college_id',
             'joinType' => 'INNER',
+            'propertyName' => 'College',
         ]);
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
             'joinType' => 'INNER',
+            'propertyName' => 'ProgramType',
         ]);
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Program',
         ]);
         $this->hasMany('ClassPeriodCourseConstraints', [
             'foreignKey' => 'class_period_id',
+            'propertyName' => 'ClassPeriodCourseConstraint',
         ]);
         $this->hasMany('ClassRoomClassPeriodConstraints', [
             'foreignKey' => 'class_period_id',
+            'propertyName' => 'ClassRoomClassPeriodConstraint',
         ]);
         $this->hasMany('InstructorClassPeriodCourseConstraints', [
             'foreignKey' => 'class_period_id',
+            'propertyName' => 'InstructorClassPeriodCourseConstraint',
         ]);
         $this->belongsToMany('CourseSchedules', [
             'foreignKey' => 'class_period_id',
             'targetForeignKey' => 'course_schedule_id',
             'joinTable' => 'course_schedules_class_periods',
+            'propertyName' => 'CourseSchedule',
         ]);
     }
 

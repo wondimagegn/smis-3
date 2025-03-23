@@ -1,11 +1,13 @@
 <?php
+
 namespace App\Controller;
+
 use Cake\Event\Event;
 use Cake\Mailer\Email;
 use Cake\Utility\Security;
 use Cake\Core\Configure;
 use Cake\Log\Log;
-
+use Cake\Cache\Cache;
 
 class UsersController extends AppController
 {
@@ -22,7 +24,8 @@ class UsersController extends AppController
             'cancel_task_confirmation',
             'build_user_menu',
             'confirm_task',
-            'editprofile'
+            'editprofile',
+            'checkSession'
         ),
         'alias' => array(
             'index' => 'List All Users',
@@ -39,8 +42,7 @@ class UsersController extends AppController
         $this->loadComponent('Attempt');
         $this->loadComponent('MathCaptcha');
         $this->loadComponent('Paginator');
-        $this->loadComponent('Flash');
-        $this->Auth->allow(['login', 'logout','forget', 'search', 'resetpassword']);
+        $this->Auth->allow(['login', 'logout', 'forget', 'search', 'resetpassword', 'checkSession']);
     }
 
     public $loginAttemptLimit = 3;
@@ -49,8 +51,8 @@ class UsersController extends AppController
     public function beforeRender(Event $event)
     {
         parent::beforeRender($event);
-
     }
+
 
     public function beforeFilter(Event $event)
     {
@@ -62,10 +64,12 @@ class UsersController extends AppController
         }
 
         // If already logged in, redirect away from login page
+        /*
         if ($this->Auth->user() && $this->request->getParam('action') === 'login') {
             $this->getRequest()->getSession()->destroy();
             return $this->redirect($this->Auth->logout());
         }
+        */
     }
 
     public function search()
@@ -140,43 +144,47 @@ class UsersController extends AppController
             $username = trim($data['username']);
 
             // Check user exists
-            $user = $this->Users->find()
+            $userexist = $this->Users->find()
                 ->where(['username' => $username])
                 ->select(['id', 'username', 'is_admin', 'role_id', 'active', 'failed_login'])
                 ->first();
 
-            if ($user) {
-                $failedLogins = $user->failed_login;
+
+            if ($userexist) {
+                $failedLogins = $userexist->failed_login;
 
                 if ($this->Attempt->limit($username, 'login', $number_of_login_attempt)) {
                     $user = $this->Auth->identify();
-                    debug($user['active']);
 
-                    if ($this->Auth->identify()) {
+                    if ($user) {
+                        $this->Auth->setUser($user);
                         if ($user['active']) {
-
-                            $this->Auth->setUser($user);
                             // Ensure $user is an entity before saving
                             $userEntity = $this->Users->get($user['id']);  // Retrieve the existing user entity
-                            $userEntity = $this->Users->patchEntity($userEntity, ['last_login' => date('Y-m-d H:i:s')]);
+                            $userEntity = $this->Users->patchEntity(
+                                $userEntity,
+                                ['last_login' => date('Y-m-d H:i:s')]
+                            );
                             // Save the updated user entity
                             $this->Users->save($userEntity);
                             $session->write('User.is_logged_in', true);
 
-                            if ($user) {
+                            if (isset($user) && !empty($user)) {
                                 // Automatically update old passwords to new hashing method
                                 if (strlen($user['password']) < 60) { // SHA1 is shorter than Bcrypt
                                     $userEntity = $this->Users->get($user['id']);
                                     $userEntity->password = $this->request->getData('password');
                                     $this->Users->save($userEntity);
-                                    Log::info("User password updated to Bcrypt: " . $user['username']);
+                                    Log::info(
+                                        "User password updated to Bcrypt: " .
+                                        $user['username']
+                                    );
                                 }
-
                                 $this->Auth->setUser($user);
-                             //   $this->redirect('/');
                             }
-                            return $this->redirect($this->Auth->redirectUrl());
-
+                            return $this->redirect(
+                                $this->Auth->redirectUrl() ?: ['controller' => 'Dashboard', 'action' => 'index']
+                            );
                         } else {
                             // Redirect graduated students
                             if ($user->role_id == ROLE_STUDENT) {
@@ -203,13 +211,15 @@ class UsersController extends AppController
                     $this->Flash->error(__('Too many failed attempts! (' . $failedLogins . ')'));
 
                     if (!empty($data['security_code']) && $this->MathCaptcha->validates($data['security_code'])) {
-                        if ($this->Auth->identify()) {
+                        $user = $this->Auth->identify();
+                        if ($user) {
+                            $this->Auth->setUser($user);
 
                             $userEntity = $this->Users->get($user['id']);  // Retrieve the existing user entity
                             $userEntity = $this->Users->patchEntity($userEntity, ['last_login' => date('Y-m-d H:i:s')]);
                             // Save the updated user entity
                             $this->Users->save($userEntity);
-                            return $this->redirect($this->Auth->redirectUrl());
+                            //  return $this->redirect($this->Auth->redirectUrl() ?: ['controller' => 'Dashboard', 'action' => 'index']);
                         } else {
                             $this->Attempt->fail($username, 'login', $this->loginAttemptDuration);
                             $this->Flash->error(__('Invalid password. Too many failed attempts will lock your account.'));
@@ -321,11 +331,23 @@ class UsersController extends AppController
 
     public function logout()
     {
-        $session = $this->getRequest()->getSession();
-        $session->destroy();
+
+        $session = $this->request->getSession();
+        $session->destroy(); // Ensure session is cleared
 
         return $this->redirect($this->Auth->logout());
     }
 
-}
+    public function checkSession()
+    {
 
+        $this->autoRender = false; // Prevent rendering a view
+        $this->request->allowMethod(['post', 'get']); // Restrict to GET and POST requests
+
+        $isLoggedIn = $this->request->getSession()->read('User.is_logged_in') ?? false;
+
+        return $this->response
+            ->withType('application/json')
+            ->withStringBody(json_encode(['is_logged_in' => $isLoggedIn]));
+    }
+}

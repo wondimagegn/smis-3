@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -64,13 +65,16 @@ class ReadmissionsTable extends Table
 
     function isEverReadmitted($student_id)
     {
-        $check = $this->find('count',
+
+        $check = $this->find(
+            'count',
             array('conditions' => array(
                 'Readmission.student_id' => $student_id,
                 'Readmission.registrar_approval = 1',
                 'Readmission.academic_commision_approval = 1'
             )
-            ));
+            )
+        );
 
         if ($check > 0) {
             return true;
@@ -211,11 +215,10 @@ class ReadmissionsTable extends Table
         // debug($students);
         $filtered_students = array();
 
-        $not_dismissal_status_ids = ['0'=> '1','1'=> '2','2'=> '3'];
+        $not_dismissal_status_ids = ['0' => '1', '1' => '2', '2' => '3'];
 
         if (!empty($students)) {
             foreach ($students as $key => $student) {
-
                 $last_status = $this->Student->StudentExamStatus->find('first', array(
                     'conditions' => array(
                         'StudentExamStatus.student_id' => $student['Student']['id']
@@ -227,7 +230,6 @@ class ReadmissionsTable extends Table
                 ));
 
                 if (!empty($last_status) && !in_array($last_status['StudentExamStatus']['academic_status_id'], $not_dismissal_status_ids) && !is_null($last_status['StudentExamStatus']['academic_status_id'])) {
-
                     $cid = $student['Curriculum']['id'];
 
                     if (!isset($filtered_students[$cid])) {
@@ -245,9 +247,9 @@ class ReadmissionsTable extends Table
                         $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
                         $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
                     } /* else {
-						$filtered_students[$cid][$index]['cgpa'] = null;
-						$filtered_students[$cid][$index]['mcgpa'] = null;
-					} */
+                        $filtered_students[$cid][$index]['cgpa'] = null;
+                        $filtered_students[$cid][$index]['mcgpa'] = null;
+                    } */
 
                     $error = "";
 
@@ -268,7 +270,6 @@ class ReadmissionsTable extends Table
                     if (isset($error) && !empty($error)) {
                         $filtered_students[$cid][$index]['criteria']['error'] = $error;
                     }
-
                 }
             }
 
@@ -277,5 +278,4 @@ class ReadmissionsTable extends Table
 
         return array();
     }
-
 }

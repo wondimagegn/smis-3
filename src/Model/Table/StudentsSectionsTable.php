@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -71,7 +71,6 @@ class StudentsSectionsTable extends Table
         ));
 
         if (isset($section['StudentsSection']) && !empty($section['StudentsSection']['section_id'])) {
-
             $publishedCourseNotRegistered = ClassRegistry::init('PublishedCourse')->find('all', array(
                 'conditions' => array(
                     'PublishedCourse.section_id' => $section['StudentsSection']['section_id'],
@@ -194,7 +193,7 @@ class StudentsSectionsTable extends Table
         $countD = 0;
         $selected = array();
 
-        if(!empty($studentSectionDetail)) {
+        if (!empty($studentSectionDetail)) {
             foreach ($studentSectionDetail as $sk => $sv) {
                 if ($sv['Section']['academicyear'] != $academicYear) {
                     $countD++;
@@ -208,10 +207,9 @@ class StudentsSectionsTable extends Table
 
         if ($countD == 0) {
             return $selected; // if one semester
-        } else if ($countD != 0) {
+        } elseif ($countD != 0) {
             return 1; //already in different academic not possible
         }
         return 2; //the student is not in section
     }
-
 }

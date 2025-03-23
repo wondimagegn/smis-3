@@ -1,75 +1,73 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class AutoMessagesController extends AppController
 {
 
-    public function index()
+    public $name = 'AutoMessages';
+    public $menuOptions = array(
+        'controllerButton' => false,
+        'exclude' => array('*')
+    );
+    public function initialize()
     {
-        $this->paginate = [
-            'contain' => ['Users'],
-        ];
-        $autoMessages = $this->paginate($this->AutoMessages);
-
-        $this->set(compact('autoMessages'));
+        parent::initialize();
+        $this->loadComponent('RequestHandler');
     }
 
-    public function view($id = null)
-    {
-        $autoMessage = $this->AutoMessages->get($id, [
-            'contain' => ['Users'],
-        ]);
 
-        $this->set('autoMessage', $autoMessage);
+    public function beforeFilter(Event $event)
+    {
+        parent::beforeFilter($event);
+        $this->Auth->Allow('markAsUnread');
+
+        if ($this->request->getSession()->check('Message.auth')) {
+            $this->request->getSession()->delete('Message.auth');
+        }
+
+        if ($this->Auth->user() && $this->request->getParam('action') === 'login') {
+            return $this->redirect($this->Auth->logout());
+        }
     }
 
-    public function add()
-    {
-        $autoMessage = $this->AutoMessages->newEntity();
-        if ($this->request->is('post')) {
-            $autoMessage = $this->AutoMessages->patchEntity($autoMessage, $this->request->getData());
-            if ($this->AutoMessages->save($autoMessage)) {
-                $this->Flash->success(__('The auto message has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+
+    public function markAsUnread($id = null)
+    {
+        $this->request->allowMethod(['post', 'put']);
+        $this->viewBuilder()->setClassName('Json');
+
+        try {
+
+            $message = $this->AutoMessages->get($id);
+            $message->is_read = 1;
+
+            if ($this->AutoMessages->save($message)) {
+                $autoMessages = $this->AutoMessages->getMessages($this->Auth->user('id'));
+                $response = [
+                    'status' => 'success',
+                    'auto_messages' => $autoMessages
+                ];
+            } else {
+                $response = [
+                    'status' => 'error',
+                    'message' => __('The auto message could not be updated.'),
+                    'errors' => $message->getErrors()
+                ];
             }
-            $this->Flash->error(__('The auto message could not be saved. Please, try again.'));
+        } catch (\Exception $e) {
+            $response = [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
         }
-
-        $this->set(compact('autoMessage'));
-    }
-
-
-    public function edit($id = null)
-    {
-        $autoMessage = $this->AutoMessages->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $autoMessage = $this->AutoMessages->patchEntity($autoMessage, $this->request->getData());
-            if ($this->AutoMessages->save($autoMessage)) {
-                $this->Flash->success(__('The auto message has been saved.'));
-
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The auto message could not be saved. Please, try again.'));
-        }
-        $this->set(compact('autoMessage'));
-    }
-
-
-    public function delete($id = null)
-    {
-        $this->request->allowMethod(['post', 'delete']);
-        $autoMessage = $this->AutoMessages->get($id);
-        if ($this->AutoMessages->delete($autoMessage)) {
-            $this->Flash->success(__('The auto message has been deleted.'));
-        } else {
-            $this->Flash->error(__('The auto message could not be deleted. Please, try again.'));
-        }
-
-        return $this->redirect(['action' => 'index']);
+        $this->set($response);
+        $this->set('_serialize', array_keys($response));
     }
 }

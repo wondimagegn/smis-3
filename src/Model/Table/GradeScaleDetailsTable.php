@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -81,18 +82,16 @@ class GradeScaleDetailsTable extends Table
         $already[] = $this->data['GradeScaleDetail']['grade_id'];
 
         if (in_array($data['grade_id'], $already)) {
-
             return false;
         }
         return true;
-
     }
 
     function field_comparison($check1, $operator, $field2)
     {
         foreach ($check1 as $key => $value1) {
             $value2 = $this->data[$this->alias][$field2];
-            if (!Validation::comparison($value1, $operator, $value2)){
+            if (!Validation::comparison($value1, $operator, $value2)) {
                 return false;
             }
         }
@@ -110,7 +109,7 @@ class GradeScaleDetailsTable extends Table
                     'GradeScale.program_id' => $data['GradeScale']['program_id']
                 )
             ));
-        } else if ($role == ROLE_DEPARTMENT) {
+        } elseif ($role == ROLE_DEPARTMENT) {
             $already_recorded_range = $this->GradeScale->find('all', array(
                 'conditions' => array(
                     'GradeScale.model' => 'Department',
@@ -134,7 +133,8 @@ class GradeScaleDetailsTable extends Table
                 foreach ($sr['GradeScaleDetail'] as $kkkk => $vvvv) {
                     foreach ($data['GradeScaleDetail'] as $k => $v) {
                         if (!empty($v['minimum_result']) && !empty($v['maximum_result'])) {
-                            if (($v['minimum_result'] <= $vvvv['minimum_result'] && $vvvv['minimum_result'] <= $v['maximum_result']) ||
+                            if (
+                                ($v['minimum_result'] <= $vvvv['minimum_result'] && $vvvv['minimum_result'] <= $v['maximum_result']) ||
                                 ($v['minimum_result'] <= $vvvv['maximum_result'] && $vvvv['maximum_result'] <= $v['maximum_result']) ||
                                 ($vvvv['minimum_result'] <= $v['minimum_result'] && $v['minimum_result'] <= $vvvv['maximum_result'])
                             ) {
@@ -154,7 +154,6 @@ class GradeScaleDetailsTable extends Table
     function gradeRangeContinuty($data = null)
     {
         if (!empty($data)) {
-
             //find the grade based on grade type and sort by point value
             $grades = $this->Grade->find('all', array(
                 'conditions' => array(
@@ -171,8 +170,9 @@ class GradeScaleDetailsTable extends Table
 
             foreach ($grades as $grade_key => $grade_value) {
                 // find grade
-                foreach ($data['GradeScaleDetail'] as
-                         $grade_scale => $grade_scale_detail) {
+                foreach (
+                    $data['GradeScaleDetail'] as $grade_scale => $grade_scale_detail
+                ) {
                     if (!empty($grade_scale_detail['maximum_result']) && !empty($grade_scale_detail['minimum_result'])) {
                         if ($grade_value['Grade']['id'] == $grade_scale_detail['grade_id']) {
                             if ($count == 0) {
@@ -208,7 +208,6 @@ class GradeScaleDetailsTable extends Table
     function checkGradeIsUnique($data = null)
     {
         if (!empty($data)) {
-
             $already_defined = null;
 
             $grades = $this->Grade->find('list', array(
@@ -224,7 +223,6 @@ class GradeScaleDetailsTable extends Table
 
             // Count the frequency of grade repeation and display invalidation message if grade is duplicated
             if (!empty($data['GradeScaleDetail'])) {
-
                 foreach ($data['GradeScaleDetail'] as $grade_id => $grade_value) {
                     $frequencey_count[] = $grade_value['grade_id'];
                 }
@@ -244,7 +242,6 @@ class GradeScaleDetailsTable extends Table
                 }
             }
             return true;
-
         }
         return false;
     }

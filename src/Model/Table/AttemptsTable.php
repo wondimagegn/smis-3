@@ -1,9 +1,10 @@
 <?php
+
 namespace App\Model\Table;
 
+use Cake\I18n\FrozenTime;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-use Cake\I18n\FrozenTime;
 
 class AttemptsTable extends Table
 {

@@ -1,73 +1,94 @@
 <?php
+
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
+
 
 class VotesController extends AppController
 {
 
+    public $name = 'Votes';
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('AcademicYear');
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
+
     public function index()
     {
-        $this->paginate = [
-            'contain' => ['RequesterUsers', 'ApplicableOnUsers'],
-        ];
-        $votes = $this->paginate($this->Votes);
 
-        $this->set(compact('votes'));
+        $this->Vote->recursive = 0;
+        $this->set('votes', $this->paginate());
     }
 
     public function view($id = null)
     {
-        $vote = $this->Votes->get($id, [
-            'contain' => ['RequesterUsers', 'ApplicableOnUsers'],
-        ]);
 
-        $this->set('vote', $vote);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid vote'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('vote', $this->Vote->read(null, $id));
     }
 
     public function add()
     {
-        $vote = $this->Votes->newEntity();
-        if ($this->request->is('post')) {
-            $vote = $this->Votes->patchEntity($vote, $this->request->getData());
-            if ($this->Votes->save($vote)) {
-                $this->Flash->success(__('The vote has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->Vote->create();
+            if ($this->Vote->save($this->request->data)) {
+                $this->Session->setFlash(__('The vote has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The vote could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The vote could not be saved. Please, try again.'));
         }
-        $this->set(compact('vote'));
     }
-
 
     public function edit($id = null)
     {
-        $vote = $this->Votes->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $vote = $this->Votes->patchEntity($vote, $this->request->getData());
-            if ($this->Votes->save($vote)) {
-                $this->Flash->success(__('The vote has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The vote could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(__('Invalid vote'));
+            return $this->redirect(array('action' => 'index'));
         }
-        $this->set(compact('vote'));
+        if (!empty($this->request->data)) {
+            if ($this->Vote->save($this->request->data)) {
+                $this->Session->setFlash(__('The vote has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The vote could not be saved. Please, try again.'));
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Vote->read(null, $id);
+        }
     }
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $vote = $this->Votes->get($id);
-        if ($this->Votes->delete($vote)) {
-            $this->Flash->success(__('The vote has been deleted.'));
-        } else {
-            $this->Flash->error(__('The vote could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid id for vote'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->Vote->delete($id)) {
+            $this->Session->setFlash(__('Vote deleted'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->Session->setFlash(__('Vote was not deleted'));
+        return $this->redirect(array('action' => 'index'));
     }
 }

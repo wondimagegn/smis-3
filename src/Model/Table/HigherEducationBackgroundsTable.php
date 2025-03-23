@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class HigherEducationBackgroundsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class HigherEducationBackgroundsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('higher_education_backgrounds');
@@ -37,6 +40,7 @@ class HigherEducationBackgroundsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->notEmptyString('name', 'Name is required.')
             ->notEmptyString('field_of_study', 'Field of study cannot be empty.')
@@ -47,26 +51,30 @@ class HigherEducationBackgroundsTable extends Table
         return $validator;
     }
 
-    function deleteHigherEducationList ($student_id=null,$data=null) {
-        $dontdeleteids=array();
-        $deleteids=array();
-        $deleteids=$this->find('list',
-            array('conditions'=>array('HigherEducationBackground.student_id'=>$student_id),
-                'fields'=>'id'));
-        if (!empty($data['HigherEducationBackground'])) {
-            foreach ($data['HigherEducationBackground'] as $in=>$va) {
-                if (!empty($va['id'])) {
-                    if (in_array($va['id'],$deleteids)) {
-                        $dontdeleteids[]=$va['id'];
-                    }
+    public function deleteHigherEducationList($student_id = null, $data = null)
+    {
 
+        $dontdeleteids = array();
+        $deleteids = array();
+        $deleteids = $this->find(
+            'list',
+            array(
+                'conditions' => array('HigherEducationBackground.student_id' => $student_id),
+                'fields' => 'id'
+            )
+        );
+        if (!empty($data['HigherEducationBackground'])) {
+            foreach ($data['HigherEducationBackground'] as $in => $va) {
+                if (!empty($va['id'])) {
+                    if (in_array($va['id'], $deleteids)) {
+                        $dontdeleteids[] = $va['id'];
+                    }
                 }
             }
-
         }
         if (!empty($dontdeleteids)) {
-            foreach ($deleteids as $in=>&$va) {
-                if (in_array($va,$dontdeleteids)) {
+            foreach ($deleteids as $in => &$va) {
+                if (in_array($va, $dontdeleteids)) {
                     unset($deleteids[$in]);
                 }
             }
@@ -75,10 +83,8 @@ class HigherEducationBackgroundsTable extends Table
 
         if (!empty($deleteids)) {
             $this->deleteAll(array(
-                'HigherEducationBackground.id'=>$deleteids), false);
+                'HigherEducationBackground.id' => $deleteids
+            ), false);
         }
-
-
     }
-
 }

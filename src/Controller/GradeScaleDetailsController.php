@@ -1,74 +1,157 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
 
+
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
+
 class GradeScaleDetailsController extends AppController
 {
 
+    public $name = 'GradeScaleDetails';
+    public $menuOptions = array(
+        'controllerButton' => false,
+        'exclude' => '*',
+
+    );
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('AcademicYear');
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+        $this->Auth->allow('get_grade_scale_detail');
+    }
+
     public function index()
     {
-        $this->paginate = [
-            'contain' => ['GradeScales', 'Grades'],
-        ];
-        $gradeScaleDetails = $this->paginate($this->GradeScaleDetails);
 
-        $this->set(compact('gradeScaleDetails'));
+        $this->GradeScaleDetail->recursive = 0;
+        $this->set('gradeScaleDetails', $this->paginate());
     }
 
     public function view($id = null)
     {
-        $gradeScaleDetail = $this->GradeScaleDetails->get($id, [
-            'contain' => ['GradeScales', 'Grades'],
-        ]);
 
-        $this->set('gradeScaleDetail', $gradeScaleDetail);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid grade scale detail'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('gradeScaleDetail', $this->GradeScaleDetail->read(null, $id));
     }
 
     public function add()
     {
-        $gradeScaleDetail = $this->GradeScaleDetails->newEntity();
-        if ($this->request->is('post')) {
-            $gradeScaleDetail = $this->GradeScaleDetails->patchEntity($gradeScaleDetail, $this->request->getData());
-            if ($this->GradeScaleDetails->save($gradeScaleDetail)) {
-                $this->Flash->success(__('The grade scale detail has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->GradeScaleDetail->create();
+            if ($this->GradeScaleDetail->save($this->request->data)) {
+                $this->Session->setFlash(__('The grade scale detail has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The grade scale detail could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The grade scale detail could not be saved. Please, try again.'));
         }
-
-        $this->set(compact('gradeScaleDetail'));
+        $gradeScales = $this->GradeScaleDetail->GradeScale->find('list');
+        $grades = $this->GradeScaleDetail->Grade->find('list');
+        $this->set(compact('gradeScales', 'grades'));
     }
 
     public function edit($id = null)
     {
-        $gradeScaleDetail = $this->GradeScaleDetails->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $gradeScaleDetail = $this->GradeScaleDetails->patchEntity($gradeScaleDetail, $this->request->getData());
-            if ($this->GradeScaleDetails->save($gradeScaleDetail)) {
-                $this->Flash->success(__('The grade scale detail has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The grade scale detail could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(__('Invalid grade scale detail'));
+            return $this->redirect(array('action' => 'index'));
         }
-
-        $this->set(compact('gradeScaleDetail', 'gradeScales', 'grades'));
+        if (!empty($this->request->data)) {
+            if ($this->GradeScaleDetail->save($this->request->data)) {
+                $this->Session->setFlash(
+                    '<span></span>' .
+                    __('The grade scale detail has been saved.'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' .
+                    __('The grade scale detail could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->GradeScaleDetail->read(null, $id);
+        }
+        $gradeScales = $this->GradeScaleDetail->GradeScale->find('list');
+        $grades = $this->GradeScaleDetail->Grade->find('list');
+        $this->set(compact('gradeScales', 'grades'));
     }
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $gradeScaleDetail = $this->GradeScaleDetails->get($id);
-        if ($this->GradeScaleDetails->delete($gradeScaleDetail)) {
-            $this->Flash->success(__('The grade scale detail has been deleted.'));
-        } else {
-            $this->Flash->error(__('The grade scale detail could not be deleted. Please, try again.'));
+
+        if (!$id) {
+            $this->Session->setFlash(
+                '<span></span>' .
+                __('Invalid id for grade scale detail.'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->GradeScaleDetail->delete($id)) {
+            $this->Session->setFlash(
+                '<span></span>' .
+                __('Grade scale detail deleted.'),
+                'default',
+                array('class' => 'success-box success-message')
+            );
+
+            return $this->redirect(array('action' => 'index'));
         }
 
-        return $this->redirect(['action' => 'index']);
+        $this->Session->setFlash(
+            '<span></span>' .
+            __('Grade scale detail was not deleted.'),
+            'default',
+            array('class' => 'error-box error-message')
+        );
+
+        return $this->redirect(array('action' => 'index'));
+    }
+
+    public function get_grade_scale_detail($grade_scale_id = null)
+    {
+
+        $this->layout = 'ajax';
+
+        $gradeScaleDetails = $this->GradeScaleDetail->find('all', array(
+            'conditions' => array('GradeScaleDetail.grade_scale_id' => $grade_scale_id),
+            'fields' => array(
+                'id',
+                'minimum_result',
+                'maximum_result'
+            ),
+            'contain' => array('Grade' => array('fields' => array('id', 'grade')))
+        ));
+
+        $this->set(compact('gradeScaleDetails'));
     }
 }

@@ -1,62 +1,123 @@
 <?php
+
 namespace App\View\Helper;
 
 use Cake\View\Helper;
 use Cake\View\Helper\FormHelper;
 use Cake\Core\Configure;
+use Cake\View\View;
+
+/**
+ * DatePickerHelper for generating date picker input fields in CakePHP 3.7
+ */
 class DatePickerHelper extends FormHelper
 {
+
+    /**
+     * Other helpers used by this helper
+     *
+     * @var array
+     */
     public $helpers = ['Html'];
 
-    private $format = 'yyyy-mm-dd';
+    /**
+     * Default configuration
+     *
+     * @var array
+     */
+    protected $_defaultConfig = [
+        'format' => '%Y-%m-%d'
+    ];
 
-    public function initialize(array $config): void
+    /**
+     * Constructor
+     *
+     * @param View $view The View this helper is being attached to
+     * @param array $config Configuration settings for the helper
+     */
+    public function __construct(View $view, array $config = [])
     {
-        parent::initialize($config);
+
+        parent::__construct($view, $config);
+        $this->_setup();
+    }
+
+    /**
+     * Sets up the helper by reading configuration
+     *
+     * @return void
+     */
+    protected function _setup()
+    {
         $format = Configure::read('DatePicker.format');
-        if ($format) {
-            $this->format = $format;
+        if ($format !== null) {
+            $this->setConfig('format', $format);
         }
     }
 
+    /**
+     * Generates a date picker input field
+     *
+     * @param string $fieldName Field name (e.g., "Model.field")
+     * @param array $options Options for the input
+     * @return string HTML and JavaScript output
+     */
     public function picker($fieldName, array $options = [])
     {
-        $this->initialize([]);
 
-        $options += [
-            'type' => 'text',
-            'label' => false,
-            'class' => 'datepicker form-control',
-            'autocomplete' => 'off',
-            'dateFormat' => 'DMY',
+        $this->_setup();
+
+        // Set the entity for the field
+        $this->setEntity($fieldName);
+
+        // Generate DOM ID
+        $htmlAttributes = $this->domId($options);
+
+        // Default options
+        $options = array_merge([
+            'type' => 'date', // Use CakePHP's date input type
+            'div' => ['class' => 'date'],
             'minYear' => date('Y') - 20,
-            'maxYear' => date('Y') + 20
+            'maxYear' => date('Y') + 20,
+            'dateFormat' => 'DMY' // Kept for reference, though unused directly
+        ], $options);
+
+        // Map minYear and maxYear to CakePHP's year range
+        $options['year'] = [
+            'start' => $options['minYear'],
+            'end' => $options['maxYear']
         ];
 
-        $fieldId = $this->_domId($fieldName);
+        // Remove dateFormat since it's not directly used by FormHelper
+        unset($options['dateFormat']);
 
+        // Uncomment to restore calendar icon functionality
+        /*
+        $options['templates'] = [
+            'inputContainer' => '<div class="{{class}}">{{content}} ' .
+                $this->Html->image('calendar.png', ['id' => $htmlAttributes['id'], 'style' => 'cursor:pointer']) .
+                '</div>'
+        ];
+        if (!empty($options['empty'])) {
+            $options['templates']['inputContainer'] .= $this->Html->image('b_drop.png', [
+                'id' => $htmlAttributes['id'] . '_drop',
+                'style' => 'cursor:pointer'
+            ]);
+        }
+        */
+
+        // Generate the input field
         $output = parent::control($fieldName, $options);
-        $output .= $this->Html->scriptBlock("
-            $(function() {
-                $('#$fieldId').datepicker({
-                    dateFormat: 'yy-mm-dd',
-                    changeMonth: true,
-                    changeYear: true,
-                    yearRange: '{$options['minYear']}:{$options['maxYear']}'
-                });
-            });
-        ");
+
+        // Add JavaScript for datepicker (assuming external JS function `datepick`)
+        $script = sprintf(
+            "datepick('%s', '01/01/%s', '31/12/%s');",
+            $htmlAttributes['id'],
+            $options['minYear'],
+            $options['maxYear']
+        );
+        $output .= $this->Html->scriptBlock($script);
+
         return $output;
     }
-
-    public function loadAssets()
-    {
-        return $this->Html->script([
-                'https://code.jquery.com/jquery-3.6.0.min.js',
-                'https://code.jquery.com/ui/1.12.1/jquery-ui.js'
-            ]) .
-            $this->Html->css('https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css');
-    }
-
 }
-?>

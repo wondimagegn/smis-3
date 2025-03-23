@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class PlacementRoundParticipantsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class PlacementRoundParticipantsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('placement_round_participants');
@@ -142,6 +145,7 @@ class PlacementRoundParticipantsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['program_id'], 'Programs'));
         $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
 
@@ -151,6 +155,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function reformat($data = array())
     {
+
         $reformatedData = array();
 
         $group_identifier = strtotime(date('Y-m-d h:i:sa'));
@@ -173,9 +178,14 @@ class PlacementRoundParticipantsTable extends Table
         // Array after removing duplicates
         //$xunique=array_unique($reformatedData);
 
-        $reformatedDataDuplicateRemoved['PlacementRoundParticipant'] = array_unique($reformatedData['PlacementRoundParticipant'], SORT_REGULAR);
+        $reformatedDataDuplicateRemoved['PlacementRoundParticipant'] = array_unique(
+            $reformatedData['PlacementRoundParticipant'],
+            SORT_REGULAR
+        );
 
-        if (count($reformatedData['PlacementRoundParticipant']) > count($reformatedDataDuplicateRemoved['PlacementRoundParticipant'])) {
+        if (count($reformatedData['PlacementRoundParticipant']) > count(
+                $reformatedDataDuplicateRemoved['PlacementRoundParticipant']
+            )) {
             $this->invalidate('foreign_key', 'Please remove the duplicated rows, and try again.');
             return false;
         }
@@ -187,6 +197,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function isDuplicated($data = array(), $edit = 0)
     {
+
         if (isset($data) && !empty($data)) {
             $firstData = $data['PlacementRoundParticipant'][1];
             if ($edit) {
@@ -232,6 +243,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function isPossibleToDefineDeadline($data = array())
     {
+
         if (isset($data) && !empty($data)) {
             $row = $this->find("first", array(
                 'conditions' => array(
@@ -252,18 +264,25 @@ class PlacementRoundParticipantsTable extends Table
         return false;
     }
 
-    public function participating_unit_name($acceptedStudentdetail = array(), $selectedAcademicYear, $apply_for_college = null, $type = 'd')
-    {
+    public function participating_unit_name(
+        $acceptedStudentdetail = array(),
+        $selectedAcademicYear,
+        $apply_for_college = null,
+        $type = 'd'
+    ) {
 
         debug(Configure::read('program_types_available_for_placement_preference'));
 
         if (!empty($acceptedStudentdetail)) {
-            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound($selectedAcademicYear, $acceptedStudentdetail['AcceptedStudent']['id']);
+            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound(
+                $selectedAcademicYear,
+                $acceptedStudentdetail['AcceptedStudent']['id']
+            );
 
             if (empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
                 // the student is still in college
                 $applied_for = 'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'];
-            } else if (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
+            } elseif (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
                 // the assignment is specialization
                 $applied_for = 'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'];
             }
@@ -274,18 +293,20 @@ class PlacementRoundParticipantsTable extends Table
                     'PlacementRoundParticipant.placement_round' => $placementRound,
                     //'PlacementRoundParticipant.program_id' => $acceptedStudentdetail['AcceptedStudent']['program_id'],
                     //'PlacementRoundParticipant.program_type_id' => array($acceptedStudentdetail['AcceptedStudent']['program_type_id'], 1),
-                    'PlacementRoundParticipant.program_id' => Configure::read('programs_available_for_placement_preference'),
-                    'PlacementRoundParticipant.program_type_id' => Configure::read('program_types_available_for_placement_preference'),
+                    'PlacementRoundParticipant.program_id' => Configure::read(
+                        'programs_available_for_placement_preference'
+                    ),
+                    'PlacementRoundParticipant.program_type_id' => Configure::read(
+                        'program_types_available_for_placement_preference'
+                    ),
                     'PlacementRoundParticipant.academic_year' => $selectedAcademicYear
                 ),
                 'recursive' => -1
             ));
-
-        } else if (isset($apply_for_college) && !empty($apply_for_college)) {
-
+        } elseif (isset($apply_for_college) && !empty($apply_for_college)) {
             if ($type == 'c') {
                 $applied_for = 'c~' . $apply_for_college;
-            } else if ($type == 'd') {
+            } elseif ($type == 'd') {
                 $applied_for = 'd~' . $apply_for_college;
             }
 
@@ -293,8 +314,12 @@ class PlacementRoundParticipantsTable extends Table
             $rows = $this->find("all", array(
                 'conditions' => array(
                     'PlacementRoundParticipant.applied_for' => $applied_for,
-                    'PlacementRoundParticipant.program_id' => Configure::read('programs_available_for_placement_preference'),
-                    'PlacementRoundParticipant.program_type_id' => Configure::read('program_types_available_for_placement_preference'),
+                    'PlacementRoundParticipant.program_id' => Configure::read(
+                        'programs_available_for_placement_preference'
+                    ),
+                    'PlacementRoundParticipant.program_type_id' => Configure::read(
+                        'program_types_available_for_placement_preference'
+                    ),
                     'PlacementRoundParticipant.academic_year' => $selectedAcademicYear,
                     //'PlacementRoundParticipant.placement_round' => $placementRound,
                     // $placementRound is not defined here
@@ -318,6 +343,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function reformatDevRegion($data = array())
     {
+
         //debug($data);
         if (isset($data['PlacementSetting']) && !empty($data['PlacementSetting'])) {
             if (isset($data['PlacementSetting'][0]) && !empty($data['PlacementSetting'][0]['developing_region'])) {
@@ -327,7 +353,7 @@ class PlacementRoundParticipantsTable extends Table
                         $v['developing_region'] = $developingRegions;
                         $reformatedData['PlacementSetting'][$k] = $v;
                     }
-                    return 	$reformatedData;
+                    return $reformatedData;
                 }
             } else {
                 return $data;
@@ -339,6 +365,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function get_selected_participating_unit_name($data)
     {
+
         $rows = $this->find("all", array(
             'conditions' => array(
                 'PlacementRoundParticipant.applied_for' => $data['PlacementPreference']['applied_for'],
@@ -365,6 +392,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function get_participating_unit_name($data)
     {
+
         $rows = $this->find("all", array(
             'conditions' => array(
                 'PlacementRoundParticipant.applied_for' => $data['applied_for'],
@@ -391,8 +419,8 @@ class PlacementRoundParticipantsTable extends Table
 
     public function allParticipatingUnitsDefined($data)
     {
-        if (!empty($data['PlacementRoundParticipant']['applied_for'])) {
 
+        if (!empty($data['PlacementRoundParticipant']['applied_for'])) {
             $colleges = classRegistry::init('College')->find('list');
             $departments = classRegistry::init('Department')->find('list');
 
@@ -429,9 +457,12 @@ class PlacementRoundParticipantsTable extends Table
 
             if (isset($collegeID)) {
                 $collegeName = $colleges[$collegeID];
-            } else if (isset($departmentID)) {
+            } elseif (isset($departmentID)) {
                 $departmentName = $departments[$departmentID];
-                $deptCollID = classRegistry::init('Department')->field('Department.college_id', array('Department.id '=> $departmentID));
+                $deptCollID = classRegistry::init('Department')->field(
+                    'Department.college_id',
+                    array('Department.id ' => $departmentID)
+                );
                 $collegeName = $colleges[$deptCollID];
             }
 
@@ -442,14 +473,14 @@ class PlacementRoundParticipantsTable extends Table
                 foreach ($rows as $k => $v) {
                     if (empty($departmentName)) {
                         if ($v['PlacementRoundParticipant']['type'] == 'College') {
-                            $participatingUnitName[$collegeName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman ('. $v['PlacementRoundParticipant']['name']. ')';
-                        } else if ($v['PlacementRoundParticipant']['type'] == 'Department') {
+                            $participatingUnitName[$collegeName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman (' . $v['PlacementRoundParticipant']['name'] . ')';
+                        } elseif ($v['PlacementRoundParticipant']['type'] == 'Department') {
                             $participatingUnitName[$collegeName]['d~' . $v['PlacementRoundParticipant']['foreign_key']] = $departments[$v['PlacementRoundParticipant']['foreign_key']];
                         }
                     } else {
                         if ($v['PlacementRoundParticipant']['type'] == 'College') {
-                            $participatingUnitName[$departmentName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman ('. $v['PlacementRoundParticipant']['name']. ')';
-                        } else if ($v['PlacementRoundParticipant']['type'] == 'Department') {
+                            $participatingUnitName[$departmentName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman (' . $v['PlacementRoundParticipant']['name'] . ')';
+                        } elseif ($v['PlacementRoundParticipant']['type'] == 'Department') {
                             $participatingUnitName[$departmentName]['d~' . $v['PlacementRoundParticipant']['foreign_key']] = $departments[$v['PlacementRoundParticipant']['foreign_key']];
                         }
                     }
@@ -462,6 +493,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function getParticipatingUnitForDirectPlacement($data)
     {
+
         $rows = $this->find("all", array(
             'conditions' => array(
                 'PlacementRoundParticipant.applied_for' => $data['applied_for'],
@@ -489,6 +521,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function get_participating_unit_for_edit($placement_round_participant_id)
     {
+
         if (isset($placement_round_participant_id) && !empty($placement_round_participant_id)) {
             $groupId = $this->find("first", array(
                 'conditions' => array(
@@ -521,6 +554,7 @@ class PlacementRoundParticipantsTable extends Table
 
     public function placementSettingDefined($data = array())
     {
+
         $participatinListCapacity = $this->find("all", array(
             'conditions' => array(
                 'PlacementRoundParticipant.applied_for' => $data['applied_for'],
@@ -570,11 +604,12 @@ class PlacementRoundParticipantsTable extends Table
         if (!empty($participatinListCapacity)) {
             foreach ($participatinListCapacity as $key => $participants) {
                 debug($participants['PlacementRoundParticipant']['intake_capacity']);
-                if (!is_null($participants['PlacementRoundParticipant']['intake_capacity']) && is_numeric($participants['PlacementRoundParticipant']['intake_capacity'])) {
+                if (!is_null($participants['PlacementRoundParticipant']['intake_capacity']) && is_numeric(
+                        $participants['PlacementRoundParticipant']['intake_capacity']
+                    )) {
                     $defined_intake_capacies[$participants['PlacementRoundParticipant']['name']] = $participants['PlacementRoundParticipant']['intake_capacity'];
                 }
             }
-
         }
 
         if (count($defined_intake_capacies) != count($participatinListCapacity)) {
@@ -582,16 +617,28 @@ class PlacementRoundParticipantsTable extends Table
         }
 
         if ($participatingSettings == 0) {
-            $this->invalidate('placement_round_participant', 'Please record placement round participant before running auto placement.');
+            $this->invalidate(
+                'placement_round_participant',
+                'Please record placement round participant before running auto placement.'
+            );
             return false;
         } elseif ($placementResultSetting == 0) {
-            $this->invalidate('placement_result_setting', 'Please record result settings in auto placement before running the auto placement.');
+            $this->invalidate(
+                'placement_result_setting',
+                'Please record result settings in auto placement before running the auto placement.'
+            );
             return false;
         } elseif ($placementReadyStudent == 0) {
-            $this->invalidate('placement_participating_student', 'Please prepare the students for auto placement before running the auto placement.');
+            $this->invalidate(
+                'placement_participating_student',
+                'Please prepare the students for auto placement before running the auto placement.'
+            );
             return false;
-        } else if (!$intake_capacity_defined_for_all_participants) {
-            $this->invalidate('placement_round_participant', 'Please define all intake capacities for all participating units for auto placement before running the auto placement.');
+        } elseif (!$intake_capacity_defined_for_all_participants) {
+            $this->invalidate(
+                'placement_round_participant',
+                'Please define all intake capacities for all participating units for auto placement before running the auto placement.'
+            );
             return false;
         }
         return true;
@@ -599,12 +646,13 @@ class PlacementRoundParticipantsTable extends Table
 
     public function roundLabel($round)
     {
+
         $r = '';
         if ($round == 1) {
             $r = $round . 'st';
         } elseif ($round == 2) {
             $r = $round . 'nd';
-        } else if ($round == 3) {
+        } elseif ($round == 3) {
             $r = $round . 'rd';
         } else {
             $r = $round . 'th';
@@ -614,19 +662,23 @@ class PlacementRoundParticipantsTable extends Table
 
     public function appliedFor($acceptedStudentdetail, $selectedAcademicYear)
     {
+
         $applied_for = '';
 
         if (!empty($acceptedStudentdetail)) {
-            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound($selectedAcademicYear, $acceptedStudentdetail['AcceptedStudent']['id']);
+            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound(
+                $selectedAcademicYear,
+                $acceptedStudentdetail['AcceptedStudent']['id']
+            );
 
             if (isset($placementRound) && !empty($placementRound)) {
-
                 $roundAppliedFor = ClassRegistry::init('PlacementParticipatingStudent')->find('first', array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.academic_year LIKE ' => $selectedAcademicYear . '%',
                         'PlacementParticipatingStudent.round' => $placementRound,
                         'PlacementParticipatingStudent.accepted_student_id' => $acceptedStudentdetail['AcceptedStudent']['id']
-                    ), 'order' => array('PlacementParticipatingStudent.round DESC')
+                    ),
+                    'order' => array('PlacementParticipatingStudent.round DESC')
                 ));
 
                 if (isset($roundAppliedFor) && !empty($roundAppliedFor)) {
@@ -635,7 +687,7 @@ class PlacementRoundParticipantsTable extends Table
                     if (empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
                         // the student is still in college
                         $applied_for = 'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'];
-                    } else if (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
+                    } elseif (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
                         // the assignment is specialization
                         $applied_for = 'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'];
                     }
@@ -648,18 +700,29 @@ class PlacementRoundParticipantsTable extends Table
 
     function canItBeDeleted($round_participant_id = null)
     {
-        if ($this->PlacementParticipatingStudent->find('count', array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))) > 0) {
+
+        if ($this->PlacementParticipatingStudent->find(
+                'count',
+                array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))
+            ) > 0) {
             return false;
-        } else if (ClassRegistry::init('PlacementParticipatingStudent')->find('count', array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))) > 0) {
+        } elseif (ClassRegistry::init('PlacementParticipatingStudent')->find(
+                'count',
+                array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))
+            ) > 0) {
             return false;
-        } else if (ClassRegistry::init('PlacementPreference')->find('count', array('conditions' => array('PlacementPreference.placement_round_participant_id' => $round_participant_id))) > 0) {
+        } elseif (ClassRegistry::init('PlacementPreference')->find(
+                'count',
+                array('conditions' => array('PlacementPreference.placement_round_participant_id' => $round_participant_id))
+            ) > 0) {
             return false;
         } else {
             return true;
         }
     }
 
-    function latest_defined_academic_year_and_round($applied_for = null) {
+    public function latest_defined_academic_year_and_round($applied_for = null)
+    {
 
         $latestAcyRnd = array();
 
@@ -668,13 +731,27 @@ class PlacementRoundParticipantsTable extends Table
                 'conditions' => array(
                     'PlacementRoundParticipant.applied_for' => $applied_for,
                 ),
-                'order' => array('PlacementRoundParticipant.academic_year' => 'DESC', 'PlacementRoundParticipant.placement_round'=> 'DESC'),
-                'group' => array('PlacementRoundParticipant.academic_year', 'PlacementRoundParticipant.placement_round', 'PlacementRoundParticipant.applied_for'),
+                'order' => array(
+                    'PlacementRoundParticipant.academic_year' => 'DESC',
+                    'PlacementRoundParticipant.placement_round' => 'DESC'
+                ),
+                'group' => array(
+                    'PlacementRoundParticipant.academic_year',
+                    'PlacementRoundParticipant.placement_round',
+                    'PlacementRoundParticipant.applied_for'
+                ),
             ));
         } else {
             $latestACYDefined = $this->find('first', array(
-                'order' => array('PlacementRoundParticipant.academic_year' => 'DESC', 'PlacementRoundParticipant.placement_round'=> 'DESC'),
-                'group' => array('PlacementRoundParticipant.academic_year', 'PlacementRoundParticipant.placement_round', 'PlacementRoundParticipant.applied_for'),
+                'order' => array(
+                    'PlacementRoundParticipant.academic_year' => 'DESC',
+                    'PlacementRoundParticipant.placement_round' => 'DESC'
+                ),
+                'group' => array(
+                    'PlacementRoundParticipant.academic_year',
+                    'PlacementRoundParticipant.placement_round',
+                    'PlacementRoundParticipant.applied_for'
+                ),
             ));
         }
 
@@ -685,18 +762,23 @@ class PlacementRoundParticipantsTable extends Table
         }
 
         return $latestAcyRnd;
-
     }
 
     function get_placement_participant_ids_by_group_identifier($group_identifier = null)
     {
+
         if (!empty($group_identifier)) {
-            $participantIDs = $this->find("list", array('conditions' => array('PlacementRoundParticipant.group_identifier' => $group_identifier), 'fields' => array('PlacementRoundParticipant.id', 'PlacementRoundParticipant.id')));
+            $participantIDs = $this->find(
+                "list",
+                array(
+                    'conditions' => array('PlacementRoundParticipant.group_identifier' => $group_identifier),
+                    'fields' => array('PlacementRoundParticipant.id', 'PlacementRoundParticipant.id')
+                )
+            );
             if (!empty($participantIDs)) {
                 return $participantIDs;
             }
         }
         return array();
     }
-
 }

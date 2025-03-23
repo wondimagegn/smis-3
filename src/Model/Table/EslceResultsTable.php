@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class EslceResultsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class EslceResultsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('eslce_results');
@@ -38,6 +41,7 @@ class EslceResultsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -71,41 +75,45 @@ class EslceResultsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
         return $rules;
     }
 
-    function deleteEslceResultList ($student_id=null,$data=null) {
-        $dontdeleteids=array();
-        $deleteids=array();
-        $deleteids=$this->find('list',
-            array('conditions'=>array('EslceResult.student_id'=>$student_id),
-                'fields'=>'id'));
+    public function deleteEslceResultList($student_id = null, $data = null)
+    {
+
+        $dontdeleteids = array();
+        $deleteids = array();
+        $deleteids = $this->find(
+            'list',
+            array(
+                'conditions' => array('EslceResult.student_id' => $student_id),
+                'fields' => 'id'
+            )
+        );
 
         if (!empty($data['EslceResult'])) {
-            foreach ($data['EslceResult'] as $in=>$va) {
+            foreach ($data['EslceResult'] as $in => $va) {
                 if (!empty($va['id'])) {
-                    if (in_array($va['id'],$deleteids)) {
-                        $dontdeleteids[]=$va['id'];
+                    if (in_array($va['id'], $deleteids)) {
+                        $dontdeleteids[] = $va['id'];
                     }
-
                 }
             }
-
         }
         if (!empty($dontdeleteids)) {
-            foreach ($deleteids as $in=>&$va) {
-                if (in_array($va,$dontdeleteids)) {
+            foreach ($deleteids as $in => &$va) {
+                if (in_array($va, $dontdeleteids)) {
                     unset($deleteids[$in]);
                 }
             }
         }
         if (!empty($deleteids)) {
             $this->deleteAll(array(
-                'EslceResult.id'=>$deleteids), false);
+                'EslceResult.id' => $deleteids
+            ), false);
         }
-
-
     }
 }

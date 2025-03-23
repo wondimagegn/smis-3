@@ -1,9 +1,10 @@
 <?php
+
 namespace App\Controller\Component;
 
 use Cake\Controller\Component;
+use Cake\ORM\TableRegistry;
 use Cake\Core\Configure;
-use Cake\I18n\Time;
 use DateTime;
 
 class AcademicYearComponent extends Component
@@ -18,69 +19,231 @@ class AcademicYearComponent extends Component
         parent::initialize($config);
     }
 
-    public function current_academicyear()
+    public function currentAcademicYear()
     {
-        $thisyear = date('Y');
-        $thismonth = date('m');
-        $shortthisyear = substr($thisyear, 2, 2);
 
-        if (in_array($thismonth, ['09', '10', '11', '12'])) {
-            $this->acyear = $thisyear . '/' . ($shortthisyear + 1);
+        $thisYear = date('Y');
+        $thisMonth = date('m');
+        $shortThisYear = substr($thisYear, 2, 2);
+
+        if (in_array($thisMonth, ["09", "10", "11", "12"])) {
+            $this->acyear = $thisYear . '/' . ($shortThisYear + 1);
         } else {
-            $this->acyear = ($thisyear - 1) . '/' . $shortthisyear;
+            $this->acyear = ($thisYear - 1) . '/' . $shortThisYear;
         }
+
         return $this->acyear;
     }
 
     public function currentAcyAndSemester()
     {
-        $currentAcYandSemester = [];
-        $thisyear = date('Y');
-        $thismonth = date('m');
-        $shortthisyear = substr($thisyear, 2, 2);
+
+        $currentAcyAndSemester = [];
+
+        $thisYear = date('Y');
+        $thisMonth = date('m');
+        $shortThisYear = substr($thisYear, 2, 2);
         $semester = 'I';
 
-        if (in_array($thismonth, ['09', '10', '11', '12'])) {
-            $ac_year = $thisyear . '/' . ($shortthisyear + 1);
+        if (in_array($thisMonth, ['09', '10', '11', '12'])) {
+            $acYear = $thisYear . '/' . ($shortThisYear + 1);
         } else {
-            $ac_year = ($thisyear - 1) . '/' . $shortthisyear;
+            $acYear = ($thisYear - 1) . '/' . $shortThisYear;
         }
 
-        $currentAcYandSemester['academic_year'] = $ac_year;
-        $acYearBeginingDate = $this->get_academicYearBegainingDate($ac_year);
-        $selected_year = explode('-', $acYearBeginingDate);
+        $currentAcyAndSemester['academic_year'] = $acYear;
+        $acYearBeginningDate = $this->getAcademicYearBeginningDate($acYear);
+        $selectedYear = explode('-', $acYearBeginningDate);
 
-        if (!empty($selected_year[0])) {
+        if (!empty($selectedYear[0])) {
             $today = date('Y-m-d');
-            $semester1end = ($selected_year[0] + 1) . '-02-20';
-            $semester2end = ($selected_year[0] + 1) . '-06-20';
-            $semester3end = ($selected_year[0] + 1) . '-09-20';
+            $semester1End = ($selectedYear[0] + 1) . '-02-20';
+            $semester2End = ($selectedYear[0] + 1) . '-06-20';
+            $semester3End = ($selectedYear[0] + 1) . '-09-20';
 
-            if ($acYearBeginingDate <= $today && $today <= $semester1end) {
+            if ($acYearBeginningDate <= $today && $today <= $semester1End) {
                 $semester = 'I';
-            } elseif ($semester1end < $today && $today <= $semester2end) {
+            } elseif ($semester1End < $today && $today <= $semester2End) {
                 $semester = 'II';
-            } elseif ($semester2end < $today && $today <= $semester3end) {
+            } elseif ($semester2End < $today && $today <= $semester3End) {
                 $semester = 'III';
             }
 
-            $currentAcYandSemester['semester'] = $semester;
+            $currentAcyAndSemester['semester'] = $semester;
         }
-        return $currentAcYandSemester;
+
+        return $currentAcyAndSemester;
     }
 
-    public function get_academicYearBegainingDate($academic_year)
+    public function getAcademicYear($givenMonth = null, $givenYear = null)
     {
-        $given_year = explode("/", $academic_year);
-        return !empty($given_year[0]) ? $given_year[0] . '-09-20' : date('Y-m-d');
+
+        if (!empty($givenMonth) && !empty($givenYear)) {
+            $shortGivenYear = substr($givenYear, 2, 2);
+
+            if (in_array($givenMonth, ["09", "10", "11", "12"])) {
+                return $givenYear . '/' . ($shortGivenYear + 1);
+            } else {
+                return ($givenYear - 1) . '/' . $shortGivenYear;
+            }
+        }
+
+        return null;
     }
+
+    public function getAcademicYearBeginningDate($academicYear)
+    {
+
+        $date = null;
+        $givenYear = explode("/", $academicYear);
+
+        if (!empty($givenYear[0])) {
+            return $givenYear[0] . '-09-20';
+        }
+
+        return date('Y-m-d');
+    }
+
+    public function nextAcademicYearBeginningDate($academicYear)
+    {
+
+        $givenYear = explode("/", $academicYear);
+        return !empty($givenYear[0]) ? ($givenYear[0] + 1) . '-09-20' : date('Y-m-d');
+    }
+
+    public function getAcademicYearBeginningDateBySemester($academicYear, $semester)
+    {
+
+        $givenYear = explode("/", $academicYear);
+        if (!empty($givenYear[0])) {
+            switch ($semester) {
+                case "I":
+                    return $givenYear[0] . '-09-20';
+                case "II":
+                    return ($givenYear[0] + 1) . '-06-20';
+                case "III":
+                    return ($givenYear[0] + 1) . '-08-20';
+            }
+        }
+        return date('Y-m-d');
+    }
+
+    public function equivalentProgramType($programTypeId = null)
+    {
+
+        $programTypeTable = TableRegistry::getTableLocator()->get('ProgramTypes');
+        $equivalentProgramType = unserialize(
+            $programTypeTable->find()
+                ->select(['equivalent_to_id'])
+                ->where(['id' => $programTypeId])
+                ->first()
+                ->equivalent_to_id ?? ''
+        );
+
+        if (!empty($equivalentProgramType)) {
+            return array_merge([$programTypeId], $equivalentProgramType);
+        }
+
+        return [$programTypeId];
+    }
+
+    public function acyearArray()
+    {
+
+        // Retrieve minimum academic year
+        $minYear = Configure::read('Calendar.universityEstablishement') ??
+            Configure::read('Calendar.applicationStartYear') ??
+            date('Y') - 5;
+
+        $minYearShort = substr($minYear, 2, 2);
+        $yearFront = substr($minYear, 0, 2);
+        $thisYear = date('Y');
+        $thisMonth = date('m');
+
+        // Adjust year based on the current month
+        if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+            $thisYear -= 1;
+        }
+
+        $front2digitThisYear = substr($thisYear, 0, 2);
+        $shortThisYear = substr($thisYear, 2, 2) + 1;
+
+        // Generate academic years
+        for ($i = $minYearShort; $i <= $shortThisYear; $i++) {
+            $this->acyear_array_data["{$front2digitThisYear}{$i}/" . ($i + 1)] = "{$front2digitThisYear}{$i}/" . ($i + 1);
+        }
+
+        arsort($this->acyear_array_data);
+        return $this->acyear_array_data;
+    }
+
+    public function acYearMinuSeparated($beginYear = '', $endYear = '')
+    {
+
+        // If no range is given, determine based on default values
+        if (empty($beginYear) && empty($endYear)) {
+            for ($i = 86; $i <= 99; $i++) {
+                $this->acyear_minu_separted["19{$i}-" . sprintf('%02d', $i + 1)] = "19{$i}/" . sprintf('%02d', $i + 1);
+            }
+
+            $thisYear = date('Y');
+            $thisMonth = date('m');
+
+            if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+                $thisYear--;
+            }
+
+            $front2digitThisYear = substr($thisYear, 0, 2);
+            $shortThisYear = substr($thisYear, 2, 2) + 1;
+
+            for ($i = 0; $i <= $shortThisYear; $i++) {
+                $yearString = sprintf('%02d', $i);
+                $this->acyear_minu_separted["{$front2digitThisYear}{$yearString}-" . sprintf('%02d', $i + 1)]
+                    = "{$front2digitThisYear}{$yearString}/" . sprintf('%02d', $i + 1);
+            }
+        } else {
+            $thisYear = $endYear;
+            $thisMonth = date('m');
+
+            if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+                $thisYear--;
+            }
+
+            $front2digitThisYear = substr($thisYear, 0, 2);
+            $shortThisYear = substr($thisYear, 2, 2);
+
+            for ($i = substr($beginYear, 2, 2); $i <= $shortThisYear; $i++) {
+                $yearString = sprintf('%02d', $i);
+                $this->acyear_minu_separted["{$front2digitThisYear}{$yearString}-" . sprintf('%02d', $i + 1)]
+                    = "{$front2digitThisYear}{$yearString}/" . sprintf('%02d', $i + 1);
+            }
+        }
+
+        arsort($this->acyear_minu_separted);
+        return $this->acyear_minu_separted;
+    }
+
 
     public function academicYearInArray($beginYear, $endYear)
     {
-        $this->acyear_array_data = [];
 
-        for ($i = substr($beginYear, 2, 2); $i <= substr($endYear, 2, 2); $i++) {
-            $this->acyear_array_data['20' . $i . '/' . ($i + 1)] = '20' . $i . '/' . ($i + 1);
+        $thisYear = $endYear;
+        $thisMonth = date('m');
+
+        // Adjust year if the current month is between January and August
+        if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+            $thisYear--;
+        }
+
+        $front2DigitThisYear = substr($thisYear, 0, 2);
+        $shortThisYear = substr($thisYear, 2, 2);
+
+        for ($i = substr($beginYear, 2, 2); $i <= $shortThisYear; $i++) {
+            $yearString = sprintf('%02d', $i);
+            $nextYearString = sprintf('%02d', $i + 1);
+
+            $formattedYear = "{$front2DigitThisYear}{$yearString}/{$nextYearString}";
+            $this->acyear_array_data[$formattedYear] = $formattedYear;
         }
 
         arsort($this->acyear_array_data);
@@ -89,20 +252,20 @@ class AcademicYearComponent extends Component
 
     public function isValidDateWithinYearRange($dateString, $minYear = null, $maxYear = null, $format = 'Y-m-d')
     {
-        if (empty($minYear)) {
-            $minYear = Configure::read('Calendar.universityEstablishement');
-        }
 
-        if (empty($maxYear)) {
-            $maxYear = $this->current_academicyear();
-        }
+        $minYear = $minYear ?? Configure::read('Calendar.universityEstablishement');
+        $maxYear = $maxYear ?? $this->currentAcademicYear();
 
         $dateTime = DateTime::createFromFormat($format, $dateString);
 
         if ($dateTime && $dateTime->format($format) === $dateString) {
-            $year = (int) $dateTime->format('Y');
-            return $year >= $minYear && $year <= $maxYear;
+            $year = (int)$dateTime->format('Y');
+
+            if ($year >= $minYear && $year <= $maxYear) {
+                return true;
+            }
         }
+
         return false;
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -25,74 +26,119 @@ class DepartmentsTable extends Table
         $this->addBehavior('Timestamp');
 
         $this->belongsTo('Colleges', [
+            'className' => 'Colleges',
             'foreignKey' => 'college_id',
             'joinType' => 'INNER',
+            'propertyName' => 'College',
         ]);
         $this->belongsTo('MoodleCategories', [
+            'className' => 'MoodleCategories',
             'foreignKey' => 'moodle_category_id',
             'joinType' => 'INNER',
+            'propertyName' => 'MoodleCategory',
         ]);
         $this->hasMany('AcademicCalendars', [
+            'className' => 'AcademicCalendars',
             'foreignKey' => 'department_id',
+            'propertyName' => 'AcademicCalendar',
         ]);
         $this->hasMany('AcceptedStudents', [
+            'className' => 'AcceptedStudents',
             'foreignKey' => 'department_id',
+            'propertyName' => 'AcceptedStudent',
         ]);
         $this->hasMany('Courses', [
+            'className' => 'Courses',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Course',
         ]);
         $this->hasMany('Curriculums', [
+
+            'className' => 'Curriculums',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Curriculum',
         ]);
         $this->hasMany('DepartmentStudyPrograms', [
+            'className' => 'DepartmentStudyPrograms',
             'foreignKey' => 'department_id',
+            'propertyName' => 'DepartmentStudyProgram',
         ]);
         $this->hasMany('DepartmentTransfers', [
+            'className' => 'DepartmentTransfers',
             'foreignKey' => 'department_id',
+            'propertyName' => 'DepartmentTransfer',
         ]);
         $this->hasMany('ExtendingAcademicCalendars', [
+            'className' => 'ExtendingAcademicCalendars',
             'foreignKey' => 'department_id',
+            'propertyName' => 'ExtendingAcademicCalendar',
         ]);
         $this->hasMany('Notes', [
+            'className' => 'Notes',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Note',
         ]);
         $this->hasMany('Offers', [
+            'className' => 'Offers',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Offer',
         ]);
         $this->hasMany('OnlineApplicants', [
+            'className' => 'OnlineApplicants',
             'foreignKey' => 'department_id',
+            'propertyName' => 'OnlineApplicant',
         ]);
 
         $this->hasMany('ParticipatingDepartments', [
+            'className' => 'ParticipatingDepartments',
             'foreignKey' => 'department_id',
+            'propertyName' => 'ParticipatingDepartment',
         ]);
         $this->hasMany('Preferences', [
+            'className' => 'Preferences',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Preference',
         ]);
         $this->hasMany('PublishedCourses', [
+            'class' => 'PublishedCourses',
             'foreignKey' => 'department_id',
+            'propertyName' => 'PublishedCourse',
         ]);
         $this->hasMany('Sections', [
+            'className' => 'Sections',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Section',
         ]);
         $this->hasMany('Specializations', [
+            'className' => 'Specializations',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Specialization',
         ]);
         $this->hasMany('StaffAssignes', [
+            'className' => 'StaffAssignes',
             'foreignKey' => 'department_id',
+            'propertyName' => 'StaffAssignee',
         ]);
         $this->hasMany('Staffs', [
+            'className' => 'Staffs',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Staff',
         ]);
         $this->hasMany('Students', [
+            'className' => 'Students',
             'foreignKey' => 'department_id',
+            'propertyName' => 'Student',
         ]);
         $this->hasMany('TakenProperties', [
+            'className' => 'TakenProperties',
             'foreignKey' => 'department_id',
+            'propertyName' => 'TakenProperty',
         ]);
 
         $this->hasMany('YearLevels', [
+            'className' => 'YearLevels',
             'foreignKey' => 'department_id',
+            'propertyName' => 'YearLevel',
         ]);
     }
 
@@ -229,21 +275,46 @@ class DepartmentsTable extends Table
 
         if ($this->Student->find('count', array('conditions' => array('Student.department_id' => $department_id))) > 0) {
             return false;
-        } else if ($this->Section->find('count', array('conditions' => array('Section.department_id' => $department_id))) > 0) {
+        } elseif ($this->Section->find('count', array('conditions' => array('Section.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->GradeScale->find('count', array('conditions' => array('GradeScale.model' => 'Department', 'GradeScale.foreign_key' => $department_id))) > 0) {
+        } elseif ($this->GradeScale->find(
+                'count',
+                array(
+                    'conditions' => array(
+                        'GradeScale.model' => 'Department',
+                        'GradeScale.foreign_key' => $department_id
+                    )
+                )
+            ) > 0) {
             return false;
-        } else if ($this->PublishedCourse->find('count', array('conditions' => array('PublishedCourse.department_id' => $department_id))) > 0) {
+        } elseif ($this->PublishedCourse->find(
+                'count',
+                array('conditions' => array('PublishedCourse.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->Curriculum->find('count', array('conditions' => array('Curriculum.department_id' => $department_id))) > 0) {
+        } elseif ($this->Curriculum->find(
+                'count',
+                array('conditions' => array('Curriculum.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->AcceptedStudent->find('count', array('conditions' => array('AcceptedStudent.department_id' => $department_id))) > 0) {
+        } elseif ($this->AcceptedStudent->find(
+                'count',
+                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->AcceptedStudent->find('count', array('conditions' => array('AcceptedStudent.department_id' => $department_id))) > 0) {
+        } elseif ($this->AcceptedStudent->find(
+                'count',
+                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->AcceptedStudent->find('count', array('conditions' => array('AcceptedStudent.department_id' => $department_id))) > 0) {
+        } elseif ($this->AcceptedStudent->find(
+                'count',
+                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
+            ) > 0) {
             return false;
-        } else if ($this->Staff->find('count', array('conditions' => array('Staff.department_id' => $department_id))) > 0) {
+        } elseif ($this->Staff->find('count', array('conditions' => array('Staff.department_id' => $department_id))
+            ) > 0) {
             return false;
         } else {
             return true;
@@ -310,7 +381,7 @@ class DepartmentsTable extends Table
                     )
                 )
             ));
-        } else if (!empty($privilaged_collage_ids)) {
+        } elseif (!empty($privilaged_collage_ids)) {
             $departments_data = $this->College->find('all', array(
                 'conditions' => array(
                     'College.id' => $privilaged_collage_ids,
@@ -349,20 +420,28 @@ class DepartmentsTable extends Table
                     if (!empty($privilaged_collage_ids) && !is_array($privilaged_collage_ids) && is_numeric($privilaged_collage_ids) && $college_and_department['College']['id'] == $privilaged_collage_ids) {
                         //for College role
                         $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } else if (!empty($privilaged_department_ids) && !empty($privilaged_collage_ids) && is_array($privilaged_collage_ids) && in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
+                    } elseif (!empty($privilaged_department_ids) && !empty($privilaged_collage_ids) && is_array(
+                            $privilaged_collage_ids
+                        ) && in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
                         $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } else if (!empty($privilaged_collage_ids) && is_array($privilaged_collage_ids) && in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
+                    } elseif (!empty($privilaged_collage_ids) && is_array($privilaged_collage_ids) && in_array(
+                            $college_and_department['College']['id'],
+                            $privilaged_collage_ids
+                        )) {
                         $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } else if (!empty($privilaged_department_ids) && empty($privilaged_collage_ids)) {
+                    } elseif (!empty($privilaged_department_ids) && empty($privilaged_collage_ids)) {
                         //for department or registrar role without college_id passed
                         $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } else if (empty($privilaged_collage_ids) && empty($privilaged_department_ids)) {
+                    } elseif (empty($privilaged_collage_ids) && empty($privilaged_department_ids)) {
                         // other roles than colllege, department & registrar
                         $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
                     }
                     // end Added By neway
                     //$departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                } else if (is_array($privilaged_department_ids) && in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
+                } elseif (is_array($privilaged_department_ids) && in_array(
+                        $college_and_department['College']['id'],
+                        $privilaged_collage_ids
+                    )) {
                     $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'Pre/Freshman/Remedial - ' . $college_and_department['College']['shortname'];
                 }
                 foreach ($college_and_department['Department'] as $key => $department) {
@@ -370,7 +449,7 @@ class DepartmentsTable extends Table
                         if (in_array($department['id'], $privilaged_department_ids)) {
                             $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
                         }
-                    } else if (isset($privilaged_department_id) && $department['id'] == $privilaged_department_ids) {
+                    } elseif (isset($privilaged_department_id) && $department['id'] == $privilaged_department_ids) {
                         debug($department);
                         $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
                     } else {
@@ -432,7 +511,6 @@ class DepartmentsTable extends Table
         }
 
         if (isset($college_id) && !empty($college_id)) {
-
             $departments_data = $this->College->Department->find('all', array(
                 'conditions' => array(
                     'Department.college_id' => $college_id,
@@ -493,7 +571,7 @@ class DepartmentsTable extends Table
                     $departments_organized[$college_and_department['College']['name']]['c~'.$college_and_department['College']['id']] = 'Freshman Program';
                 } */
                 foreach ($college_and_department['Department'] as $key => $department) {
-                    //	if(in_array($department['id'], $privilaged_department_ids)) {
+                    //  if(in_array($department['id'], $privilaged_department_ids)) {
                     $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
                     //  }
                 }
@@ -662,5 +740,4 @@ class DepartmentsTable extends Table
         }
         return $departments_organized;
     }
-
 }

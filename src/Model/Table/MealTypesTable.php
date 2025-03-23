@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class MealTypesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class MealTypesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('meal_types');
@@ -28,8 +31,10 @@ class MealTypesTable extends Table
             'foreignKey' => 'meal_type_id',
         ]);
     }
+
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->notEmptyString('meal_name', 'Meal name should not be empty. Please provide a valid meal name.')
             ->add('meal_name', 'unique', [
@@ -41,14 +46,18 @@ class MealTypesTable extends Table
         return $validator;
     }
 
-    function checkUnique ($data, $fieldName) {
-        $valid=true;
-        if(!isset($this->data['MealType']['id'])){
-            if(isset($fieldName) && $this->hasField($fieldName)) {
+    public function checkUnique($data, $fieldName)
+    {
 
-                $check=$this->find('count',array('conditions'=>array('MealType.meal_name'=>$this->data['MealType']['meal_name'])));
-                if($check>0) {
-                    $valid=false;
+        $valid = true;
+        if (!isset($this->data['MealType']['id'])) {
+            if (isset($fieldName) && $this->hasField($fieldName)) {
+                $check = $this->find(
+                    'count',
+                    array('conditions' => array('MealType.meal_name' => $this->data['MealType']['meal_name']))
+                );
+                if ($check > 0) {
+                    $valid = false;
                 }
             }
         }

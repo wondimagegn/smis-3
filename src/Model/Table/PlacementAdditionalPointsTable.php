@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -99,7 +99,7 @@ class PlacementAdditionalPointsTable extends Table
     {
         debug($data);
         $reformatedData = array();
-        //	$group_identifier = strtotime(date('Y-m-d h:i:sa'));
+        //  $group_identifier = strtotime(date('Y-m-d h:i:sa'));
         if (isset($data) && !empty($data)) {
             $firstData = $data['PlacementAdditionalPoint'][1];
             $findSettingGroup = classRegistry::init('PlacementRoundParticipant')->find("first", array(
@@ -117,20 +117,22 @@ class PlacementAdditionalPointsTable extends Table
             ));
 
             foreach ($data['PlacementAdditionalPoint'] as $dk => $dv) {
+                $isSettingAlreadyRecorded = $this->find('first', array(
+                    'conditions' => array(
+                        'PlacementAdditionalPoint.type' => $firstData['type'],
+                        'PlacementAdditionalPoint.point' => $firstData['point'],
+                        'PlacementAdditionalPoint.round' => $firstData['round'],
+                        'PlacementAdditionalPoint.applied_for' => $firstData['applied_for'],
 
-                $isSettingAlreadyRecorded=$this->find('first',array('conditions'=>array('PlacementAdditionalPoint.type'=>$firstData['type'],
-                    'PlacementAdditionalPoint.point'=>$firstData['point'],
-                    'PlacementAdditionalPoint.round'=>$firstData['round'],
-                    'PlacementAdditionalPoint.applied_for'=>$firstData['applied_for'],
-
-                    'PlacementAdditionalPoint.academic_year'=>$firstData['academic_year'],
-                    'PlacementAdditionalPoint.program_id'=>$firstData['program_id'],
-                    'PlacementAdditionalPoint.program_type_id'=>$firstData['program_type_id'],
+                        'PlacementAdditionalPoint.academic_year' => $firstData['academic_year'],
+                        'PlacementAdditionalPoint.program_id' => $firstData['program_id'],
+                        'PlacementAdditionalPoint.program_type_id' => $firstData['program_type_id'],
                 ),
-                    'recursive'=>-1));
+                    'recursive' => -1
+                ));
                 $reformatedData['PlacementAdditionalPoint'][$dk] = $dv;
-                if(isset($isSettingAlreadyRecorded['PlacementAdditionalPoint']) && !empty($isSettingAlreadyRecorded['PlacementAdditionalPoint'])){
-                    $reformatedData['PlacementAdditionalPoint'][$dk]['id']=$isSettingAlreadyRecorded['PlacementAdditionalPoint']['id'];
+                if (isset($isSettingAlreadyRecorded['PlacementAdditionalPoint']) && !empty($isSettingAlreadyRecorded['PlacementAdditionalPoint'])) {
+                    $reformatedData['PlacementAdditionalPoint'][$dk]['id'] = $isSettingAlreadyRecorded['PlacementAdditionalPoint']['id'];
                 }
 
                 $reformatedData['PlacementAdditionalPoint'][$dk]['group_identifier'] = $findSettingGroup['PlacementRoundParticipant']['group_identifier'];

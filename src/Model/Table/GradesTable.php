@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -79,14 +80,12 @@ class GradesTable extends Table
     function checkGradeIsUnique($data = null)
     {
         if (!empty($data)) {
-
             $frequencey_count = array();
             $point_value_count = array();
 
             // Count the frequency of grade repeation and display invalidation message if grade is duplicated
 
             if (!empty($data['Grade'])) {
-
                 foreach ($data['Grade'] as $grade_id => $grade_value) {
                     $frequencey_count[] = $grade_value['grade'];
                     $point_value_count[] = $grade_value['point_value'];
@@ -104,8 +103,7 @@ class GradesTable extends Table
                     }
                 }
 
-                if ($data['GradeType']['used_in_gpa'] == 1){
-
+                if ($data['GradeType']['used_in_gpa'] == 1) {
                     debug($point_value_count);
                     $how_many_timesPV = array_count_values($point_value_count);
 

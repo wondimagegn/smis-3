@@ -1,69 +1,121 @@
 <?php
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class CampusesController extends AppController
 {
 
+    public $name = 'Campuses';
+    public $menuOptions = array(
+        'parent' => 'mainDatas',
+        'exclude' => array('index'),
+        'weight' => -2,
+        'alias' => array(
+            'add' => 'Add Campus',
+        )
+    );
+
     public function index()
     {
-        $campuses = $this->paginate($this->Campuses);
 
-        $this->set(compact('campuses'));
+        $this->Campus->recursive = 0;
+        $this->set('campuses', $this->paginate());
     }
 
     public function view($id = null)
     {
-        $campus = $this->Campuses->get($id, [
-            'contain' => ['AcceptedStudents', 'ClassRoomBlocks', 'Colleges', 'DormitoryBlocks', 'MealHalls'],
-        ]);
 
-        $this->set('campus', $campus);
+        if (!$id) {
+            $this->Session->setFlash(
+                '<span></span>' . __('Invalid campus'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('campus', $this->Campus->read(null, $id));
     }
 
     public function add()
     {
-        $campus = $this->Campuses->newEntity();
-        if ($this->request->is('post')) {
-            $campus = $this->Campuses->patchEntity($campus, $this->request->getData());
-            if ($this->Campuses->save($campus)) {
-                $this->Flash->success(__('The campus has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        $this->set($this->request->data);
+        if (!empty($this->request->data)) {
+            $this->Campus->create();
+            if ($this->Campus->save($this->request->data)) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The campus has been saved'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The campus could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
             }
-            $this->Flash->error(__('The campus could not be saved. Please, try again.'));
         }
-        $this->set(compact('campus'));
     }
 
     public function edit($id = null)
     {
-        $campus = $this->Campuses->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $campus = $this->Campuses->patchEntity($campus, $this->request->getData());
-            if ($this->Campuses->save($campus)) {
-                $this->Flash->success(__('The campus has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The campus could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(
+                '<span></span>' . __('Invalid campus'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+            return $this->redirect(array('action' => 'index'));
         }
-        $this->set(compact('campus'));
+        if (!empty($this->request->data)) {
+            if ($this->Campus->save($this->request->data)) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The campus has been saved'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' .
+                    __('The campus could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Campus->read(null, $id);
+        }
     }
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $campus = $this->Campuses->get($id);
-        if ($this->Campuses->delete($campus)) {
-            $this->Flash->success(__('The campus has been deleted.'));
-        } else {
-            $this->Flash->error(__('The campus could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid id for campus'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->Campus->delete($id)) {
+            $this->Session->setFlash(
+                '<span></span>' . __('Campus deleted'),
+                'default',
+                array('class' => 'success-box success-message')
+            );
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->Session->setFlash(
+            '<span></span>' . __('Campus was not deleted'),
+            'default',
+            array('class' => 'error-box error-message')
+        );
+        return $this->redirect(array('action' => 'index'));
     }
 }

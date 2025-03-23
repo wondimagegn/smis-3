@@ -1,70 +1,118 @@
 <?php
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class AttachmentsController extends AppController
 {
 
-    public function index()
-    {
-        $attachments = $this->paginate($this->Attachments);
+    public $name = 'Attachments';
 
-        $this->set(compact('attachments'));
+    public $menuOptions = array(
+        'controllerButton' => false,
+        'exclude' => array('*'),
+    );
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+        $this->Auth->allowedActions = array('delete');
     }
 
+    public function index()
+    {
+
+        $this->Attachment->recursive = 0;
+        $this->set('attachments', $this->paginate());
+    }
 
     public function view($id = null)
     {
-        $attachment = $this->Attachments->get($id, [
-            'contain' => [],
-        ]);
 
-        $this->set('attachment', $attachment);
+        if (!$id) {
+            $this->Flash->error(__('Invalid attachment'));
+            return $this->redirect(array('action' => 'index'));
+        }
+
+        $this->set('attachment', $this->Attachment->read(null, $id));
     }
 
     public function add()
     {
-        $attachment = $this->Attachments->newEntity();
-        if ($this->request->is('post')) {
-            $attachment = $this->Attachments->patchEntity($attachment, $this->request->getData());
-            if ($this->Attachments->save($attachment)) {
-                $this->Flash->success(__('The attachment has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->Attachment->create();
+            if ($this->Attachment->save($this->request->data)) {
+                $this->Flash->success(__('The attachment has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Flash->error(__('The attachment could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The attachment could not be saved. Please, try again.'));
         }
-        $this->set(compact('attachment'));
     }
 
     public function edit($id = null)
     {
-        $attachment = $this->Attachments->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $attachment = $this->Attachments->patchEntity($attachment, $this->request->getData());
-            if ($this->Attachments->save($attachment)) {
-                $this->Flash->success(__('The attachment has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The attachment could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Flash->error(__('Invalid attachment'));
+            return $this->redirect(array('action' => 'index'));
         }
-        $this->set(compact('attachment'));
+
+        if (!empty($this->request->data)) {
+            if ($this->Attachment->save($this->request->data)) {
+                $this->Flash->success(__('The attachment has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Flash->error(__('The attachment could not be saved. Please, try again.'));
+            }
+        }
+
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Attachment->read(null, $id);
+        }
     }
 
-    public function delete($id = null)
+    public function delete($id = null, $action_controller_id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $attachment = $this->Attachments->get($id);
-        if ($this->Attachments->delete($attachment)) {
-            $this->Flash->success(__('The attachment has been deleted.'));
-        } else {
-            $this->Flash->error(__('The attachment could not be deleted. Please, try again.'));
+
+        $attachment_detail = explode('~', $action_controller_id);
+
+        if (!$id) {
+            $this->Flash->error(__('Invalid Attachment ID'));
+            if (!empty($attachment_detail[0]) && !empty($attachment_detail[1]) && !empty($attachment_detail[2])) {
+                return $this->redirect(
+                    array(
+                        'controller' => $attachment_detail[1],
+                        'action' => $attachment_detail[0],
+                        $attachment_detail[2]
+                    )
+                );
+            }
         }
 
-        return $this->redirect(['action' => 'index']);
+
+        if ($this->Attachment->delete($id)) {
+            $this->Flash->success(__('Attachment deleted successfully.'));
+            if (!empty($attachment_detail[0]) && !empty($attachment_detail[1]) && !empty($attachment_detail[2])) {
+                $this->redirect(
+                    array(
+                        'controller' => $attachment_detail[1],
+                        'action' => $attachment_detail[0],
+                        $attachment_detail[2]
+                    )
+                );
+            }
+        }
+
+        if (!empty($attachment_detail[0]) && !empty($attachment_detail[1]) && !empty($attachment_detail[2])) {
+            $this->Flash->error(__('Attachment can not be deleted.'));
+            $this->redirect(
+                array('controller' => $attachment_detail[1], 'action' => $attachment_detail[0], $attachment_detail[2])
+            );
+        }
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -114,7 +115,7 @@ class PlacementDeadlinesTable extends Table
             if ($status['PlacementDeadline']['deadline'] > date("Y-m-d H:i:s")) {
                 // deined not passed
                 return 1;
-            } else if ($status['PlacementDeadline']['deadline'] < date("Y-m-d H:i:s")) {
+            } elseif ($status['PlacementDeadline']['deadline'] < date("Y-m-d H:i:s")) {
                 //defined and passed
                 return 2;
             }
@@ -125,7 +126,6 @@ class PlacementDeadlinesTable extends Table
     public function isDuplicated($data = array())
     {
         if (isset($data) && !empty($data)) {
-
             if (isset($data['PlacementDeadline']['id'])) {
                 $definedCount = $this->find("count", array(
                     'conditions' => array(

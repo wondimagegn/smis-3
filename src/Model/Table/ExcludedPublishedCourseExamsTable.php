@@ -1,13 +1,14 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class ExcludedPublishedCourseExamsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +17,7 @@ class ExcludedPublishedCourseExamsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('excluded_published_course_exams');
@@ -36,6 +38,7 @@ class ExcludedPublishedCourseExamsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -52,19 +55,47 @@ class ExcludedPublishedCourseExamsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
 
         return $rules;
     }
 
 
-    function beforeDeleteCheckEligibility($id=null,$college_id=null){
-        $department_ids = $this->PublishedCourse->Department->find('list',array('fields'=>array('Department.id','Department.id'),'conditions'=>array('Department.college_id'=>$college_id)));
-        $published_course_ids = $this->PublishedCourse->find('list', array('fields'=>array('PublishedCourse.id','PublishedCourse.id'), 'conditions'=>array("OR"=>array('PublishedCourse.college_id'=>$college_id,'PublishedCourse.department_id'=>$department_ids))));
-        $count = $this->find('count',array('conditions'=>array('ExcludedPublishedCourseExam.published_course_id'=>$published_course_ids, 'ExcludedPublishedCourseExam.id'=>$id)));
-        if($count >0){
+    public function beforeDeleteCheckEligibility($id = null, $college_id = null)
+    {
+
+        $department_ids = $this->PublishedCourse->Department->find(
+            'list',
+            array(
+                'fields' => array('Department.id', 'Department.id'),
+                'conditions' => array('Department.college_id' => $college_id)
+            )
+        );
+        $published_course_ids = $this->PublishedCourse->find(
+            'list',
+            array(
+                'fields' => array('PublishedCourse.id', 'PublishedCourse.id'),
+                'conditions' => array(
+                    "OR" => array(
+                        'PublishedCourse.college_id' => $college_id,
+                        'PublishedCourse.department_id' => $department_ids
+                    )
+                )
+            )
+        );
+        $count = $this->find(
+            'count',
+            array(
+                'conditions' => array(
+                    'ExcludedPublishedCourseExam.published_course_id' => $published_course_ids,
+                    'ExcludedPublishedCourseExam.id' => $id
+                )
+            )
+        );
+        if ($count > 0) {
             return true;
-        } else{
+        } else {
             return false;
         }
     }

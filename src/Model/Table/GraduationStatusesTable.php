@@ -1,8 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
@@ -67,11 +66,9 @@ class GraduationStatusesTable extends Table
         ));
 
         if (!empty($student_detail) && !empty($exam_status_detail)) {
-
             $options = array();
 
             if (isset($student_detail['GraduateList']) && $student_detail['GraduateList']['id'] != "") {
-
                 $options['conditions'] = array('GraduationStatus.cgpa <= ' . $exam_status_detail['StudentExamStatus']['cgpa']);
                 $options['conditions']['OR'][0] = array('GraduationStatus.academic_year <= ' . substr($student_detail['Student']['admissionyear'], 0, 4));
                 $options['conditions']['OR'][1] = array(
@@ -79,7 +76,6 @@ class GraduationStatusesTable extends Table
                     'GraduationStatus.program_id' => $student_detail['Student']['program_id'],
                     'GraduationStatus.academic_year <= ' . substr($student_detail['GraduateList']['graduate_date'], 0, 4)
                 );
-
             } else {
                 $options['conditions'] = array(
                     'GraduationStatus.academic_year <= ' . substr($student_detail['Student']['admissionyear'], 0, 4),

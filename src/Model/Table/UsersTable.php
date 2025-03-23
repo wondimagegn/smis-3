@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Model\Table;
+
 use Acl\Controller\Component\AclComponent;
 use Cake\Core\Configure;
 use Cake\ORM\Query;
@@ -21,8 +23,7 @@ use Cake\Controller\ComponentRegistry;
 use Cake\Acl;
 use Cake\Utility\Inflector; // Import Inflector from the correct namespace
 
-
-
+use Cake\Cache\Cache;
 
 class UsersTable extends Table
 {
@@ -113,9 +114,6 @@ class UsersTable extends Table
 
       //  $this->addBehavior('Acl.Acl', ['requester']);
         $this->addBehavior('Acl.Acl', ['type' => 'requester']);
-
-
-
     }
 
 
@@ -144,7 +142,6 @@ class UsersTable extends Table
             $entity->password = (new DefaultPasswordHasher())->hash($entity->password);
         }
         return true;
-
     }
 
     /**
@@ -231,7 +228,9 @@ class UsersTable extends Table
                     'Students.graduated' => 0,
                 ])
                 ->where(function ($exp, $q) {
-                    return $exp->in('Students.id',
+
+                    return $exp->in(
+                        'Students.id',
                         $q->newExpr()->add('SELECT student_id FROM students_sections WHERE archive = 0')
                     );
                 });
@@ -397,14 +396,28 @@ class UsersTable extends Table
         // ereg function was DEPRECATED in PHP 5.3.0, and REMOVED in PHP 7.0.0. using preg_match()
         if (!empty($securitysetting)) {
             if ($securitysetting['password_strength'] == 1) { //Medium
-                if (!preg_match('/[a-z]/', $password)) return false;
-                if (!preg_match('/[A-Z]/', $password)) return false;
-                if (!preg_match('/[0-9]/', $password)) return false;
+                if (!preg_match('/[a-z]/', $password)) {
+                    return false;
+                }
+                if (!preg_match('/[A-Z]/', $password)) {
+                    return false;
+                }
+                if (!preg_match('/[0-9]/', $password)) {
+                    return false;
+                }
             } else { //Strong
-                if (!preg_match('/[a-z]/', $password)) return false;
-                if (!preg_match('/[A-Z]/', $password)) return false;
-                if (!preg_match('/[0-9]/', $password)) return false;
-                if (!preg_match('/[!,@,#,$,%,^,&,*,?,_,~,-,(,)]/', $password)) return false;
+                if (!preg_match('/[a-z]/', $password)) {
+                    return false;
+                }
+                if (!preg_match('/[A-Z]/', $password)) {
+                    return false;
+                }
+                if (!preg_match('/[0-9]/', $password)) {
+                    return false;
+                }
+                if (!preg_match('/[!,@,#,$,%,^,&,*,?,_,~,-,(,)]/', $password)) {
+                    return false;
+                }
             }
         } else {
             return false;
@@ -425,199 +438,7 @@ class UsersTable extends Table
         if (!$userId) {
             return [];
         }
-
-        // Load ACL component
-        $registry = new ComponentRegistry();
-        $acl = new AclComponent($registry);
-
-        // Load the Aros table
-        $ArosTable = TableRegistry::getTableLocator()->get('Aros');
-
-        // Get user and role AROs
-        $aroUser = $ArosTable->find()
-            ->where(['model' => 'Users', 'foreign_key' => $userId])
-            ->first();
-
-        $user = $this->get($userId, ['contain' => ['Roles']]);
-        $aroRole = $ArosTable->find()
-            ->where(['model' => 'Roles', 'foreign_key' => $user->role_id])
-            ->first();
-
-        // Create user ARO if it doesn’t exist and role ARO is present
-        if (!$aroUser && $aroRole) {
-            $aroUser = $ArosTable->newEntity([
-                'parent_id' => $aroRole->id,
-                'model' => 'Users',
-                'foreign_key' => $userId,
-                'alias' => 'User-' . $userId
-            ]);
-            if (!$ArosTable->save($aroUser)) {
-                $this->log('Failed to save user ARO for user ID ' . $userId, 'error');
-                return ['UserLevel' => [], 'RoleLevel' => []];
-            }
-        }
-
-
-        // Get all controllers and actions
-        $controllers = $this->getAllControllers();
-        $permissions = [];
-        $reformatePermission = [];
-
-        foreach ($controllers as $controller) {
-            $actions = $this->getControllerActions($controller);
-
-            foreach ($actions as $action) {
-                $acoPath = "controllers/" . Inflector::camelize($controller) . "/{$action}";
-                if ($aroUser && $acl->check(
-                        ['model' => 'Users', 'foreign_key' => $userId],
-                        $acoPath
-                    )) {
-                    $permissions[] = $acoPath;
-                }
-                if ($aroRole && $acl->check(
-                        ['model' => 'Roles', 'foreign_key' => $user->role_id],
-                        $acoPath
-                    )) {
-                    $permissions[] = $acoPath;
-                }
-
-
-            }
-        }
-
-        // Special permissions for admin/sysadmin
-        if ($user->is_admin || $user->role_id === ROLE_SYSADMIN) {
-            $adminPermissions = [
-                'controllers/Securitysettings/permission_management',
-                'controllers/Securitysettings/index',
-                'controllers/Acls/Permissions/add',
-                'controllers/Acls/Permissions/delete',
-                'controllers/Acls/Permissions/index',
-                'controllers/Acls/Permissions/edit',
-                'controllers/Acls/Acos/index',
-                'controllers/Acls/Acls/index',
-                'controllers/Users/index'
-            ];
-
-
-            if ($user->role_id === Configure::read('Roles.REGISTRAR') ||
-                $user->role_id === Configure::read('Roles.SYSADMIN')) {
-                $adminPermissions[] = 'controllers/Users/responsible';
-            }
-            if ($user->role_id === Configure::read('Roles.DEPARTMENT') ) {
-                $adminPermissions[] = 'controllers/Users/department_create_user_account';
-            }
-            if ($user->role_id === Configure::read('Roles.SYSADMIN') ) {
-                $adminPermissions[] = 'controllers/Users/add';
-            }
-            if (Configure::read('Developer')) {
-                $adminPermissions = array_merge($adminPermissions, [
-                    'controllers/Acls/Acos/add',
-                    'controllers/Acls/Acos/edit',
-                    'controllers/Acls/Acos/delete',
-                    'controllers/Acls/Acos/rebuild'
-                ]);
-            }
-            $permissions = array_merge($permissions, $adminPermissions);
-        }
-
-        $permissions[] = 'controllers/Dashboard/index';
-
-        $permissions = array_unique($permissions);
-
-        // Reformat permissions for menu construction with no duplicates and conditional index
-        foreach ($permissions as $perm) {
-            $parts = explode('/', $perm);
-            if (count($parts) <= 2 || $parts[0] !== 'controllers') {
-                continue;
-            }
-
-            $controllerName = $parts[1];
-            $actionName = $parts[2];
-
-            // Skip Acls controller actions from reformatting
-            if ($controllerName === 'Acls') {
-                continue;
-            }
-
-            // Handle student-specific restrictions
-            if ($user->role_id === Configure::read('Roles.STUDENT')) {
-                $student = $user->students[0] ?? null;
-                $acceptedStudent = $student->accepted_students[0] ?? null;
-                if ($acceptedStudent && $acceptedStudent->placementtype === 'REGISTRAR PLACED' &&
-                    in_array($controllerName, ['Preferences', 'AcceptedStudents'])) {
-                    continue;
-                }
-                if ($acceptedStudent && empty($acceptedStudent->placementtype) &&
-                    $acceptedStudent->placement_approved_by_department && $controllerName === 'Preferences') {
-                    continue;
-                }
-            }
-
-            // Initialize controller actions if not set
-            if (!isset($reformatePermission[$controllerName]['action'])) {
-                $reformatePermission[$controllerName]['action'] = [];
-            }
-
-            // Add action only if not already present
-            if (!in_array($actionName, $reformatePermission[$controllerName]['action'])) {
-                $reformatePermission[$controllerName]['action'][] = $actionName;
-            }
-        }
-
-        // Add 'index' automatically only if other actions exist (excluding Acls)
-
-        foreach ($reformatePermission as $controller => &$data) {
-            $actions = array_filter($data['action'], function ($action) {
-                return $action !== 'index';
-            });
-            if (!empty($actions) && !in_array('index', $data['action']) && $controller !== 'Acls') {
-                $data['action'][] = 'index';
-                $permissions[] = "controllers/$controller/index";
-            }
-        }
-
-
-
-        // Handle equivalent ACLs
-        $equivalentACL = Configure::read('ACL.equivalentACL');
-        if (is_array($equivalentACL)) {
-            foreach ($equivalentACL as $parent => $childAcls) {
-                foreach ($childAcls as $childAcl) {
-                    $checking = explode('/', $childAcl);
-                    $parentParts = explode('/', $parent);
-
-                    if ($checking[1] === '*' && isset($reformatePermission[$checking[0]]['action'])) {
-                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
-                    } elseif (isset($reformatePermission[$checking[0]]['action']) && in_array($checking[1], $reformatePermission[$checking[0]]['action'])) {
-                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
-                    }
-                }
-            }
-        }
-
-        // Handle equivalent ACLs
-        $equivalentACL = Configure::read('ACL.equivalentACL');
-        if (is_array($equivalentACL)) {
-            foreach ($equivalentACL as $parent => $childAcls) {
-                foreach ($childAcls as $childAcl) {
-                    $checking = explode('/', $childAcl);
-                    $parentParts = explode('/', $parent);
-
-                    if ($checking[1] === '*' && isset($reformatePermission[$checking[0]]['action'])) {
-                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
-                    } elseif (isset($reformatePermission[$checking[0]]['action']) && in_array($checking[1], $reformatePermission[$checking[0]]['action'])) {
-                        $this->addEquivalentPermissions($checking[0], $parentParts[0], $reformatePermission, $permissions);
-                    }
-                }
-            }
-        }
-
-        return [
-            'permission' => array_unique($permissions),
-            'reformatePermission' => $reformatePermission
-        ];
-
+        return $this->getOrganizedPermissions($userId);
     }
 
     /**
@@ -796,11 +617,11 @@ class UsersTable extends Table
         if (!empty($search_params['User']['name'])) {
             $options['conditions'][] = array(
                 "OR" => array(
-                    'User.first_name LIKE ' =>  '%'. (trim($search_params['User']['name'])) . '%',
-                    'User.last_name LIKE ' =>  '%'. (trim($search_params['User']['name'])) . '%',
-                    'User.middle_name LIKE ' =>  '%'.( trim($search_params['User']['name'])) . '%',
-                    'User.username LIKE' =>  '%'. (trim($search_params['User']['name'])) . '%',
-                    'User.email LIKE' =>  '%'. (trim($search_params['User']['name'])) . '%',
+                    'User.first_name LIKE ' => '%' . (trim($search_params['User']['name'])) . '%',
+                    'User.last_name LIKE ' => '%' . (trim($search_params['User']['name'])) . '%',
+                    'User.middle_name LIKE ' => '%' . (trim($search_params['User']['name'])) . '%',
+                    'User.username LIKE' => '%' . (trim($search_params['User']['name'])) . '%',
+                    'User.email LIKE' => '%' . (trim($search_params['User']['name'])) . '%',
                 )
             );
         }
@@ -808,7 +629,7 @@ class UsersTable extends Table
         if (!empty($department_id) && $role_id == ROLE_DEPARTMENT) {
             //$options['conditions'][] = array('User.id IN (select user_id from staffs where department_id = ' . $department_id . ')');
             $options['conditions'][] = array('User.id IN (select user_id from staffs where department_id = ' . $department_id . ' and active = ' . $search_params['Staff']['active'] . ')');
-        } else if (!empty($college_id) && $role_id == ROLE_COLLEGE) {
+        } elseif (!empty($college_id) && $role_id == ROLE_COLLEGE) {
             //$options['conditions'][] = array('User.id IN (select user_id from staffs where college_id = ' . $college_id . ')');
             $options['conditions'][] = array('User.id IN (select user_id from staffs where college_id = ' . $college_id . ' and active = ' . $search_params['Staff']['active'] . ')');
         } else {
@@ -884,7 +705,7 @@ class UsersTable extends Table
         }
 
         // Prepare hashed password
-        $hashedPassword = (new DefaultPasswordHasher)->hash(trim($commonPassword));
+        $hashedPassword = (new DefaultPasswordHasher())->hash(trim($commonPassword));
 
         // Collect user IDs to update
         $userIds = [];
@@ -913,8 +734,8 @@ class UsersTable extends Table
         $acceptedStudentsTable = TableRegistry::getTableLocator()->get('AcceptedStudents');
 
         // Get the admission year conversion
-        $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
-        $admissionYearConverted = $AcademicYear->get_academicYearBegainingDate($academicYear);
+        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
+        $admissionYearConverted = $AcademicYear->getAcademicYearBegainingDate($academicYear);
 
         // Build query conditions dynamically
         $conditions = [
@@ -942,7 +763,7 @@ class UsersTable extends Table
         }
 
         // Prepare user accounts for batch insert
-        $hashedPassword = (new DefaultPasswordHasher)->hash(trim($commonPassword));
+        $hashedPassword = (new DefaultPasswordHasher())->hash(trim($commonPassword));
         $newUsers = [];
         $studentUpdates = [];
         $acceptedStudentUpdates = [];
@@ -998,7 +819,7 @@ class UsersTable extends Table
         $usersTable = TableRegistry::getTableLocator()->get('Users');
 
         $generatedPassword = $this->generateRandomPassword(8);
-        $hashedPassword = (new DefaultPasswordHasher)->hash($generatedPassword);
+        $hashedPassword = (new DefaultPasswordHasher())->hash($generatedPassword);
 
         // Check if the mobile number belongs to a student
         $student = $studentsTable->find()
@@ -1366,7 +1187,6 @@ class UsersTable extends Table
             ->contain(['Roles'])
             ->select(['id', 'role_id', 'username', 'is_admin', 'email_verified'])
             ->first();
-
         if (!$user) {
             return [];
         }
@@ -1376,7 +1196,11 @@ class UsersTable extends Table
         if ($user->role_id == Configure::read('Roles.STUDENT')) {
             $userDetails += $this->getStudentDetails($userId);
         } else {
-            $userDetails += $this->getStaffDetails($userId, $user->role_id, $user->is_admin);
+
+            $userDetails =array_merge($userDetails,$this->getStaffDetails($userId, $user->role_id, $user->is_admin));
+
+
+
         }
 
         return $userDetails;
@@ -1418,13 +1242,12 @@ class UsersTable extends Table
             $applicableAssignments['last_section'] = $studentSection->section;
         }
 
-        return ['ApplicableAssignments' => $applicableAssignments];
+        return ['ApplicableAssignments' => $applicableAssignments, 'Student' => $student->toArray()];
     }
 
     private function getStaffDetails($userId, $roleId, $isAdmin)
     {
         $staffTable = TableRegistry::getTableLocator()->get('Staffs');
-        debug($staffTable);
 
         $staff = $staffTable->find()
             ->where(['Staffs.user_id' => $userId])
@@ -1433,6 +1256,7 @@ class UsersTable extends Table
                 'Departments' => ['fields' => ['id', 'name']]
             ])
             ->first();
+
 
         if (!$staff) {
             return [];
@@ -1453,11 +1277,16 @@ class UsersTable extends Table
             'year_level_names' => []
         ];
 
-        if (in_array($roleId, [
+
+        if (
+            in_array($roleId, [
             Configure::read('Roles.REGISTRAR'),
             Configure::read('Roles.MEAL'),
             Configure::read('Roles.ACCOMODATION')
-        ])) {
+            ])
+        ) {
+
+
             if ($isAdmin) {
                 $applicableAssignments['program_ids'] = $activePrograms;
                 $applicableAssignments['program_type_ids'] = $activeProgramTypes;
@@ -1469,7 +1298,9 @@ class UsersTable extends Table
                     ->toArray();
                 $applicableAssignments['year_level_names'] = [0 => 'Pre'];
             }
-        } else if ($roleId == Configure::read('Roles.COLLEGE')) {
+
+
+        } elseif ($roleId == Configure::read('Roles.COLLEGE')) {
             $applicableAssignments['college_ids'] = [$staff->college->id => $staff->college->id];
 
             if (!$isAdmin) {
@@ -1478,7 +1309,7 @@ class UsersTable extends Table
                 $applicableAssignments['college_permission'] = 1;
                 $applicableAssignments['year_level_names'] = [0 => 'Pre'];
             }
-        } else if ($roleId == Configure::read('Roles.DEPARTMENT')) {
+        } elseif ($roleId == Configure::read('Roles.DEPARTMENT')) {
             $applicableAssignments['department_ids'] = [$staff->department->id => $staff->department->id];
             $applicableAssignments['program_ids'] = $activePrograms;
             $applicableAssignments['program_type_ids'] = $activeProgramTypes;
@@ -1493,7 +1324,12 @@ class UsersTable extends Table
                 ->toArray();
         }
 
-        return ['ApplicableAssignments' => $applicableAssignments];
+        $result['ApplicableAssignments']=$applicableAssignments;
+        $result['Staff']=$staff->toArray();
+
+        return $result;
+
+      //  return ['ApplicableAssignments' => $applicableAssignments, 'Staff' => $staff->toArray()];
     }
     public function getEquivalentProgramTypes($program_type_id = 0)
     {
@@ -1515,5 +1351,486 @@ class UsersTable extends Table
 
         return $programTypesToLook;
     }
+
+
+    public function getOrganizedPermissions($userId)
+    {
+
+        // Retrieve the user record to determine admin status and role.
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $user = $usersTable->get($userId);
+        $isAdmin = $user->is_admin;
+        $userRoleId = $user->role_id;
+
+        // Build a userDetail array. If you have additional student details, merge them here.
+        // For example, if the Student model is associated with Users, you might load it.
+
+        $userDetail = ['User' => $user->toArray()];
+        if ($userRoleId == ROLE_STUDENT) {
+            $studentsTable = TableRegistry::getTableLocator()->get('Students');
+            $student = $studentsTable->find()
+                ->contain(['AcceptedStudent', 'User'])
+                ->where(['user_id' => $userId])
+                ->first();
+            $userDetail = $student->toArray();
+        }
+
+        $allowedRoleIds = Configure::read('PermissionByRole.allowedRoleIds');
+        $mergePermissions = $isAdmin || in_array($userRoleId, $allowedRoleIds);
+
+
+        $arosTable = TableRegistry::getTableLocator()->get('Aros');
+        $directQuery = $arosTable->find();
+        $directQuery->select([
+            'aco_id' => 'acos.id',
+            'alias' => 'acos.alias',
+            'parent_alias' => 'ParentAcos.alias',
+            '_create' => 'aros_acos._create',
+            // Mark as a direct (user-level) permission.
+            'source' => $directQuery->newExpr("'User'")
+        ])
+            ->innerJoin('aros_acos', 'Aros.id = aros_acos.aro_id')
+            ->innerJoin('acos', 'aros_acos.aco_id = acos.id')
+            ->innerJoin(['ParentAcos' => 'acos'], 'acos.parent_id = ParentAcos.id')
+            ->where([
+                'Aros.model' => 'Users',
+                'Aros.foreign_key' => $userId
+            ]);
+
+        // --- Role-Based Permissions Query ---
+        $roleQuery = $arosTable->find()->from(['UserAro' => 'aros']);
+        $roleQuery->select([
+            'aco_id' => 'acos.id',
+            'alias' => 'acos.alias',
+            'parent_alias' => 'ParentAcos.alias',
+            '_create' => 'aros_acos._create',
+            // Mark as a role-based permission.
+            'source' => $roleQuery->newExpr("'Role'")
+        ])
+            ->innerJoin(['RoleAro' => 'aros'], 'UserAro.parent_id = RoleAro.id')
+            ->innerJoin(['aros_acos' => 'aros_acos'], 'RoleAro.id = aros_acos.aro_id')
+            ->innerJoin(['acos' => 'acos'], 'aros_acos.aco_id = acos.id')
+            ->innerJoin(['ParentAcos' => 'acos'], 'acos.parent_id = ParentAcos.id')
+            ->where([
+                'UserAro.model' => 'Users',
+                'UserAro.foreign_key' => $userId
+            ]);
+
+        // --- Choose final query based on allowed roles ---
+        if ($mergePermissions) {
+            $finalQuery = $directQuery->union($roleQuery);
+            $finalQuery->order([
+                'parent_alias' => 'ASC',
+                'alias' => 'ASC'
+            ]);
+        } else {
+            // For users not in allowed roles (non-admin), only use direct permissions.
+            $finalQuery = $directQuery;
+        }
+
+        $results = $finalQuery->all();
+
+
+        // --- Organize the output from queries ---
+        // We merge allowed routes into "AllowedRoutes" and keep direct-denied routes in "UserLevelDenied".
+        $output = [
+            'AllowedRoutes' => [],
+            'UserLevelDenied' => []
+        ];
+
+        foreach ($results as $row) {
+            // Prepend "controllers/" to parent_alias if not present.
+            if (stripos($row->parent_alias, 'controllers') === false) {
+                $parentAlias = 'controllers/' . $row->parent_alias;
+            } else {
+                $parentAlias = $row->parent_alias;
+            }
+            // Build the full route.
+            $route = $parentAlias . '/' . $row->alias;
+
+            if ($row->source === 'User') {
+                if ((int)$row->_create == 1) {
+                    $output['AllowedRoutes'][] = $route;
+                } elseif ((int)$row->_create == 0) {
+                    $output['UserLevelDenied'][] = $route;
+                }
+            } elseif ($row->source == 'Role') {
+                if ((int)$row->_create === 1) {
+                    $output['AllowedRoutes'][] = $route;
+                }
+            }
+        }
+
+
+        // Remove duplicates.
+        $output['AllowedRoutes'] = array_values(array_unique($output['AllowedRoutes']));
+
+
+        // --- Add additional routes based on extra conditions ---
+        // Start with the current allowed routes.
+        $permissions = $output['AllowedRoutes'];
+
+        // Security modules for non-student users.
+        if (!isset($userDetail['Student']) && ($isAdmin ||
+                $userDetail['User']['role_id'] == ROLE_SYSADMIN)) {
+            if ($userDetail['User']['role_id'] == ROLE_REGISTRAR || ($isAdmin && $userDetail['User']['role_id'] == ROLE_SYSADMIN)) {
+                $permissions[] = "controllers/Users/assign";
+            }
+            if ($userDetail['User']['role_id'] == ROLE_DEPARTMENT) {
+                $permissions[] = "controllers/Users/department_create_user_account";
+            }
+            if ($userDetail['User']['role_id'] != ROLE_DEPARTMENT && $userDetail['User']['role_id'] != ROLE_COLLEGE) {
+                $permissions[] = "controllers/Users/add";
+            }
+            if (Configure::read("Developer")) {
+                $permissions[] = 'controllers/Acls/Acos/add';
+                $permissions[] = 'controllers/Acls/Acos/edit';
+                $permissions[] = 'controllers/Acls/Acos/delete';
+                $permissions[] = 'controllers/Acls/Acos/rebuild';
+            }
+            $permissions[] = 'controllers/Securitysettings/permission_management';
+            $permissions[] = 'controllers/Securitysettings/index';
+            $permissions[] = 'controllers/Acls/Permissions/add';
+            $permissions[] = 'controllers/Acls/Permissions/delete';
+            $permissions[] = 'controllers/Acls/Permissions/index';
+            $permissions[] = 'controllers/Acls/Permissions/edit';
+            $permissions[] = 'controllers/Acls/Acos/index';
+            $permissions[] = 'controllers/Acls/Acls/index';
+            $permissions[] = 'controllers/Users/index';
+        }
+
+        if ($userDetail['User']['role_id'] == ROLE_CLEARANCE) {
+            $permissions[] = "controllers/TakenProperties/add";
+            $permissions[] = "controllers/TakenProperties/edit";
+            $permissions[] = "controllers/TakenProperties/delete";
+            $permissions[] = "controllers/TakenProperties/returned_property";
+        }
+
+        // Common routes.
+        $permissions[] = 'controllers/Dashboard/index';
+        $permissions[] = 'controllers/Helps/index';
+
+        // Remove duplicates.
+        $permissions = array_values(array_unique($permissions));
+
+        // Remove duplicates from additional permissions.
+        $permissions = array_values(array_unique($permissions));
+
+        // --- Auto-add "index" for controllers that have at least one allowed action ---
+        // For each allowed route, extract the controller part (the second segment)
+        // and ensure that "controllers/ControllerName/index" exists.
+        $finalPermissions = $permissions; // start with current allowed routes
+        $controllers = [];
+        foreach ($permissions as $perm) {
+            // Expected format: "controllers/ControllerName/Action"
+            $parts = explode('/', $perm);
+            if (count($parts) >= 3) {
+                $controller = $parts[1]; // second segment
+                $controllers[$controller] = true;
+            }
+        }
+        // Now, for each controller, check if "controllers/ControllerName/index" exists.
+        foreach (array_keys($controllers) as $controller) {
+            $indexRoute = "controllers/{$controller}/index";
+            if (!in_array($indexRoute, $finalPermissions)) {
+                $finalPermissions[] = $indexRoute;
+            }
+        }
+
+        // Re-index and sort if desired.
+        sort($finalPermissions);
+
+
+        // --- Reformat the permission list for menu construction ---
+        $reformatePermission = [];
+        foreach ($finalPermissions as $in => $controller) {
+            // Explode into segments (expected format: controllers/ControllerName/Action).
+            $tmController = explode('/', $controller);
+
+            // Skip empty values.
+            if (!isset($controller) || empty($controller)) {
+                unset($finalPermissions[$in]);
+                continue;
+            }
+
+            // If the user is a student, apply additional filtering.
+            if ($userDetail['User']['role_id'] == ROLE_STUDENT &&
+                isset($userDetail['Student'][0]['AcceptedStudent']['id'])) {
+                // If placement type is "REGISTRAR PLACED", remove Preferences and AcceptedStudents actions.
+                if ($userDetail['Student'][0]['AcceptedStudent']['placementtype'] == "REGISTRAR PLACED") {
+                    if (count($tmController) > 2 &&
+                        $tmController[0] == 'controllers' &&
+                        (strcasecmp($tmController[1], 'Preferences') === 0 ||
+                            strcasecmp($tmController[1], 'AcceptedStudents') === 0)) {
+                        unset($finalPermissions[$in]);
+                        continue;
+                    }
+                } // Else if placement type is empty and certain conditions are met, remove Preferences.
+                else {
+                    if (empty($userDetail['Student'][0]['AcceptedStudent']['placementtype'])) {
+                        if (isset($userDetail['Student'][0]) &&
+                            !empty($userDetail['Student'][0]) &&
+                            !empty($userDetail['Student'][0]['AcceptedStudent']['department_id']) &&
+                            $userDetail['Student'][0]['AcceptedStudent']['Placement_Approved_By_Department'] == 1 &&
+                            !empty($userDetail['Student'][0]['curriculum_id'])) {
+                            if (count($tmController) > 2 &&
+                                $tmController[0] == 'controllers' &&
+                                strcasecmp($tmController[1], 'Preferences') === 0) {
+                                unset($finalPermissions[$in]);
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remove course exemption and course substitution requests for student role.
+            if ($userDetail['User']['role_id'] == ROLE_STUDENT &&
+                (count($tmController) > 2 && $tmController[0] == 'controllers' &&
+                    (strcasecmp($tmController[1], 'CourseExemptions') === 0 ||
+                        strcasecmp($tmController[1], 'CourseSubstitutionRequests') === 0))) {
+                unset($finalPermissions[$in]);
+                continue;
+            }
+
+            // Remove PlacementParticipatingStudents from the menu list.
+            if (count($tmController) > 2 &&
+                $tmController[0] == 'controllers' &&
+                strcasecmp($tmController[1], 'PlacementParticipatingStudents') === 0) {
+                unset($finalPermissions[$in]);
+                continue;
+            }
+
+            // Build the reformatted array for menu construction.
+            if (count($tmController) > 2 && $tmController[0] == 'controllers' && $tmController[2] != 'Acls') {
+                $reformatePermission[$tmController[1]]['action'][] = $tmController[2];
+            }
+        }
+
+        // Optionally sort the reformatted array by controller name.
+        ksort($reformatePermission);
+
+        //include index automatically if any of the controller action is allowed
+
+        if (!empty($reformatePermission)) {
+            foreach ($reformatePermission as $c => &$a) {
+                if (!in_array('index', $a['action']) && !strcmp($c, "Acls") == 0) {
+                    $a['action'][] = 'index';
+                    $permissions[] = 'controllers' . DS . $c . DS . 'index';
+                }
+            }
+        }
+
+
+        // Handle equivalent ACLs
+        $equivalentACL = Configure::read('ACL.equivalentACL');
+        if (is_array($equivalentACL)) {
+            foreach ($equivalentACL as $parent => $childAcls) {
+                foreach ($childAcls as $childAcl) {
+                    $checking = explode('/', $childAcl);
+                    $parentParts = explode('/', $parent);
+
+                    if ($checking[1] === '*' && isset($reformatePermission[$checking[0]]['action'])) {
+                        $this->addEquivalentPermissions(
+                            $checking[0],
+                            $parentParts[0],
+                            $reformatePermission,
+                            $permissions
+                        );
+                    } elseif (isset($reformatePermission[$checking[0]]['action']) && in_array(
+                            $checking[1],
+                            $reformatePermission[$checking[0]]['action']
+                        )) {
+                        $this->addEquivalentPermissions(
+                            $checking[0],
+                            $parentParts[0],
+                            $reformatePermission,
+                            $permissions
+                        );
+                    }
+                }
+            }
+        }
+
+        $result['permission'] = $permissions;
+        $result['reformatePermission'] = $reformatePermission;
+
+        //debug($result);
+
+        if ($userDetail['User']['role_id'] == ROLE_STUDENT) {
+
+
+            if (!empty($result['reformatePermission']['CourseRegistrations']['action']) &&
+                is_array($result['reformatePermission']['CourseRegistrations']['action'])) {
+                foreach ($result['reformatePermission']['CourseRegistrations']['action'] as $key => $value) {
+                    if (strcasecmp($value, 'register_individual_course') == 0) {
+                        unset($result['reformatePermission']['CourseRegistrations']['action'][$key]);
+                    }
+                }
+            }
+
+            if (!empty($result['reformatePermission']['Readmissions']['action']) &&
+                is_array($result['reformatePermission']['Readmissions']['action'])) {
+                foreach ($result['reformatePermission']['Readmissions']['action'] as $key => $value) {
+                    if (strcasecmp($value, 'apply') == 0) {
+                        unset($result['reformatePermission']['Readmissions']['action'][$key]);
+                    }
+                }
+            }
+
+            if (!empty($result['permission']) && is_array($result['permission'])) {
+                foreach ($result['permission'] as $key => $value) {
+                    if (strcasecmp($value, 'controllers/CourseRegistrations/register_individual_course') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+                }
+            }
+        }
+
+        if ($userDetail['User']['role_id'] == ROLE_COLLEGE) {
+            if (!empty($result['permission']) && is_array($result['permission'])) {
+                foreach ($result['permission'] as $key => $value) {
+                    if (strcasecmp($value, 'controllers/courseInstructorAssignments/assign_course_instructor') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+
+                    if (strcasecmp($value, 'controllers/Clearances/add') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+
+                    if (strcasecmp($value, 'controllers/Clearances/approve_clearance') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+
+                    if (strcasecmp($value, 'controllers/Clearances/withdraw_management') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+                }
+            }
+
+        }
+
+        if ($userDetail['User']['role_id'] == ROLE_DEPARTMENT) {
+
+
+            if (!empty($result['permission']) && is_array($result['permission'])) {
+                foreach ($result['permission'] as $key => $value) {
+                    if (strcasecmp($value, 'controllers/Clearances/add') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+
+                    if (strcasecmp($value, 'controllers/Clearances/approve_clearance') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+
+                    if (strcasecmp($value, 'controllers/Clearances/withdraw_management') == 0) {
+                        unset($result['permission'][$key]);
+                    }
+                }
+            }
+        }
+
+        if (!empty($result['permission'])) {
+            $result['permission'] = array_unique($result['permission']);
+            //debug($result['permission']);
+        }
+
+        if (!empty($result['reformatePermission'])) {
+            ksort($result['reformatePermission']);
+        }
+
+
+        return $result;
+
+
+    }
+
+    public function getFilteredPermissions($userId)
+    {
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $arosTable = TableRegistry::getTableLocator()->get('Aros');
+
+        // Retrieve user info
+        $user = $usersTable->get($userId);
+        $isAdmin = $user->is_admin;
+        $userRoleId = $user->role_id;
+
+        $allowedRoleIds = Configure::read('PermissionByRole.allowedRoleIds');
+        $mergePermissions = $isAdmin || in_array($userRoleId, $allowedRoleIds);
+
+        // --- Direct User Permissions Query ---
+        $directQuery = $arosTable->find();
+        $directQuery->select([
+            'aco_id'       => 'acos.id',
+            'alias'        => 'acos.alias',
+            'parent_alias' => 'ParentAcos.alias',
+            '_create'      => 'aros_acos._create',
+            '_read'        => 'aros_acos._read',
+            '_update'      => 'aros_acos._update',
+            '_delete'      => 'aros_acos._delete',
+            'source'       => $directQuery->newExpr("'User'")
+        ])
+            ->innerJoin('aros_acos', 'Aros.id = aros_acos.aro_id')
+            ->innerJoin('acos', 'aros_acos.aco_id = acos.id')
+            ->leftJoin(['ParentAcos' => 'acos'], 'acos.parent_id = ParentAcos.id')
+            ->where([
+                'Aros.model'       => 'Users',
+                'Aros.foreign_key' => $userId
+            ]);
+
+        // --- Role-Based Permissions Query --- (Only if the user is an admin or in the allowed role)
+        if ($mergePermissions) {
+            $roleQuery = $arosTable->find()->from(['UserAro' => 'aros']);
+            $roleQuery->select([
+                'aco_id'       => 'acos.id',
+                'alias'        => 'acos.alias',
+                'parent_alias' => 'ParentAcos.alias',
+                '_create'      => 'aros_acos._create',
+                '_read'        => 'aros_acos._read',
+                '_update'      => 'aros_acos._update',
+                '_delete'      => 'aros_acos._delete',
+                'source'       => $roleQuery->newExpr("'Role'")
+            ])
+                ->innerJoin(['RoleAro' => 'aros'], 'UserAro.parent_id = RoleAro.id')
+                ->innerJoin(['aros_acos' => 'aros_acos'], 'RoleAro.id = aros_acos.aro_id')
+                ->innerJoin(['acos' => 'acos'], 'aros_acos.aco_id = acos.id')
+                ->leftJoin(['ParentAcos' => 'acos'], 'acos.parent_id = ParentAcos.id')
+                ->where([
+                    'UserAro.model'       => 'Roles',
+                    'UserAro.foreign_key' => $userRoleId
+                ]);
+
+            // Combine permissions
+            $finalQuery = $directQuery->union($roleQuery);
+        } else {
+            $finalQuery = $directQuery; // Non-admin users only get direct permissions
+        }
+
+        $finalQuery->order([
+            'parent_alias' => 'ASC',
+            'alias'        => 'ASC'
+        ]);
+
+        $results = $finalQuery->all();
+        $permissions = [];
+
+        foreach ($results as $row) {
+            $parentAlias = stripos($row->parent_alias, 'controllers') === false
+                ? 'controllers/' . $row->parent_alias
+                : $row->parent_alias;
+
+            $route = $parentAlias . '/' . $row->alias;
+
+            if ((int)$row->_create === 1 || (int)$row->_read === 1 || (int)$row->_update === 1 || (int)$row->_delete === 1) {
+                $permissions[] = $route;
+            }
+        }
+
+        $permissions = array_values(array_unique($permissions));
+
+        return ['permission' => $permissions];
+    }
+
+
 
 }

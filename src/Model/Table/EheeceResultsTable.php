@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -93,7 +93,6 @@ class EheeceResultsTable extends Table
                     }
                 }
             }
-
         }
 
         if (!empty($dontdeleteids)) {
@@ -107,7 +106,6 @@ class EheeceResultsTable extends Table
         if (!empty($deleteids)) {
             $this->deleteAll(array('EheeceResult.id' => $deleteids), false);
         }
-
     }
 
     function updateExamTakenDate($college_id, $admissionYear)
@@ -137,7 +135,6 @@ class EheeceResultsTable extends Table
                     $updateExamTakenDate['EheeceResult'][$count]['exam_year'] = $takenDate[0] . '-07-01';
                     $count++;
                 }
-
             }
         }
 

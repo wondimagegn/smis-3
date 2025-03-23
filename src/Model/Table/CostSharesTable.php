@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -27,6 +27,7 @@ class CostSharesTable extends Table
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
             'joinType' => 'INNER',
+            'className' => 'Students',
         ]);
     }
 
@@ -89,122 +90,138 @@ class CostSharesTable extends Table
         return $rules;
     }
 
-    public function getCostSharingGraduated($data){
+    public function getCostSharingGraduated($data)
+    {
         debug($data);
-        App::import('Component','AcademicYear');
-        $AcademicYear= new AcademicYearComponent(new ComponentRegistry);
-        $graduateDate= $AcademicYear->get_academicYearBegainingDate($data['Report']['graduated_academic_year']);
-        $options=array();
-        $options['contain']=array(
-            'Student'=>array('order'=>array('Student.first_name ASC'),'Department','GraduateList'),
+        App::import('Component', 'AcademicYear');
+        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
+        $graduateDate = $AcademicYear->getAcademicYearBegainingDate($data['Report']['graduated_academic_year']);
+        $options = array();
+        $options['contain'] = array(
+            'Student' => array('order' => array('Student.first_name ASC'), 'Department', 'GraduateList'),
 
         );
-        if (isset($data['Report']['department_id']) && !empty($data['Report']['department_id']))
-        {
+        if (isset($data['Report']['department_id']) && !empty($data['Report']['department_id'])) {
             $college_ids = explode('~', $data['Report']['department_id']);
-            if(count($college_ids) > 1) {
-                $options['conditions']['Student.college_id']=$college_ids[1];
+            if (count($college_ids) > 1) {
+                $options['conditions']['Student.college_id'] = $college_ids[1];
             } else {
-                $options['conditions']['Student.department_id']=$data['Report']['department_id'];
+                $options['conditions']['Student.department_id'] = $data['Report']['department_id'];
             }
         }
 
         if (isset($data['Report']['program_id']) && !empty($data['Report']['program_id'])) {
-            $options['conditions']['Student.program_id']=$data['Report']['program_id'];
+            $options['conditions']['Student.program_id'] = $data['Report']['program_id'];
         }
         if (isset($data['Report']['program_type_id']) && !empty($data['Report']['program_type_id'])) {
-            $options['conditions']['Student.program_type_id']=$data['Report']['program_type_id'];
+            $options['conditions']['Student.program_type_id'] = $data['Report']['program_type_id'];
         }
 
 
-        if(isset($data['Report']['graduated_academic_year']) && !empty($data['Report']['graduated_academic_year'])){
+        if (isset($data['Report']['graduated_academic_year']) && !empty($data['Report']['graduated_academic_year'])) {
             // it should be in between
-            $nextGraduateAcademicYear=$this->Student->StudentExamStatus->getNextSemster($data['Report']['graduated_academic_year'])['academic_year'];
+            $nextGraduateAcademicYear = $this->Student->StudentExamStatus->getNextSemster(
+                $data['Report']['graduated_academic_year']
+            )['academic_year'];
             $options['conditions'][] = "Student.id IN (SELECT student_id FROM graduate_lists where graduate_date >='$graduateDate' and graduate_date <='$nextGraduateAcademicYear' )";
         }
         if (isset($data['Report']['name']) && !empty($data['Report']['name'])) {
-            $options['conditions']['Student.first_name LIKE ']=$data['Report']['name'].'%';
+            $options['conditions']['Student.first_name LIKE '] = $data['Report']['name'] . '%';
         }
 
         if (isset($data['Report']['studentnumber']) && !empty($data['Report']['studentnumber'])) {
             unset($options['conditions']);
-            $options['conditions']['Student.studentnumber']=$data['Report']['studentnumber'];
+            $options['conditions']['Student.studentnumber'] = $data['Report']['studentnumber'];
         }
 
-        $studentCosts=$this->find('all',$options);
+        $studentCosts = $this->find('all', $options);
 
-        $formattedStudentList=array();
-        if(!empty($studentCosts)){
-            App::import('Component','EthiopicDateTime');
-            $EthiopicDateTimeAC= new EthiopicDateTimeComponent();
+        $formattedStudentList = array();
+        if (!empty($studentCosts)) {
+            App::import('Component', 'EthiopicDateTime');
+            $EthiopicDateTimeAC = new EthiopicDateTimeComponent();
             foreach ($studentCosts as $key => $value) {
-
-                $formattedStudentList['StudentList'][$value['Student']['Department']['name'].'~'.$value['Student']['full_name'].'~'.$value['Student']['studentnumber'].'~'.$value['Student']['gender'].'~'.$value['Student']['GraduateList']['graduate_date']][$EthiopicDateTimeAC->GetEthiopicYear(1,9,$value['CostShare']['academic_year'])]=$value['CostShare'];
-                $formattedStudentList['CostSharingYearList'][$EthiopicDateTimeAC->GetEthiopicYear(1,9,$value['CostShare']['academic_year'])]=$EthiopicDateTimeAC->GetEthiopicYear(1,9,$value['CostShare']['academic_year']);
+                $formattedStudentList['StudentList'][$value['Student']['Department']['name'] . '~' . $value['Student']['full_name'] . '~' . $value['Student']['studentnumber'] . '~' . $value['Student']['gender'] . '~' . $value['Student']['GraduateList']['graduate_date']][$EthiopicDateTimeAC->GetEthiopicYear(
+                    1,
+                    9,
+                    $value['CostShare']['academic_year']
+                )] = $value['CostShare'];
+                $formattedStudentList['CostSharingYearList'][$EthiopicDateTimeAC->GetEthiopicYear(
+                    1,
+                    9,
+                    $value['CostShare']['academic_year']
+                )] = $EthiopicDateTimeAC->GetEthiopicYear(1, 9, $value['CostShare']['academic_year']);
             }
-
         }
         asort($formattedStudentList['CostSharingYearList']);
 
         return $formattedStudentList;
     }
 
-    public function getCostSharingNotGraduated($data){
+    public function getCostSharingNotGraduated($data)
+    {
         debug($data);
-        App::import('Component','AcademicYear');
-        $AcademicYear= new AcademicYearComponent(new ComponentRegistry);
-        $graduateDate= $AcademicYear->get_academicYearBegainingDate($data['Report']['graduated_academic_year']);
-        $options=array();
-        $options['contain']=array('CostShare','Department');
-        $options['order']=array('Student.first_name ASC');
-        if (isset($data['Report']['department_id']) && !empty($data['Report']['department_id']))
-        {
+        App::import('Component', 'AcademicYear');
+        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
+        $graduateDate = $AcademicYear->getAcademicYearBegainingDate($data['Report']['graduated_academic_year']);
+        $options = array();
+        $options['contain'] = array('CostShare', 'Department');
+        $options['order'] = array('Student.first_name ASC');
+        if (isset($data['Report']['department_id']) && !empty($data['Report']['department_id'])) {
             $college_ids = explode('~', $data['Report']['department_id']);
-            if(count($college_ids) > 1) {
-                $options['conditions']['Student.college_id']=$college_ids[1];
+            if (count($college_ids) > 1) {
+                $options['conditions']['Student.college_id'] = $college_ids[1];
             } else {
-                $options['conditions']['Student.department_id']=$data['Report']['department_id'];
+                $options['conditions']['Student.department_id'] = $data['Report']['department_id'];
             }
         }
 
         if (isset($data['Report']['program_id']) && !empty($data['Report']['program_id'])) {
-            $options['conditions']['Student.program_id']=$data['Report']['program_id'];
+            $options['conditions']['Student.program_id'] = $data['Report']['program_id'];
         }
         if (isset($data['Report']['program_type_id']) && !empty($data['Report']['program_type_id'])) {
-            $options['conditions']['Student.program_type_id']=$data['Report']['program_type_id'];
+            $options['conditions']['Student.program_type_id'] = $data['Report']['program_type_id'];
         }
 
         if (isset($data['Report']['name']) && !empty($data['Report']['name'])) {
-            $options['conditions']['Student.first_name LIKE ']=$data['Report']['name'].'%';
+            $options['conditions']['Student.first_name LIKE '] = $data['Report']['name'] . '%';
         }
 
 
-        if(isset($data['Report']['graduated_academic_year']) && !empty($data['Report']['graduated_academic_year'])){
+        if (isset($data['Report']['graduated_academic_year']) && !empty($data['Report']['graduated_academic_year'])) {
             // it should be in between
-            $nextGraduateAcademicYear=$this->Student->StudentExamStatus->getNextSemster($data['Report']['graduated_academic_year'])['academic_year'];
+            $nextGraduateAcademicYear = $this->Student->StudentExamStatus->getNextSemster(
+                $data['Report']['graduated_academic_year']
+            )['academic_year'];
 
 
             $options['conditions'][] = "Student.admissionyear >='$graduateDate' and Student.admissionyear <='$nextGraduateAcademicYear'";
-
         }
 
         if (isset($data['Report']['studentnumber']) && !empty($data['Report']['studentnumber'])) {
             unset($options['conditions']);
-            $options['conditions']['Student.studentnumber']=$data['Report']['studentnumber'];
+            $options['conditions']['Student.studentnumber'] = $data['Report']['studentnumber'];
         }
-        $studentCosts=$this->Student->find('all',$options);
+        $studentCosts = $this->Student->find('all', $options);
 
-        $formattedStudentList=array();
-        if(!empty($studentCosts)){
-            App::import('Component','EthiopicDateTime');
-            $EthiopicDateTimeAC= new EthiopicDateTimeComponent();
+        $formattedStudentList = array();
+        if (!empty($studentCosts)) {
+            App::import('Component', 'EthiopicDateTime');
+            $EthiopicDateTimeAC = new EthiopicDateTimeComponent();
             foreach ($studentCosts as $key => $value) {
-                foreach($value['CostShare'] as $cs=>$cv){
-                    $formattedStudentList['StudentList'][$value['Department']['name'].'~'.$value['Student']['full_name'].'~'.$value['Student']['studentnumber'].'~'.$value['Student']['gender']][$EthiopicDateTimeAC->GetEthiopicYear(1,9,$cv['academic_year'])]=$cv;
-                    $formattedStudentList['CostSharingYearList'][$EthiopicDateTimeAC->GetEthiopicYear(1,9,$cv['academic_year'])]=$EthiopicDateTimeAC->GetEthiopicYear(1,9,$cv['academic_year']);
+                foreach ($value['CostShare'] as $cs => $cv) {
+                    $formattedStudentList['StudentList'][$value['Department']['name'] . '~' . $value['Student']['full_name'] . '~' . $value['Student']['studentnumber'] . '~' . $value['Student']['gender']][$EthiopicDateTimeAC->GetEthiopicYear(
+                        1,
+                        9,
+                        $cv['academic_year']
+                    )] = $cv;
+                    $formattedStudentList['CostSharingYearList'][$EthiopicDateTimeAC->GetEthiopicYear(
+                        1,
+                        9,
+                        $cv['academic_year']
+                    )] = $EthiopicDateTimeAC->GetEthiopicYear(1, 9, $cv['academic_year']);
                 }
             }
-
         }
         asort($formattedStudentList['CostSharingYearList']);
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -27,6 +28,7 @@ class ClearancesTable extends Table
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Student',
         ]);
     }
 
@@ -107,7 +109,6 @@ class ClearancesTable extends Table
         ));
 
         if ($check_student_returned_properties > 0) {
-
             $details = $this->Student->TakenProperty->find('all', array(
                 'conditions' => array(
                     'TakenProperty.returned ' => 0,
@@ -121,9 +122,9 @@ class ClearancesTable extends Table
                 foreach ($details as $index => $value) {
                     if (!empty($value['TakenProperty']['office_id'])) {
                         $loan_item[$value['Office']['name']][] = $value['TakenProperty']['name'];
-                    } else if (!empty($value['TakenProperty']['college_id'])) {
+                    } elseif (!empty($value['TakenProperty']['college_id'])) {
                         $loan_item[$value['College']['name']][] = $value['TakenProperty']['name'];
-                    } else if (!empty($value['Department']['name'])) {
+                    } elseif (!empty($value['Department']['name'])) {
                         $loan_item[$value['Department']['name']][] = $value['TakenProperty']['name'];
                     }
                 }
@@ -188,7 +189,7 @@ class ClearancesTable extends Table
     function preparedAttachment($data = null)
     {
         if (!empty($data['Attachment'])) {
-            foreach ($data['Attachment'] as $in =>  &$dv) {
+            foreach ($data['Attachment'] as $in => &$dv) {
                 if (empty($dv['file']['name']) && empty($dv['file']['type']) && empty($dv['tmp_name'])) {
                     unset($data['Attachment'][$in]);
                 } else {
@@ -304,10 +305,10 @@ class ClearancesTable extends Table
                     // is proper withdraw ?
                     $this->invalidate('error', 'You need to fill clearance/withdraw before applying for readmission.');
                     return 0; // not allow
-                } else if ($readmissionAchieved == 3) {
+                } elseif ($readmissionAchieved == 3) {
                     $this->invalidate('error', 'You have not achieved the minimum readmission point for readmission application. Please advice registrar for further information.');
                     return 3; // not allow
-                } else if ($readmissionAchieved == 4 || $readmissionAchieved == 6) {
+                } elseif ($readmissionAchieved == 4 || $readmissionAchieved == 6) {
                     return 4;  // allow
                 }
             } else {
@@ -324,8 +325,8 @@ class ClearancesTable extends Table
          * 0 not cleared                         // redirect to clearance page
          * 1 cleared
          * 2 cleared but not have status         // allow readmission application on hold state
-         * 3 cleared and have status but not achieved readmission point 	// not elegible
-         * 4 cleared and have status but achieved readmission point   	// elegible
+         * 3 cleared and have status but not achieved readmission point     // not elegible
+         * 4 cleared and have status but achieved readmission point     // elegible
          * 5 withdraw not completed
          * 6 withdraw properly
          */
@@ -344,7 +345,6 @@ class ClearancesTable extends Table
         ));
 
         if (empty($student_status)) {
-
             $lastregistredDate = ClassRegistry::init('CourseRegistration')->find('first', array(
                 'conditions' => array(
                     'CourseRegistration.student_id' => $student_id
@@ -409,7 +409,6 @@ class ClearancesTable extends Table
         ));
 
         if (!empty($student_id)) {
-
             $latestSemester = $this->Student->CourseRegistration->find('all', array(
                 'fields' => array(
                     'CourseRegistration.semester',
@@ -447,7 +446,7 @@ class ClearancesTable extends Table
                         'YearLevel.department_id' => $student_detail['Student']['department_id'],
                         'YearLevel.id' => $v['CourseRegistration']['year_level_id']
                     ));
-                } else if (empty($student_detail['Student']['department_id']) && !empty($student_detail['Student']['college_id'])) {
+                } elseif (empty($student_detail['Student']['department_id']) && !empty($student_detail['Student']['college_id'])) {
                     $semester_year_level['year_level'] = "1st";
                 }
             }
@@ -519,7 +518,7 @@ class ClearancesTable extends Table
                         if ($student_status['StudentExamStatus']['sgpa'] > $acadamic_rule['AcademicRule']['sgpa']) {
                             return 4;
                         }
-                    } else if ($acadamic_rule['AcademicRule']['cgpa'] != 0) {
+                    } elseif ($acadamic_rule['AcademicRule']['cgpa'] != 0) {
                         if ($student_status['StudentExamStatus']['cgpa'] > $acadamic_rule['AcademicRule']['cgpa']) {
                             //return true;
                             return 4;
@@ -541,7 +540,7 @@ class ClearancesTable extends Table
     {
         $clearance_request_organized_by_program = array();
 
-        if(!empty($data)) {
+        if (!empty($data)) {
             foreach ($data as $index => $value) {
                 if (!empty($value['Student']['Department']['name'])) {
                     if (!empty($value['Student']['id'])) {
@@ -564,7 +563,7 @@ class ClearancesTable extends Table
     {
         $options = array();
 
-        if (isset($days_back) && !empty($days_back)){
+        if (isset($days_back) && !empty($days_back)) {
             $request_date = date('Y-m-d ', strtotime("-" . $days_back . " day "));
         } else {
             $request_date = date('Y-m-d ', strtotime("-" . DAYS_BACK_CLEARANCE . " day "));
@@ -621,7 +620,6 @@ class ClearancesTable extends Table
         ));
 
         if (!empty($last_registration_date)) {
-
             $check_clearance = $this->find('count', array(
                 'conditions' => array(
                     'Clearance.student_id' => $student_id,

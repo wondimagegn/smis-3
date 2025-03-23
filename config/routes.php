@@ -29,7 +29,59 @@ Router::scope('/', function (RouteBuilder $routes) {
     // Connect the root URL to DashboardController index action
     $routes->connect('/', ['controller' => 'Dashboard', 'action' => 'index']);
 
+    $routes->setExtensions(['json']); // Enable .json requests
+    $routes->connect('/dashboard/getMessageAjax',
+        ['controller' => 'Dashboard', 'action' => 'getMessageAjax']
+    );
+    $routes->connect('/dashboard/getRankAjax',
+        ['controller' => 'Dashboard', 'action' => 'getRankAjax']
+    );
 
+    $routes->connect('/dashboard/getStudentAssignedDormitory',
+        ['controller' => 'Dashboard', 'action' => 'getStudentAssignedDormitory']
+    );
+
+    $routes->connect('/dashboard/getApprovalRejectGradeChange',
+        ['controller' => 'Dashboard', 'action' => 'getApprovalRejectGradeChange']
+    );
+
+
+    $routes->connect('/dashboard/disptachedAssignedCourseList',
+        ['controller' => 'Dashboard', 'action' => 'disptachedAssignedCourseList']
+    );
+
+
+    $routes->connect('/dashboard/addDropRequestController',
+        ['controller' => 'Dashboard', 'action' => 'addDropRequestController']
+    );
+
+    $routes->connect('/dashboard/clearanceWithdrawSubRequest',
+        ['controller' => 'Dashboard', 'action' => 'clearanceWithdrawSubRequest']
+    );
+
+
+    $routes->connect('/dashboard/getBackupAccountRequest',
+        ['controller' => 'Dashboard', 'action' => 'getBackupAccountRequest']
+    );
+
+
+
+    $routes->connect('/dashboard/getProfileNotComplete',
+        ['controller' => 'Dashboard', 'action' => 'getProfileNotComplete']
+    );
+
+
+
+    // Explicit route for AJAX-based PATCH requests to edit auto message
+
+    $routes->connect(
+        '/auto-messages/mark-as-unread/:id',
+        ['controller' => 'AutoMessages', 'action' => 'markAsUnread', '_method' => ['POST', 'PUT']],
+        ['pass' => ['id'], 'id' => '[0-9a-f\-]+']
+    );
+
+
+/*
     // Define RESTful resource routes for Dashboard
     $routes->resources('Dashboard', [
         'map' => [
@@ -43,16 +95,12 @@ Router::scope('/', function (RouteBuilder $routes) {
             ['action' => 'getProfileNotComplete', 'method' => 'POST', 'path' => 'getProfileNotComplete'],
         ]
     ]);
+    */
 
-    // Define RESTful resource routes for AutoMessages
-    $routes->resources('AutoMessages', [
-        'map' => [
-            ['action' => 'delete', 'method' => 'GET', 'path' => ':id']
-        ]
-    ]);
+    $routes->connect('/dashboard/getMessageAjax',
+        ['controller' => 'Dashboard', 'action' => 'getMessageAjax']);
 
-    // Enable JSON and PDF extensions
-    $routes->setExtensions(['json', 'pdf']);
+
 
 
     // Register scoped middleware for in scopes.
@@ -60,14 +108,18 @@ Router::scope('/', function (RouteBuilder $routes) {
         'httpOnly' => true,
     ]));
     $routes->applyMiddleware('csrf');
-    $routes->connect('/', ['controller' => 'Pages', 'action' => 'display', 'home']);
-    $routes->connect('/pages/*', ['controller' => 'Pages', 'action' => 'display']);
+//    $routes->connect('/', ['controller' => 'Pages', 'action' => 'display', 'home']);
+ //   $routes->connect('/pages/*', ['controller' => 'Pages', 'action' => 'display']);
+
+    $routes->connect('/', array('controller' => 'Dashboard', 'action' => 'index'));
+
+   // $routes->fallbacks(DashedRoute::class);
+
+});
+
+Router::defaultRouteClass(DashedRoute::class);
+
+Router::scope('/', function ($routes) {
+    $routes->connect('/', ['controller' => 'Dashboard', 'action' => 'index']);
     $routes->fallbacks(DashedRoute::class);
 });
-return function (RouteBuilder $routes) {
-    $routes->plugin('Acls', ['path' => '/acls'], function (RouteBuilder $builder) {
-        $builder->connect('/', ['controller' => 'Acls', 'action' => 'index']);
-        $builder->fallbacks();
-    });
-};
-

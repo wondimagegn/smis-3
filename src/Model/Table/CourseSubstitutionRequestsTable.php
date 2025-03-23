@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -115,7 +115,10 @@ class CourseSubstitutionRequestsTable extends Table
             'Student.department_id' => $department_ids,
             'Student.graduated' => 0,
             'CourseSubstitutionRequest.department_approve is null',
-            'CourseSubstitutionRequest.request_date >= ' => date("Y-m-d", strtotime("-".DAYS_BACK_COURSE_SUBSTITUTION." day")),
+            'CourseSubstitutionRequest.request_date >= ' => date(
+                "Y-m-d",
+                strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
+            ),
         );
 
         $substitutionCount = $this->find('count', $options);

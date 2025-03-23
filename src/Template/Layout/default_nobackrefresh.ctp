@@ -21,22 +21,26 @@
 
     <!-- STYLESHEETS -->
     <?= $this->Html->css(['foundation', 'js/tip/tooltipster', 'js/footable/css/footable-demos']) ?>
+    <?= $this->Html->css([
+        'dashboard',
+        'style',
+        'dripicon',
+        'typicons',
+        'font-awesome',
+        'sass/css/theme',
+        'css/pace-theme-flash',
+        'slicknav',
+        'jquery.dataTables.min',
+        'js/footable/css/footable.core',
+        'js/footable/css/footable.standalone',
+        'js/footable/css/footable-demos',
+        'common1',
+        'responsive-tables'
+    ]) ?>
 
-    <?php if (Configure::read('debug') || true): ?>
-        <?= $this->Html->css([
-            'dashboard', 'style', 'dripicon', 'typicons', 'font-awesome',
-            'sass/css/theme', 'css/pace-theme-flash', 'slicknav',
-            'jquery.dataTables.min', 'js/footable/css/footable.core',
-            'js/footable/css/footable.standalone', 'js/footable/css/footable-demos',
-            'common1', 'responsive-tables'
-        ]) ?>
+    <?= $this->Html->script('js/pace/pace') ?>
+    <?= $this->Html->css('js/pace/themes/orange/pace-theme-flash') ?>
 
-        <?= $this->Html->script('js/pace/pace') ?>
-        <?= $this->Html->css('js/pace/themes/orange/pace-theme-flash') ?>
-
-    <?php else: ?>
-        <?= $this->AssetCompress->css('internal.css', ['full' => true]) ?>
-    <?php endif; ?>
 
     <?= $this->Html->script([
         'jquery', 'vendor/modernizr', 'jquery-customselect-1.9.1.min'
@@ -68,7 +72,7 @@
             var checkInterval = 10000; // Check every 10 seconds
 
             function checkSession() {
-                fetch('/users/check_session')
+                fetch('/users/check-session')
                     .then(response => response.json())
                     .then(data => {
                         if (!data.is_logged_in) {
@@ -175,7 +179,6 @@
 </div>
 
 <!-- JavaScript Files -->
-<?php if (Configure::read('debug') || true): ?>
     <?= $this->Html->script([
         'waypoints.min', 'preloader-script', 'foundation.min',
         'foundation/foundation.abide', 'slimscroll/jquery.slimscroll',
@@ -188,13 +191,6 @@
         'footable/js/footable.filter', 'footable/js/footable.paginate',
         'jquery-department_placement'
     ]); ?>
-<?php else: ?>
-    <?= $this->AssetCompress->script('mainjslib.js', ['full' => true]); ?>
-    <?= $this->AssetCompress->script('foundation.js', ['full' => true]); ?>
-    <?= $this->AssetCompress->script('maininternaledu.js', ['full' => true]); ?>
-    <?= $this->AssetCompress->script('additionaljavascript.js', ['full' => true]); ?>
-    <?= $this->AssetCompress->script('floatjavascript.js', ['full' => true]); ?>
-<?php endif; ?>
 
 <!-- Form Validation -->
 <script type="text/javascript">

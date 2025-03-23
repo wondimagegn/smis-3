@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class AlumniTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class AlumniTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('alumni');
@@ -27,6 +30,7 @@ class AlumniTable extends Table
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Student',
         ]);
     }
 
@@ -38,6 +42,7 @@ class AlumniTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -150,6 +155,7 @@ class AlumniTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->isUnique(['email']));
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
@@ -157,70 +163,82 @@ class AlumniTable extends Table
     }
 
 
-    public function formatResponse($data){
-        $formattedData=array();
-        $formattedData['Alumnus']=$data['Alumnus'];
-        $count=0;
-        foreach($data['AlumniResponse'] as $k=>$v){
-            if(isset($v['answer']['mother']) && !empty($v['answer']['mother']) && isset($v['answer']['father']) &&
-                !empty($v['answer']['father'])){
-                $formattedData['AlumniResponse'][$count]['survey_question_id']=$v['survey_question_id'];
-                $formattedData['AlumniResponse'][$count]['mother']=1;
-                $formattedData['AlumniResponse'][$count]['survey_question_answer_id']=$v['answer']['mother'];
+    public function formatResponse($data)
+    {
+
+        $formattedData = array();
+        $formattedData['Alumnus'] = $data['Alumnus'];
+        $count = 0;
+        foreach ($data['AlumniResponse'] as $k => $v) {
+            if (
+                isset($v['answer']['mother']) && !empty($v['answer']['mother']) && isset($v['answer']['father']) &&
+                !empty($v['answer']['father'])
+            ) {
+                $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
+                $formattedData['AlumniResponse'][$count]['mother'] = 1;
+                $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer']['mother'];
 
                 $count++;
-                $formattedData['AlumniResponse'][$count]['survey_question_id']=$v['survey_question_id'];
-                $formattedData['AlumniResponse'][$count]['father']=1;
-                $formattedData['AlumniResponse'][$count]['survey_question_answer_id']=$v['answer']['father'];
-
+                $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
+                $formattedData['AlumniResponse'][$count]['father'] = 1;
+                $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer']['father'];
             } else {
-                if(empty($v['answer'])){
-                    $formattedData['AlumniResponse'][$count]['survey_question_id']=$v['survey_question_id'];
+                if (empty($v['answer'])) {
+                    $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
 
-                    $formattedData['AlumniResponse'][$count]['specifiy']=$v['specifiy'];
-                } else if(is_array($v['answer'])) {
-                    foreach($v['answer'] as $ak=>$av){
-                        if($av==1){
-                            $formattedData['AlumniResponse'][$count]['survey_question_id']=$v['survey_question_id'];
+                    $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
+                } elseif (is_array($v['answer'])) {
+                    foreach ($v['answer'] as $ak => $av) {
+                        if ($av == 1) {
+                            $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
 
-                            $formattedData['AlumniResponse'][$count]['specifiy']=$v['specifiy'];
-                            $formattedData['AlumniResponse'][$count]['survey_question_answer_id']=$ak;
+                            $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
+                            $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $ak;
                             $count++;
                         }
-
                     }
-                } else if(!empty($v['answer']) && !is_array($v['answer'])){
-                    $formattedData['AlumniResponse'][$count]['survey_question_id']=$v['survey_question_id'];
+                } elseif (!empty($v['answer']) && !is_array($v['answer'])) {
+                    $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
 
-                    $formattedData['AlumniResponse'][$count]['specifiy']=$v['specifiy'];
-                    $formattedData['AlumniResponse'][$count]['survey_question_answer_id']=$v['answer'];
+                    $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
+                    $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer'];
                 }
             }
             $count++;
         }
 
         return $formattedData;
-
     }
 
-    function completedRoundOneQuestionner($student_id){
-        $surveyQuestions=ClassRegistry::init('SurveyQuestion')->find('all',
-            array('contain'=>array('SurveyQuestionAnswer')));
-        $alumni_id=$this->find('first',array('conditions'=>array('Alumnus.student_id'=>$student_id),'recursive'=>-1));
-        if(empty($alumni_id['Alumnus']['student_id'])){
+    public function completedRoundOneQuestionner($student_id)
+    {
+
+        $surveyQuestions = ClassRegistry::init('SurveyQuestion')->find(
+            'all',
+            array('contain' => array('SurveyQuestionAnswer'))
+        );
+        $alumni_id = $this->find(
+            'first',
+            array('conditions' => array('Alumnus.student_id' => $student_id), 'recursive' => -1)
+        );
+        if (empty($alumni_id['Alumnus']['student_id'])) {
             return false;
         } else {
             return true;
         }
 
-        if(!empty($surveyQuestions)){
-
-            foreach($surveyQuestions as $k=>$v){
-
-                $response=ClassRegistry::init('AlumniResponse')->find('count',
-                    array('conditions'=>array('AlumniResponse.alumni_id'=>$alumni_id['Alumnus']['id'],
-                        'AlumniResponse.survey_question_id'=>$v['SurveyQuestion']['id'])));
-                if(empty($response)){
+        if (!empty($surveyQuestions)) {
+            foreach ($surveyQuestions as $k => $v) {
+                $response = ClassRegistry::init('AlumniResponse')->find(
+                    'count',
+                    array(
+                        'conditions' => array(
+                            'AlumniResponse.alumni_id' => $alumni_id['Alumnus']['id'],
+                            'AlumniResponse.survey_question_id' => $v['SurveyQuestion']['id']
+                        )
+                    )
+                );
+                if (empty($response)) {
                     debug($v['SurveyQuestion']['id']);
                     return false;
                 }
@@ -229,68 +247,87 @@ class AlumniTable extends Table
         }
         return false;
     }
-    public function getSelectedAlumniSurvey($student_ids){
-        $alumniresponse=$this->find('all',array('conditions'=>array('Alumnus.student_id'=>$student_ids),'contain'=>array('AlumniResponse'=>array('SurveyQuestion','SurveyQuestionAnswer'))));
+
+    public function getSelectedAlumniSurvey($student_ids)
+    {
+
+        $alumniresponse = $this->find(
+            'all',
+            array(
+                'conditions' => array('Alumnus.student_id' => $student_ids),
+                'contain' => array('AlumniResponse' => array('SurveyQuestion', 'SurveyQuestionAnswer'))
+            )
+        );
         return $alumniresponse;
-
     }
-    public function getCompletedSurvey($student_ids){
-        $alumniresponse=$this->find('all',array('conditions'=>array('Alumnus.student_id'=>$student_ids),'contain'=>array('AlumniResponse'=>array('SurveyQuestion','SurveyQuestionAnswer'))));
-        $student=array();
-        foreach($alumniresponse as $k=>$v){
-            foreach($v['AlumniResponse'] as $alk=>$alv){
 
-                if($alv['mother']==1){
-                    $student[$v['Alumnus']['full_name'].'~'.$v['Alumnus']['student_id']][$alv['survey_question_id']]['mother']=$alv;
-                } else if ($alv['father']==1){
-                    $student[$v['Alumnus']['full_name'].'~'.$v['Alumnus']['student_id']][$alv['survey_question_id']]['father']=$alv;
+    public function getCompletedSurvey($student_ids)
+    {
+
+        $alumniresponse = $this->find(
+            'all',
+            array(
+                'conditions' => array('Alumnus.student_id' => $student_ids),
+                'contain' => array('AlumniResponse' => array('SurveyQuestion', 'SurveyQuestionAnswer'))
+            )
+        );
+        $student = array();
+        foreach ($alumniresponse as $k => $v) {
+            foreach ($v['AlumniResponse'] as $alk => $alv) {
+                if ($alv['mother'] == 1) {
+                    $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['mother'] = $alv;
+                } elseif ($alv['father'] == 1) {
+                    $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['father'] = $alv;
                 } else {
-                    if($alv['SurveyQuestion']['allow_multiple_answers']==1){
-                        $student[$v['Alumnus']['full_name'].'~'.$v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'][]=$alv;
-
-                    } else if ($alv['SurveyQuestion']['answer_required_yn']==1 && !empty($alv['survey_question_answer_id'])){
-                        $student[$v['Alumnus']['full_name'].'~'.$v['Alumnus']['student_id']][$alv['survey_question_id']]['answer']=$alv;
-                    } else if(empty($alv['survey_question_answer_id']) && !empty($alv['specifiy'])){
-                        $student[$v['Alumnus']['full_name'].'~'.$v['Alumnus']['student_id']][$alv['survey_question_id']]['answer']=$alv['specifiy'];
+                    if ($alv['SurveyQuestion']['allow_multiple_answers'] == 1) {
+                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'][] = $alv;
+                    } elseif ($alv['SurveyQuestion']['answer_required_yn'] == 1 && !empty($alv['survey_question_answer_id'])) {
+                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'] = $alv;
+                    } elseif (empty($alv['survey_question_answer_id']) && !empty($alv['specifiy'])) {
+                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'] = $alv['specifiy'];
                     }
                 }
-
             }
         }
         return $student;
-
     }
 
-    public function checkIfStudentGradutingClass($student_id){
-        $studentCurriculum=ClassRegistry::init('Student')->find('first',array('conditions'=>array('Student.id'=>$student_id),
-            'contain'=>array('Curriculum')));
+    public function checkIfStudentGradutingClass($student_id)
+    {
 
-        $allRegistration=ClassRegistry::init('CourseRegistration')->find('all',array('conditions'=>array('CourseRegistration.student_id'=>$student_id),
-            'contain'=>array('PublishedCourse'=>array('Course'))));
-        $sumRegistered=0;
-        $graduatingCourseTaken=0;
-        foreach($allRegistration as $k=>$v){
-            $sumRegistered+=$v['PublishedCourse']['Course']['credit'];
-            if($v['PublishedCourse']['Course']['thesis']){
-                $graduatingCourseTaken=1;
+        $studentCurriculum = ClassRegistry::init('Student')->find('first', array(
+            'conditions' => array('Student.id' => $student_id),
+            'contain' => array('Curriculum')
+        ));
+
+        $allRegistration = ClassRegistry::init('CourseRegistration')->find('all', array(
+            'conditions' => array('CourseRegistration.student_id' => $student_id),
+            'contain' => array('PublishedCourse' => array('Course'))
+        ));
+        $sumRegistered = 0;
+        $graduatingCourseTaken = 0;
+        foreach ($allRegistration as $k => $v) {
+            $sumRegistered += $v['PublishedCourse']['Course']['credit'];
+            if ($v['PublishedCourse']['Course']['thesis']) {
+                $graduatingCourseTaken = 1;
                 break;
             }
         }
 
-        $exemptionMaximum=$this->query(
+        $exemptionMaximum = $this->query(
             "SELECT SUM(course_taken_credit) as sumex
 		FROM  course_exemptions
-		WHERE student_id =".$student_id."
+		WHERE student_id =" . $student_id . "
 		order by SUM(course_taken_credit)
 		DESC limit 1
-		");
+		"
+        );
 
-        if(($sumRegistered+$exemptionMaximum[0][0]['sumex'])>=$studentCurriculum['Curriculum']['minimum_credit_points'] ){
+        if (($sumRegistered + $exemptionMaximum[0][0]['sumex']) >= $studentCurriculum['Curriculum']['minimum_credit_points']) {
             return true;
-        } else if ($graduatingCourseTaken==1){
+        } elseif ($graduatingCourseTaken == 1) {
             return true;
         }
         return false;
-
     }
 }

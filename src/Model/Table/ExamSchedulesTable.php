@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class ExamSchedulesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class ExamSchedulesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('exam_schedules');
@@ -44,6 +47,7 @@ class ExamSchedulesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -77,6 +81,7 @@ class ExamSchedulesTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['class_room_id'], 'ClassRooms'));
         $rules->add($rules->existsIn(['exam_split_section_id'], 'ExamSplitSections'));
         $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
@@ -84,26 +89,35 @@ class ExamSchedulesTable extends Table
         return $rules;
     }
 
-    function getExamSchedule($college_id = null, $acadamic_year = null, $semester = null, $program_id = null, $program_type_ids = null, $department_ids = null, $year_levels = null, $organize_by_departments = null, $organize_by_year_levels = null) {
+    public function getExamSchedule(
+        $college_id = null,
+        $acadamic_year = null,
+        $semester = null,
+        $program_id = null,
+        $program_type_ids = null,
+        $department_ids = null,
+        $year_levels = null,
+        $organize_by_departments = null,
+        $organize_by_year_levels = null
+    ) {
+
         $year_level_ids = array();
         $sections = array();
         $publishedCourses = array();
-        foreach($department_ids as $dep_key => $department_id) {
-            foreach($year_levels as $year_level) {
-                if($year_level == 1) {
-                    $year_level_name = $year_level.'st';
-                }
-                else if($year_level == 2) {
-                    $year_level_name = $year_level.'nd';
-                }
-                else if($year_level == 3) {
-                    $year_level_name = $year_level.'rd';
-                }
-                else {
-                    $year_level_name = $year_level.'th';
+        foreach ($department_ids as $dep_key => $department_id) {
+            foreach ($year_levels as $year_level) {
+                if ($year_level == 1) {
+                    $year_level_name = $year_level . 'st';
+                } elseif ($year_level == 2) {
+                    $year_level_name = $year_level . 'nd';
+                } elseif ($year_level == 3) {
+                    $year_level_name = $year_level . 'rd';
+                } else {
+                    $year_level_name = $year_level . 'th';
                 }
 
-                $yearLevel = ClassRegistry::init('YearLevel')->find('first',
+                $yearLevel = ClassRegistry::init('YearLevel')->find(
+                    'first',
                     array(
                         'conditions' =>
                             array(
@@ -113,7 +127,10 @@ class ExamSchedulesTable extends Table
                         'recursive' => -1
                     )
                 );
-                if((isset($yearLevel['YearLevel']['id']) || strcasecmp($dep_key, 'FP') == 0) && !empty($yearLevel['YearLevel']['id'])) {
+                if ((isset($yearLevel['YearLevel']['id']) || strcasecmp(
+                            $dep_key,
+                            'FP'
+                        ) == 0) && !empty($yearLevel['YearLevel']['id'])) {
                     $options = array(
                         'conditions' =>
                             array(
@@ -134,16 +151,15 @@ class ExamSchedulesTable extends Table
                                     )
                             )
                     );
-                    if(strcasecmp($dep_key, 'FP') == 0) {
+                    if (strcasecmp($dep_key, 'FP') == 0) {
                         $options['conditions']['Section.college_id'] = $college_id;
-                    }
-                    else {
+                    } else {
                         $options['conditions']['Section.department_id'] = $department_id;
                     }
                     $sections_t = $this->PublishedCourse->Section->find('all', $options);
 
-                    foreach($sections_t as $section_key => $section) {
-                        foreach($section['PublishedCourse'] as $pc_key => $pc) {
+                    foreach ($sections_t as $section_key => $section) {
+                        foreach ($section['PublishedCourse'] as $pc_key => $pc) {
                             $publishedCourses[] = $pc['id'];
                         }
                     }
@@ -151,7 +167,8 @@ class ExamSchedulesTable extends Table
             }
         }
 
-        $examSchedules = $this->find('all',
+        $examSchedules = $this->find(
+            'all',
             array(
                 'conditions' =>
                     array(
@@ -244,26 +261,33 @@ class ExamSchedulesTable extends Table
         return $examSchedules;
     }
 
-    function cancelExamSchedule($college_id = null, $acadamic_year = null, $semester = null, $program_id = null, $program_type_ids = null, $department_ids = null, $year_levels = null) {
+    public function cancelExamSchedule(
+        $college_id = null,
+        $acadamic_year = null,
+        $semester = null,
+        $program_id = null,
+        $program_type_ids = null,
+        $department_ids = null,
+        $year_levels = null
+    ) {
+
         $year_level_ids = array();
         $sections = array();
         $publishedCourses = array();
-        foreach($department_ids as $dep_key => $department_id) {
-            foreach($year_levels as $year_level) {
-                if($year_level == 1) {
-                    $year_level_name = $year_level.'st';
-                }
-                else if($year_level == 2) {
-                    $year_level_name = $year_level.'nd';
-                }
-                else if($year_level == 3) {
-                    $year_level_name = $year_level.'rd';
-                }
-                else {
-                    $year_level_name = $year_level.'th';
+        foreach ($department_ids as $dep_key => $department_id) {
+            foreach ($year_levels as $year_level) {
+                if ($year_level == 1) {
+                    $year_level_name = $year_level . 'st';
+                } elseif ($year_level == 2) {
+                    $year_level_name = $year_level . 'nd';
+                } elseif ($year_level == 3) {
+                    $year_level_name = $year_level . 'rd';
+                } else {
+                    $year_level_name = $year_level . 'th';
                 }
 
-                $yearLevel = $this->PublishedCourse->Section->YearLevel->find('first',
+                $yearLevel = $this->PublishedCourse->Section->YearLevel->find(
+                    'first',
                     array(
                         'conditions' =>
                             array(
@@ -273,7 +297,10 @@ class ExamSchedulesTable extends Table
                         'recursive' => -1
                     )
                 );
-                if((isset($yearLevel['YearLevel']['id']) || strcasecmp($dep_key, 'FP') == 0) && !empty($yearLevel['YearLevel']['id'])) {
+                if ((isset($yearLevel['YearLevel']['id']) || strcasecmp(
+                            $dep_key,
+                            'FP'
+                        ) == 0) && !empty($yearLevel['YearLevel']['id'])) {
                     $options = array(
                         'conditions' =>
                             array(
@@ -296,31 +323,28 @@ class ExamSchedulesTable extends Table
                                     )
                             )
                     );
-                    if(strcasecmp($dep_key, 'FP') == 0) {
+                    if (strcasecmp($dep_key, 'FP') == 0) {
                         $options['conditions']['Section.college_id'] = $college_id;
-                    }
-                    else {
+                    } else {
                         $options['conditions']['Section.department_id'] = $department_id;
                     }
                     $sections_t = $this->PublishedCourse->Section->find('all', $options);
                     //debug($sections_t);
-                    foreach($sections_t as $section_key => $section) {
-                        foreach($section['PublishedCourse'] as $pc_key => $pc) {
+                    foreach ($sections_t as $section_key => $section) {
+                        foreach ($section['PublishedCourse'] as $pc_key => $pc) {
                             $publishedCourses[] = $pc['id'];
                         }
                     }
                 }
             }//End of each year level
         }//End of each department
-        if(empty($publishedCourses)) {
+        if (empty($publishedCourses)) {
             return 0;
         }
-        if($this->deleteAll(array('ExamSchedule.published_course_id' => $publishedCourses))) {
+        if ($this->deleteAll(array('ExamSchedule.published_course_id' => $publishedCourses))) {
             return 1;
-        }
-        else {
+        } else {
             return 2;
         }
     }
-
 }

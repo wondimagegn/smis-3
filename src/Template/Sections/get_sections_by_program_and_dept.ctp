@@ -1,0 +1,11 @@
+<option value="0">[ Select Section ]</option>
+<?php
+if (isset($student_sections) && count($student_sections) > 0) {
+	foreach ($student_sections as $id => $section) {
+		echo "<optgroup label='" . $id . "'>";
+		foreach ($section as $key => $value) {
+			echo "<option value='" . $key . "'>" . $value . "</option>";
+		}
+		echo "</optgroup>";
+	}
+} ?>

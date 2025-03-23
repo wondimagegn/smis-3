@@ -1,12 +1,11 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
-
 class AcceptedStudent extends Entity
 {
-
     protected $_accessible = [
         'first_name' => true,
         'middle_name' => true,
@@ -73,5 +72,4 @@ class AcceptedStudent extends Entity
     {
         return trim("{$this->first_name} {$this->middle_name} {$this->last_name}");
     }
-
 }

@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-
 
 class AcceptedStudentsTable extends Table
 {
@@ -27,67 +27,87 @@ class AcceptedStudentsTable extends Table
 
         $this->belongsTo('Regions', [
             'foreignKey' => 'region_id',
+            'propertyName' => 'Region',
         ]);
         $this->belongsTo('Zones', [
             'foreignKey' => 'zone_id',
+            'propertyName' => 'Zone',
         ]);
         $this->belongsTo('Woredas', [
             'foreignKey' => 'woreda_id',
+            'propertyName' => 'Woreda',
         ]);
         $this->belongsTo('Colleges', [
             'foreignKey' => 'college_id',
+            'propertyName' => 'College',
         ]);
         $this->belongsTo('Campuses', [
             'foreignKey' => 'campus_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Campus',
         ]);
 
         $this->belongsTo('Departments', [
             'foreignKey' => 'department_id',
+            'propertyName' => 'Department',
         ]);
         $this->belongsTo('Curriculums', [
             'foreignKey' => 'curriculum_id',
+            'propertyName' => 'Curriculum',
         ]);
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
+            'propertyName' => 'Program',
         ]);
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
+            'propertyName' => 'ProgramType',
         ]);
         $this->belongsTo('Specializations', [
             'foreignKey' => 'specialization_id',
+            'propertyName' => 'Specialization',
         ]);
         $this->belongsTo('PlacementTypes', [
             'foreignKey' => 'placement_type_id',
+            'propertyName' => 'PlacementType',
         ]);
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'User',
         ]);
         $this->belongsTo('OnlineApplicants', [
             'foreignKey' => 'online_applicant_id',
+            'propertyName' => 'OnlineApplicant',
         ]);
 
 
         $this->hasMany('DormitoryAssignments', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'DormitoryAssignment',
         ]);
         $this->hasMany('MealHallAssignments', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'MealHallAssignment',
         ]);
         $this->hasMany('PlacementEntranceExamResultEntries', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'PlacementEntranceExamResultEntry',
         ]);
         $this->hasMany('PlacementParticipatingStudents', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'PlacementParticipatingStudent',
         ]);
         $this->hasMany('PlacementPreferences', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'PlacementPreference',
         ]);
         $this->hasMany('Preferences', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'Preference',
         ]);
         $this->hasMany('Students', [
             'foreignKey' => 'accepted_student_id',
+            'propertyName' => 'Student',
         ]);
     }
 
@@ -257,7 +277,6 @@ class AcceptedStudentsTable extends Table
 
         if (isset($acceptedStudents) && !empty($acceptedStudents)) {
             foreach ($acceptedStudents as $pk => $pv) {
-
                 if (isset($pv['Student']['id']) && !empty($pv['Student']['id'])) {
                     //find section college,
                     $sectionCollege = ClassRegistry::init('StudentsSection')->find('first', array('conditions' => array('StudentsSection.student_id' => $pv['Student']['id']), 'contain' => array('Section')));
@@ -270,7 +289,6 @@ class AcceptedStudentsTable extends Table
                     $admittedStudentToBeAssigned = array();
 
                     if (isset($sectionCollege['Section']['college_id']) && !empty($sectionCollege['Section']['college_id'])) {
-
                         $acceptedStudentToBeAssigned['AcceptedStudent']['id'] = $pv['AcceptedStudent']['id'];
                         $acceptedStudentToBeAssigned['AcceptedStudent']['college_id'] = $sectionCollege['Section']['college_id'];
                         $admittedStudentToBeAssigned['Student']['id'] = $pv['Student']['id'];
@@ -295,7 +313,6 @@ class AcceptedStudentsTable extends Table
     function getRecentAcceptedStudent($college_id = null, $academicyear = null)
     {
         if (!empty($college_id) && !empty($academicyear)) {
-
             $recentAcceptedStudent = $this->find('all', array(
                 'conditions' => array(
                     'AcceptedStudent.college_id' => $college_id,
@@ -310,8 +327,8 @@ class AcceptedStudentsTable extends Table
 
     function readAllById($id = null)
     {
-        if ($id)  {
 
+        if ($id) {
             $data = $this->find("first", array(
                 "conditions" => array('AcceptedStudent.id' => $id),
                 'contain' => array(
@@ -347,7 +364,6 @@ class AcceptedStudentsTable extends Table
     function getidlessstudentsummery($thisacademicyear = null)
     {
         if (!empty($thisacademicyear)) {
-
             $colleges = $this->College->find('list', array('conditions' => array('College.active' => 1)));
             $programs = $this->Program->find('list');
             $programtypes = $this->ProgramType->find('list');
@@ -465,8 +481,8 @@ class AcceptedStudentsTable extends Table
         if ($college_id && $academicyear) {
             $conditions['OR'] = array(
                 array('AcceptedStudent.department_id' => array('', 0)),
-                array('AcceptedStudent.department_id' => NULL),
-                array('AcceptedStudent.placementtype' => array(NULL, CANCELLED_PLACEMENT))
+                array('AcceptedStudent.department_id' => null),
+                array('AcceptedStudent.placementtype' => array(null, CANCELLED_PLACEMENT))
             );
 
             $conditions['AND'] = array(array(
@@ -616,7 +632,7 @@ class AcceptedStudentsTable extends Table
         //debug($departments_without_privilaged_quota);
         $merged_department_order = array();
 
-        if(!empty($departments_without_privilaged_quota)){
+        if (!empty($departments_without_privilaged_quota)) {
             foreach ($departments_without_privilaged_quota as $key => $value) {
                 $merged_department_order[$value['ParticipatingDepartment']['department_id']]['weight'] = 10000000;
             }
@@ -719,7 +735,6 @@ class AcceptedStudentsTable extends Table
         $departmentsprivilagedorder = array();
 
         if (!empty($prefrenceMatrix)) {
-
             foreach ($prefrenceMatrix as $key => $value) {
                 $sum = 0;
                 $total_student = array_sum($value);
@@ -850,17 +865,13 @@ class AcceptedStudentsTable extends Table
         //Here comes the majic of internal quota adjustment
 
         if (!empty($reservedQuotaNumber)) {
-
             $gap = 0;
 
             do {
-
                 $recheck = false;
 
                 foreach ($reservedQuotaNumber as $result_critiera_id => &$allocation_value) {
-
                     if ($allocation_value['reservedquota'] > $allocation_value['available']) {
-
                         $gap = $allocation_value['reservedquota'] - $allocation_value['available'];
                         $allocation_value['reservedquota'] = $allocation_value['reservedquota'] - $gap;
                         $recheck = true;
@@ -881,7 +892,6 @@ class AcceptedStudentsTable extends Table
                         if ($reserved_sum > 0) {
                             foreach ($reservedQuotaNumber as $result_critiera_id2 => &$allocation_value2) {
                                 if (!$allocation_value2['adjusted']) {
-
                                     $gap_distribution_sum += round($gap * ($allocation_value2['reservedquota'] / $reserved_sum));
                                     $allocation_value2['reservedquota'] += round($gap * ($allocation_value2['reservedquota'] / $reserved_sum));
 
@@ -901,11 +911,8 @@ class AcceptedStudentsTable extends Table
                             // rather set  available to reserved quota of result category, in the next version think of proportionality ?
 
                             if (($gap - $gap_distribution_sum) > 0) {
-
                                 foreach ($reservedQuotaNumber as $result_critiera_id3 => &$allocation_value3) {
-
-                                    if ($allocation_value3['reservedquota'] == 0 && !$allocation_value3['adjusted'] && $allocation_value3['available'] > 0 ) {
-
+                                    if ($allocation_value3['reservedquota'] == 0 && !$allocation_value3['adjusted'] && $allocation_value3['available'] > 0) {
                                         $allocation_value3['reservedquota'] = ($allocation_value3['available'] >= ($gap - $gap_distribution_sum) ? ($gap - $gap_distribution_sum) : $allocation_value3['available']);
                                         $gap_distribution_sum += $allocation_value3['reservedquota'];
 
@@ -935,7 +942,6 @@ class AcceptedStudentsTable extends Table
 
         if (!empty($adjusted_privilaged_quota)) {
             foreach ($adjusted_privilaged_quota as $privilage_type => &$quota) {
-
                 $privilagedcondition = null;
 
                 if (strcasecmp($privilage_type, "female") == 0) {
@@ -943,7 +949,6 @@ class AcceptedStudentsTable extends Table
                 } elseif (strcasecmp($privilage_type, "disability") == 0) {
                     $privilagedcondition = "AcceptedStudent.disability IS NOT NULL";
                 } else {
-
                     $regions = ClassRegistry::init('ParticipatingDepartment')->find('first', array('conditions' => array('ParticipatingDepartment.college_id' => $college_id, 'ParticipatingDepartment.academic_year' => $academicyear)));
 
                     if (empty($regions['ParticipatingDepartment']['developing_regions_id'])) {
@@ -961,7 +966,6 @@ class AcceptedStudentsTable extends Table
                 if ($number_of_participating_department && $quota) {
                     // the logic is unkown ?
                     for ($i = 1; $i < $number_of_participating_department; $i++) {
-
                         $list_students_in_x_preference = $this->Preference->find('all', array(
                                 'fields' => array('Preference.accepted_student_id', 'Preference.department_id'),
                                 'conditions' => array(
@@ -980,12 +984,10 @@ class AcceptedStudentsTable extends Table
                                         )
                                     )
                                 )
-                            )
-                        );
+                        ));
 
                         // simply count privilaged students in preference 1  for a particular department
                         if ($i == 1) {
-
                             $sum_available_students_privilaged += count($list_students_in_x_preference);
                             // if there are enough students by their first preference for allocated quota for the department.
                             // no need to continue the loop if there are enough privilaged students in system
@@ -1010,7 +1012,7 @@ class AcceptedStudentsTable extends Table
                         ));
 
                         if (!empty($list_of_departments_id)) {
-                            foreach ($list_of_departments_id  as $key => $value) {
+                            foreach ($list_of_departments_id as $key => $value) {
                                 $reformat_list_of_department_ids[] = $value['AcceptedStudent']['department_id'];
                             }
                         }
@@ -1075,7 +1077,6 @@ class AcceptedStudentsTable extends Table
                         if ($reserved_sum > 0) {
                             foreach ($reservedQuotaNumber as $result_critiera_id2 => &$allocation_value2) {
                                 if (!$allocation_value2['adjusted']) {
-
                                     $gap_distribution_sum += round($privilaged_quota_gap * ($allocation_value2['reservedquota'] / $reserved_sum));
                                     $allocation_value2['reservedquota'] += round($privilaged_quota_gap * ($allocation_value2['reservedquota'] / $reserved_sum));
 
@@ -1117,7 +1118,6 @@ class AcceptedStudentsTable extends Table
         } elseif (strcasecmp($privilage_type, "disability") == 0) {
             $privilagedcondition = "AcceptedStudent.disability IS NOT NULL";
         } else {
-
             $regions = ClassRegistry::init('ParticipatingDepartment')->find('first', array('conditions' => array('ParticipatingDepartment.college_id' => $college_id, 'ParticipatingDepartment.academic_year' => $academicyear)));
 
             if (empty($regions['ParticipatingDepartment']['developing_regions_id'])) {
@@ -1142,7 +1142,6 @@ class AcceptedStudentsTable extends Table
         if ($number_of_participating_department && $adjusted_privilaged_quota[$privilage_type] > 0) {
             // the logic is unkown ?
             for ($i = 1; $i < $number_of_participating_department; $i++) {
-
                 $list_students_in_x_preference = $this->Preference->find('all', array(
                         'fields' => array('Preference.accepted_student_id'),
                         'order' => $result_order_by,
@@ -1163,8 +1162,7 @@ class AcceptedStudentsTable extends Table
                                 )
                             )
                         )
-                    )
-                );
+                ));
                 // simply count privilaged students in preference 1 for a particular department
                 //debug($department_id);
                 //debug($privilage_type);
@@ -1206,7 +1204,7 @@ class AcceptedStudentsTable extends Table
                 ));
 
                 if (!empty($list_of_departments_id)) {
-                    foreach ($list_of_departments_id  as $key => $value) {
+                    foreach ($list_of_departments_id as $key => $value) {
                         $reformat_list_of_department_ids[] = $value['AcceptedStudent']['department_id'];
                     }
                 }
@@ -1225,8 +1223,8 @@ class AcceptedStudentsTable extends Table
                                     'conditions' => array(
                                         'Preference.accepted_student_id' => $student['Preference']['accepted_student_id'],
                                         'Preference.preferences_order' => $j
-                                    ))
-                            );
+                                    )
+                            ));
 
                             // is her/his previous preference selected department was
                             // processed ? Exclude from selecting, wait till her
@@ -1307,8 +1305,8 @@ class AcceptedStudentsTable extends Table
                 $index = count($placement_cancelation_list);
                 $placement_cancelation_list[$index]['id'] = $acceptedStudent['AcceptedStudent']['id'];
                 $placement_cancelation_list[$index]['placementtype'] = CANCELLED_PLACEMENT;
-                $placement_cancelation_list[$index]['minute_number'] = NULL;
-                $placement_cancelation_list[$index]['department_id'] = NULL;
+                $placement_cancelation_list[$index]['minute_number'] = null;
+                $placement_cancelation_list[$index]['department_id'] = null;
             }
         }
 
@@ -1320,7 +1318,6 @@ class AcceptedStudentsTable extends Table
                 $autoplacedstudents = $this->auto_parallel_assignment($academicyear, $college_id, $resulttype);
 
                 if (isset($autoplacedstudents) && !empty($autoplacedstudents)) {
-
                     $placedStudentsSave = array();
                     $count = 0;
 
@@ -1420,7 +1417,6 @@ class AcceptedStudentsTable extends Table
                 //debug($ready_competitive_department_allocation);
 
                 do {
-
                     $completed = false;
                     //debug($department_id);
                     //debug($ready_competitive_department_allocation);
@@ -1438,7 +1434,8 @@ class AcceptedStudentsTable extends Table
                                 );
                                 //debug($department_id);
                                 //debug($sortedStudentByPreferenceAndGrade);
-                                if (!empty($sortedStudentByPreferenceAndGrade)) { {
+                                if (!empty($sortedStudentByPreferenceAndGrade)) {
+                                    {
                                     $n = ($reserved_quota_adjusted['reservedquota'] <= count($sortedStudentByPreferenceAndGrade) ? $reserved_quota_adjusted['reservedquota'] : count($sortedStudentByPreferenceAndGrade));
 
                                     if ($n) {
@@ -1452,7 +1449,7 @@ class AcceptedStudentsTable extends Table
                                     //debug($sortedStudentByPreferenceAndGrade);
                                     unset($sortedStudentByPreferenceAndGrade);
                                     //debug($sortedStudentByPreferenceAndGrade);
-                                }
+                                    }
                                 }
                             }
                         }
@@ -1492,7 +1489,6 @@ class AcceptedStudentsTable extends Table
 
                                     $completed = true;
                                 } else {
-
                                     unset($placedStudents);
                                     $placedStudents = array();
                                     $gap = $quota - (!empty($privilaged_selected) ? count($privilaged_selected[$privilage_type]) : 0);
@@ -1535,10 +1531,11 @@ class AcceptedStudentsTable extends Table
                                             //debug($ready_competitive_department_allocation);
                                             //$ready_competitive_department_allocation
                                             foreach ($ready_competitive_department_allocation as $result_critiera_id3 => &$allocation_value3) {
-                                                if ($allocation_value3['reservedquota'] == 0 && !$allocation_value3['adjusted'] && $allocation_value3['available'] > 0) { {
+                                                if ($allocation_value3['reservedquota'] == 0 && !$allocation_value3['adjusted'] && $allocation_value3['available'] > 0) {
+                                                    {
                                                     $allocation_value3['reservedquota'] = ($allocation_value3['available'] >= ($gap - $gap_distribution_sum) ? ($gap - $gap_distribution_sum) : $allocation_value3['available']);
                                                     $gap_distribution_sum += $allocation_value3['reservedquota'];
-                                                }
+                                                    }
 
                                                     if (($gap - $gap_distribution_sum) <= 0) {
                                                         break;
@@ -1651,7 +1648,6 @@ class AcceptedStudentsTable extends Table
 
             return $newly_placed_student;
         }  // no participating department algorithm will not executed.
-
     } // function end
 
 
@@ -2226,5 +2222,4 @@ class AcceptedStudentsTable extends Table
         //debug($acceptedStudentsResult);
         //debug($student_results);
     }
-
 }

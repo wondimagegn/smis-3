@@ -1,76 +1,111 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
 
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
+
 class NotesController extends AppController
 {
 
-    public function index()
-    {
-        $this->paginate = [
-            'contain' => ['Colleges', 'Departments', 'Users'],
-        ];
-        $notes = $this->paginate($this->Notes);
+    public $name = 'Notes';
+    public $menuOptions = array(
+        'parent' => 'campuses',
+        'alias' => array(
+            'index' => 'View Notes',
+            'add' => "Add Note"
+        )
+    );
+    public $paginate = [];
 
-        $this->set(compact('notes'));
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
     }
 
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
+
+    public function index()
+    {
+
+        $this->Note->recursive = 0;
+        $this->set('notes', $this->paginate());
+    }
 
     public function view($id = null)
     {
-        $note = $this->Notes->get($id, [
-            'contain' => ['Colleges', 'Departments', 'Users'],
-        ]);
 
-        $this->set('note', $note);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid note'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('note', $this->Note->read(null, $id));
     }
-
 
     public function add()
     {
-        $note = $this->Notes->newEntity();
-        if ($this->request->is('post')) {
-            $note = $this->Notes->patchEntity($note, $this->request->getData());
-            if ($this->Notes->save($note)) {
-                $this->Flash->success(__('The note has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->Note->create();
+            if ($this->Note->save($this->request->data)) {
+                $this->Session->setFlash(__('The note has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The note could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The note could not be saved. Please, try again.'));
         }
-        $this->set(compact('note'));
+        $colleges = $this->Note->College->find('list');
+        $departments = $this->Note->Department->find('list');
+        $users = $this->Note->User->find('list');
+        $this->set(compact('colleges', 'departments', 'users'));
     }
-
 
     public function edit($id = null)
     {
-        $note = $this->Notes->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $note = $this->Notes->patchEntity($note, $this->request->getData());
-            if ($this->Notes->save($note)) {
-                $this->Flash->success(__('The note has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The note could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(__('Invalid note'));
+            return $this->redirect(array('action' => 'index'));
         }
-        $this->set(compact('note'));
+        if (!empty($this->request->data)) {
+            if ($this->Note->save($this->request->data)) {
+                $this->Session->setFlash(__('The note has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The note could not be saved. Please, try again.'));
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Note->read(null, $id);
+        }
+        $colleges = $this->Note->College->find('list');
+        $departments = $this->Note->Department->find('list');
+        $users = $this->Note->User->find('list');
+        $this->set(compact('colleges', 'departments', 'users'));
     }
-
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $note = $this->Notes->get($id);
-        if ($this->Notes->delete($note)) {
-            $this->Flash->success(__('The note has been deleted.'));
-        } else {
-            $this->Flash->error(__('The note could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid id for note'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->Note->delete($id)) {
+            $this->Session->setFlash(__('Note deleted'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->Session->setFlash(__('Note was not deleted'));
+        return $this->redirect(array('action' => 'index'));
     }
 }

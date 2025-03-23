@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,7 +9,6 @@ use Cake\Validation\Validator;
 
 class WoredasTable extends Table
 {
-
     public function initialize(array $config)
     {
         parent::initialize($config);

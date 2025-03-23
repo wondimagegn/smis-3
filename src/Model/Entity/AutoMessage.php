@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
@@ -16,10 +17,8 @@ class AutoMessage extends Entity
      */
     protected $_accessible = [
         'message' => true,
-        'read' => true,
+        'is_read' => true,
         'user_id' => true,
-        'created' => true,
-        'modified' => true,
-        'user' => true,
     ];
+
 }

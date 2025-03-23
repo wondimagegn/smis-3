@@ -1,13 +1,15 @@
 <?php
+
 namespace App\Controller;
+
+use App\Auth\LegacyPasswordHasher;
 use Cake\Controller\Controller;
+use Cake\Core\Configure;
 use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
-use Cake\Core\Configure;
-use Cake\Auth\DefaultPasswordHasher;
-use App\Auth\LegacyPasswordHasher;
+use Cake\Utility\Inflector;
 
-use Cake\Utility\Inflector; // Import Inflector from the correct namespace
+// Import Inflector from the correct namespace
 
 class AppController extends Controller
 {
@@ -36,19 +38,27 @@ class AppController extends Controller
     public $program_ids = [];
     public $program_type_ids = [];
     public $onlyPre = 0;
-
+    protected $allowedActions = []; // Store allowed actions dynamically
     public function initialize()
     {
         parent::initialize();
+        /*
         $this->loadComponent('Acl', [
-            'className' => 'Acl.Acl'
+            'className' => 'Acl.Acl',
+
+
+        ]);
+        */
+
+        $this->loadComponent('Acl', [
+            'className' => 'App.CustomAcl'
         ]);
 
         // Load Auth only once
         $this->loadComponent('Auth', [
-            //'authorize' => ['Acl'],
-            // 'Acl.Actions' => ['actionPath' => 'controllers/'],
-            'authorize' => ['Acl'],
+
+            'authorize' => ['Acl.Actions'],
+            //'authorize' => [], // Disable ACL
             'authenticate' => [
                 'Form' => [
                     'fields' => [
@@ -60,26 +70,32 @@ class AppController extends Controller
             ],
             'loginAction' => [
                 'controller' => 'Users',
-                'action' => 'login',
-                'plugin' => false
-            ],
-            'logoutRedirect' => [
-                'controller' => 'Users',
                 'action' => 'login'
             ],
             'loginRedirect' => [
                 'controller' => 'Dashboard',
                 'action' => 'index'
             ],
+            'logoutRedirect' => [
+                'controller' => 'Users',
+                'action' => 'login'
+            ],
 
-            'authError' => 'You are not authorized to access that page.',
-            'storage' => 'Session'
+
+            'authError' => 'You do not have permission to access the page you just selected',
+            'unauthorizedRedirect' => false, // ✅ Prevent redirect loop
+            'storage' => 'Session',
+
+            // 'unauthorizedRedirect' => $this->referer(),
+            //  'authorize' => ['Controller'], // Optional for ACL
+
         ]);
+        // Ensure user session is loaded
+        $this->set('authUser', $this->Auth->user());
 
         $this->loadComponent('RequestHandler');
         $this->loadComponent('Flash');
         $this->loadComponent('MenuOptimized');
-
     }
 
     protected function _findIp()
@@ -91,26 +107,48 @@ class AppController extends Controller
     {
         parent::beforeFilter($event);
 
-        $session = $this->request->getSession();
-        debug($session);
+        // Store all allowed actions from child controllers
+        if (!isset($this->allowedActions)) {
+            $this->allowedActions = [];
+        }
 
+        // Retrieve actions that are explicitly allowed in the child controller
+        $this->allowedActions = array_merge($this->allowedActions,
+            $this->Auth->allowedActions);
+
+        // ✅ Skip ACL Check for Publicly Allowed Actions (from any controller)
+        if (in_array($this->request->getParam('action'), $this->allowedActions)) {
+
+            return; // Skip ACL check, allow the action
+        }
+
+
+
+        $session = $this->request->getSession();
         if ($session->check('Auth.User')) {
             $auth = $session->read('Auth.User');
             if (!empty($auth)) {
+                $userTable = TableRegistry::getTableLocator()->get('Users');
+                $permissionLists = $userTable->getAllPermissions($auth['id']);
+
                 $this->set('username', $auth['username']);
                 $this->set('last_login', $auth['last_login']);
                 $this->set('user_id', $auth['id']);
 
 
-                $userTable = TableRegistry::getTableLocator()->get('Users');
-                $permissionLists = $userTable->getAllPermissions($auth['id']);
+                if ($auth['id'] && !$session->read('permissionLists') || true) {
 
-                Configure::write('permissionLists', $permissionLists['permission']);
-                Configure::write('PermissionLists.Perm', $permissionLists['permission']);
-                Configure::write('reformatePermission', $permissionLists['reformatePermission']);
+                    $permissionLists = $userTable->getAllPermissions($auth['id']);
 
-                $session->write('permissionLists', $permissionLists['permission']);
-                $session->write('reformatePermission', $permissionLists['reformatePermission']);
+                    Configure::write('permissionLists', $permissionLists['permission']);
+                    Configure::write('PermissionLists.Perm', $permissionLists['permission']);
+                    Configure::write('reformatePermission', $permissionLists['reformatePermission']);
+
+                    $session->write('permissionLists', $permissionLists['permission']);
+                    $session->write('reformatePermission', $permissionLists['reformatePermission']);
+                }
+
+
                 $session->write('role_id', $auth['role_id']);
                 $this->role_id = $auth['role_id'];
 
@@ -122,17 +160,18 @@ class AppController extends Controller
                 $this->set('user_full_name', $auth['full_name']);
                 $session->write('user_id', $auth['id']);
 
-                $userDetail = $session->read('users_relation') ?? $userTable->getUserDetails($auth['id']);
+                $userDetail = $session->read('users_relation') ??
+                    $userTable->getUserDetails($auth['id']);
 
-                if ($userDetail) {
+                if (isset($userDetail) && !empty($userDetail)) {
                     $session->write('users_relation', $userDetail);
                 } else {
                     $this->Flash->error('There is a conflicting session, please login again.');
                     return $this->redirect($this->Auth->logout());
                 }
 
-                if (!empty($userDetail['Staff'][0])) {
-                    $this->staff_id = $userDetail['Staff'][0]['id'];
+                if (!empty($userDetail['Staff'])) {
+                    $this->staff_id = $userDetail['Staff']['id'];
 
                     if (!empty($userDetail['Role'])) {
                         $this->role_id = $userDetail['Role']['id'];
@@ -141,31 +180,31 @@ class AppController extends Controller
                         $this->set('role_name', $this->role_name);
                     }
 
-                    if (!empty($userDetail['Staff'][0]['college_id'])) {
-                        $this->college_id = $userDetail['Staff'][0]['college_id'];
+                    if (!empty($userDetail['Staff']['college_id'])) {
+                        $this->college_id = $userDetail['Staff']['college_id'];
                         $this->set('college_id', $this->college_id);
                     }
 
-                    if (!empty($userDetail['Staff'][0]['department_id'])) {
-                        $this->department_id = $userDetail['Staff'][0]['department_id'];
+                    if (!empty($userDetail['Staff']['department_id'])) {
+                        $this->department_id = $userDetail['Staff']['department_id'];
                         $this->set('department_id', $this->department_id);
                     }
 
-                    if (!empty($userDetail['Staff'][0]['College']['name'])) {
-                        $this->college_name = $userDetail['Staff'][0]['College']['name'];
+                    if (!empty($userDetail['Staff']['College']['name'])) {
+                        $this->college_name = $userDetail['Staff']['College']['name'];
                         $this->set('college_name', $this->college_name);
                     }
 
-                    if (!empty($userDetail['Staff'][0]['Department']['name'])) {
-                        $this->department_name = $userDetail['Staff'][0]['Department']['name'];
+                    if (!empty($userDetail['Staff']['Department']['name'])) {
+                        $this->department_name = $userDetail['Staff']['Department']['name'];
                         $this->set('department_name', $this->department_name);
                     }
-                } else if (!empty($userDetail['Student'][0])) {
-                    $this->student_id = $userDetail['Student'][0]['id'];
-                    $this->college_id = $userDetail['Student'][0]['college_id'];
-                    $this->department_id = $userDetail['Student'][0]['department_id'];
-                    $this->program_id = $userDetail['Student'][0]['program_id'];
-                    $this->program_type_id = $userDetail['Student'][0]['program_type_id'];
+                } elseif (!empty($userDetail['Student'])) {
+                    $this->student_id = $userDetail['Student']['id'];
+                    $this->college_id = $userDetail['Student']['college_id'];
+                    $this->department_id = $userDetail['Student']['department_id'];
+                    $this->program_id = $userDetail['Student']['program_id'];
+                    $this->program_type_id = $userDetail['Student']['program_type_id'];
 
                     $this->set('college_id', $this->college_id);
                     $this->set('department_id', $this->department_id);
@@ -173,12 +212,16 @@ class AppController extends Controller
                     $this->set('program_type_id', $this->program_type_id);
                 }
 
+
+
                 $this->department_ids = $userDetail['ApplicableAssignments']['department_ids'] ?? [];
                 $this->college_ids = $userDetail['ApplicableAssignments']['college_ids'] ?? [];
                 $this->program_ids = $userDetail['ApplicableAssignments']['program_ids'] ?? [];
                 $this->program_type_ids = $userDetail['ApplicableAssignments']['program_type_ids'] ?? [];
                 $this->onlyPre = $userDetail['ApplicableAssignments']['college_permission'] ?? 0;
                 $this->year_levels = $userDetail['ApplicableAssignments']['year_level_names'] ?? [];
+
+
 
                 if ($this->onlyPre == 1) {
                     $this->department_ids = [];
@@ -192,21 +235,36 @@ class AppController extends Controller
                 }
             }
         }
-
+        /*
         $user = $this->Auth->user();
-        if ($user) {
 
-            //$aco = "controllers/{$this->name}/{$this->request->getParam('action')}";
-            $acoPath = "controllers/" . Inflector::camelize($this->name) . "/{$this->request->getParam('action')}";
+        if (!empty($user) && isset($user['id'])) {
 
-            if (!$this->Acl->check(
-                ['model' => 'Users', 'foreign_key' =>  $user['id']],
-                $acoPath
-            )) {
-
-                $this->Flash->error('You are not authorized to access that location.');
-                return $this->redirect(['controller' => 'Pages', 'action' => 'home']);
+            // Store all allowed actions from child controllers
+            if (!isset($this->allowedActions)) {
+                $this->allowedActions = [];
             }
+
+            // Retrieve actions that are explicitly allowed in the child controller
+            $this->allowedActions = array_merge($this->allowedActions, $this->Auth->allowedActions);
+
+            // ✅ Skip ACL Check for Publicly Allowed Actions (from any controller)
+            if (in_array($this->request->getParam('action'), $this->allowedActions)) {
+                return; // Skip ACL check, allow the action
+            }
+
+            $acoPath = "controllers/" . Inflector::camelize($this->name) .
+                "/{$this->request->getParam('action')}";
+
+            $permissionCheck = $this->Acl->check(['Roles' => ['id' => $user['role_id']]], $acoPath);
+            // If no access for role, check by user
+            if (!$permissionCheck) {
+                $this->Flash->error(__('You are not authorized to access this page.'));
+                //  return $this->redirect(['controller' => 'Users', 'action' => 'login']);
+                return $this->redirect('/');
+            }
+
         }
+        */
     }
 }

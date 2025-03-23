@@ -1,3 +1,8 @@
+<?php
+
+use Cake\Core\Configure;
+
+?>
 <!DOCTYPE html>
 <html class="no-js" lang="en">
 <head>
@@ -10,16 +15,33 @@
     <?= $this->Html->css('jquery-customselect-1.9.1'); ?>
 
     <script>
+
+
         document.addEventListener('DOMContentLoaded', function() {
             var isLoggedIn = <?= json_encode($this->request->getSession()->read('User.is_logged_in')); ?>;
+
             if (isLoggedIn) {
                 setInterval(function() {
-                    fetch('/users/check_session')
-                        .then(response => response.json())
-                        .then(data => { if (!data.is_logged_in) window.location.reload(); });
+                    fetch('<?= $this->Url->build(["controller" => "Users", "action" => "checkSession"]); ?>', {
+                        method: 'GET',
+                        headers: {'X-Requested-With': 'XMLHttpRequest'} // Ensures AJAX request
+                    })
+                        .then(response => response.text()) // Read response as text first
+                        .then(text => {
+                            try {
+                                const data = JSON.parse(text); // Convert text to JSON
+                                if (!data.is_logged_in) {
+                                    window.location.reload();
+                                }
+                            } catch (error) {
+                                console.error("Invalid JSON response:", text); // Debugging
+                            }
+                        })
+                        .catch(error => console.error("Fetch error:", error));
                 }, 10000);
             }
         });
+
     </script>
 </head>
 
@@ -119,6 +141,7 @@
                     </div>
                 </div>
                 <?= $this->fetch('content'); ?>
+
             </div>
         </div>
         <footer>

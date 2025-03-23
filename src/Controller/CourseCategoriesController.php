@@ -1,11 +1,8 @@
 <?php
 namespace App\Controller;
 
-use App\Controller\AppController;
-
 class CourseCategoriesController extends AppController
 {
-
     public function index()
     {
         $this->paginate = [

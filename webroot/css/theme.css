@@ -905,7 +905,7 @@ ol.breadcrumb.newcrumb {
   font-size: 12px;
   color: #666; }
 
-/* 
+/*
 Dropdown menus
 */
 .dropdown-menu > li > a {
@@ -976,7 +976,7 @@ Drodown in navbars
     font-weight: 100;
     color: #808CA0; }
 
-/* 
+/*
 Sidebar Menu
 */
 body {
@@ -1329,7 +1329,7 @@ li.hide-min-toggle {
   /* width: 35px; */
   border: 2px solid rgba(255, 255, 255, 0.1); }
 
-/* 
+/*
 Show up sidemenu when minimize
 */
 /*
@@ -1448,7 +1448,7 @@ ul.topnav h4 {
   float: right !important;
   margin-top: -2px; }
 
-/* 
+/*
         CONTENT
 */
 /*
@@ -1996,5 +1996,3 @@ footer {
   float: left;
   height: 50px;
   width: 4px; }
-
-/*# sourceMappingURL=theme.css.map */

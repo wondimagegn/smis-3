@@ -1,13 +1,14 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class AlumniMembersTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +17,7 @@ class AlumniMembersTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('alumni_members');
@@ -33,6 +35,7 @@ class AlumniMembersTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -145,27 +148,35 @@ class AlumniMembersTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->isUnique(['email']));
 
         return $rules;
     }
 
-    public function nextTrackingNumber(){
-        $nextapplicationnumber=$this->find('first',
-            array('order'=>array('AlumniMember.created DESC')));
-        if(isset($nextapplicationnumber)
-            && !empty($nextapplicationnumber)){
-            return $nextapplicationnumber['AlumniMember']['trackingnumber']+1;
+    public function nextTrackingNumber()
+    {
+
+        $nextapplicationnumber = $this->find(
+            'first',
+            array('order' => array('AlumniMember.created DESC'))
+        );
+        if (
+            isset($nextapplicationnumber)
+            && !empty($nextapplicationnumber)
+        ) {
+            return $nextapplicationnumber['AlumniMember']['trackingnumber'] + 1;
         }
         return 20011;
     }
 
-    function checkUnique($data, $fieldName) {
+    public function checkUnique($data, $fieldName)
+    {
+
         $valid = false;
-        if(isset($fieldName) && $this->hasField($fieldName)) {
+        if (isset($fieldName) && $this->hasField($fieldName)) {
             $valid = $this->isUnique(array($fieldName => $data));
         }
         return $valid;
     }
-
 }

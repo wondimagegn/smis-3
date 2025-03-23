@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -137,12 +138,11 @@ class CourseDropsTable extends Table
         //debug(implode(",", $publishedCourseIds));
 
         if (!empty($publishedCourseIds)) {
-
             $course_registration_ids = $this->CourseRegistration->find('list', array(
                 'conditions' => array(
                     'CourseRegistration.published_course_id' => $publishedCourseIds,
                     'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.id not in (select course_registration_id from course_drops where student_id = ' .$student_id . ' and registrar_confirmation = 1 and department_approval = 1) '
+                    'CourseRegistration.id not in (select course_registration_id from course_drops where student_id = ' . $student_id . ' and registrar_confirmation = 1 and department_approval = 1) '
                 ),
                 'fields' => 'id',
                 //'order' => array('CourseRegistration.created' => 'DESC')
@@ -153,9 +153,7 @@ class CourseDropsTable extends Table
 
             //check student is passed ?
             if (!empty($course_registration_ids)) {
-
                 foreach ($course_registration_ids as $key => $course_registration_id) {
-
                     $latest_grade = $this->CourseRegistration->getCourseRegistrationLatestApprovedGradeDetail($course_registration_id);
 
                     //prerequisite taken but grade is not submitted
@@ -189,9 +187,7 @@ class CourseDropsTable extends Table
             ));
 
             if (!empty($course_add_ids)) {
-
                 foreach ($course_add_ids as $key => $course_add_id) {
-
                     $latest_grade = ClassRegistry::init('CourseAdd')->getCourseAddLatestApprovedGradeDetail($course_add_id);
 
                     //prerequist taken but grade is not submitted
@@ -233,7 +229,6 @@ class CourseDropsTable extends Table
         //does the course has prerequiste
 
         if (!empty($course_id) && $this->isPrerequisteExist($course_id) === true) {
-
             $prerequisite_course_id = $this->getPrerequisteCourseId($course_id);
 
             $listOfPrerequistes = $this->CourseRegistration->PublishedCourse->Course->Prerequisite->find('list', array(
@@ -255,11 +250,9 @@ class CourseDropsTable extends Table
                     }
                 }
             }
-
         }
 
         if (!empty($course_id)) {
-
             $equivalent_course_taken = $this->CourseRegistration->PublishedCourse->Course->getTakenEquivalentCourses($student_id, $course_id);
 
             $publishedCourseIds = $this->CourseRegistration->PublishedCourse->find('list', array(
@@ -314,7 +307,7 @@ class CourseDropsTable extends Table
                 //student is allowed for repetation
                 if ($gradeSubmitted == 1) {
                     return 3; // allow rep
-                } else if ($gradeSubmitted == 0) {
+                } elseif ($gradeSubmitted == 0) {
                     return 2;
                 }
             }
@@ -336,7 +329,6 @@ class CourseDropsTable extends Table
 
             if (!empty($course_add_ids)) {
                 foreach ($course_add_ids as $key => $course_add_id) {
-
                     //$latest_grade = ClassRegistry::init('CourseAdd')->getCourseAddLatestApprovedGradeDetail($course_add_id);
 
                     $latest_grade = ClassRegistry::init('ExamGrade')->getApprovedGrade($course_add_id, 0);
@@ -355,7 +347,7 @@ class CourseDropsTable extends Table
                     //student is already taken courses dont allow add
                     if ($gradeSubmitted == 1) {
                         return 3; //normal registration
-                    } else if ($gradeSubmitted == 0) {
+                    } elseif ($gradeSubmitted == 0) {
                         return 2;
                     }
                 }
@@ -474,7 +466,6 @@ class CourseDropsTable extends Table
                         $course_drop_reformat[$count] = $value;
                         $course_drop_reformat[$count]['prequisite_taken_passsed'] = 0;
                     }
-
                 } else {
                     $course_drop_reformat[$count] = $value;
                     $course_drop_reformat[$count]['prequisite_taken_passsed'] = 1;
@@ -514,7 +505,6 @@ class CourseDropsTable extends Table
         }
 
         if (!empty($department_ids)) {
-
             $options['contain'] = array(
                 'Student'  => array(
                     'conditions' => array(
@@ -526,9 +516,7 @@ class CourseDropsTable extends Table
                     'fields' => array('id', 'department_id')
                 )
             );
-
-        } else if (!empty($college_ids)) {
-
+        } elseif (!empty($college_ids)) {
             $options['contain'] = array(
                 'Student'  => array(
                     'conditions' => array(
@@ -557,7 +545,7 @@ class CourseDropsTable extends Table
                     if ((is_array($department_ids) && in_array($registred_id['Student']['department_id'], $department_ids)) || (!is_array($department_ids) && $registred_id['Student']['department_id'] == $department_ids)) {
                         $list_of_registred_ids[] = $registred_id['CourseRegistration']['id'];
                     }
-                } else if (isset($registred_id['Student']['college_id']) && !empty($registred_id['Student']['college_id']) && !empty($registred_id['CourseRegistration']['student_id'])) {
+                } elseif (isset($registred_id['Student']['college_id']) && !empty($registred_id['Student']['college_id']) && !empty($registred_id['CourseRegistration']['student_id'])) {
                     if ((is_array($college_ids) && in_array($registred_id['Student']['college_id'], $college_ids)) || (!is_array($college_ids) && $registred_id['Student']['college_id'] == $college_ids)) {
                         $list_of_registred_ids[] = $registred_id['CourseRegistration']['id'];
                     }
@@ -601,7 +589,6 @@ class CourseDropsTable extends Table
             }
 
             $coursesDrop['count'] = count($coursesDrop['list']);
-
         }
 
         return $coursesDrop;
@@ -624,7 +611,7 @@ class CourseDropsTable extends Table
             $previous_status_semester['semester']
         );
 
-        //	debug( $latest_status_year_semester);
+        //  debug( $latest_status_year_semester);
         $student_section_exam_status = $this->CourseRegistration->Student->get_student_section($student_id, $latest_academic_year_semester['academic_year'], $latest_status_year_semester['semester']);
 
         //StudentBasicInfo
@@ -759,7 +746,7 @@ class CourseDropsTable extends Table
 
         if (!empty($this->department_ids) && empty($data['Student']['department_id']) && empty($data['Student']['studentnumber'])) {
             $search_conditions['conditions'][] = array('Student.department_id' => $this->department_ids);
-        } else if (!empty($this->college_ids) && empty($data['Student']['college_id'])) {
+        } elseif (!empty($this->college_ids) && empty($data['Student']['college_id'])) {
             $search_conditions['conditions'][] = array('Student.college_id' => $this->college_ids, 'Student.department_id is null');
         }
 
@@ -789,7 +776,7 @@ class CourseDropsTable extends Table
         $prequist = $this->CourseRegistration->PublishedCourse->Course->Prerequisite->find('first', array('conditions' => array('Prerequisite.course_id' => $course_id)));
 
         if (isset($prequist['Prerequisite']['prerequisite_course_id'])) {
-            return 	$prequist['Prerequisite']['prerequisite_course_id'];
+            return $prequist['Prerequisite']['prerequisite_course_id'];
         } else {
             return array();
         }
@@ -807,7 +794,7 @@ class CourseDropsTable extends Table
                     'Section.archive' => 0,
                 )
             ));
-        } else if (!empty($college_ids)) {
+        } elseif (!empty($college_ids)) {
             $sections = $this->Student->Section->find('list', array(
                 'conditions' => array(
                     'Section.department_id is null',
@@ -955,7 +942,6 @@ class CourseDropsTable extends Table
         if (!empty($courseDrops)) {
             foreach ($courseDrops as $pk => &$pv) {
                 if (array_key_exists($pv['Student']['StudentsSection'][0]['section_id'], $sections)) {
-
                     $semesterAc = ClassRegistry::init('CourseRegistration')->getLastestStudentSemesterAndAcademicYear($pv['Student']['id'], $current_academic_year, 1);
                     $pv['Student']['max_load'] = $this->Student->calculateStudentLoad($pv['Student']['id'], $semesterAc['semester'], $semesterAc['academic_year']);
 
@@ -993,13 +979,13 @@ class CourseDropsTable extends Table
                     'Student.graduated = 0',
                 );
             }
-        } else if ($registrar == 2) {
+        } elseif ($registrar == 2) {
             $options['conditions'] = array(
                 'Student.department_id' => $department_ids,
                 'CourseDrop.department_approval is null',
                 'Student.graduated = 0',
             );
-        } else if ($registrar == 3) {
+        } elseif ($registrar == 3) {
             if (!empty($college_ids)) {
                 $options['conditions'] = array(
                     'Student.department_id is null',
@@ -1014,7 +1000,6 @@ class CourseDropsTable extends Table
         $courseDropCount = 0;
 
         if (!empty($options['conditions'])) {
-
             $this->Student->bindModel(array('hasMany' => array('StudentsSection')));
 
             $options['contain'] = array(

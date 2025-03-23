@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -106,5 +107,4 @@ class UserDormAssignmentsTable extends Table
 
         return $organizedAssignments;
     }
-
 }

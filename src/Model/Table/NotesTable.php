@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class NotesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class NotesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('notes');
@@ -42,15 +45,17 @@ class NotesTable extends Table
      * @return \Cake\Validation\Validator
      */
 
-    function getRecentNote(){
+    public function getRecentNote()
+    {
+
         $start = date('Y-m-d');
         $end = date('Y-m-d', strtotime('+7 day'));
         $conditions = array('Note.start_date <=' => $end, 'Note.end_date >=' => $start);
         $getRecentNote = $this->find('all', array(
-                'conditions' => $conditions,
-                'order' => 'title DESC',
-                'limit' => 2)
-        );
+            'conditions' => $conditions,
+            'order' => 'title DESC',
+            'limit' => 2
+        ));
         return $getRecentNote;
     }
 }

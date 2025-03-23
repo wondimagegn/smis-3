@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -48,8 +49,11 @@ class DormitoriesTable extends Table
             ->greaterThanOrEqual('dorm_number', 0, 'Dorm number must be greater than or equal to zero.')
             ->add('dorm_number', 'unique', [
                 'rule' => function ($value, $context) {
-                    return $this->find('all',
-                        ['conditions' => ['dorm_number' => $value]])->isEmpty();
+
+                    return $this->find(
+                        'all',
+                        ['conditions' => ['dorm_number' => $value]]
+                    )->isEmpty();
                 },
                 'message' => 'This dorm number already exists.
                 Please provide a unique dorm number.'
@@ -79,5 +83,4 @@ class DormitoriesTable extends Table
 
         return $rules;
     }
-
 }

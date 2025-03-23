@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -135,7 +135,6 @@ class CourseAddsTable extends Table
         $grade_history = array();
 
         if ($course_add_id != null) {
-
             $grade_history_row = $this->ExamGrade->find('all', array(
                 'conditions' => array(
                     'ExamGrade.course_add_id' => $course_add_id
@@ -202,7 +201,6 @@ class CourseAddsTable extends Table
             if (empty($exam_grade_change)) {
                 return 'on-process';
             } else {
-
                 if ($exam_grade_change['manual_ng_conversion'] == 1 || $exam_grade_change['auto_ng_conversion'] == 1) {
                     return 'accepted';
                 }
@@ -211,19 +209,19 @@ class CourseAddsTable extends Table
                     if ($exam_grade_change['college_approval'] == 1 || $exam_grade_change['makeup_exam_result'] != null) {
                         if ($exam_grade_change['registrar_approval'] == 1) {
                             return 'accepted';
-                        } else if ($exam_grade_change['registrar_approval'] == -1) {
+                        } elseif ($exam_grade_change['registrar_approval'] == -1) {
                             return 'rejected';
-                        } else if ($exam_grade_change['registrar_approval'] == null) {
+                        } elseif ($exam_grade_change['registrar_approval'] == null) {
                             return 'on-process';
                         }
-                    } else if ($exam_grade_change['college_approval'] == -1) {
+                    } elseif ($exam_grade_change['college_approval'] == -1) {
                         return 'rejected';
-                    } else if ($exam_grade_change['college_approval'] == null) {
+                    } elseif ($exam_grade_change['college_approval'] == null) {
                         return 'on-process';
                     }
-                } else if ($exam_grade_change['department_approval'] == -1) {
+                } elseif ($exam_grade_change['department_approval'] == -1) {
                     return 'rejected';
-                } else if ($exam_grade_change['department_approval'] == null) {
+                } elseif ($exam_grade_change['department_approval'] == null) {
                     return 'on-process';
                 }
             }
@@ -240,14 +238,14 @@ class CourseAddsTable extends Table
                 if ($exam_grade['department_approval'] == 1) {
                     if ($exam_grade['registrar_approval'] == 1) {
                         return 'accepted';
-                    } else if ($exam_grade['registrar_approval'] == -1) {
+                    } elseif ($exam_grade['registrar_approval'] == -1) {
                         return 'rejected';
-                    } else if ($exam_grade['registrar_approval'] == null) {
+                    } elseif ($exam_grade['registrar_approval'] == null) {
                         return 'on-process';
                     }
-                } else if ($exam_grade['department_approval'] == -1) {
+                } elseif ($exam_grade['department_approval'] == -1) {
                     return 'rejected';
-                } else if ($exam_grade['department_approval'] == null) {
+                } elseif ($exam_grade['department_approval'] == null) {
                     return 'on-process';
                 }
             }
@@ -278,7 +276,8 @@ class CourseAddsTable extends Table
 
         if (!empty($grade_histories)) {
             foreach ($grade_histories as $key => $grade_history) {
-                if (isset($grade_history['ExamGrade']['grade']) && $grade_history['ExamGrade']['grade'] != $latest_grade &&
+                if (
+                    isset($grade_history['ExamGrade']['grade']) && $grade_history['ExamGrade']['grade'] != $latest_grade &&
                     ($grade_history['type'] != 'Change' || (($grade_history['ExamGrade']['department_approval'] == 1 || $grade_history['ExamGrade']['initiated_by_department'] == 1) && $grade_history['ExamGrade']['registrar_approval'] == 1 && $grade_history['ExamGrade']['college_approval'] == 1) || ($grade_history['ExamGrade']['makeup_exam_result'] != null && ($grade_history['ExamGrade']['department_approval'] == 1 || $grade_history['ExamGrade']['initiated_by_department'] == 1) && $grade_history['ExamGrade']['registrar_approval'] == 1))
                 ) {
                     $latest_grade = $grade_history['ExamGrade']['grade'];
@@ -297,7 +296,8 @@ class CourseAddsTable extends Table
 
         if (!empty($grade_histories)) {
             foreach ($grade_histories as $key => $grade_history) {
-                if (strcasecmp($grade_history['type'], 'Add') == 0 ||
+                if (
+                    strcasecmp($grade_history['type'], 'Add') == 0 ||
                     (strcasecmp($grade_history['type'], 'Change') == 0 && $grade_history['ExamGrade']['makeup_exam_result'] == null && $grade_history['ExamGrade']['department_approval'] != -1 && $grade_history['ExamGrade']['college_approval'] != -1 && $grade_history['ExamGrade']['registrar_approval'] != -1) ||
                     (strcasecmp($grade_history['type'], 'Change') == 0 && $grade_history['ExamGrade']['makeup_exam_result'] != null) ||
                     (strcasecmp($grade_history['type'], 'Change') == 0 && ($grade_history['ExamGrade']['auto_ng_conversion'] == 1 || $grade_history['ExamGrade']['manual_ng_conversion'] == 1))
@@ -321,10 +321,18 @@ class CourseAddsTable extends Table
 
         if (!empty($grade_histories)) {
             foreach ($grade_histories as $key => $grade_history) {
-                if (((strcasecmp($grade_history['type'], 'Add') == 0 && !empty($grade_history['ExamGrade']) && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1) ||
+                if (
+                    ((strcasecmp(
+                                $grade_history['type'],
+                                'Add'
+                            ) == 0 && !empty($grade_history['ExamGrade']) && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1) ||
                         (strcasecmp($grade_history['type'], 'Change') == 0 && $grade_history['ExamGrade']['makeup_exam_result'] == null && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['college_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1) ||
                         (strcasecmp($grade_history['type'], 'Change') == 0 && $grade_history['ExamGrade']['makeup_exam_result'] != null && $grade_history['ExamGrade']['initiated_by_department'] == 0 && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1) ||
-                        (strcasecmp($grade_history['type'], 'Change') == 0 && $grade_history['ExamGrade']['makeup_exam_result'] != null && $grade_history['ExamGrade']['initiated_by_department'] == 1 && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1)) || (isset($grade_history['ExamGrade']['auto_ng_conversion']) && $grade_history['ExamGrade']['auto_ng_conversion'])) {
+                        (strcasecmp(
+                                $grade_history['type'],
+                                'Change'
+                            ) == 0 && $grade_history['ExamGrade']['makeup_exam_result'] != null && $grade_history['ExamGrade']['initiated_by_department'] == 1 && $grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == 1)) || (isset($grade_history['ExamGrade']['auto_ng_conversion']) && $grade_history['ExamGrade']['auto_ng_conversion'])
+                ) {
                     //$latest_grade_detail = $grade_history;
                     //debug($grade_history);
                     if (isset($latest_grade_detail) && !empty($latest_grade_detail)) {
@@ -372,7 +380,6 @@ class CourseAddsTable extends Table
             //debug($matching_courses);
 
             if ($include_equivalent == 1) {
-
                 $student_department = $this->Student->find('first', array(
                     'conditions' => array(
                         'Student.id' => $student_id
@@ -412,7 +419,6 @@ class CourseAddsTable extends Table
                         } */
 
                         $matching_courses[] = $course_id;
-
                     } else {
                         // If the course is from other department then we are going to look for its equivalent department course
 
@@ -462,7 +468,10 @@ class CourseAddsTable extends Table
 
             if (!empty($course_adds_raw)) {
                 foreach ($course_adds_raw as $key => $value) {
-                    if (($value['PublishedCourse']['add'] == 1 || ($value['CourseAdd']['department_approval'] == 1 && $value['CourseAdd']['registrar_confirmation'] == 1)) && in_array($value['PublishedCourse']['Course']['id'], $matching_courses)){
+                    if (($value['PublishedCourse']['add'] == 1 || ($value['CourseAdd']['department_approval'] == 1 && $value['CourseAdd']['registrar_confirmation'] == 1)) && in_array(
+                            $value['PublishedCourse']['Course']['id'],
+                            $matching_courses
+                        )) {
                         $course_adds[] = $value;
                     }
                 }
@@ -522,8 +531,7 @@ class CourseAddsTable extends Table
             $options['conditions'][] = 'Student.graduated = 0';
             $options['conditions'][] = 'PublishedCourse.section_id is not null';
             $options['conditions'][] = 'PublishedCourse.course_id is not null';
-
-        } else if ($registrar_department == 2) {
+        } elseif ($registrar_department == 2) {
             $options['contain'] = array(
                 'PublishedCourse' => array(
                     'Course' => array(
@@ -658,9 +666,8 @@ class CourseAddsTable extends Table
         $courseAdds = array();
 
         if (!empty($options['conditions'])) {
-
             if (isset($acy_ranges) && !empty($acy_ranges)) {
-                $acy_ranges_by_comma_quoted = "'" . implode ( "', '", $acy_ranges ) . "'";
+                $acy_ranges_by_comma_quoted = "'" . implode("', '", $acy_ranges) . "'";
                 $options['conditions'][] = 'CourseAdd.academic_year IN (' . $acy_ranges_by_comma_quoted . ')';
             }
 
@@ -679,9 +686,7 @@ class CourseAddsTable extends Table
         $options = array();
 
         if (!empty($department_ids) || !empty($college_ids)) {
-
             if ($registrar == 1) {
-
                 /* if (!empty($department_ids) && is_array($department_ids)) {
                     $activeDepartmentIDs = $this->PublishedCourse->Department->find('list', array('conditions' => array('Department.id' => $department_ids, 'Department.active' => 1)));
                     if (!empty($activeDepartmentIDs)) {
@@ -708,7 +713,7 @@ class CourseAddsTable extends Table
                     $options['conditions']['Student.department_id'] = $department_ids;
                     $options['conditions'][] = 'CourseAdd.department_approval = 1';
                     $options['conditions'][] = 'CourseAdd.registrar_confirmation is null';
-                } else if (!empty($college_ids)) {
+                } elseif (!empty($college_ids)) {
                     $options['conditions'] = array(
                         'Student.department_id is null ',
                         'Student.college_id ' => $college_ids,
@@ -718,15 +723,14 @@ class CourseAddsTable extends Table
                     );
                 }
                 //debug($options);
-
-            } else if ($registrar == 2) {
+            } elseif ($registrar == 2) {
                 $options['conditions'] = array(
                     'Student.department_id' => $department_ids,
                     'CourseAdd.department_approval is null',
                     'CourseAdd.department_approval is null',
                     'Student.graduated = 0',
                 );
-            } else if ($registrar == 3) {
+            } elseif ($registrar == 3) {
                 if (!empty($college_ids)) {
                     $options['conditions'] = array(
                         'Student.department_id is null',
@@ -742,9 +746,8 @@ class CourseAddsTable extends Table
         $courseAddCount = 0;
 
         if (!empty($options['conditions'])) {
-
             if (isset($acy_ranges) && !empty($acy_ranges)) {
-                $acy_ranges_by_comma_quoted = "'" . implode ( "', '", $acy_ranges ) . "'";
+                $acy_ranges_by_comma_quoted = "'" . implode("', '", $acy_ranges) . "'";
                 $options['conditions'][] = 'CourseAdd.academic_year IN (' . $acy_ranges_by_comma_quoted . ')';
                 $options['conditions'][] = 'CourseAdd.auto_rejected <> 1';
             }
@@ -788,7 +791,6 @@ class CourseAddsTable extends Table
         if (!empty($courseAdds)) {
             //debug($courseAdds[0]);
             foreach ($courseAdds as $pk => &$pv) {
-
                 $pv['Student']['max_load'] = $this->Student->calculateStudentLoad($pv['Student']['id'], $pv['CourseAdd']['semester'], $pv['CourseAdd']['academic_year']);
                 $pv['Student']['maximumCreditPerSemester'] =  ClassRegistry::init('AcademicCalendar')->maximumCreditPerSemester($pv['Student']['id']);
                 //$pv['Student']['GeneralSetting'] =  ClassRegistry::init('GeneralSetting')->getAllGeneralSettingsByStudentByProgramIdOrBySectionID($pv['Student']['id'])['GeneralSetting'];
@@ -856,7 +858,7 @@ class CourseAddsTable extends Table
                             $pre_passed = ClassRegistry::init('CourseDrop')->prequisite_taken($student_id, $prevalue['prerequisite_course_id']);
                             if ($pre_passed === true) {
                                 $passed_count['passed'] = $passed_count['passed'] + 1;
-                            } else if ($pre_passed == 2) {
+                            } elseif ($pre_passed == 2) {
                                 $passed_count['onhold'] = $passed_count['onhold'] + 1;
                             }
                         }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -197,7 +198,8 @@ class CurriculumsTable extends Table
     {
         if ($this->Course->find('count', array('conditions' => array('Course.curriculum_id' => $curriculum_id))) > 0) {
             return false;
-        } else if ($this->Student->find('count', array('conditions' => array('Student.curriculum_id' => $curriculum_id))) > 0) {
+        } elseif ($this->Student->find('count', array('conditions' => array('Student.curriculum_id' => $curriculum_id))
+            ) > 0) {
             return false;
         }
         /* else if ($this->Attachment->find('count', array('conditions' => array('Attachment.model' => 'Curriculum', 'Attachment.foreign_key' => $curriculum_id))) > 0) {
@@ -229,7 +231,7 @@ class CurriculumsTable extends Table
     function preparedAttachment($data = null)
     {
         if (!empty($data['Attachment'])) {
-            foreach ($data['Attachment'] as $in =>  &$dv) {
+            foreach ($data['Attachment'] as $in => &$dv) {
                 if (empty($dv['file']['name']) && empty($dv['file']['type']) && empty($dv['tmp_name'])) {
                     unset($data['Attachment'][$in]);
                 } else {
@@ -278,11 +280,10 @@ class CurriculumsTable extends Table
         if (!empty($departmentStudyProgramDetails)) {
             foreach ($departmentStudyProgramDetails as $dspkey => $dspval) {
                 //debug($dspval);
-                $departmentStudyProgramListForSelect[$dspval['DepartmentStudyProgram']['id']] =  $dspval['StudyProgram']['study_program_name'] . '(' . $dspval['StudyProgram']['code'] .') => ' . $dspval['ProgramModality']['modality'] . '(' . $dspval['ProgramModality']['code'] . ') => ' . $dspval['Qualification']['qualification'] . '(' . $dspval['Qualification']['code'] . ')';
+                $departmentStudyProgramListForSelect[$dspval['DepartmentStudyProgram']['id']] = $dspval['StudyProgram']['study_program_name'] . '(' . $dspval['StudyProgram']['code'] . ') => ' . $dspval['ProgramModality']['modality'] . '(' . $dspval['ProgramModality']['code'] . ') => ' . $dspval['Qualification']['qualification'] . '(' . $dspval['Qualification']['code'] . ')';
             }
         }
 
         return $departmentStudyProgramListForSelect;
     }
-
 }

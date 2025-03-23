@@ -1,72 +1,99 @@
 <?php
+
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
+
 
 class JournalsController extends AppController
 {
 
+    public $name = 'Journals';
+
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('AcademicYear');
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
+
     public function index()
     {
-        $journals = $this->paginate($this->Journals);
 
-        $this->set(compact('journals'));
+        $this->Journal->recursive = 0;
+        $this->set('journals', $this->paginate());
     }
 
     public function view($id = null)
     {
-        $journal = $this->Journals->get($id, [
-            'contain' => ['Courses'],
-        ]);
 
-        $this->set('journal', $journal);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid journal'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->set('journal', $this->Journal->read(null, $id));
     }
 
     public function add()
     {
-        $journal = $this->Journals->newEntity();
-        if ($this->request->is('post')) {
-            $journal = $this->Journals->patchEntity($journal, $this->request->getData());
-            if ($this->Journals->save($journal)) {
-                $this->Flash->success(__('The journal has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if (!empty($this->request->data)) {
+            $this->Journal->create();
+            if ($this->Journal->save($this->request->data)) {
+                $this->Session->setFlash(__('The journal has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The journal could not be saved. Please, try again.'));
             }
-            $this->Flash->error(__('The journal could not be saved. Please, try again.'));
         }
-        $this->set(compact('journal'));
+        $courses = $this->Journal->Course->find('list');
+        $this->set(compact('courses'));
     }
-
 
     public function edit($id = null)
     {
-        $journal = $this->Journals->get($id, [
-            'contain' => ['Courses'],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $journal = $this->Journals->patchEntity($journal, $this->request->getData());
-            if ($this->Journals->save($journal)) {
-                $this->Flash->success(__('The journal has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The journal could not be saved. Please, try again.'));
+        if (!$id && empty($this->request->data)) {
+            $this->Session->setFlash(__('Invalid journal'));
+            return $this->redirect(array('action' => 'index'));
         }
-
-        $this->set(compact('journal'));
+        if (!empty($this->request->data)) {
+            if ($this->Journal->save($this->request->data)) {
+                $this->Session->setFlash(__('The journal has been saved'));
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(__('The journal could not be saved. Please, try again.'));
+            }
+        }
+        if (empty($this->request->data)) {
+            $this->request->data = $this->Journal->read(null, $id);
+        }
+        $courses = $this->Journal->Course->find('list');
+        $this->set(compact('courses'));
     }
-
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $journal = $this->Journals->get($id);
-        if ($this->Journals->delete($journal)) {
-            $this->Flash->success(__('The journal has been deleted.'));
-        } else {
-            $this->Flash->error(__('The journal could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        if (!$id) {
+            $this->Session->setFlash(__('Invalid id for journal'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        if ($this->Journal->delete($id)) {
+            $this->Session->setFlash(__('Journal deleted'));
+            return $this->redirect(array('action' => 'index'));
+        }
+        $this->Session->setFlash(__('Journal was not deleted'));
+        return $this->redirect(array('action' => 'index'));
     }
 }

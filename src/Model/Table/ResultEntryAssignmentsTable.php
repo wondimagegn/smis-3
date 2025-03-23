@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -71,7 +72,6 @@ class ResultEntryAssignmentsTable extends Table
     function isRegisteredAndAddedCourse($published_course_id = null, $student_id = null)
     {
         if (!empty($published_course_id) && !empty($student_id)) {
-
             $registered = $this->CourseRegistration->find("count", array(
                 'conditions' => array(
                     'CourseRegistration.student_id' => $student_id,
@@ -115,7 +115,6 @@ class ResultEntryAssignmentsTable extends Table
         $makeup_exams_formated = array();
 
         if ($department_id != "" && $acadamic_year != "") {
-
             $conditions['PublishedCourse.given_by_department_id'] = $department_id;
             $conditions['PublishedCourse.academic_year'] = $acadamic_year;
 
@@ -165,11 +164,11 @@ class ResultEntryAssignmentsTable extends Table
                                 'YearLevel' => array('order' => array('YearLevel.name')),
                                 'College' => array('id', 'name', 'type', 'stream'),
                                 'Department' => array(
-                                    'fields'=> array('id', 'name', 'type'),
+                                    'fields' => array('id', 'name', 'type'),
                                     'College' => array('id', 'name', 'type', 'stream')
                                 ),
                                 'GivenByDepartment' => array(
-                                    'fields'=> array('id', 'name', 'type'),
+                                    'fields' => array('id', 'name', 'type'),
                                     'College' => array('id', 'name', 'type', 'stream')
                                 ),
                                 'CourseInstructorAssignment' => array(
@@ -214,11 +213,11 @@ class ResultEntryAssignmentsTable extends Table
                                 'YearLevel' => array('order' => array('YearLevel.name')),
                                 'College' => array('id', 'name', 'type', 'stream'),
                                 'Department' => array(
-                                    'fields'=> array('id', 'name', 'type'),
+                                    'fields' => array('id', 'name', 'type'),
                                     'College' => array('id', 'name', 'type', 'stream')
                                 ),
                                 'GivenByDepartment' => array(
-                                    'fields'=> array('id', 'name', 'type'),
+                                    'fields' => array('id', 'name', 'type'),
                                     'College' => array('id', 'name', 'type', 'stream')
                                 ),
                                 'CourseInstructorAssignment' => array(
@@ -267,19 +266,19 @@ class ResultEntryAssignmentsTable extends Table
                                 $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_code'] . ') [Registered]';
                                 $makeup_exams_formated[$count]['ExamGrade'] = (isset($makeup_exam['CourseRegistration']['ExamGrade'][0]) ? $makeup_exam['CourseRegistration']['ExamGrade'][0] : array());
                                 $makeup_exams_formated[$count]['assigned_instructor'] = (isset($makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Title']['title'] . '. ' . $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['full_name'] . ' (' . $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Position']['position'] . ')' : '');
-                                $makeup_exams_formated[$count]['assigned_instructor_contact'] = (isset($makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Department']['name'] .  ', ' . (isset($makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile']) ? ' (Mobile: '.$makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile'] . ')' : '')  : '');
+                                $makeup_exams_formated[$count]['assigned_instructor_contact'] = (isset($makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Department']['name'] . ', ' . (isset($makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile']) ? ' (Mobile: ' . $makeup_exam['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile'] . ')' : '') : '');
                             } else {
                                 $makeup_exams_formated[$count]['student_name'] = $makeup_exam['CourseAdd']['Student']['first_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['middle_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['last_name'];
                                 $makeup_exams_formated[$count]['student_id'] = $makeup_exam['CourseAdd']['Student']['studentnumber'];
                                 $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_code'] . ') [Added]';
                                 $makeup_exams_formated[$count]['ExamGrade'] = (isset($makeup_exam['CourseAdd']['ExamGrade'][0]) ? $makeup_exam['CourseAdd']['ExamGrade'][0] : array());
                                 $makeup_exams_formated[$count]['assigned_instructor'] = (isset($makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Title']['title'] . '. ' . $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['full_name'] . ' (' . $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Position']['position'] . ')' : '');
-                                $makeup_exams_formated[$count]['assigned_instructor_contact'] = (isset($makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Department']['name'] .  ', ' . (isset($makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile']) ? ' (Mobile: '.$makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile'] . ')' : '')  : '');
+                                $makeup_exams_formated[$count]['assigned_instructor_contact'] = (isset($makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]) ? $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Department']['name'] . ', ' . (isset($makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile']) ? ' (Mobile: ' . $makeup_exam['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['phone_mobile'] . ')' : '') : '');
                             }
 
                             $makeup_exams_formated[$count]['minute_number'] = $makeup_exam['minute_number'];
                             $makeup_exams_formated[$count]['taken_exam'] = $makeup_exams['Course']['course_title'] . ' (' . $makeup_exams['Course']['course_code'] . ')';
-                            $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams['Section']['name'] . ' (' . (isset($makeup_exams['Section']['YearLevel']['id']) ? $makeup_exams['Section']['YearLevel']['name'] : ($makeup_exams['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial': 'Pre/1st')). ', ' . $makeup_exams['Section']['academicyear']. ')';
+                            $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams['Section']['name'] . ' (' . (isset($makeup_exams['Section']['YearLevel']['id']) ? $makeup_exams['Section']['YearLevel']['name'] : ($makeup_exams['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $makeup_exams['Section']['academicyear'] . ')';
                             $makeup_exams_formated[$count]['created'] = $makeup_exam['created'];
                             $makeup_exams_formated[$count]['modified'] = $makeup_exam['modified'];
                             $makeup_exams_formated[$count]['result'] = (!empty($makeup_exam['result']) ? $makeup_exam['result'] : '');
@@ -293,5 +292,4 @@ class ResultEntryAssignmentsTable extends Table
 
         return $makeup_exams_formated;
     }
-
 }

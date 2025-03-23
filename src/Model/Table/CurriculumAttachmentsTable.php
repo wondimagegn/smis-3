@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -83,5 +84,4 @@ class CurriculumAttachmentsTable extends Table
         }
         return false;
     }
-
 }

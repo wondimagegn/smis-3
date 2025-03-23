@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -97,15 +98,17 @@ class RegionsTable extends Table
     {
         if ($this->Student->find('count', array('conditions' => array('Student.region_id' => $region_id))) > 0) {
             return false;
-        } else if ($this->Contact->find('count', array('conditions' => array('Contact.region_id' => $region_id))) > 0) {
+        } elseif ($this->Contact->find('count', array('conditions' => array('Contact.region_id' => $region_id))) > 0) {
             return false;
-        } else if ($this->AcceptedStudent->find('count', array('conditions' => array('AcceptedStudent.region_id' => $region_id))) > 0) {
+        } elseif ($this->AcceptedStudent->find(
+                'count',
+                array('conditions' => array('AcceptedStudent.region_id' => $region_id))
+            ) > 0) {
             return false;
-        } else if ($this->Staff->find('count', array('conditions' => array('Staff.region_id' => $region_id))) > 0) {
+        } elseif ($this->Staff->find('count', array('conditions' => array('Staff.region_id' => $region_id))) > 0) {
             return false;
         } else {
             return true;
         }
     }
-
 }

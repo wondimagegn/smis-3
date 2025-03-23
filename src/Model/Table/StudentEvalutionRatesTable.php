@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -61,7 +62,7 @@ class StudentEvalutionRatesTable extends Table
     {
         $course = array();
         $type = 1; // Course Registration
-        $section_id = NULL;
+        $section_id = null;
 
         $mostRecentReg = $this->Student->CourseRegistration->find('first', array(
             'conditions' => array(
@@ -80,7 +81,6 @@ class StudentEvalutionRatesTable extends Table
         ));
 
         if (!empty($mostRecentReg)) {
-
             $section_id = $mostRecentReg['CourseRegistration']['section_id'];
 
             $course = $this->Student->CourseRegistration->find('first', array(
@@ -159,7 +159,6 @@ class StudentEvalutionRatesTable extends Table
                 }
             }
         } else {
-
             // worst case senario, students with only Course adds without any Course Registration for the semester
 
             $mostRecentAdd = $this->Student->CourseAdd->find('first', array(
@@ -218,11 +217,9 @@ class StudentEvalutionRatesTable extends Table
         }
 
         if (!empty($course)) {
-
             //debug($course);
 
             if (!ALLOW_STAFF_EVALUATION_AFTER_GRADE_SUBMISSION) {
-
                 isset($course['CourseRegistration']) ? debug($course['CourseRegistration']['id']) : '';
                 isset($course['CourseAdd']) ? debug($course['CourseAdd']['id']) : '';
 
@@ -239,7 +236,6 @@ class StudentEvalutionRatesTable extends Table
                     //$course = array();
                 }
             }
-
         }
 
         return $course;
@@ -263,5 +259,4 @@ class StudentEvalutionRatesTable extends Table
 
         return $getAS;
     }
-
 }

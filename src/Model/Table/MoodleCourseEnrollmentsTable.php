@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -24,5 +25,4 @@ class MoodleCourseEnrollmentsTable extends Table
 
         $this->addBehavior('Timestamp');
     }
-
 }

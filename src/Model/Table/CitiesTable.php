@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -27,18 +28,23 @@ class CitiesTable extends Table
         $this->belongsTo('Regions', [
             'foreignKey' => 'region_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Region',
         ]);
         $this->belongsTo('Zones', [
             'foreignKey' => 'zone_id',
+            'propertyName' => 'Zone',
         ]);
         $this->hasMany('Contacts', [
-            'foreignKey' => 'city_id',
+            'foreignKey' => 'contact_id',
+            'propertyName' => 'Contact',
         ]);
         $this->hasMany('Staffs', [
             'foreignKey' => 'city_id',
+            'propertyName' => 'Staff',
         ]);
         $this->hasMany('Students', [
             'foreignKey' => 'city_id',
+            'propertyName' => 'Student',
         ]);
     }
 
@@ -152,9 +158,9 @@ class CitiesTable extends Table
     {
         if ($this->Student->find('count', array('conditions' => array('Student.city_id' => $city))) > 0) {
             return false;
-        } else if ($this->Contact->find('count', array('conditions' => array('Contact.city_id' => $city))) > 0) {
+        } elseif ($this->Contact->find('count', array('conditions' => array('Contact.city_id' => $city))) > 0) {
             return false;
-        } else if ($this->Staff->find('count', array('conditions' => array('Staff.city_id' => $city))) > 0) {
+        } elseif ($this->Staff->find('count', array('conditions' => array('Staff.city_id' => $city))) > 0) {
             return false;
         } else {
             return true;

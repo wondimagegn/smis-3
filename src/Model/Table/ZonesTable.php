@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -84,5 +85,4 @@ class ZonesTable extends Table
         }
         return true;
     }
-
 }

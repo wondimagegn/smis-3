@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class AcademicStatusesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class AcademicStatusesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('academic_statuses');
@@ -29,12 +32,15 @@ class AcademicStatusesTable extends Table
         ]);
         $this->hasMany('HistoricalStudentExamStatuses', [
             'foreignKey' => 'academic_status_id',
+            'propertyName' => 'HistoricalStudentExamStatus',
         ]);
         $this->hasMany('OtherAcademicRules', [
             'foreignKey' => 'academic_status_id',
+            'propertyName' => 'OtherAcademicRule',
         ]);
         $this->hasMany('StudentExamStatuses', [
             'foreignKey' => 'academic_status_id',
+            'propertyName' => 'StudentExamStatus',
         ]);
     }
 
@@ -46,6 +52,7 @@ class AcademicStatusesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -67,12 +74,20 @@ class AcademicStatusesTable extends Table
         return $validator;
     }
 
-    function canItBeDeleted($id = null) {
-        if($this->StudentExamStatus->find('count', array('conditions' => array('StudentExamStatus.academic_status_id' =>$id))) > 0)
+    public function canItBeDeleted($id = null)
+    {
+
+        if ($this->StudentExamStatus->find(
+                'count',
+                array('conditions' => array('StudentExamStatus.academic_status_id' => $id))
+            ) > 0) {
             return false;
-        if($this->AcademicStand->find('count',array('conditions' => array('AcademicStand.academic_status_id' =>$id))) > 0)
+        }
+        if ($this->AcademicStand->find('count', array('conditions' => array('AcademicStand.academic_status_id' => $id))
+            ) > 0) {
             return false;
-        else
+        } else {
             return false;
+        }
     }
 }

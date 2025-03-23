@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -137,7 +137,6 @@ class PlacementParticipatingStudentsTable extends Table
     public function reformat($data = array())
     {
         if (isset($data) && !empty($data)) {
-
             $reformatedData = array();
 
             $checkedBoxStudents = $data['PlacementParticipatingStudent']['approve'];
@@ -168,7 +167,6 @@ class PlacementParticipatingStudentsTable extends Table
             if ($isThePlacementRun) {
                 return 1;
             } else {
-
                 if (isset($dataa['PlacementParticipatingStudent']) && !empty($dataa['PlacementParticipatingStudent'])) {
                     foreach ($dataa['PlacementParticipatingStudent'] as $dk => $dv) {
                         //check if there is entry already and exclude
@@ -182,8 +180,7 @@ class PlacementParticipatingStudentsTable extends Table
                                     'PlacementParticipatingStudent.round' => $dv['round'],
                                 ),
                                 'recursive' => -1
-                            )
-                        );
+                        ));
 
                         if (in_array($dv['accepted_student_id'], $selectedStudents)) {
                             $reformatedData['PlacementParticipatingStudent'][$dk] = $dv;
@@ -196,7 +193,6 @@ class PlacementParticipatingStudentsTable extends Table
                 }
 
                 return $reformatedData;
-
             }
         }
 
@@ -206,7 +202,6 @@ class PlacementParticipatingStudentsTable extends Table
     public function reformatForDelete($data = array())
     {
         if (isset($data) && !empty($data)) {
-
             $reformatedData = array();
 
             $checkedBoxStudents = $data['PlacementParticipatingStudent']['approve'];
@@ -239,7 +234,6 @@ class PlacementParticipatingStudentsTable extends Table
             if ($isThePlacementRun) {
                 return 1;
             } else {
-
                 if (isset($dataa['PlacementParticipatingStudent']) && !empty($dataa['PlacementParticipatingStudent'])) {
                     foreach ($dataa['PlacementParticipatingStudent'] as $dk => $dv) {
                         //check if there is entry already and exclude
@@ -253,8 +247,7 @@ class PlacementParticipatingStudentsTable extends Table
                                     'PlacementParticipatingStudent.round' => $dv['round'],
                                 ),
                                 'recursive' => -1
-                            )
-                        );
+                        ));
 
                         if ($alreadyPrepared && in_array($dv['accepted_student_id'], $selectedStudents)) {
                             //debug($dv);
@@ -287,16 +280,14 @@ class PlacementParticipatingStudentsTable extends Table
             )
         ));
 
-        if (isset($previousRound) && !empty($previousRound)){
+        if (isset($previousRound) && !empty($previousRound)) {
             $applied_for = $previousRound['PlacementParticipatingStudent']['applied_for'];
         } else {
-
             $student_section_exam_status = ClassRegistry::init('Student')->get_student_section($acceptedStudentdetail['Student']['id'], null, null);
             //debug($student_section_exam_status);
 
             // for readmitted students/withdrawed students
             if (isset($student_section_exam_status['Section']) && $student_section_exam_status['Section']['academicyear'] == $academic_year && !$student_section_exam_status['Section']['archive']) {
-
                 $nonBatchStudentlist = $this->Student->find('list', array(
                     'conditions' => array(
                         'Student.college_id' => $acceptedStudentdetail['Student']['college_id'],
@@ -324,9 +315,7 @@ class PlacementParticipatingStudentsTable extends Table
                 ));
 
                 debug($previousRound);
-
             } else {
-
                 $batchAcceptedStudentlist = $this->AcceptedStudent->find('list', array(
                     'conditions' => array(
                         'AcceptedStudent.academicyear' => $acceptedStudentdetail['AcceptedStudent']['academicyear'],
@@ -354,14 +343,14 @@ class PlacementParticipatingStudentsTable extends Table
                 if (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
                     // the assignment is specialization
                     $applied_for = 'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'];
-                } else if (isset($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
+                } elseif (isset($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
                     // the student is still in college, and what was the previous college assigment if exist
                     $applied_for = 'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'];
                 }
             }
         }
 
-        if(isset($applied_for) && !empty($applied_for)){
+        if (isset($applied_for) && !empty($applied_for)) {
             $participatingRound = ClassRegistry::init('PlacementParticipatingStudent')->find('first', array(
                 'conditions' => array(
                     'PlacementParticipatingStudent.applied_for' => $applied_for,
@@ -404,7 +393,7 @@ class PlacementParticipatingStudentsTable extends Table
                 'PlacementParticipatingStudent.round' => $firstData['placement_round'],
                 'PlacementParticipatingStudent.program_id' => $firstData['program_id'],
                 'PlacementParticipatingStudent.program_type_id' => $firstData['program_type_id']
-                //	'PlacementParticipatingStudent.placement_round_participant_id is not null '
+                //  'PlacementParticipatingStudent.placement_round_participant_id is not null '
             ),
             'order' => array(
                 'PlacementParticipatingStudent.academic_year' => 'DESC',

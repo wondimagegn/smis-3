@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -34,7 +35,6 @@ class MealHallsTable extends Table
         $this->hasMany('MealHallAssignments', [
             'foreignKey' => 'meal_hall_id',
         ]);
-
     }
     public function validationDefault(Validator $validator)
     {

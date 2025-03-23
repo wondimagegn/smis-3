@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
@@ -51,6 +52,4 @@ class Curriculum extends Entity
     {
         return "{$this->name} - {$this->year_introduced}";
     }
-
-
 }

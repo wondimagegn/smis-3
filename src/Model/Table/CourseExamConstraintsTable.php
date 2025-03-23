@@ -1,13 +1,14 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class CourseExamConstraintsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +17,7 @@ class CourseExamConstraintsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('course_exam_constraints');
@@ -36,6 +38,7 @@ class CourseExamConstraintsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -64,20 +67,30 @@ class CourseExamConstraintsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
 
         return $rules;
     }
-    function get_already_recorded_course_exam_constraint($published_course_id=null){
-        if(!empty($published_course_id)){
-            $courseExamConstraints = $this->find('all',array('conditions'=>array('CourseExamConstraint.published_course_id'=>$published_course_id),'order'=>array('CourseExamConstraint.exam_date','CourseExamConstraint.session'),'recursive'=>-1));
+
+    public function get_already_recorded_course_exam_constraint($published_course_id = null)
+    {
+
+        if (!empty($published_course_id)) {
+            $courseExamConstraints = $this->find(
+                'all',
+                array(
+                    'conditions' => array('CourseExamConstraint.published_course_id' => $published_course_id),
+                    'order' => array('CourseExamConstraint.exam_date', 'CourseExamConstraint.session'),
+                    'recursive' => -1
+                )
+            );
             $course_exam_constraints_by_date = array();
-            foreach($courseExamConstraints as $courseExamConstraint){
+            foreach ($courseExamConstraints as $courseExamConstraint) {
                 $course_exam_constraints_by_date[$courseExamConstraint['CourseExamConstraint']['exam_date']][$courseExamConstraint['CourseExamConstraint']['session']]['id'] = $courseExamConstraint['CourseExamConstraint']['id'];
                 $course_exam_constraints_by_date[$courseExamConstraint['CourseExamConstraint']['exam_date']][$courseExamConstraint['CourseExamConstraint']['session']]['active'] = $courseExamConstraint['CourseExamConstraint']['active'];
             }
             return $course_exam_constraints_by_date;
         }
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -103,7 +104,7 @@ class DepartmentStudyProgramsTable extends Table
                     'DepartmentStudyProgram.id <> ' => $data['DepartmentStudyProgram']['id']
                 )
             ));
-        } else if (!empty($data['DepartmentStudyProgram'])) {
+        } elseif (!empty($data['DepartmentStudyProgram'])) {
             $count = $this->find('count', array(
                 'conditions' => array(
                     'DepartmentStudyProgram.department_id' => $data['DepartmentStudyProgram']['department_id'],

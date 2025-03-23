@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -26,18 +27,23 @@ class CampusesTable extends Table
 
         $this->hasMany('AcceptedStudents', [
             'foreignKey' => 'campus_id',
+            'propertyName' => 'AcceptedStudent'
         ]);
         $this->hasMany('ClassRoomBlocks', [
             'foreignKey' => 'campus_id',
+            'propertyName' => 'ClassRoomBlock'
         ]);
         $this->hasMany('Colleges', [
             'foreignKey' => 'campus_id',
+            'propertyName' => 'College'
         ]);
         $this->hasMany('DormitoryBlocks', [
             'foreignKey' => 'campus_id',
+            'propertyName' => 'DormitoryBlock'
         ]);
         $this->hasMany('MealHalls', [
             'foreignKey' => 'campus_id',
+            'propertyName' => 'MealHall'
         ]);
     }
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -53,5 +54,4 @@ class StudentEvalutionCommentsTable extends Table
 
         return $validator;
     }
-
 }

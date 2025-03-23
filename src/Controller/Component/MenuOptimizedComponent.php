@@ -1,76 +1,81 @@
 <?php
 namespace App\Controller\Component;
-use Cake\Controller\Component;
+
 use Cake\Cache\Cache;
-use Cake\Event\EventInterface;
-use Cake\Utility\Inflector;
+use Cake\Controller\Component;
+use Cake\Controller\ComponentRegistry;
 use Cake\Core\Configure;
 use Cake\Filesystem\Folder;
-use Cake\Controller\ComponentRegistry;
-
+use Cake\Utility\Inflector;
 
 class MenuOptimizedComponent extends Component
 {
 
-    protected $_defaultConfig = [
-        'defaultMenuParent' => null,
-        'autoLoad' => true,
-        'cacheKey' => 'menu_storage',
-        'cacheTime' => '+1 day',
-        'cacheConfig' => 'menu_component',
-        'aclSeparator' => '/',
-        'aclPath' => 'controllers/',
-        'excludeActions' => ['view', 'edit', 'delete', 'admin_edit', 'admin_delete', 'admin_view'],
+    public $components = ['Acl', 'Auth', 'Flash'];
+    public $defaultMenuParent = null;
+    public $autoLoad = true;
+    public $cacheKey = 'menu_storage';
+    public $cacheTime = '+1 day';
+    public $cacheConfig = 'menu_component';
+    public $aclSeparator = '/';
+    public $aclPath = 'controllers/';
+    public $excludeActions = ['view', 'edit', 'delete', 'admin_edit', 'admin_delete', 'admin_view'];
 
-        'components' => ['Auth', 'Acl']
-    ];
-
-    protected $rawMenus = [];
-    protected $_rebuildMenus = false;
-    protected $excludedMethods = [];
+    public $excludedMethods = [];
     public $menu = [];
+    public $rawMenus = [];
+    protected $_rebuildMenus = false;
 
     public function __construct(ComponentRegistry $registry, array $config = [])
     {
         parent::__construct($registry, $config);
-
+        $this->Auth = $this->getController()->Auth;
     }
 
     public function initialize(array $config): void
     {
         parent::initialize($config);
+        $session = $this->getController()->getRequest()->getSession();
 
-        // Check if user is logged in and clear cache if there are new user assignments
-        debug($this->Auth);
-        if ($this->Auth && $this->Auth->user() && $this->Auth->user('id')) {
+        // Check if user is logged in
+        if ($this->Auth->user('id')) {
             $dir = new Folder(Configure::read('Utility.cache'));
-            if ($this->Auth->user('role_id') == 3) {
+
+            $roleId = $this->Auth->user('role_id');
+            if ($roleId == 3) {
                 $files = $dir->findRecursive('menu_storagerole3_menu_storage');
-            } elseif ($this->Auth->user('role_id') == 2) {
+            } elseif ($roleId == 2) {
                 $files = $dir->findRecursive('menu_storagerole2_menu_storage');
             } else {
                 $files = $dir->findRecursive('menu_storageuser' . $this->Auth->user('id') . '.*');
             }
 
             if (empty($files)) {
-                $this->Session->delete('permissionLists');
+                $session->delete('permissionLists');
                 $this->_rebuildMenus = true;
             }
         }
     }
 
-    public function startup(): void
+    public function startup()
     {
-        Cache::setConfig($this->getConfig('cacheConfig'), [
-            'engine' => 'File',
-            'duration' => $this->getConfig('cacheTime'),
-            'prefix' => $this->getConfig('cacheKey')
-        ]);
 
-        if (!$this->Auth || !$this->Auth->user()) {
+        if (!$this->Auth->user()) {
             return;
         }
 
+        // Add menu items
+        $this->menu = $this->addMenu([
+            'title' => 'Exam Schedule View',
+            'parent' => 'examSchedule',
+            'url' => ['controller' => 'ExamSchedules', 'action' => 'college_exam_schedule_view']
+        ]);
+
+        $this->menu = $this->addMenu([
+            'title' => 'Basic Profile',
+            'parent' => 'dashboard',
+            'url' => ['controller' => 'Students', 'action' => 'profile']
+        ]);
 
         // add custom menu, this happens when we need to promot some action
         $this->menu = $this->addMenu(array(
@@ -443,87 +448,104 @@ class MenuOptimizedComponent extends Component
             ),
         ));
 
-        if ($this->getConfig('autoLoad')) {
-            $this->loadCache();
+
+        if ($this->autoLoad) {
+            //$this->loadCache();
             $this->constructMenu($this->Auth->user());
-            $this->writeCache();
+            //$this->writeCache();
         }
     }
 
-    public function writeCache(): bool
+    public function writeCache()
     {
-        $data = ['menus' => $this->rawMenus];
-        if (Cache::write($this->getConfig('cacheKey'), $data, $this->getConfig('cacheConfig'))) {
+
+        $data = ['menus' => array_unique($this->rawMenus, SORT_REGULAR)];
+
+        if (Cache::write($this->cacheKey, $data, $this->cacheConfig)) {
             return true;
         }
-        $this->log('Menu Component - Could not write Menu cache.');
+
+        Log::error('Menu Component - Could not write Menu cache.');
         return false;
     }
 
-    public function loadCache(): bool
+    public function loadCache()
     {
-        if ($data = Cache::read($this->getConfig('cacheKey'), $this->getConfig('cacheConfig'))) {
+
+        $data = Cache::read($this->cacheKey, $this->cacheConfig);
+
+        if ($data) {
             $this->rawMenus = $this->_mergeMenuCache($data['menus']);
             return true;
         }
+
         $this->_rebuildMenus = true;
         return false;
     }
 
-    public function clearCache(): bool
+    public function clearCache()
     {
-        return Cache::delete($this->getConfig('cacheKey'), $this->getConfig('cacheConfig'));
+
+        return Cache::delete($this->cacheKey, $this->cacheConfig);
     }
 
-    public function constructMenu($aro): void
+    public function constructMenu($aro)
     {
-        $aroKey = is_array($aro) ?
-            ($aro['role_id'] == 3 ? 'Role3' : ($aro['role_id'] == 2 ? 'Role2' : 'User' . $aro['id'])) :
-            'User' . $aro['id'];
 
-        $cacheKey = $aroKey . '_' . $this->getConfig('cacheKey');
-        $completeMenu = Cache::read($cacheKey, $this->getConfig('cacheConfig'));
+        if (is_array($aro)) {
+            $roleId = $this->Auth->user('role_id');
+            $aroKey = ($roleId == 3) ? 'Role3' : (($roleId == 2) ? 'Role2' : 'User' . $aro['id']);
+        }
+
+        // $cacheKey = $aroKey . '_' . $this->cacheKey;
+        // $completeMenu = Cache::read($cacheKey, $this->cacheConfig);
+        $completeMenu = false;
 
         if (!$completeMenu || $this->_rebuildMenus) {
             $this->generateRawMenus();
-            $menu = [];
 
+            $menu = [];
             foreach ($this->rawMenus as $item) {
                 $aco = Inflector::camelize($item['url']['controller']);
-                if (isset($item['url']['action'])) {
-                    $aco = $this->getConfig('aclPath') . $aco . $this->getConfig('aclSeparator') . $item['url']['action'];
+                if (!empty($item['url']['action'])) {
+                    $aco = $this->aclPath . $aco . $this->aclSeparator .
+                        $item['url']['action'];
                 }
-
                 if ($this->check($aro, $aco)) {
-                    $menu[$item['id']] = $item;
+                    if (!isset($menu[$item['id']])) {
+                        $menu[$item['id']] = $item;
+                    }
                 }
             }
 
             $completeMenu = $this->_formatMenu($menu);
-            Cache::write($cacheKey, $completeMenu, $this->getConfig('cacheConfig'));
+            //  Cache::write($cacheKey, $completeMenu, $this->cacheConfig);
         }
 
         $this->menu = $completeMenu;
     }
 
-    public function generateRawMenus(): void
+    public function generateRawMenus()
     {
-        $cakeAdmin = Configure::read('Routing.prefixes.0');
+
+        $cakeAdmin = Configure::read('Routing.prefixes')[0] ?? null;
         $this->createExclusions();
 
-        $controllers = $this->permissions();
+        // Get all controllers dynamically
+        $Controllers = $this->permissions();
 
-        if (!empty($controllers)) {
-            foreach ($controllers as $ctrlName => $actions) {
-                // In CakePHP 3, we don't need App::import as we use namespaces
-                // Controller should be loaded via proper namespace
-                $ctrlClass = "App\\Controller\\" . $ctrlName . 'Controller';
+        if (!empty($Controllers)) {
+            foreach ($Controllers as $ctrlName => $actions) {
+                // Load controller dynamically
+                $ctrlClass = 'App\\Controller\\' . $ctrlName . 'Controller';
 
-                $methods = $actions['action'];
+                if (!class_exists($ctrlClass)) {
+                    continue; // Skip if the controller does not exist
+                }
 
-                // Use reflection instead of get_class_vars for better practice in CakePHP 3
-                $reflection = new \ReflectionClass($ctrlClass);
-                $classVars = $reflection->getDefaultProperties();
+                $methods = $actions['action'] ?? [];
+
+                $classVars = get_class_vars($ctrlClass);
                 $menuOptions = $this->setOptions($classVars);
 
                 if ($menuOptions === false) {
@@ -538,14 +560,9 @@ class MenuOptimizedComponent extends Component
                 if (!empty($methods)) {
                     foreach ($methods as $action) {
                         $camelAction = Inflector::variable($action);
-                        $human = empty($menuOptions['alias']) || !isset($menuOptions['alias'][$action])
-                            ? Inflector::humanize(Inflector::underscore($action))
-                            : $menuOptions['alias'][$action];
+                        $human = $menuOptions['alias'][$action] ?? Inflector::humanize(Inflector::underscore($action));
 
-                        $url = [
-                            'controller' => $ctrlCamel,
-                            'action' => $action
-                        ];
+                        $url = ['controller' => $ctrlCamel, 'action' => $action];
 
                         if ($cakeAdmin) {
                             $url[$cakeAdmin] = false;
@@ -569,6 +586,7 @@ class MenuOptimizedComponent extends Component
                 }
 
                 if ($menuOptions['controllerButton']) {
+                    // Use admin index if available
                     $action = $adminController ? $cakeAdmin . '_index' : 'index';
 
                     $url = [
@@ -577,6 +595,7 @@ class MenuOptimizedComponent extends Component
                         'admin' => $adminController,
                     ];
 
+                    // Core menu item
                     $menuItem = [
                         'parent' => $menuOptions['parent'],
                         'id' => $ctrlCamel,
@@ -590,108 +609,24 @@ class MenuOptimizedComponent extends Component
         }
     }
 
-    public function permissions(): ?array
+
+    public function permissions()
     {
-        // In CakePHP 3, Session is typically accessed through the request object
-        return $this->getController()->getRequest()->getSession()->read('reformatePermission');
+
+        return $this->getController()->getRequest()->getSession()->read('reformatePermission'); // ✅ FIXED SESSION USAGE
+
     }
 
-    public function check($aro, string $aco, string $action = "*"): bool
+    public function check($aro, $aco, $action = "*")
     {
-        if ($aro === null || $aco === null) {
-            return false;
-        }
 
-        $permissionLists = $this->getController()->getRequest()->getSession()->read('permissionLists');
-
-        if (!empty($permissionLists)) {
-            return in_array($aco, $permissionLists);
-        }
-        return false;
+        $permissionLists = $this->getController()->getRequest()->getSession()->read(
+            'permissionLists'
+        ); // ✅ FIXED SESSION USAGE
+        return isset($permissionLists) && !empty($permissionLists) && in_array($aco, $permissionLists);
     }
 
-    public function getControllers(): array
-    {
-        // Configure::listObjects() is removed in CakePHP 3
-        // You would typically implement this differently, perhaps using the App class
-        // Here's a basic implementation:
-        $controllers = [];
-        $folder = new \Cake\Filesystem\Folder(APP . 'Controller');
-        $files = $folder->find('.*Controller\.php');
-
-        foreach ($files as $file) {
-            $controllers[] = str_replace('Controller.php', '', $file);
-        }
-        return $controllers;
-    }
-
-    public function filterMethods(array $methods, array $remove = []): array
-    {
-        if (!empty($remove)) {
-            $remove = array_map('strtolower', $remove);
-        }
-
-        $exclusions = array_merge($this->excludedMethods, $remove);
-
-        if (!empty($methods)) {
-            foreach ($methods as $k => $method) {
-                $method = strtolower($method);
-
-                if (strpos($method, '_') === 0) {
-                    unset($methods[$k]);
-                    continue;
-                }
-
-                if (in_array($method, $exclusions)) {
-                    unset($methods[$k]);
-                }
-            }
-        }
-
-        return array_values($methods);
-    }
-
-    public function setOptions(array $controllerVars)
-    {
-        $cakeAdmin = Configure::read('Routing.prefixes.0');
-        $menuOptions = $controllerVars['menuOptions'] ?? [];
-
-        $exclude = [
-            'view',
-            'edit',
-            'delete',
-            $cakeAdmin . '_edit',
-            $cakeAdmin . '_delete',
-            $cakeAdmin . '_view'
-        ];
-
-        $defaults = [
-            'exclude' => $exclude,
-            'alias' => [],
-            'parent' => $this->getConfig('defaultMenuParent'),
-            'controllerButton' => true
-        ];
-
-        // Set::merge is removed in CakePHP 3, use array_merge instead
-        $menuOptions = array_merge($defaults, $menuOptions);
-
-        if (in_array('*', (array)$menuOptions['exclude'])) {
-            return false;
-        }
-
-        return $menuOptions;
-    }
-
-    public function createExclusions(): void
-    {
-        $methods = array_merge(
-            get_class_methods(\Cake\Controller\Controller::class),
-            $this->getConfig('excludeActions')
-        );
-        $this->excludedMethods = array_map('strtolower', $methods);
-    }
-
-    public function addMenu(array $menu): void
+    public function addMenu($menu)
     {
         $defaults = [
             'title' => null,
@@ -702,7 +637,6 @@ class MenuOptimizedComponent extends Component
         ];
 
         $menu = array_merge($defaults, $menu);
-
         if (!$menu['id'] && isset($menu['url'])) {
             $menu['id'] = $this->_createId($menu['url']);
         }
@@ -714,57 +648,50 @@ class MenuOptimizedComponent extends Component
         $this->rawMenus[] = $menu;
     }
 
-    public function beforeRender(EventInterface $event)
+    public function beforeRender()
     {
-        $controller = $event->getSubject(); // Get controller instance
-        $controller->set('menuoptimized', $this->menu);
+
+        $this->getController()->set('menuoptimized', $this->menu);
     }
 
-
-    /**
-     * Make a Unique Menu item key
-     *
-     * @param mixed ...$parts Variable number of arguments
-     * @return string Unique key name
-     */
-    protected function _createId(...$parts): string
+    protected function _createId()
     {
-        if (is_array($parts[0])) {
-            $parts = $parts[0];
+
+        $args = func_get_args(); // Get function arguments
+        $flattened = [];
+
+        foreach ($args as $arg) {
+            if (is_array($arg)) {
+                $flattened = array_merge($flattened, $arg); // Flatten nested arrays
+            } else {
+                $flattened[] = $arg;
+            }
         }
 
-        return Inflector::variable(implode('-', $parts));
+        return Inflector::variable(implode('-', $flattened)); // Ensure only strings are passed
     }
 
-    /**
-     * Recursive function to construct Menu
-     *
-     * @param array $menu Menu items to format
-     * @return array Formatted menu structure
-     */
-    protected function _formatMenu(array $menu): array
+    protected function _formatMenu($menu)
     {
+
         $out = [];
         $idMap = [];
 
-        if (!empty($menu)) {
-            foreach ($menu as $item) {
-                $item['children'] = [];
-                $id = $item['id'];
-                $parentId = $item['parent'];
+        foreach ($menu as $item) {
+            $item['children'] = [];
+            $id = $item['id'];
+            $parentId = $item['parent'];
 
-                if (isset($idMap[$id]['children'])) {
-                    // am() function isn't available in CakePHP 3, use array_merge instead
-                    $idMap[$id] = array_merge($item, $idMap[$id]);
-                } else {
-                    $idMap[$id] = array_merge($item, ['children' => []]);
-                }
+            if (isset($idMap[$id]['children'])) {
+                $idMap[$id] = array_merge_recursive($item, $idMap[$id]);
+            } else {
+                $idMap[$id] = array_merge_recursive($item, ['children' => []]);
+            }
 
-                if ($parentId) {
-                    $idMap[$parentId]['children'][] = &$idMap[$id];
-                } else {
-                    $out[] = &$idMap[$id];
-                }
+            if ($parentId) {
+                $idMap[$parentId]['children'][] = &$idMap[$id];
+            } else {
+                $out[] = &$idMap[$id];
             }
         }
 
@@ -772,41 +699,27 @@ class MenuOptimizedComponent extends Component
         return $out;
     }
 
-    /**
-     * Sort the menu before returning it. Used with usort()
-     *
-     * @param array $one First menu item
-     * @param array $two Second menu item
-     * @return int Comparison result
-     */
-    protected function _sortMenu(array $one, array $two): int
+    protected function _sortMenu($one, $two)
     {
-        if ($one['weight'] === $two['weight']) {
-            return 1;
-        }
-        return ($one['weight'] < $two['weight']) ? -1 : 1;
+
+        return $one['weight'] <=> $two['weight'];
     }
 
-    /**
-     * Merge the Cached menus with the Menus added in Controller::beforeFilter to ensure they are unique
-     *
-     * @param array $cachedMenus Cached menu items
-     * @return array Merged Menus
-     */
-    protected function _mergeMenuCache(array $cachedMenus): array
+
+    protected function _mergeMenuCache($cachedMenus)
     {
-        $cacheCount = count($cachedMenus); // sizeOf() replaced with count()
+
+        $cacheCount = count($cachedMenus);
         $currentCount = count($this->rawMenus);
         $tmp = [];
 
-        if ($currentCount > 0) {
-            for ($i = 0; $i < $currentCount; $i++) {
+        if ($currentCount !== 0) {
+            foreach ($this->rawMenus as $addedMenu) {
                 $exist = false;
-                $addedMenu = $this->rawMenus[$i];
 
-                if ($cacheCount > 0) {
-                    for ($j = 0; $j < $cacheCount; $j++) {
-                        if ($addedMenu['id'] === $cachedMenus[$j]['id']) {
+                if ($cacheCount !== 0) {
+                    foreach ($cachedMenus as $cachedItem) {
+                        if ($addedMenu['id'] === $cachedItem['id']) {
                             $exist = true;
                             break;
                         }
@@ -824,6 +737,77 @@ class MenuOptimizedComponent extends Component
         }
 
         return array_merge($cachedMenus, $tmp);
+    }
+
+    public function createExclusions()
+    {
+
+        // Get methods from AppController (instead of 'Controller')
+        $appControllerMethods = get_class_methods('App\Controller\AppController');
+
+        // Ensure it includes all inherited methods
+        if (!$appControllerMethods) {
+            $appControllerMethods = [];
+        }
+
+        // Merge with excluded actions
+        $methods = array_merge($appControllerMethods, $this->excludeActions);
+
+        // Convert all method names to lowercase
+        $this->excludedMethods = array_map('strtolower', $methods);
+    }
+
+    public function filterMethods(array $methods, array $remove = []): array
+    {
+
+        // Convert removed method names to lowercase
+        $remove = array_map('strtolower', $remove);
+
+        // Ensure excluded methods exist
+        $exclusions = isset($this->excludedMethods) ? array_merge($this->excludedMethods, $remove) : $remove;
+
+        // Filter methods
+        return array_values(array_filter($methods, function ($method) use ($exclusions) {
+
+            $method = strtolower($method);
+
+            // Ignore private/protected methods
+            if (strpos($method, '_') === 0) {
+                return false;
+            }
+
+            // Remove methods that exist in exclusions
+            return !in_array($method, $exclusions);
+        }));
+    }
+
+    public function setOptions($controllerVars)
+    {
+
+        $cakeAdmin = Configure::read('Routing.prefixes')[0] ?? '';
+
+        // Ensure menuOptions exists and is an array
+        $menuOptions = $controllerVars['menuOptions'] ?? [];
+
+        // Define default exclusions and options
+        $exclude = ['view', 'edit', 'delete', "{$cakeAdmin}_edit", "{$cakeAdmin}_delete", "{$cakeAdmin}_view"];
+
+        $defaults = [
+            'exclude' => $exclude,
+            'alias' => [],
+            'parent' => $this->defaultMenuParent,
+            'controllerButton' => true
+        ];
+
+        // Merge user-defined options with defaults
+        $menuOptions = array_merge($defaults, $menuOptions);
+
+        // If '*' is in exclude list, return false
+        if (in_array('*', (array)$menuOptions['exclude'], true)) {
+            return false;
+        }
+
+        return $menuOptions;
     }
 
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -29,6 +30,4 @@ class OtpsTable extends Table
             'joinType' => 'INNER',
         ]);
     }
-
-
 }

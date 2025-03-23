@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -90,9 +91,9 @@ class GraduationLettersTable extends Table
 
         if (!empty($GraduationLetter_detail_department)) {
             return $GraduationLetter_detail_department;
-        } else if (!empty($GraduationLetter_detail_college)) {
+        } elseif (!empty($GraduationLetter_detail_college)) {
             return $GraduationLetter_detail_college;
-        } else if (!empty($GraduationLetter_detail_all)) {
+        } elseif (!empty($GraduationLetter_detail_all)) {
             return $GraduationLetter_detail_all;
         } else {
             return array();
@@ -105,7 +106,6 @@ class GraduationLettersTable extends Table
         $letter = array();
 
         if (!empty($student_ids)) {
-
             foreach ($student_ids as $k => $student_id) {
                 $student_detail = ClassRegistry::init('Student')->find('first', array(
                     'conditions' => array(
@@ -145,14 +145,13 @@ class GraduationLettersTable extends Table
 
                 if (!empty($GraduationLetter_detail_department)) {
                     $letter[] = $GraduationLetter_detail_department;
-                } else if (!empty($GraduationLetter_detail_college)) {
+                } elseif (!empty($GraduationLetter_detail_college)) {
                     $letter[] = $GraduationLetter_detail_college;
-                } else if (!empty($GraduationLetter_detail_all)) {
+                } elseif (!empty($GraduationLetter_detail_all)) {
                     $letter[] = $GraduationLetter_detail_all;
                 }
             }
         }
         return $letter;
     }
-
 }

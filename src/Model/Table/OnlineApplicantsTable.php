@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -265,17 +266,16 @@ class OnlineApplicantsTable extends Table
     function preparedAttachment($data = null)
     {
 
-        foreach ($data['Attachment'] as $in =>  &$dv) {
-
+        foreach ($data['Attachment'] as $in => &$dv) {
             if (
                 empty($dv['file']['name']) && empty($dv['file']['type'])
                 && empty($dv['tmp_name'])
             ) {
                 unset($data['Attachment'][$in]);
-            } else if ($in == 0) {
+            } elseif ($in == 0) {
                 $dv['model'] = 'OnlineApplicant';
                 $dv['group'] = 'OnlineApplicantFiles';
-            } else if ($in == 1) {
+            } elseif ($in == 1) {
                 $dv['model'] = 'OnlineApplicant';
                 $dv['group'] = 'OnlineApplicantPaymentSlips';
             }

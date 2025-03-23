@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -26,24 +26,31 @@ class ContactsTable extends Table
 
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
+            'propertyName' => 'Student',
         ]);
         $this->belongsTo('Staffs', [
             'foreignKey' => 'staff_id',
+            'propertyName' => 'Staff',
         ]);
         $this->belongsTo('Countries', [
             'foreignKey' => 'country_id',
+            'propertyName' => 'Country',
         ]);
         $this->belongsTo('Regions', [
             'foreignKey' => 'region_id',
+            'propertyName' => 'Region',
         ]);
         $this->belongsTo('Zones', [
             'foreignKey' => 'zone_id',
+            'propertyName' => 'Zone',
         ]);
         $this->belongsTo('Woredas', [
             'foreignKey' => 'woreda_id',
+            'propertyName' => 'Woreda',
         ]);
         $this->belongsTo('Cities', [
             'foreignKey' => 'city_id',
+            'propertyName' => 'City',
         ]);
     }
 

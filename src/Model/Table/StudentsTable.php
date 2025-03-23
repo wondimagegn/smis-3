@@ -2737,7 +2737,7 @@ class StudentsTable extends Table
         }
 
         if ($admissionAcademicYear != 'all') {
-            //$options['conditions']['Student.admissionyear'] = $AcademicYear->get_academicYearBegainingDate($admissionAcademicYear);
+            //$options['conditions']['Student.admissionyear'] = $AcademicYear->getAcademicYearBegainingDate($admissionAcademicYear);
             //admissionyear will have issues when students are enrolled online later that their batches
             // affects transfered students and non regular ones Neway
             $options['conditions']['Student.academicyear'] = $admissionAcademicYear;
@@ -2922,7 +2922,7 @@ class StudentsTable extends Table
         }
 
         if ($admissionAcademicYear != 'all') {
-            //$options['conditions']['Student.admissionyear'] = $AcademicYear->get_academicYearBegainingDate($admissionAcademicYear);
+            //$options['conditions']['Student.admissionyear'] = $AcademicYear->getAcademicYearBegainingDate($admissionAcademicYear);
             //admissionyear will have issues when students are enrolled online later that their batches
             // affects transfered students and non regular ones Neway
             $options['conditions']['Student.academicyear'] = $admissionAcademicYear;
@@ -4931,8 +4931,7 @@ class StudentsTable extends Table
         }
 
         if (isset($acadamic_year) && !empty($acadamic_year)) {
-
-            $graduateDate = $AcademicYear->get_academicYearBegainingDate($acadamic_year);
+            $graduateDate = $AcademicYear->getAcademicYearBegainingDate($acadamic_year);
         }
 
         // list out the department
@@ -5109,7 +5108,7 @@ GROUP BY st1.academic_status_id , st.region_id";
         App::import('Component', 'AcademicYear');
 
         $AcademicYear = new AcademicYearComponent(new ComponentRegistry);
-        $admissionYear = $AcademicYear->get_academicYearBegainingDate($academic_year);
+        $admissionYear = $AcademicYear->getAcademicYearBegainingDate($academic_year);
         $departments = $this->Department->find('list', array('conditions' => array('Department.active' => 1)));
 
         if (!empty($departments)) {
@@ -5209,7 +5208,7 @@ GROUP BY st1.academic_status_id , st.region_id";
             isset($data['acadamic_year']) &&
             !empty($data['acadamic_year'])
         ) {
-            $admittedYear = $AcademicYear->get_academicYearBegainingDate($data['acadamic_year']);
+            $admittedYear = $AcademicYear->getAcademicYearBegainingDate($data['acadamic_year']);
 
             if (empty($data['year_level_id'])) {
 

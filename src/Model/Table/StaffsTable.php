@@ -1,15 +1,16 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class StaffsTable extends Table
 {
+
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('staffs');
@@ -20,33 +21,39 @@ class StaffsTable extends Table
         $this->addBehavior('Timestamp');
 
         // Define Relationships
-        $this->belongsTo('Users');
-        $this->belongsTo('Colleges');
-        $this->belongsTo('Positions');
-        $this->belongsTo('Departments');
-        $this->belongsTo('Titles');
-        $this->belongsTo('Countries');
-        $this->belongsTo('Regions');
-        $this->belongsTo('Zones');
-        $this->belongsTo('Woredas');
-        $this->belongsTo('Cities');
-        $this->belongsTo('ServiceWings');
-        $this->belongsTo('Educations');
+        $this->belongsTo('Users',['propertyName'=>'User']);
+        $this->belongsTo('Colleges',['propertyName'=>'College']);
+        $this->belongsTo('Positions',['propertyName'=>'Position']);
+        $this->belongsTo('Departments',['propertyName'=>'Department']);
+        $this->belongsTo('Titles',['propertyName'=>'Title']);
+        $this->belongsTo('Countries',['propertyName'=>'Country']);
+        $this->belongsTo('Regions',['propertyName'=>'Region']);
+        $this->belongsTo('Zones',['propertyName'=>'Zone']);
+        $this->belongsTo('Woredas',['propertyName'=>'Woreda']);
+        $this->belongsTo('Cities',['propertyName'=>'City']);
+        $this->belongsTo('ServiceWings',['propertyName'=>'ServiceWing']);
+        $this->belongsTo('Educations',['propertyName'=>'Education']);
 
-        $this->hasMany('Invigilators');
-        $this->hasMany('ColleagueEvaluationRates');
-        $this->hasMany('Contacts');
-        $this->hasMany('CourseInstructorAssignments');
-        $this->hasMany('InstructorClassPeriodCourseConstraints');
-        $this->hasMany('InstructorExamExcludeDateConstraints');
-        $this->hasMany('InstructorNumberOfExamConstraints');
-        $this->hasMany('StaffForExams');
-        $this->hasMany('StaffStudies');
+        $this->hasMany('Invigilators',['propertyName'=>'Invigilator']);
+        $this->hasMany('ColleagueEvaluationRates',
+            ['propertyName'=>'ColleagueEvaluationRate']);
+        $this->hasMany('Contacts',['propertyName'=>'Contact']);
+        $this->hasMany('CourseInstructorAssignments',
+            ['propertyName'=>'CourseInstructorAssignment']);
+        $this->hasMany('InstructorClassPeriodCourseConstraints',
+            ['propertyName'=>'InstructorClassPeriodCourseConstraint']);
+        $this->hasMany('InstructorExamExcludeDateConstraints',
+            ['propertyName'=>'InstructorExamExcludeDateConstraint']);
+        $this->hasMany('InstructorNumberOfExamConstraints',
+            ['propertyName'=>'InstructorNumberOfExamConstraint']);
+        $this->hasMany('StaffForExams',['propertyName'=>'StaffForExam']);
+        $this->hasMany('StaffStudies',['propertyName'=>'StaffStudy']);
 
         $this->hasMany('Attachments', [
             'foreignKey' => 'foreign_key',
             'conditions' => ['model' => 'Staff'],
             'dependent' => true,
+            'propertyName' => 'Attachment'
         ]);
 
         $this->belongsToMany('Courses', [
@@ -54,11 +61,13 @@ class StaffsTable extends Table
             'foreignKey' => 'staff_id',
             'targetForeignKey' => 'course_id',
             'unique' => true,
+            'propertyName' => 'Course'
         ]);
     }
 
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->notEmptyString('first_name', 'Please enter staff first name.')
             ->notEmptyString('middle_name', 'Please enter staff middle name.')
@@ -91,14 +100,17 @@ class StaffsTable extends Table
     }
 
 
-
-
     function canItBeDeleted($staff_id = null)
     {
-        if ($this->CourseInstructorAssignment->find('count', array('conditions' => array('CourseInstructorAssignment.staff_id' => $staff_id))) > 0) {
+
+        if ($this->CourseInstructorAssignment->find(
+                'count',
+                array('conditions' => array('CourseInstructorAssignment.staff_id' => $staff_id))
+            ) > 0) {
             return false;
         } else {
-            if ($this->find('count', array('conditions' => array('Staff.user_id != ""', 'Staff.id' => $staff_id))) > 0) {
+            if ($this->find('count', array('conditions' => array('Staff.user_id != ""', 'Staff.id' => $staff_id))
+                ) > 0) {
                 return false;
             } else {
                 return true;
@@ -108,6 +120,7 @@ class StaffsTable extends Table
 
     function checkLengthPhone($data, $fieldName)
     {
+
         $valid = true;
         if (isset($fieldName) && $this->hasField($fieldName)) {
             $check = strlen($data[$fieldName]);
@@ -119,8 +132,15 @@ class StaffsTable extends Table
         return $valid;
     }
 
-    function getInvigilators($college_id = null, $acadamic_year = null, $semester = null, $exam_date = null, $session = null, $year_level = null)
-    {
+    function getInvigilators(
+        $college_id = null,
+        $acadamic_year = null,
+        $semester = null,
+        $exam_date = null,
+        $session = null,
+        $year_level = null
+    ) {
+
         $staffsForExam = array();
 
         $department_ids = $this->Department->find('list', array(
@@ -153,7 +173,7 @@ class StaffsTable extends Table
         $i = 0;
 
         if (!empty($staffs)) {
-            foreach($staffs as $staff) {
+            foreach ($staffs as $staff) {
                 $staffsForExam[$i]['id'] = $staff['Staff']['id'];
                 if (!empty($staff['InstructorNumberOfExamConstraint'])) {
                     $staffsForExam[$i]['max_number_of_exam'] = $staff['InstructorNumberOfExamConstraint'][0]['max_number_of_exam'];
@@ -179,8 +199,11 @@ class StaffsTable extends Table
                 ));
 
                 if (!empty($assigned_exams)) {
-                    foreach($assigned_exams as $assigned_exam) {
-                        if (strcasecmp($assigned_exam['PublishedCourse']['Section']['YearLevel']['name'], $year_level) == 0) {
+                    foreach ($assigned_exams as $assigned_exam) {
+                        if (strcasecmp(
+                                $assigned_exam['PublishedCourse']['Section']['YearLevel']['name'],
+                                $year_level
+                            ) == 0) {
                             $staffsForExam[$i]['assigned_exam']++;
                         }
                     }
@@ -193,8 +216,9 @@ class StaffsTable extends Table
         return $staffsForExam;
     }
 
-    function getInstructorReformated ($department_id = null, $college_id = null)
+    public function getInstructorReformated($department_id = null, $college_id = null)
     {
+
         if (!empty($department_id)) {
             $instructors = $this->Staff->find('all', array(
                 'conditions' => array(
@@ -203,7 +227,7 @@ class StaffsTable extends Table
                 ),
                 'contain' => array('Position' => array('id', 'position'), 'Title' => array('id', 'title'))
             ));
-        } else if (!empty($college_id)) {
+        } elseif (!empty($college_id)) {
             $instructors = $this->Staff->find('all', array(
                 'conditions' => array(
                     'Staff.college_id' => $college_id,
@@ -216,13 +240,17 @@ class StaffsTable extends Table
                 'conditions' => array(
                     'Staff.id  IN (SELECT id FROM staffs WHERE  user_id IN  (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )))'
                 ),
-                'contain' => array('Department' => array('id', 'name'), 'Position' => array('id', 'position'), 'Title' => array('id', 'title'))
+                'contain' => array(
+                    'Department' => array('id', 'name'),
+                    'Position' => array('id', 'position'),
+                    'Title' => array('id', 'title')
+                )
             ));
         }
 
         $instructor_list = array();
 
-        if(!empty($instructors)) {
+        if (!empty($instructors)) {
             foreach ($instructors as $index => $value) {
                 $instructor_list[$value['Department']['name']][$value['Staff']['id']] = $value['Title']['title'] . ' ' . $value['Staff']['full_name'] . '(' . $value['Position']['position'] . ')';
             }
@@ -233,6 +261,7 @@ class StaffsTable extends Table
 
     public function getDistributionStats($department_id = null, $sex = 'all')
     {
+
         $query = "";
         $student_ids = array();
         $options = array();
@@ -254,10 +283,19 @@ class StaffsTable extends Table
                     'contain' => array('College', 'YearLevel')
                 ));
             } else {
-                $departments = $this->Department->find('all', array('conditions' => array('Department.id' => $department_id, 'Department.active' => 1), 'contain' => array('College', 'YearLevel')));
+                $departments = $this->Department->find(
+                    'all',
+                    array(
+                        'conditions' => array('Department.id' => $department_id, 'Department.active' => 1),
+                        'contain' => array('College', 'YearLevel')
+                    )
+                );
             }
         } else {
-            $departments = $this->Department->find('all', array('conditions' => array('Department.active' => 1), 'contain' => array('College', 'YearLevel')));
+            $departments = $this->Department->find(
+                'all',
+                array('conditions' => array('Department.active' => 1), 'contain' => array('College', 'YearLevel'))
+            );
         }
 
         $distributionStatsTeachersByGender = array();
@@ -267,7 +305,6 @@ class StaffsTable extends Table
         if (!empty($departments)) {
             foreach ($departments as $key => $value) {
                 if (($sex == "male" || $sex == "female")) {
-
                     $numberofinstructors = $this->find('count', array(
                         'conditions' => array(
                             'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
@@ -278,24 +315,23 @@ class StaffsTable extends Table
                     ));
 
                     debug($numberofinstructors);
-                    $distributionStatsTeachersByGender[$value['Department']['name']][strtolower($sex)] = $numberofinstructors;
+                    $distributionStatsTeachersByGender[$value['Department']['name']][strtolower(
+                        $sex
+                    )] = $numberofinstructors;
 
                     $graph['labels'][$value['Department']['id']] = $value['Department']['name'];
 
                     if (strtolower($sex) == "female") {
                         $indexS = 1;
-                    } else if (strtolower($sex) == "male") {
+                    } elseif (strtolower($sex) == "male") {
                         $indexS = 0;
                     }
 
                     $graph['data'][$indexS][$value['Department']['id']] += $numberofinstructors;
-
-                } else if ($sex == "all") {
-
+                } elseif ($sex == "all") {
                     $sexList = array('male' => 'male', 'female' => 'female');
 
                     foreach ($sexList as $skey => $svalue) {
-
                         $numberofinstructors = $this->find('count', array(
                             'conditions' => array(
                                 'Staff.user_id IN  (SELECT id FROM users WHERE role_id = ' . ROLE_INSTRUCTOR . ' )',
@@ -305,17 +341,18 @@ class StaffsTable extends Table
                             )
                         ));
 
-                        $distributionStatsTeachersByGender[$value['Department']['name']][strtolower($svalue)] = $numberofinstructors;
+                        $distributionStatsTeachersByGender[$value['Department']['name']][strtolower(
+                            $svalue
+                        )] = $numberofinstructors;
                         $graph['labels'][$value['Department']['id']] = $value['Department']['name'];
 
                         if (strtolower($svalue) == "female") {
                             $indexS = 1;
-                        } else if (strtolower($svalue) == "male") {
+                        } elseif (strtolower($svalue) == "male") {
                             $indexS = 0;
                         }
 
                         $graph['data'][$indexS][$value['Department']['id']] += $numberofinstructors;
-
                     }
                 }
             }
@@ -325,11 +362,11 @@ class StaffsTable extends Table
         $distribution['graph'] = $graph;
 
         return $distribution;
-
     }
 
-    public function getDistributionStatsByAcademicRank($department_id = null,$sex='all')
+    public function getDistributionStatsByAcademicRank($department_id = null, $sex = 'all')
     {
+
         $query = "";
         $student_ids = array();
         $options = array();
@@ -351,10 +388,19 @@ class StaffsTable extends Table
                     'contain' => array('College', 'YearLevel')
                 ));
             } else {
-                $departments = $this->Department->find('all', array('conditions' => array('Department.id' => $department_id, 'Department.active' => 1), 'contain' => array('College', 'YearLevel')));
+                $departments = $this->Department->find(
+                    'all',
+                    array(
+                        'conditions' => array('Department.id' => $department_id, 'Department.active' => 1),
+                        'contain' => array('College', 'YearLevel')
+                    )
+                );
             }
         } else {
-            $departments = $this->Department->find('all', array('conditions' => array('Department.active' => 1), 'contain' => array('College', 'YearLevel')));
+            $departments = $this->Department->find(
+                'all',
+                array('conditions' => array('Department.active' => 1), 'contain' => array('College', 'YearLevel'))
+            );
         }
 
         $distributionStatsTeachersByAcademicRank = array();
@@ -367,7 +413,10 @@ class StaffsTable extends Table
             'group' => array('Staff.position_id')
         ));
 
-        $positions = $this->Position->find('list', array('fields' => array('id', 'position'), 'conditions' => array('Position.id' => $teacherPositionLists)));
+        $positions = $this->Position->find(
+            'list',
+            array('fields' => array('id', 'position'), 'conditions' => array('Position.id' => $teacherPositionLists))
+        );
         debug($positions);
         $graph['series'] = $positions;
 
@@ -386,12 +435,13 @@ class StaffsTable extends Table
                                 )
                             ));
 
-                            $distributionStatsTeachersByAcademicRank[$value['Department']['name']][strtolower($sex)][$pk] = $numberofinstructors;
+                            $distributionStatsTeachersByAcademicRank[$value['Department']['name']][strtolower(
+                                $sex
+                            )][$pk] = $numberofinstructors;
 
                             $graph['labels'][$value['Department']['id']] = $value['Department']['name'];
                             $graph['data'][$pk][$value['Department']['id']] += $numberofinstructors;
-
-                        } else if ($sex == "all") {
+                        } elseif ($sex == "all") {
                             $sexList = array('male' => 'male', 'female' => 'female');
                             foreach ($sexList as $skey => $svalue) {
                                 $numberofinstructors = $this->find('count', array(
@@ -404,7 +454,9 @@ class StaffsTable extends Table
                                     )
                                 ));
 
-                                $distributionStatsTeachersByAcademicRank[$value['Department']['name']][strtolower($svalue)][$pk] = $numberofinstructors;
+                                $distributionStatsTeachersByAcademicRank[$value['Department']['name']][strtolower(
+                                    $svalue
+                                )][$pk] = $numberofinstructors;
                                 $graph['labels'][$value['Department']['id']] = $value['Department']['name'];
                                 $graph['data'][$pk][$value['Department']['id']] += $numberofinstructors;
                             }
@@ -420,7 +472,7 @@ class StaffsTable extends Table
         return $distribution;
     }
 
-    public function getDistributionStatsTeacherToStudents($department_id = null,$sex='all')
+    public function getDistributionStatsTeacherToStudents($department_id = null, $sex = 'all')
     {
 
         $query = "";
@@ -464,15 +516,13 @@ class StaffsTable extends Table
 
         if (!empty($departments)) {
             foreach ($departments as $key => $value) {
-
                 $totalnumberofinstructors = $this->find('count', array(
-                        'conditions' => array(
-                            'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
-                            'Staff.department_id' => $value['Department']['id'],
-                            'Staff.active' => 1
-                        )
+                    'conditions' => array(
+                        'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
+                        'Staff.department_id' => $value['Department']['id'],
+                        'Staff.active' => 1
                     )
-                );
+                ));
 
                 $totalnumberofstudents = ClassRegistry::init('Student')->find('count', array(
                     'conditions' => array(
@@ -566,6 +616,7 @@ class StaffsTable extends Table
 
     function preparedAttachment($data = null, $group = null)
     {
+
         if (!empty($data['Attachment'])) {
             foreach ($data['Attachment'] as $in => &$dv) {
                 if (empty($dv['file']['name']) && empty($dv['file']['type']) && empty($dv['tmp_name'])) {
@@ -587,7 +638,7 @@ class StaffsTable extends Table
             $staffs = $this->find('all', array(
                 'conditions' => array(
                     'Staff.department_id' => $department_id,
-                    'Staff.user_id in (select id from users where role_id = '. ROLE_INSTRUCTOR .')'
+                    'Staff.user_id in (select id from users where role_id = ' . ROLE_INSTRUCTOR . ')'
                 ),
                 'contain' => array(
                     'User',
@@ -598,7 +649,7 @@ class StaffsTable extends Table
             ));
         } else {
             $staffs = $this->find('all', array(
-                'conditions' => array('Staff.user_id in (select id from users where role_id = '. ROLE_INSTRUCTOR .')'),
+                'conditions' => array('Staff.user_id in (select id from users where role_id = ' . ROLE_INSTRUCTOR . ')'),
                 'contain' => array(
                     'User',
                     'CourseInstructorAssignment' => array('limit' => 1),
@@ -652,24 +703,27 @@ class StaffsTable extends Table
                     ));
 
                     if (count($staffDouble) > 1) {
-
                         //find out which account is most used and move the account
-                        $mostRecentAccount = $this->User->find('first', array('conditions' => array('User.id' => array_keys($staffDouble), 'User.active' => 1), 'order' => array('User.last_login' => 'DESC'), 'recursive' => -1));
+                        $mostRecentAccount = $this->User->find(
+                            'first',
+                            array(
+                                'conditions' => array('User.id' => array_keys($staffDouble), 'User.active' => 1),
+                                'order' => array('User.last_login' => 'DESC'),
+                                'recursive' => -1
+                            )
+                        );
 
                         debug($mostRecentAccount);
 
                         if (!empty($mostRecentAccount)) {
-
                             $staffIdToBeUsed = $staffDouble[$mostRecentAccount['User']['id']];
 
                             debug($staffIdToBeUsed);
 
                             foreach ($staffDouble as $skey => $svalue) {
-
                                 if ($svalue == $staffIdToBeUsed) {
                                     continue;
                                 } else {
-
                                     debug($svalue);
                                     //what about colleague evaluations?? Neway
 
@@ -685,29 +739,58 @@ class StaffsTable extends Table
                                         }
                                     } */
 
-                                    $date_modified = '"'. date('Y-m-d H:i:s') . '"';
+                                    $date_modified = '"' . date('Y-m-d H:i:s') . '"';
 
-                                    $courseInstructorAssignmentsUpdate = $this->CourseInstructorAssignment->find('list', array('conditions' => array('CourseInstructorAssignment.staff_id' => $svalue), 'fields' => array('CourseInstructorAssignment.id', 'CourseInstructorAssignment.id')));
+                                    $courseInstructorAssignmentsUpdate = $this->CourseInstructorAssignment->find(
+                                        'list',
+                                        array(
+                                            'conditions' => array('CourseInstructorAssignment.staff_id' => $svalue),
+                                            'fields' => array(
+                                                'CourseInstructorAssignment.id',
+                                                'CourseInstructorAssignment.id'
+                                            )
+                                        )
+                                    );
                                     debug($courseInstructorAssignmentsUpdate);
 
                                     if (!empty($courseInstructorAssignmentsUpdate)) {
                                         $this->CourseInstructorAssignment->recursive = -1;
-                                        $this->CourseInstructorAssignment->updateAll(array('CourseInstructorAssignment.staff_id' => $staffIdToBeUsed, 'CourseInstructorAssignment.modified' => $date_modified), array('CourseInstructorAssignment.id' => $courseInstructorAssignmentsUpdate));
+                                        $this->CourseInstructorAssignment->updateAll(
+                                            array(
+                                                'CourseInstructorAssignment.staff_id' => $staffIdToBeUsed,
+                                                'CourseInstructorAssignment.modified' => $date_modified
+                                            ),
+                                            array('CourseInstructorAssignment.id' => $courseInstructorAssignmentsUpdate)
+                                        );
                                     }
 
-                                    $colleagueEvalutionRateUpdate = $this->ColleagueEvalutionRate->find('list', array('conditions' => array('ColleagueEvalutionRate.staff_id' => $svalue), 'fields' => array('ColleagueEvalutionRate.id', 'ColleagueEvalutionRate.id')));
+                                    $colleagueEvalutionRateUpdate = $this->ColleagueEvalutionRate->find(
+                                        'list',
+                                        array(
+                                            'conditions' => array('ColleagueEvalutionRate.staff_id' => $svalue),
+                                            'fields' => array('ColleagueEvalutionRate.id', 'ColleagueEvalutionRate.id')
+                                        )
+                                    );
                                     debug($colleagueEvalutionRateUpdate);
 
                                     if (!empty($colleagueEvalutionRateUpdate)) {
                                         $this->ColleagueEvalutionRate->recursive = -1;
-                                        $this->ColleagueEvalutionRate->updateAll(array('ColleagueEvalutionRate.staff_id' => $staffIdToBeUsed, 'ColleagueEvalutionRate.modified' => $date_modified), array('ColleagueEvalutionRate.id' => $colleagueEvalutionRateUpdate));
+                                        $this->ColleagueEvalutionRate->updateAll(
+                                            array(
+                                                'ColleagueEvalutionRate.staff_id' => $staffIdToBeUsed,
+                                                'ColleagueEvalutionRate.modified' => $date_modified
+                                            ),
+                                            array('ColleagueEvalutionRate.id' => $colleagueEvalutionRateUpdate)
+                                        );
                                     }
 
                                     //$delete = $this->User->delete($skey);
                                     //$delete = $this->delete($svalue);
 
-                                    $this->User->updateAll(array('User.active' => 0, 'User.modified' => $date_modified), array('User.id' => $skey));
-                                    $this->updateAll(array('Staff.active' => 0, 'Staff.modified' => $date_modified), array('Staff.id' => $svalue));
+                                    $this->User->updateAll(array('User.active' => 0, 'User.modified' => $date_modified),
+                                        array('User.id' => $skey));
+                                    $this->updateAll(array('Staff.active' => 0, 'Staff.modified' => $date_modified),
+                                        array('Staff.id' => $svalue));
                                 }
                             }
                         }
@@ -719,6 +802,7 @@ class StaffsTable extends Table
 
     public function updateEducationAndServiceWing($department_id = null)
     {
+
         if (!empty($department_id)) {
             $staffs = $this->find('all', array(
                 'conditions' => array(
@@ -746,10 +830,10 @@ class StaffsTable extends Table
                 if ($svalue['User']['role_id'] == ROLE_INSTRUCTOR) {
                     $updateStaffs['Staff']['servicewing'] = 'Academician';
                     $updateStaffs['Staff']['service_wing_id'] = SERVICE_WING_ACADEMICIAN;
-                } else if ($svalue['User']['role_id'] == ROLE_REGISTRAR) {
+                } elseif ($svalue['User']['role_id'] == ROLE_REGISTRAR) {
                     $updateStaffs['Staff']['servicewing'] = 'Registrar';
                     $updateStaffs['Staff']['service_wing_id'] = SERVICE_WING_REGISTRAR;
-                } else if ($svalue['User']['role_id'] == ROLE_SYSADMIN) {
+                } elseif ($svalue['User']['role_id'] == ROLE_SYSADMIN) {
                     $updateStaffs['Staff']['servicewing'] = 'Technical Support';
                     $updateStaffs['Staff']['service_wing_id'] = SERVICE_WING_TECHNICAL_SUPPORT;
                 } else {
@@ -757,16 +841,16 @@ class StaffsTable extends Table
                     $updateStaffs['Staff']['service_wing_id'] = SERVICE_WING_TECHNICAL_SUPPORT;
                 }
 
-                if ($svalue['Staff']['position_id'] == 1 || $svalue['Staff']['position_id'] == 2 || $svalue['Staff']['position_id'] == 3 ) {
+                if ($svalue['Staff']['position_id'] == 1 || $svalue['Staff']['position_id'] == 2 || $svalue['Staff']['position_id'] == 3) {
                     $updateStaffs['Staff']['education'] = 'Degree';
                     $updateStaffs['Staff']['education_id'] = EDUCATION_DEGREE;
-                } else if ($svalue['Staff']['position_id'] == 11 || $svalue['Staff']['position_id'] == 12 || $svalue['Staff']['position_id'] == 13) {
+                } elseif ($svalue['Staff']['position_id'] == 11 || $svalue['Staff']['position_id'] == 12 || $svalue['Staff']['position_id'] == 13) {
                     $updateStaffs['Staff']['education'] = 'Diploma';
                     $updateStaffs['Staff']['education_id'] = EDUCATION_DIPLOMA;
-                } else if ($svalue['Staff']['position_id'] == 5 || $svalue['Staff']['position_id'] == 6 || $svalue['Staff']['position_id'] == 7 ) {
+                } elseif ($svalue['Staff']['position_id'] == 5 || $svalue['Staff']['position_id'] == 6 || $svalue['Staff']['position_id'] == 7) {
                     $updateStaffs['Staff']['education'] = 'Doctorate';
                     $updateStaffs['Staff']['education_id'] = EDUCATION_DOCTRATE;
-                } else if ($svalue['Staff']['position_id'] == 4) {
+                } elseif ($svalue['Staff']['position_id'] == 4) {
                     $updateStaffs['Staff']['education'] = 'Master';
                     $updateStaffs['Staff']['education_id'] = EDUCATION_MASTERS;
                 } else {
@@ -785,6 +869,7 @@ class StaffsTable extends Table
 
     public function updateGender($department_id = null)
     {
+
         if (!empty($department_id)) {
             $staffs = $this->find('all', array(
                 'conditions' => array(
@@ -827,6 +912,7 @@ class StaffsTable extends Table
 
     public function updateStaffId($department_id = null)
     {
+
         if (!empty($department_id)) {
             $staffs = $this->find('all', array(
                 'conditions' => array(
@@ -862,11 +948,11 @@ class StaffsTable extends Table
                 $count++;
             }
         }
-
     }
 
     public function updateCountry($department_id = null)
     {
+
         if (!empty($department_id)) {
             $staffs = $this->find('all', array(
                 'conditions' => array(
@@ -888,7 +974,89 @@ class StaffsTable extends Table
             ));
         }
 
-        $indians = array(2845, 2833, 2825, 2817, 2801, 2597, 2417, 2412, 2401, 2348, 2347, 2269, 2232, 2229, 2190, 2185, 2186, 2149, 2132, 2126, 2114, 2109, 2106, 2096, 2083, 2059, 2012, 59, 1852, 1597, 2109, 1342, 1861, 70, 1608, 2379, 1356, 2384, 606, 1118, 2401, 1899, 2417, 2179, 2193, 1426, 1939, 2195, 1172, 920, 731, 492, 1027, 266, 1045, 1557, 1051, 305, 1843, 837, 77, 1110, 602, 1664, 1157, 647, 1677, 1194, 187, 959, 1480, 1485, 1744, 217, 2012, 733, 742, 1766, 761, 1017, 1097);
+        $indians = array(
+            2845,
+            2833,
+            2825,
+            2817,
+            2801,
+            2597,
+            2417,
+            2412,
+            2401,
+            2348,
+            2347,
+            2269,
+            2232,
+            2229,
+            2190,
+            2185,
+            2186,
+            2149,
+            2132,
+            2126,
+            2114,
+            2109,
+            2106,
+            2096,
+            2083,
+            2059,
+            2012,
+            59,
+            1852,
+            1597,
+            2109,
+            1342,
+            1861,
+            70,
+            1608,
+            2379,
+            1356,
+            2384,
+            606,
+            1118,
+            2401,
+            1899,
+            2417,
+            2179,
+            2193,
+            1426,
+            1939,
+            2195,
+            1172,
+            920,
+            731,
+            492,
+            1027,
+            266,
+            1045,
+            1557,
+            1051,
+            305,
+            1843,
+            837,
+            77,
+            1110,
+            602,
+            1664,
+            1157,
+            647,
+            1677,
+            1194,
+            187,
+            959,
+            1480,
+            1485,
+            1744,
+            217,
+            2012,
+            733,
+            742,
+            1766,
+            761,
+            1017,
+            1097
+        );
 
         if (!empty($staffs)) {
             foreach ($staffs as $skey => $svalue) {
@@ -917,6 +1085,7 @@ class StaffsTable extends Table
 
     public function getActiveTeacherByDegree($department_id = null, $sex = 'all')
     {
+
         $graph['data'] = array();
         $graph['labels'] = array();
 
@@ -980,41 +1149,45 @@ class StaffsTable extends Table
                 foreach ($sexList as $skey => $svalue) {
                     $collegeDepartmentYearCount[$value['College']['name']] += 1;
                     foreach ($educations as $ckey => $cvalue) {
-
-                        $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Ethiopian'] = $this->find('count', array(
-                            'conditions' => array(
-                                'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
-                                'Staff.gender' => $skey,
-                                'Staff.education' => $ckey,
-                                'Staff.country_id' => 68,
-                                'Staff.department_id' => $value['Department']['id'],
-                                'Staff.active' => 1,
+                        $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Ethiopian'] = $this->find(
+                            'count',
+                            array(
+                                'conditions' => array(
+                                    'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
+                                    'Staff.gender' => $skey,
+                                    'Staff.education' => $ckey,
+                                    'Staff.country_id' => 68,
+                                    'Staff.department_id' => $value['Department']['id'],
+                                    'Staff.active' => 1,
+                                )
                             )
-                        ));
+                        );
 
-                        $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Foreigner'] = $this->find('count', array(
-                            'conditions' => array(
-                                'Staff.user_id IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
-                                'Staff.gender' => $skey,
-                                'Staff.education' => $ckey,
-                                'Staff.country_id !=' => COUNTRY_ID_OF_ETHIOPIA,
-                                'Staff.department_id' => $value['Department']['id'],
-                                'Staff.active' => 1,
+                        $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Foreigner'] = $this->find(
+                            'count',
+                            array(
+                                'conditions' => array(
+                                    'Staff.user_id IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
+                                    'Staff.gender' => $skey,
+                                    'Staff.education' => $ckey,
+                                    'Staff.country_id !=' => COUNTRY_ID_OF_ETHIOPIA,
+                                    'Staff.department_id' => $value['Department']['id'],
+                                    'Staff.active' => 1,
+                                )
                             )
-                        ));
+                        );
 
                         $graph['labels'][$value['Department']['id']] = $value['Department']['name'];
 
                         if (strtolower($skey) == "female") {
                             $indexS = 1;
-                        } else if (strtolower($skey) == "male") {
+                        } elseif (strtolower($skey) == "male") {
                             $indexS = 0;
                         }
 
                         $graph['data'][$indexS][$value['Department']['id']] += $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Ethiopian'];
 
                         $graph['data'][$indexS][$value['Department']['id']] += $teachersStatisticsByDegree[$value['College']['name']][$value['Department']['name']][$skey][$ckey]['Foreigner'];
-
                     }
                 }
                 $collegeDepartmentYearCount[$value['College']['name']] += 1;
@@ -1087,10 +1260,22 @@ class StaffsTable extends Table
             'Degree' => 'Degree'
         );
 
-        $educations = ClassRegistry::init('Education')->find('list', array('conditions' => array('Education.use_in_reports' => 1, 'Education.active' => 1), 'fields' => array('id', 'shortname')));
+        $educations = ClassRegistry::init('Education')->find(
+            'list',
+            array(
+                'conditions' => array('Education.use_in_reports' => 1, 'Education.active' => 1),
+                'fields' => array('id', 'shortname')
+            )
+        );
 
         //$positions = array('4' => 'Lecturer', '5' => 'Assistant Professor', '6' => 'Associate Professor', '7' => 'Professor');
-        $positions = ClassRegistry::init('Position')->find('list', array('conditions' => array('Position.service_wing_id' => 1, 'Position.active' => 1), 'fields' => array('id', 'position')));
+        $positions = ClassRegistry::init('Position')->find(
+            'list',
+            array(
+                'conditions' => array('Position.service_wing_id' => 1, 'Position.active' => 1),
+                'fields' => array('id', 'position')
+            )
+        );
 
         $collegeDepartmentYearCount = array();
 
@@ -1100,24 +1285,26 @@ class StaffsTable extends Table
                     $collegeDepartmentYearCount[$value['College']['name']] += 1;
                     foreach ($educations as $ekey => $evalue) {
                         foreach ($sexList as $skey => $svalue) {
-                            $teachersStatisticsByAcademicRank[$value['College']['name']][$value['Department']['name']][$evalue][$pvalue][$skey] = $this->find('count', array(
-                                'conditions' => array(
-                                    'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
-                                    'Staff.gender' => $skey,
-                                    'OR' => array(
-                                        'Staff.education' => $evalue,
-                                        'Staff.education_id' => $ekey,
-                                    ),
-                                    //'Staff.education' => $ekey,
-                                    'Staff.position_id' => $pkey,
-                                    'Staff.department_id' => $value['Department']['id'],
-                                    'Staff.active' => 1,
+                            $teachersStatisticsByAcademicRank[$value['College']['name']][$value['Department']['name']][$evalue][$pvalue][$skey] = $this->find(
+                                'count',
+                                array(
+                                    'conditions' => array(
+                                        'Staff.user_id  IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
+                                        'Staff.gender' => $skey,
+                                        'OR' => array(
+                                            'Staff.education' => $evalue,
+                                            'Staff.education_id' => $ekey,
+                                        ),
+                                        //'Staff.education' => $ekey,
+                                        'Staff.position_id' => $pkey,
+                                        'Staff.department_id' => $value['Department']['id'],
+                                        'Staff.active' => 1,
+                                    )
                                 )
-                            ));
+                            );
                         }
                     }
                 }
-
             }
         }
 
@@ -1126,7 +1313,6 @@ class StaffsTable extends Table
         //$distribution['graph'] = $graph;
 
         return $distribution;
-
     }
 
     public function getTeachersOnStudyLeave($department_id = null, $sex = 'all')
@@ -1194,15 +1380,16 @@ class StaffsTable extends Table
                     $collegeDepartmentYearCount[$value['College']['name']] += 1;
                     foreach ($educations as $ckey => $cvalue) {
                         $insideEthiopiaStudies = $this->find('count', array(
-                                'conditions' => array(
-                                    'Staff.user_id IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
-                                    'Staff.gender' => $skey,
-                                    'Staff.education' => $ckey,
-                                    'Staff.department_id' => $value['Department']['id'],
-                                    'Staff.id in (select staff_id from staff_studies where return_date > "' . date('Y-m-d') . '" and country_id=68 )'
-                                )
+                            'conditions' => array(
+                                'Staff.user_id IN (SELECT id FROM users WHERE role_id=' . ROLE_INSTRUCTOR . ' )',
+                                'Staff.gender' => $skey,
+                                'Staff.education' => $ckey,
+                                'Staff.department_id' => $value['Department']['id'],
+                                'Staff.id in (select staff_id from staff_studies where return_date > "' . date(
+                                    'Y-m-d'
+                                ) . '" and country_id=68 )'
                             )
-                        );
+                        ));
 
                         $outSideEthiopiaStudies = $this->find('count', array(
                             'conditions' => array(
@@ -1210,7 +1397,9 @@ class StaffsTable extends Table
                                 'Staff.gender' => $skey,
                                 'Staff.education' => $ckey,
                                 'Staff.department_id' => $value['Department']['id'],
-                                'Staff.id in (select staff_id from staff_studies where return_date > "' . date('Y-m-d') . '" and country_id!=68 )'
+                                'Staff.id in (select staff_id from staff_studies where return_date > "' . date(
+                                    'Y-m-d'
+                                ) . '" and country_id!=68 )'
                             )
                         ));
 
@@ -1221,13 +1410,12 @@ class StaffsTable extends Table
 
                         if (strtolower($skey) == "female") {
                             $indexS = 1;
-                        } else if (strtolower($skey) == "male") {
+                        } elseif (strtolower($skey) == "male") {
                             $indexS = 0;
                         }
 
                         $graph['data'][$indexS][$value['Department']['id']] += $insideEthiopiaStudies;
                         $graph['data'][$indexS][$value['Department']['id']] += $outSideEthiopiaStudies;
-
                     }
                 }
                 $collegeDepartmentYearCount[$value['College']['name']] += 1;
@@ -1239,7 +1427,6 @@ class StaffsTable extends Table
         $distribution['graph'] = $graph;
 
         return $distribution;
-
     }
 
     public function getSpecialNeeds($department_id = null, $sex = 'all')
@@ -1296,7 +1483,6 @@ class StaffsTable extends Table
 
         foreach ($departments as $key => $value) {
             foreach ($sexList as $skey => $svalue) {
-
             }
         }
 
@@ -1305,8 +1491,8 @@ class StaffsTable extends Table
         $distribution['graph'] = $graph;
 
         return $distribution;
-
     }
+
     public function remove_duplicate_staff($department_id = null)
     {
 
@@ -1330,7 +1516,11 @@ class StaffsTable extends Table
 
         if (!empty($result)) {
             foreach ($result as $k => $vv) {
-                $staff_duplicated[strtolower(trim($vv['y']['first_name'])) . '~' . strtolower(trim($vv['y']['middle_name'])) . '~' . strtolower(trim($vv['y']['last_name'])) . '~' . $vv['y']['department_id']][$vv['y']['id']] = $vv['y']['user_id'];
+                $staff_duplicated[strtolower(trim($vv['y']['first_name'])) . '~' . strtolower(
+                    trim($vv['y']['middle_name'])
+                ) . '~' . strtolower(
+                    trim($vv['y']['last_name'])
+                ) . '~' . $vv['y']['department_id']][$vv['y']['id']] = $vv['y']['user_id'];
             }
         }
 
@@ -1355,10 +1545,11 @@ class StaffsTable extends Table
                 //update assignment table with the account most actives
 
                 foreach ($allinstructorAssignments as $assk => $asssid) {
-
                     $this->CourseInstructorAssignment->id = $asssid['CourseInstructorAssignment']['id'];
-                    $this->CourseInstructorAssignment->saveField('staff_id', $mostRecentAssignment['CourseInstructorAssignment']['staff_id']);
-
+                    $this->CourseInstructorAssignment->saveField(
+                        'staff_id',
+                        $mostRecentAssignment['CourseInstructorAssignment']['staff_id']
+                    );
                     /* if ($mostRecentAssignment['CourseInstructorAssignment']['staff_id'] != $asssid['CourseInstructorAssignment']['staff_id']) {
                         //remove staff and user
                         if (isset($asssid['CourseInstructorAssignment']['staff_id']) && !empty($asssid['CourseInstructorAssignment']['staff_id'])) {
@@ -1380,7 +1571,10 @@ class StaffsTable extends Table
             foreach ($staff_duplicated as $s => $sd) {
                 foreach ($sd as $sid => $suid) {
                     // check if instructor assignment is done
-                    $assigned = $this->CourseInstructorAssignment->find('count', array('conditions' => array('CourseInstructorAssignment.staff_id' => $sid)));
+                    $assigned = $this->CourseInstructorAssignment->find(
+                        'count',
+                        array('conditions' => array('CourseInstructorAssignment.staff_id' => $sid))
+                    );
                     if ($assigned == 0) {
                         //remove staff and user
                         $this->delete($sid);

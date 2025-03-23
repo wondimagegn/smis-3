@@ -1,13 +1,14 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class ExamRoomNumberOfInvigilatorsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +17,7 @@ class ExamRoomNumberOfInvigilatorsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('exam_room_number_of_invigilators');
@@ -38,6 +40,7 @@ class ExamRoomNumberOfInvigilatorsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -70,14 +73,20 @@ class ExamRoomNumberOfInvigilatorsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['class_room_id'], 'ClassRooms'));
 
         return $rules;
     }
 
 
-    function is_class_room_used($id=null){
-        $count = $this->find('count', array('conditions'=>array('ExamRoomNumberOfInvigilator.class_room_id'=>$id), 'limit'=>2));
+    public function is_class_room_used($id = null)
+    {
+
+        $count = $this->find(
+            'count',
+            array('conditions' => array('ExamRoomNumberOfInvigilator.class_room_id' => $id), 'limit' => 2)
+        );
         return $count;
     }
 }

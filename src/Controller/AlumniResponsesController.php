@@ -2,10 +2,18 @@
 namespace App\Controller;
 
 use App\Controller\AppController;
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
 
 class AlumniResponsesController extends AppController
 {
 
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
     public function index()
     {
         $this->paginate = [

@@ -1,76 +1,152 @@
 <?php
+
 namespace App\Controller;
 
 use App\Controller\AppController;
 
-/**
- * SurveyQuestions Controller
- *
- * @property \App\Model\Table\SurveyQuestionsTable $SurveyQuestions
- *
- * @method \App\Model\Entity\SurveyQuestion[]|\Cake\Datasource\ResultSetInterface paginate($object = null, array $settings = [])
- */
+use Cake\Event\Event;
+use Cake\ORM\TableRegistry;
+use Cake\Core\Configure;
+
 class SurveyQuestionsController extends AppController
 {
 
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+        $this->Auth->Allow('add', 'edit', 'index');
+    }
+
     public function index()
     {
-        $surveyQuestions = $this->paginate($this->SurveyQuestions);
 
-        $this->set(compact('surveyQuestions'));
+        $this->SurveyQuestion->recursive = 0;
+        $this->set('surveyQuestions', $this->Paginator->paginate());
     }
 
     public function view($id = null)
     {
-        $surveyQuestion = $this->SurveyQuestions->get($id, [
-            'contain' => ['AlumniResponses', 'SurveyQuestionAnswers'],
-        ]);
 
-        $this->set('surveyQuestion', $surveyQuestion);
+        if (!$this->SurveyQuestion->exists($id)) {
+            throw new NotFoundException(__('Invalid survey question'));
+        }
+        $options = array('conditions' => array('SurveyQuestion.' . $this->SurveyQuestion->primaryKey => $id));
+        $this->set('surveyQuestion', $this->SurveyQuestion->find('first', $options));
     }
 
     public function add()
     {
-        $surveyQuestion = $this->SurveyQuestions->newEntity();
-        if ($this->request->is('post')) {
-            $surveyQuestion = $this->SurveyQuestions->patchEntity($surveyQuestion, $this->request->getData());
-            if ($this->SurveyQuestions->save($surveyQuestion)) {
-                $this->Flash->success(__('The survey question has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
+        if ($this->request->is('post')) {
+            $this->SurveyQuestion->create();
+
+            $this->request->data = $this->SurveyQuestion->unsetdata($this->request->data);
+
+            if (isset($this->request->data['SurveyQuestionAnswer']) && !empty($this->request->data['SurveyQuestionAnswer'])) {
+                $saved = $this->SurveyQuestion->saveAll($this->request->data);
+            } else {
+                $saved = $this->SurveyQuestion->save($this->request->data);
             }
-            $this->Flash->error(__('The survey question could not be saved. Please, try again.'));
+
+            if ($saved) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The survey question has been saved.'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The survey question could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
         }
-        $this->set(compact('surveyQuestion'));
     }
 
     public function edit($id = null)
     {
-        $surveyQuestion = $this->SurveyQuestions->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $surveyQuestion = $this->SurveyQuestions->patchEntity($surveyQuestion, $this->request->getData());
-            if ($this->SurveyQuestions->save($surveyQuestion)) {
-                $this->Flash->success(__('The survey question has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The survey question could not be saved. Please, try again.'));
+        if (!$this->SurveyQuestion->exists($id)) {
+            throw new NotFoundException(__('Invalid survey question'));
         }
-        $this->set(compact('surveyQuestion'));
+        if ($this->request->is(array('post', 'put'))) {
+            /*
+            if ($this->SurveyQuestion->save($this->request->data)) {
+
+                $this->Session->setFlash('<span></span>'.__('The survey question has been saved.'),'default',array('class'=>'success-box success-message'));
+
+                return $this->redirect(array('action' => 'index'));
+            } else {
+
+                    $this->Session->setFlash('<span></span>'.__('The survey question could not be saved. Please, try again.'),'default',array('class'=>'error-box error-message'));
+
+            }
+            */
+
+            $this->request->data = $this->SurveyQuestion->unsetdata($this->request->data);
+
+            if (isset($this->request->data['SurveyQuestionAnswer']) && !empty($this->request->data['SurveyQuestionAnswer'])) {
+                $saved = $this->SurveyQuestion->saveAll($this->request->data);
+            } else {
+                $saved = $this->SurveyQuestion->save($this->request->data);
+            }
+
+            if ($saved) {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The survey question has been saved.'),
+                    'default',
+                    array('class' => 'success-box success-message')
+                );
+
+                return $this->redirect(array('action' => 'index'));
+            } else {
+                $this->Session->setFlash(
+                    '<span></span>' . __('The survey question could not be saved. Please, try again.'),
+                    'default',
+                    array('class' => 'error-box error-message')
+                );
+            }
+        } else {
+            $options = array('conditions' => array('SurveyQuestion.' . $this->SurveyQuestion->primaryKey => $id));
+            $this->request->data = $this->SurveyQuestion->find('first', $options);
+        }
     }
 
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $surveyQuestion = $this->SurveyQuestions->get($id);
-        if ($this->SurveyQuestions->delete($surveyQuestion)) {
-            $this->Flash->success(__('The survey question has been deleted.'));
-        } else {
-            $this->Flash->error(__('The survey question could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        $this->SurveyQuestion->id = $id;
+        if (!$this->SurveyQuestion->exists()) {
+            throw new NotFoundException(__('Invalid survey question'));
+        }
+        $this->request->allowMethod('post', 'delete');
+        if ($this->SurveyQuestion->delete()) {
+            $this->Session->setFlash(
+                '<span></span>' . __('The survey question has been deleted.'),
+                'default',
+                array('class' => 'success-box success-message')
+            );
+        } else {
+            $this->Session->setFlash(
+                '<span></span>' . __('The survey question could not be deleted. Please, try again.'),
+                'default',
+                array('class' => 'error-box error-message')
+            );
+        }
+        return $this->redirect(array('action' => 'index'));
     }
 }

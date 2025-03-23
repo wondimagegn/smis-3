@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -153,7 +154,9 @@ class StudentStatusPatternsTable extends Table
             )
         ));
 
-        debug($minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: '. $minimumPointofCurriculum['Student']['id'].')');
+        debug(
+            $minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: ' . $minimumPointofCurriculum['Student']['id'] . ')'
+        );
 
         if ($check_registered_last_year_level_courses_from_curriculum) {
             debug($check_registered_last_year_level_courses_from_curriculum);
@@ -183,7 +186,9 @@ class StudentStatusPatternsTable extends Table
                 //debug($minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: '. $minimumPointofCurriculum['Student']['id'].')' . ' completed minimum required credits & took last year courses from curriculum');
                 return true;
             } else {
-                debug($minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: '. $minimumPointofCurriculum['Student']['id'].')' . ' doesnot completed minimum required credits but took last year courses from curriculum');
+                debug(
+                    $minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: ' . $minimumPointofCurriculum['Student']['id'] . ')' . ' doesnot completed minimum required credits but took last year courses from curriculum'
+                );
             }
         } else {
             //debug($minimumPointofCurriculum['Student']['full_name_studentnumber'] . ' (DB ID: '. $minimumPointofCurriculum['Student']['id'].')' . ' doesnot took any last year courses from curriculum');
@@ -191,5 +196,4 @@ class StudentStatusPatternsTable extends Table
 
         return false;
     }
-
 }

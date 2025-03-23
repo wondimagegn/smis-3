@@ -1,73 +1,126 @@
 <?php
+
+
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
 
 class OtherAcademicRulesController extends AppController
 {
 
+    /**
+     * Components
+     *
+     * @var array
+     */
+
+    public $paginate = [];
+
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('Flash');
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
+
+    /**
+     * index method
+     *
+     * @return void
+     */
     public function index()
     {
-        $this->paginate = [
-            'contain' => ['Departments', 'Programs', 'ProgramTypes', 'YearLevels', 'Curriculums', 'CourseCategories', 'AcademicStatuses'],
-        ];
-        $otherAcademicRules = $this->paginate($this->OtherAcademicRules);
 
-        $this->set(compact('otherAcademicRules'));
+        $this->OtherAcademicRule->recursive = 0;
+        $this->set('otherAcademicRules', $this->Paginator->paginate());
     }
 
+    /**
+     * view method
+     *
+     * @param string $id
+     * @return void
+     * @throws NotFoundException
+     */
     public function view($id = null)
     {
-        $otherAcademicRule = $this->OtherAcademicRules->get($id, [
-            'contain' => ['Departments', 'Programs', 'ProgramTypes', 'YearLevels', 'Curriculums', 'CourseCategories', 'AcademicStatuses'],
-        ]);
 
-        $this->set('otherAcademicRule', $otherAcademicRule);
+        if (!$this->OtherAcademicRule->exists($id)) {
+            throw new NotFoundException(__('Invalid other academic rule'));
+        }
+        $options = array('conditions' => array('OtherAcademicRule.' . $this->OtherAcademicRule->primaryKey => $id));
+        $this->set('otherAcademicRule', $this->OtherAcademicRule->find('first', $options));
     }
 
+    /**
+     * add method
+     *
+     * @return void
+     */
     public function add()
     {
-        $otherAcademicRule = $this->OtherAcademicRules->newEntity();
+
         if ($this->request->is('post')) {
-            $otherAcademicRule = $this->OtherAcademicRules->patchEntity($otherAcademicRule, $this->request->getData());
-            if ($this->OtherAcademicRules->save($otherAcademicRule)) {
-                $this->Flash->success(__('The other academic rule has been saved.'));
-
-                return $this->redirect(['action' => 'index']);
+            $this->OtherAcademicRule->create();
+            if ($this->OtherAcademicRule->save($this->request->data)) {
+                return $this->flash(__('The other academic rule has been saved.'), array('action' => 'index'));
             }
-            $this->Flash->error(__('The other academic rule could not be saved. Please, try again.'));
         }
-
-        $this->set(compact('otherAcademicRule'));
     }
 
+/**
+ * edit method
+ *
+ * @throws NotFoundException
+ * @param string $id
+ * @return void
+ */
     public function edit($id = null)
     {
-        $otherAcademicRule = $this->OtherAcademicRules->get($id, [
-            'contain' => [],
-        ]);
-        if ($this->request->is(['patch', 'post', 'put'])) {
-            $otherAcademicRule = $this->OtherAcademicRules->patchEntity($otherAcademicRule, $this->request->getData());
-            if ($this->OtherAcademicRules->save($otherAcademicRule)) {
-                $this->Flash->success(__('The other academic rule has been saved.'));
 
-                return $this->redirect(['action' => 'index']);
-            }
-            $this->Flash->error(__('The other academic rule could not be saved. Please, try again.'));
+        if (!$this->OtherAcademicRule->exists($id)) {
+            throw new NotFoundException(__('Invalid other academic rule'));
         }
-        $this->set(compact('otherAcademicRule'));
+        if ($this->request->is(array('post', 'put'))) {
+            if ($this->OtherAcademicRule->save($this->request->data)) {
+                return $this->flash(__('The other academic rule has been saved.'), array('action' => 'index'));
+            }
+        } else {
+            $options = array('conditions' => array('OtherAcademicRule.' . $this->OtherAcademicRule->primaryKey => $id));
+            $this->request->data = $this->OtherAcademicRule->find('first', $options);
+        }
     }
 
+    /**
+     * delete method
+     *
+     * @throws NotFoundException
+     * @param string $id
+     * @return void
+     */
     public function delete($id = null)
     {
-        $this->request->allowMethod(['post', 'delete']);
-        $otherAcademicRule = $this->OtherAcademicRules->get($id);
-        if ($this->OtherAcademicRules->delete($otherAcademicRule)) {
-            $this->Flash->success(__('The other academic rule has been deleted.'));
-        } else {
-            $this->Flash->error(__('The other academic rule could not be deleted. Please, try again.'));
-        }
 
-        return $this->redirect(['action' => 'index']);
+        $this->OtherAcademicRule->id = $id;
+        if (!$this->OtherAcademicRule->exists()) {
+            throw new NotFoundException(__('Invalid other academic rule'));
+        }
+        $this->request->allowMethod('post', 'delete');
+        if ($this->OtherAcademicRule->delete()) {
+            return $this->flash(__('The other academic rule has been deleted.'), array('action' => 'index'));
+        } else {
+            return $this->flash(
+                __('The other academic rule could not be deleted. Please, try again.'),
+                array('action' => 'index')
+            );
+        }
     }
 }

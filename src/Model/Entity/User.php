@@ -1,8 +1,8 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
-
 
 class User extends Entity
 {
@@ -62,6 +62,14 @@ class User extends Entity
         'user_dorm_assignments' => true,
         'user_meal_assignments' => true,
     ];
+
+    protected $_virtual = ['full_name']; // Define virtual fields
+
+    protected function _getFullName()
+    {
+
+        return $this->first_name . ' ' . $this->middle_name . ' ' . $this->last_name;
+    }
 
     /**
      * Fields that are excluded from JSON versions of the entity.

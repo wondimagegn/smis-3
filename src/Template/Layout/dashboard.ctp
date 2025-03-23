@@ -1,7 +1,14 @@
-<!DOCTYPE html>
-<html class="no-js" lang="en">
+<?php
+
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+
+?>
+<!doctype html>
+<html class="no-js">
 <head>
     <?= $this->Html->charset(); ?>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>
         <?= Configure::read('ApplicationShortName') . ' ' . Configure::read('ApplicationVersionShort'); ?>
@@ -40,6 +47,10 @@
     </script>
 </head>
 <body>
+
+<div id="preloader">
+    <div id="status">&nbsp;</div>
+</div>
 <div class="off-canvas-wrap" data-offcanvas>
     <div class="inner-wrap">
         <div id="skin-select">
@@ -82,6 +93,7 @@
                     </div>
                 </div>
                 <?= $this->fetch('content'); ?>
+
             </div>
         </div>
 
@@ -98,7 +110,12 @@
     'slimscroll/jquery.slimscroll', 'slicknav/jquery.slicknav', 'sliding-menu',
     'scriptbreaker-multiple-accordion-1', 'number/jquery.counterup.min',
     'circle-progress/jquery.circliful', 'number-progress-bar/jquery.velocity.min',
-    'number-progress-bar/number-pb', 'app', 'loader/loader', 'loader/demo'
+    'number-progress-bar/number-pb',
+    'app',
+    'loader/loader',
+    'loader/demo',
+    'angular',
+    'smisangularapp'
 ]); ?>
 
 <script>
@@ -106,6 +123,34 @@
         $(document).foundation();
     });
 </script>
+<script type="text/javascript">
+    $(function () {
+        $(document).foundation();
+    });
+    $(document).ready(function () {
+        $('#select-all').click(function (event) { //on click
+            if (this.checked) { // check select status
+                $('.checkbox1').each(function () { //loop through each checkbox
+                    this.checked = true; //select all checkboxes with class "checkbox1"
+                });
+            } else {
+                $('.checkbox1').each(function () { //loop through each checkbox
+                    this.checked = false; //deselect all checkboxes with class "checkbox1"
+                });
+            }
+        });
+
+        $('.checkbox1').click(function (event) {
+            //on click
+            if (!this.checked) {
+                // check select status
+                $('#select-all').attr('checked', false);
+            }
+        });
+    });
+
+</script>
+
 
 <?= $this->fetch('script'); ?>
 </body>

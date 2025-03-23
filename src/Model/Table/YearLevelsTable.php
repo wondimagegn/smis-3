@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,7 +9,6 @@ use Cake\Validation\Validator;
 
 class YearLevelsTable extends Table
 {
-
     public function initialize(array $config): void
     {
         parent::initialize($config);
@@ -124,5 +124,4 @@ class YearLevelsTable extends Table
             ->first()
             ->id ?? null;
     }
-
 }

@@ -1,13 +1,13 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class CountriesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +16,7 @@ class CountriesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('countries');
@@ -49,6 +50,7 @@ class CountriesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -66,30 +68,61 @@ class CountriesTable extends Table
         return $validator;
     }
 
-    function checkUnique() {
-        $count=0;
+    public function checkUnique()
+    {
+
+        $count = 0;
         if (!empty($this->data['Country']['id'])) {
-            $count=$this->find('count',array('conditions'=>array('Country.id <> '=>$this->data['Country']['id'],'Country.name'=>trim($this->data['Country']['name']))));
+            $count = $this->find(
+                'count',
+                array(
+                    'conditions' => array(
+                        'Country.id <> ' => $this->data['Country']['id'],
+                        'Country.name' => trim($this->data['Country']['name'])
+                    )
+                )
+            );
         } else {
-            $count=$this->find('count',array('conditions'=>array('Country.name'=>trim($this->data['Country']['name']))));
+            $count = $this->find(
+                'count',
+                array('conditions' => array('Country.name' => trim($this->data['Country']['name'])))
+            );
         }
 
-        if ($count>0) {
+        if ($count > 0) {
             return false;
         }
         return true;
     }
-    function canItBeDeleted($country_id = null) {
-        if($this->Student->find('count', array('conditions' => array('Student.country_id'
-            => $country_id))) > 0)
+
+    public function canItBeDeleted($country_id = null)
+    {
+
+        if (
+            $this->Student->find('count', array(
+                'conditions' => array(
+                    'Student.country_id'
+                    => $country_id
+                )
+            )) > 0
+        ) {
             return false;
-        else if($this->Contact->find('count', array('conditions' =>
-                array('Contact.country_id' =>$country_id))) > 0)
+        } elseif (
+            $this->Contact->find('count', array(
+                'conditions' =>
+                    array('Contact.country_id' => $country_id)
+            )) > 0
+        ) {
             return false;
-        else if($this->Region->find('count', array('conditions' =>
-                array('Region.country_id' =>$country_id))) > 0)
+        } elseif (
+            $this->Region->find('count', array(
+                'conditions' =>
+                    array('Region.country_id' => $country_id)
+            )) > 0
+        ) {
             return false;
-        else
+        } else {
             return true;
+        }
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class PasswordHistoriesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class PasswordHistoriesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('password_histories');
@@ -38,6 +41,7 @@ class PasswordHistoriesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -60,13 +64,17 @@ class PasswordHistoriesTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['user_id'], 'Users'));
 
         return $rules;
     }
 
-    function isThePasswordUsedBefore($user_id = null, $password = null) {
-        $passwordHistories = $this->find('all',
+    public function isThePasswordUsedBefore($user_id = null, $password = null)
+    {
+
+        $passwordHistories = $this->find(
+            'all',
             array(
                 'conditions' =>
                     array(
@@ -74,7 +82,8 @@ class PasswordHistoriesTable extends Table
                     )
             )
         );
-        $user = $this->User->find('first',
+        $user = $this->User->find(
+            'first',
             array(
                 'conditions' =>
                     array(
@@ -83,15 +92,14 @@ class PasswordHistoriesTable extends Table
             )
         );
         $password = Security::hash($password, null, true);
-        foreach($passwordHistories as $passwordHistory) {
-            if(strcmp($passwordHistory['PasswordHistory']['password'], $password) == 0) {
+        foreach ($passwordHistories as $passwordHistory) {
+            if (strcmp($passwordHistory['PasswordHistory']['password'], $password) == 0) {
                 return true;
             }
         }
-        if(strcmp($user['User']['password'], $password) == 0) {
+        if (strcmp($user['User']['password'], $password) == 0) {
             return true;
         }
         return false;
     }
-
 }

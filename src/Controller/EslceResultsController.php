@@ -1,11 +1,26 @@
 <?php
+
 namespace App\Controller;
 
-use App\Controller\AppController;
+use Cake\Event\Event;
+
 
 class EslceResultsController extends AppController
 {
 
+    public function initialize()
+    {
+
+        parent::initialize();
+        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
+
+    }
+
+    public function beforeFilter(Event $event)
+    {
+
+        parent::beforeFilter($event);
+    }
     public function index()
     {
         $this->paginate = [

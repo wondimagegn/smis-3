@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -73,7 +74,6 @@ class DropOutsTable extends Table
     {
         $last_registration_date = $this->Student->CourseRegistration->find('first', array('conditions' => array('CourseRegistration.student_id' => $student_id), 'order' => array('CourseRegistration.created DESC'), 'recursive' => -1));
         if (!empty($last_registration_date)) {
-
             $check_dropout = $this->find('count', array(
                 'conditions' => array(
                     'DropOut.student_id' => $student_id,
@@ -89,5 +89,4 @@ class DropOutsTable extends Table
         }
         return false;
     }
-
 }

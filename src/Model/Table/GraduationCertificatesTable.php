@@ -1,8 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
@@ -95,9 +94,9 @@ class GraduationCertificatesTable extends Table
 
             if (!empty($GraduationCertificate_detail_department['GraduationCertificate'])) {
                 return $GraduationCertificate_detail_department;
-            } else if (!empty($GraduationCertificate_detail_college['GraduationCertificate'])) {
+            } elseif (!empty($GraduationCertificate_detail_college['GraduationCertificate'])) {
                 return $GraduationCertificate_detail_college;
-            } else if (!empty($GraduationCertificate_detail_all['GraduationCertificate'])) {
+            } elseif (!empty($GraduationCertificate_detail_all['GraduationCertificate'])) {
                 return $GraduationCertificate_detail_all;
             } else {
                 return array();
@@ -150,9 +149,9 @@ class GraduationCertificatesTable extends Table
 
                 if (!empty($GraduationCertificate_detail_department)) {
                     $student_certificate_list[] = $GraduationCertificate_detail_department;
-                } else if (!empty($GraduationLetter_detail_college)) {
+                } elseif (!empty($GraduationLetter_detail_college)) {
                     $student_certificate_list[] = $GraduationCertificate_detail_college;
-                } else if (!empty($GraduationLetter_detail_all)) {
+                } elseif (!empty($GraduationLetter_detail_all)) {
                     $student_certificate_list[] = $GraduationCertificate_detail;
                 }
             }

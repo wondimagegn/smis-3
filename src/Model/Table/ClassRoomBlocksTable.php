@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class ClassRoomBlocksTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class ClassRoomBlocksTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('class_room_blocks');
@@ -25,13 +28,16 @@ class ClassRoomBlocksTable extends Table
         $this->belongsTo('Colleges', [
             'foreignKey' => 'college_id',
             'joinType' => 'INNER',
+            'propertyName' => 'College',
         ]);
         $this->belongsTo('Campuses', [
             'foreignKey' => 'campus_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Campus',
         ]);
         $this->hasMany('ClassRooms', [
             'foreignKey' => 'class_room_block_id',
+            'propertyName' => 'ClassRoom',
         ]);
     }
 
@@ -43,6 +49,7 @@ class ClassRoomBlocksTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -64,12 +71,15 @@ class ClassRoomBlocksTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['college_id'], 'Colleges'));
         $rules->add($rules->existsIn(['campus_id'], 'Campuses'));
 
         return $rules;
     }
-    function send_class_room_block_data (){
+
+    public function send_class_room_block_data()
+    {
 
         return $this->data;
     }

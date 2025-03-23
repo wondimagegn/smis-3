@@ -1,13 +1,14 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class ApplicablePaymentsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +17,7 @@ class ApplicablePaymentsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('applicable_payments');
@@ -27,6 +29,7 @@ class ApplicablePaymentsTable extends Table
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Student',
         ]);
     }
 
@@ -38,6 +41,7 @@ class ApplicablePaymentsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -96,19 +100,26 @@ class ApplicablePaymentsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
         return $rules;
     }
 
-    function duplication ($data=null) {
+    public function duplication($data = null)
+    {
+
         if (empty($data['ApplicablePayment']['sponsor_type'])) {
             return 0;
         }
-        $count=$this->find('count',array('conditions'=>
-            array('ApplicablePayment.student_id'=>$data['ApplicablePayment']['student_id'],
-                'ApplicablePayment.semester'=>$data['ApplicablePayment']['semester'],
-                'ApplicablePayment.academic_year'=>$data['ApplicablePayment']['academic_year'])));
+        $count = $this->find('count', array(
+            'conditions' =>
+                array(
+                    'ApplicablePayment.student_id' => $data['ApplicablePayment']['student_id'],
+                    'ApplicablePayment.semester' => $data['ApplicablePayment']['semester'],
+                    'ApplicablePayment.academic_year' => $data['ApplicablePayment']['academic_year']
+                )
+        ));
         debug($count);
         return $count;
     }

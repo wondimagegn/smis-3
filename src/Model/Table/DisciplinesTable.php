@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class DisciplinesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class DisciplinesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('disciplines');
@@ -38,6 +41,7 @@ class DisciplinesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -71,20 +75,27 @@ class DisciplinesTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
         return $rules;
     }
-    function duplication ($data=null)
+
+    public function duplication($data = null)
     {
-        if ( empty($data['Discipline']['title']) || empty($data['Discipline']['description']) ) {
+
+        if (empty($data['Discipline']['title']) || empty($data['Discipline']['description'])) {
             return 0;
         }
         //fee_amount
 
-        $count=$this->find('count',array('conditions'=>
-            array('Discipline.student_id'=>$data['Discipline']['student_id'],
-                'Discipline.discipline_taken_date'=>$data['Discipline']['discipline_taken_date'])));
+        $count = $this->find('count', array(
+            'conditions' =>
+                array(
+                    'Discipline.student_id' => $data['Discipline']['student_id'],
+                    'Discipline.discipline_taken_date' => $data['Discipline']['discipline_taken_date']
+                )
+        ));
 
         return $count;
     }

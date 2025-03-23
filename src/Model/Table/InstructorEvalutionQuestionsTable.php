@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -83,7 +84,6 @@ class InstructorEvalutionQuestionsTable extends Table
         ));
 
         if (!empty($publishedCourse)) {
-
             $t = ClassRegistry::init('StudentEvalutionRate')->find('all', array(
                 'conditions' => array('StudentEvalutionRate.published_course_id' => $publishedCourse['PublishedCourse']['id']),
                 'fields' => array('DISTINCT StudentEvalutionRate.instructor_evalution_question_id'),
@@ -107,7 +107,7 @@ class InstructorEvalutionQuestionsTable extends Table
 
                     if ($active['InstructorEvalutionQuestion']['active'] == 1) {
                         $totalDistinctQuestion['active'][$ev['StudentEvalutionRate']['instructor_evalution_question_id']] = $ev['StudentEvalutionRate']['instructor_evalution_question_id'];
-                    } else if ($active['InstructorEvalutionQuestion']['active'] == 0) {
+                    } elseif ($active['InstructorEvalutionQuestion']['active'] == 0) {
                         $totalDistinctQuestion['notactive'][$ev['StudentEvalutionRate']['instructor_evalution_question_id']] = $ev['StudentEvalutionRate']['instructor_evalution_question_id'];
                     }
                 }
@@ -119,7 +119,6 @@ class InstructorEvalutionQuestionsTable extends Table
             } else {
                 $totalObjectiveStudentQuestion = count($totalDistinctQuestion['notactive']);
             }
-
         } else {
             $totalObjectiveStudentQuestion = ClassRegistry::init('InstructorEvalutionQuestion')->find('count', array(
                 'conditions' => array(
@@ -177,7 +176,6 @@ class InstructorEvalutionQuestionsTable extends Table
         $count = 0;
 
         if (!empty($ct)) {
-
             $arr = array();
             $firstElement = $ct[0]['InstructorEvalutionQuestion']['active'];
 
@@ -209,7 +207,6 @@ class InstructorEvalutionQuestionsTable extends Table
             ),
             'fields' => array('DISTINCT ColleagueEvalutionRate.instructor_evalution_question_id'),
         )); */
-
     }
 
     public function totalObjectiveHeadQuestion($academic_year, $semester, $staff_id)
@@ -247,7 +244,6 @@ class InstructorEvalutionQuestionsTable extends Table
         $count = 0;
 
         if (!empty($ct)) {
-
             $arr = array();
             $firstElement = $ct[0]['InstructorEvalutionQuestion']['active'];
 
@@ -272,5 +268,4 @@ class InstructorEvalutionQuestionsTable extends Table
 
         return $count;
     }
-
 }

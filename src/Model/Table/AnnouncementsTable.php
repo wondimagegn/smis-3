@@ -1,11 +1,10 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-
 
 class AnnouncementsTable extends Table
 {
@@ -28,6 +27,7 @@ class AnnouncementsTable extends Table
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
             'joinType' => 'INNER',
+            'propertyName' => 'User',
         ]);
     }
 
@@ -85,16 +85,22 @@ class AnnouncementsTable extends Table
         return $rules;
     }
 
-    public function getNotExpiredAnnouncements(){
-        $announcements=$this->find('all',
-            array('conditions'=>array('Announcement.annucement_start <='=>date('Y-m-d'),
-                'Announcement.annucement_end >='=>date('Y-m-d'),
-                'Announcement.is_published'=>1,
+    public function getNotExpiredAnnouncements()
+    {
+
+        $announcements = $this->find(
+            'all',
+            array(
+                'conditions' => array(
+                    'Announcement.annucement_start <=' => date('Y-m-d'),
+                    'Announcement.annucement_end >=' => date('Y-m-d'),
+                    'Announcement.is_published' => 1,
 
             ),
-                'order'=>array('Announcement.annucement_start DESC'),
-                'contain'=>array('User')
-            ));
+                'order' => array('Announcement.annucement_start DESC'),
+                'contain' => array('User')
+            )
+        );
         return $announcements;
     }
 }

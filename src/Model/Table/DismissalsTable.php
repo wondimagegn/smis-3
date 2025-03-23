@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class DismissalsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class DismissalsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('dismissals');
@@ -38,6 +41,7 @@ class DismissalsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -78,54 +82,80 @@ class DismissalsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['student_id'], 'Students'));
 
         return $rules;
     }
 
-    function dismissedBecauseOfDiscipelanryNotReadmitted($student_id=null,$current_academicyear=null) {
-        $last_status_date=$this->Student->StudentExamStatus->find('first',
-            array('conditions'=>array(
-                'StudentExamStatus.student_id'=>$student_id),'order'=>array('StudentExamStatus.created DESC')));
+    public function dismissedBecauseOfDiscipelanryNotReadmitted($student_id = null, $current_academicyear = null)
+    {
 
-        $check_dismissal = $this->find('count',
-            array('conditions'=>array(
-                'Dismissal.student_id'=>$student_id,
-                'Dismissal.dismisal_date >= '=>$last_status_date['StudentExamStatus']['created'])));
-        if ($check_dismissal>0) {
-            if (!($this->Student->Readmission->is_readmitted ($student_id,$current_academicyear))){
+        $last_status_date = $this->Student->StudentExamStatus->find(
+            'first',
+            array(
+                'conditions' => array(
+                    'StudentExamStatus.student_id' => $student_id
+                ),
+                'order' => array('StudentExamStatus.created DESC')
+            )
+        );
+
+        $check_dismissal = $this->find(
+            'count',
+            array(
+                'conditions' => array(
+                    'Dismissal.student_id' => $student_id,
+                    'Dismissal.dismisal_date >= ' => $last_status_date['StudentExamStatus']['created']
+                )
+            )
+        );
+        if ($check_dismissal > 0) {
+            if (!($this->Student->Readmission->is_readmitted($student_id, $current_academicyear))) {
                 return true;
             } else {
                 return false;
             }
-
         } else {
-
             return false;
         }
-
     }
 
-    function dismissedBecauseOfDiscipelanryAfterRegistrationNotReadmitted($student_id=null,$current_academicyear=null) {
-        $last_registration_date=$this->Student->CourseRegistration->find('first',
-            array('conditions'=>array(
-                'CourseRegistration.student_id'=>$student_id),'order'=>array('CourseRegistration.created DESC'),'recursive'=>-1));
-        if(!empty($last_registration_date)){
-            $check_dismissal = $this->find('count',
-                array('conditions'=>array( 'Dismissal.student_id'=>$student_id,'Dismissal.dismisal_date >= '=>$last_registration_date['CourseRegistration']['created'])));
-            if ($check_dismissal>0) {
-                if (!($this->Student->Readmission->is_readmitted ($student_id,$current_academicyear))){
+    public function dismissedBecauseOfDiscipelanryAfterRegistrationNotReadmitted(
+        $student_id = null,
+        $current_academicyear = null
+    ) {
+
+        $last_registration_date = $this->Student->CourseRegistration->find(
+            'first',
+            array(
+                'conditions' => array(
+                    'CourseRegistration.student_id' => $student_id
+                ),
+                'order' => array('CourseRegistration.created DESC'),
+                'recursive' => -1
+            )
+        );
+        if (!empty($last_registration_date)) {
+            $check_dismissal = $this->find(
+                'count',
+                array(
+                    'conditions' => array(
+                        'Dismissal.student_id' => $student_id,
+                        'Dismissal.dismisal_date >= ' => $last_registration_date['CourseRegistration']['created']
+                    )
+                )
+            );
+            if ($check_dismissal > 0) {
+                if (!($this->Student->Readmission->is_readmitted($student_id, $current_academicyear))) {
                     return true;
                 } else {
                     return false;
                 }
-
             } else {
-
                 return false;
             }
         }
         return false;
-
     }
 }

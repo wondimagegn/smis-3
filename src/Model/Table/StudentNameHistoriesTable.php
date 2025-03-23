@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -65,7 +66,6 @@ class StudentNameHistoriesTable extends Table
     {
         $reformated_data = array();
         if (isset($data['Student']['id']) && !empty($data['Student']['id'])) {
-
             ///////////////////////////////amharic/////////////////////////////////////
             $reformated_data['StudentNameHistory']['to_amharic_first_name'] = $data['Student']['amharic_first_name'];
             $reformated_data['StudentNameHistory']['to_amharic_middle_name'] = $data['Student']['amharic_middle_name'];
@@ -90,6 +90,4 @@ class StudentNameHistoriesTable extends Table
             return $data;
         }
     }
-
-
 }

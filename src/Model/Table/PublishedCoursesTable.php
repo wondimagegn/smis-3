@@ -1,14 +1,13 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 class PublishedCoursesTable extends Table
 {
-
     public function initialize(array $config)
     {
         parent::initialize($config);
@@ -16,37 +15,93 @@ class PublishedCoursesTable extends Table
         $this->setTable('published_courses');
         $this->setPrimaryKey('id');
         $this->setDisplayField('id');
-
-        // Add associations
-        $this->belongsTo('Courses', [
-            'foreignKey' => 'course_id',
-            'joinType' => 'INNER',
-        ]);
-
-        $this->belongsTo('Programs', [
-            'foreignKey' => 'program_id',
-            'joinType' => 'INNER',
-        ]);
-
-        $this->belongsTo('ProgramTypes', [
-            'foreignKey' => 'program_type_id',
-            'joinType' => 'INNER',
-        ]);
-
-        $this->belongsTo('Departments', [
-            'foreignKey' => 'department_id',
-            'joinType' => 'INNER',
-        ]);
-
-        $this->belongsTo('Sections', [
-            'foreignKey' => 'section_id',
-            'joinType' => 'INNER',
-        ]);
-
         $this->belongsTo('YearLevels', [
-            'foreignKey' => 'year_level_id',
-            'joinType' => 'INNER',
+                'propertyName' => 'YearLevel']);
+        $this->belongsTo('GradeScales',
+            [
+                'propertyName' => 'GradeScale']);
+        $this->belongsTo('Courses',
+            [
+                'propertyName' => 'Course']);
+        $this->belongsTo('ProgramTypes',
+            [
+                'propertyName' => 'ProgramType']);
+        $this->belongsTo('Programs',
+            [
+                'propertyName' => 'Program']);
+        $this->belongsTo('Departments',
+            [
+                'propertyName' => 'Department']);
+        $this->belongsTo('GivenByDepartments', [
+            'className' => 'Departments',
+            'foreignKey' => 'given_by_department_id',
+            'propertyName' => 'GivenByDepartment',
         ]);
+        $this->belongsTo('Colleges',[
+            'propertyName' => 'College']);
+        $this->belongsTo('Sections',[
+            'propertyName' => 'Section']);
+
+        $this->hasMany('CourseSchedules',
+            [
+                'propertyName' => 'CourseSchedule',]);
+        $this->hasMany('UnschedulePublishedCourses',
+            [
+                'propertyName' => 'UnschedulePublishedCourse',]);
+        $this->hasMany('ExamSchedules',
+            [
+                'propertyName' => 'ExamSchedule',]);
+        $this->hasMany('GradeScalePublishedCourses',
+            [
+                'propertyName' => 'GradeScalePublishedCourse',]);
+        $this->hasMany('MakeupExams',[
+            'propertyName' => 'MakeupExam']);
+        $this->hasMany('MergedSectionsCourses',
+            [
+                'propertyName' => 'MergedSectionCourse']);
+        $this->hasMany('MergedSectionsExams',
+            [
+                'propertyName' => 'MergedSectionExam']);
+        $this->hasMany('SectionSplitForPublishedCourses',
+            [
+                'propertyName' => 'SectionSplitForPublishedCourse']);
+        $this->hasMany('CourseInstructorAssignments', [
+            'dependent' => true,
+            'propertyName' => 'CourseInstructorAssignment'
+        ]);
+        $this->hasMany('CourseRegistrations',
+            [
+                'propertyName' => 'CourseRegistration']);
+        $this->hasMany('CourseAdds',
+            [
+                'propertyName' => 'CourseAdd']);
+        $this->hasMany('ClassPeriodCourseConstraints',
+            [
+                'propertyName' => 'ClassPeriodCourseConstraint']);
+        $this->hasMany('ClassRoomCourseConstraints',
+            [
+                'propertyName' => 'ClassRoomCourseConstraint']);
+        $this->hasMany('CourseExamConstraints',
+            [
+                'propertyName' => 'CourseExamConstraint']);
+        $this->hasMany('ExamRoomCourseConstraints',
+            [
+                'propertyName' => 'ExamRoomCourseConstraint']);
+        $this->hasMany('Attendances',
+            [
+                'propertyName' => 'Attendance']);
+        $this->hasMany('ExamTypes',[
+            'propertyName' => 'ExamType']);
+        $this->hasMany('FxResitRequests',
+            [
+                'propertyName' => 'FxResitRequest']);
+        $this->hasMany('ResultEntryAssignments',
+            [
+                'propertyName' => 'ResultEntryAssignment']);
+
+        $this->hasOne('CourseExamGapConstraints',
+            [
+                'propertyName' => 'CourseExamGapConstraint']);
 
         $this->addBehavior('Timestamp');
     }
@@ -110,7 +165,8 @@ class PublishedCoursesTable extends Table
 
         if ($this->CourseAdd->find('count', array('conditions' => array('CourseAdd.published_course_id' => $id))) > 0) {
             return false;
-        } else if ($this->MakeupExam->find('count', array('conditions' => array('MakeupExam.published_course_id' => $id))) > 0) {
+        } elseif ($this->MakeupExam->find('count', array('conditions' => array('MakeupExam.published_course_id' => $id))
+            ) > 0) {
             return false;
         } else {
             return true;
@@ -401,7 +457,6 @@ class PublishedCoursesTable extends Table
                         } else {
                             $student_adds[] = $student_all_add;
                         }
-
                     } else {
                         unset($student_all_adds[$key]);
                     }
@@ -444,23 +499,19 @@ class PublishedCoursesTable extends Table
             if (!empty($students_makeup_exam)) {
                 foreach ($students_makeup_exam as $key => $student_makeup_exam) {
                     if ($student_makeup_exam['MakeupExam']['course_registration_id'] != null) {
-
                         $students_makeup_exam[$key]['ExamGradeHistory'] = $this->CourseRegistration->getCourseRegistrationGradeHistory($student_makeup_exam['MakeupExam']['course_registration_id']);
                         $students_makeup_exam[$key]['LatestGradeDetail'] = $this->CourseRegistration->getCourseRegistrationLatestGradeDetail($student_makeup_exam['MakeupExam']['course_registration_id']);
                         $students_makeup_exam[$key]['AnyExamGradeIsOnProcess'] = $this->CourseRegistration->isAnyGradeOnProcess($student_makeup_exam['MakeupExam']['course_registration_id']);
                         $students_makeup_exam[$key]['freshman_program'] = (!is_null($student_makeup_exam['PublishedCourse']['college_id']) ? true : false);
 
                         $students_makeup_exam[$key]['ExamResultHistory'] = $this->CourseRegistration->ExamResult->find('all', array('conditions' => array('ExamResult.course_registration_id' => $student_makeup_exam['MakeupExam']['course_registration_id']), 'contain' => array()));
-
                     } else {
-
                         $students_makeup_exam[$key]['ExamGradeHistory'] = $this->CourseAdd->getCourseAddGradeHistory($student_makeup_exam['MakeupExam']['course_add_id']);
                         $students_makeup_exam[$key]['LatestGradeDetail'] = $this->CourseAdd->getCourseAddLatestGradeDetail($student_makeup_exam['MakeupExam']['course_add_id']);
                         $students_makeup_exam[$key]['AnyExamGradeIsOnProcess'] = $this->CourseAdd->isAnyGradeOnProcess($student_makeup_exam['MakeupExam']['course_add_id']);
                         $students_makeup_exam[$key]['freshman_program'] = (!is_null($student_makeup_exam['PublishedCourse']['college_id']) ? true : false);
 
                         $students_makeup_exam[$key]['ExamResultHistory'] = $this->CourseAdd->ExamResult->find('all', array('conditions' => array('ExamResult.course_add_id' => $student_makeup_exam['MakeupExam']['course_add_id']), 'contain' => array()));
-
                     }
 
                     if (!empty($student_makeup_exam['CourseRegistration']) && $student_makeup_exam['CourseRegistration']['id'] != "") {
@@ -495,7 +546,6 @@ class PublishedCoursesTable extends Table
         $students_makeup_exam = array();
 
         if ($published_course_id != null) {
-
             $section_and_course_detail = $this->find('first', array(
                 'conditions' => array(
                     'PublishedCourse.id' => $published_course_id
@@ -541,7 +591,6 @@ class PublishedCoursesTable extends Table
             //student previously taken course detail
             if (!empty($students_makeup_exam)) {
                 foreach ($students_makeup_exam as $key => &$student_makeup_exam) {
-
                     if ($student_makeup_exam['MakeupExam']['course_registration_id'] != null) {
                         $students_makeup_exam[$key]['ExamGradeHistory'] = $this->CourseRegistration->getCourseRegistrationGradeHistory($student_makeup_exam['MakeupExam']['course_registration_id']);
                         $students_makeup_exam[$key]['LatestGradeDetail'] = $this->CourseRegistration->getCourseRegistrationLatestGradeDetail($student_makeup_exam['MakeupExam']['course_registration_id']);
@@ -587,7 +636,6 @@ class PublishedCoursesTable extends Table
         $students_makeup_exam = array();
 
         if ($published_course_id != null) {
-
             $section_and_course_detail = $this->find('first', array(
                 'conditions' => array(
                     'PublishedCourse.id' => $published_course_id
@@ -669,7 +717,6 @@ class PublishedCoursesTable extends Table
         $student_course_register_and_adds = array();
 
         if ($published_course_id != null) {
-
             $fx_applied_student_lists = ClassRegistry::init('FxResitRequest')->find('list', array(
                 'conditions' => array(
                     'FxResitRequest.published_course_id' => $published_course_id
@@ -710,7 +757,6 @@ class PublishedCoursesTable extends Table
 
             if (!empty($students)) {
                 foreach ($students as $key => &$student) {
-
                     $students[$key]['ExamGradeHistory'] = $this->CourseRegistration->getCourseRegistrationGradeHistory($student['CourseRegistration']['id']);
                     $students[$key]['LatestGradeDetail'] = $this->CourseRegistration->getCourseRegistrationLatestGradeDetail($student['CourseRegistration']['id']);
 
@@ -766,7 +812,6 @@ class PublishedCoursesTable extends Table
 
             if (!empty($student_all_adds)) {
                 foreach ($student_all_adds as $key => &$student_all_add) {
-
                     if (isset($student_all_adds[$key]['ExamGrade']) && !empty($student_all_adds[$key]['ExamGrade'])) {
                         foreach ($student_all_adds[$key]['ExamGrade'] as $eg_key => $exam_grade) {
                             $student_all_adds[$key]['ExamGrade'][$eg_key]['department_approved_by_name'] = ClassRegistry::init('User')->field('full_name', array('User.id' => $student_all_adds[$key]['ExamGrade'][$eg_key]['department_approved_by']));
@@ -821,7 +866,7 @@ class PublishedCoursesTable extends Table
                             $students_with_fx[$value['Student']['id']]['course_registration_id'] = $value['CourseRegistration']['id'];
                             $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
                             $students_with_fx[$value['Student']['id']]['makeupalreadyapplied'] = ClassRegistry::init('MakeupExam')->makeUpExamApplied($value['Student']['id'], $value['PublishedCourse']['id'], $value['CourseRegistration']['id'], 1);
-                        } else if (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && $value['CourseAdd']['id'] != "") {
+                        } elseif (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && $value['CourseAdd']['id'] != "") {
                             $students_with_fx[$value['Student']['id']]['course_add_id'] = $value['CourseAdd']['id'];
                             $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
 
@@ -886,7 +931,6 @@ class PublishedCoursesTable extends Table
         $grade_scale = array();
 
         if (!empty($published_course_id)) {
-
             $course_detail = $this->find('first', array(
                 'conditions' => array(
                     'PublishedCourse.id' => $published_course_id
@@ -922,7 +966,6 @@ class PublishedCoursesTable extends Table
             //debug($course_detail);
             //Check if grade is already submitted so that the already applied scale will be used
             if ((isset($course_detail['CourseRegistration'][0]['ExamGrade']) && !empty($course_detail['CourseRegistration'][0]['ExamGrade'])) || (isset($course_detail['CourseAdd'][0]['ExamGrade']) && !empty($course_detail['CourseAdd'][0]['ExamGrade']))) {
-
                 $grade_scale_detail = $this->GradeScale->find('first', array(
                     'conditions' => array(
                         'GradeScale.id' => ((isset($course_detail['CourseRegistration'][0]['ExamGrade']) && !empty($course_detail['CourseRegistration'][0]['ExamGrade'])) ? $course_detail['CourseRegistration']['0']['ExamGrade'][0]['grade_scale_id'] : $course_detail['CourseAdd']['0']['ExamGrade'][0]['grade_scale_id'])
@@ -960,8 +1003,7 @@ class PublishedCoursesTable extends Table
 
                 $grade_scale['GradeScaleDetail'] = $formated_grade_scale_details;
                 $grade_scale['GradeScale'] = $grade_scale_detail['GradeScale'];
-
-            } else if ($grade_scale_detail['PublishedCourse']['grade_scale_id'] != "" && $grade_scale_detail['PublishedCourse']['grade_scale_id'] != "0") {
+            } elseif ($grade_scale_detail['PublishedCourse']['grade_scale_id'] != "" && $grade_scale_detail['PublishedCourse']['grade_scale_id'] != "0") {
                 //if it already has assigned grade scale
                 $grade_scale['scale_by'] = 'Department';
                 $grade_scale['Course'] = $grade_scale_detail['Course'];
@@ -981,11 +1023,10 @@ class PublishedCoursesTable extends Table
                 $grade_scale['GradeScaleDetail'] = $formated_grade_scale_details;
                 unset($grade_scale_detail['GradeScale']['GradeScaleDetail']);
                 $grade_scale['GradeScale'] = $grade_scale_detail['GradeScale'];
-
             } else {
-
                 //If it is delegated to the department
-                if (($course_detail['Course']['Curriculum']['program_id'] == 1 && $course_detail['Course']['Curriculum']['Department']['College']['deligate_scale'] == 1) ||
+                if (
+                    ($course_detail['Course']['Curriculum']['program_id'] == 1 && $course_detail['Course']['Curriculum']['Department']['College']['deligate_scale'] == 1) ||
                     ($course_detail['Course']['Curriculum']['program_id'] == 2 && $course_detail['Course']['Curriculum']['Department']['College']['deligate_for_graduate_study'] == 1)
                 ) {
                     if (!empty($course_detail['PublishedCourse']['department_id'])) {
@@ -1048,10 +1089,9 @@ class PublishedCoursesTable extends Table
                         } else {
                             $grade_scale['error'] = 'Grade scale is not defined/deactivated for "' . $grade_type_detail['GradeType']['type'] . '" grade type under ' . $course_detail['Course']['Curriculum']['Department']['College']['name'] . ' for <b><u>' . $course_detail['Course']['Curriculum']['Program']['name'] . '</u></b> program. Please contact the registrar to set grade scale and you can submit grade for the course.';
                         }
-                    } else if (count($grade_scale_and_type['GradeScale']) > 1) {
+                    } elseif (count($grade_scale_and_type['GradeScale']) > 1) {
                         $grade_scale['error'] = 'Multiple grade scale for the same grade type is set by the ' . $course_detail['Course']['Curriculum']['Department']['College']['name'] . ' for ' . $grade_scale_detail['Course']['course_title'] . ' (' . $grade_scale_detail['Course']['course_code'] . ') course. Please contact your ' . $course_detail['Course']['Curriculum']['Department']['College']['name'] . ' to deactivate grade scales which are not on use.';
                     } else {
-
                         $grade_scale_detail = $this->GradeScale->find('first', array(
                             'conditions' => array(
                                 'GradeScale.id' => $grade_scale_and_type['GradeScale']['0']['id']
@@ -1098,7 +1138,6 @@ class PublishedCoursesTable extends Table
         $published_courses_list = array();
 
         if (!empty($section_id)) {
-
             $last_ac_and_semester = $this->find('first', array(
                 'fields' => array(
                     'academic_year',
@@ -1189,7 +1228,6 @@ class PublishedCoursesTable extends Table
         $course_instructor = null;
 
         if (!empty($exam_grade_id)) {
-
             $exam_grade_detail = $this->CourseRegistration->ExamGrade->find('first', array(
                 'conditions' => array(
                     'ExamGrade.id' => $exam_grade_id
@@ -1222,7 +1260,7 @@ class PublishedCoursesTable extends Table
 
             if (isset($exam_grade_detail['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']) && !empty($exam_grade_detail['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
                 $course_instructor = $exam_grade_detail['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-            } else if (isset($exam_grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']) && !empty($exam_grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
+            } elseif (isset($exam_grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']) && !empty($exam_grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
                 $course_instructor = $exam_grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
             }
         }
@@ -1235,7 +1273,6 @@ class PublishedCoursesTable extends Table
         $published_course = null;
 
         if (!empty($exam_grade_id)) {
-
             $exam_grade_detail = $this->CourseRegistration->ExamGrade->find('first', array(
                 'conditions' => array(
                     'ExamGrade.id' => $exam_grade_id
@@ -1248,7 +1285,7 @@ class PublishedCoursesTable extends Table
 
             if (isset($exam_grade_detail['CourseRegistration']['PublishedCourse']) && !empty($exam_grade_detail['CourseRegistration']['PublishedCourse'])) {
                 $published_course = $exam_grade_detail['CourseRegistration']['PublishedCourse'];
-            } else if (isset($exam_grade_detail['CourseAdd']['PublishedCourse']) && !empty($exam_grade_detail['CourseAdd']['PublishedCourse'])) {
+            } elseif (isset($exam_grade_detail['CourseAdd']['PublishedCourse']) && !empty($exam_grade_detail['CourseAdd']['PublishedCourse'])) {
                 $published_course = $exam_grade_detail['CourseAdd']['PublishedCourse'];
             }
         }
@@ -1338,7 +1375,6 @@ class PublishedCoursesTable extends Table
             } else {
                 //check if the student has published course in first semester in some section
                 if (!empty($oneSampleStudent)) {
-
                     $findMostRecentSection = ClassRegistry::init('StudentsSection')->find('first', array(
                         'conditions' => array(
                             'StudentsSection.student_id' => $oneSampleStudent['StudentsSection']['student_id'],
@@ -1357,8 +1393,8 @@ class PublishedCoursesTable extends Table
                                 'PublishedCourse.program_type_id' => $program_type_id,
                                 'PublishedCourse.year_level_id' => $year_level_id,
                                 'PublishedCourse.section_id' => $findMostRecentSection['StudentsSection']['section_id']
-                            ))
-                    );
+                            )
+                    ));
 
                     if ($isCoursepublished) {
                         return true;
@@ -1448,7 +1484,6 @@ class PublishedCoursesTable extends Table
         $publishedList = array();
 
         if (!empty($publishedCourseId)) {
-
             $published_course = $this->find('first', array(
                 'conditions' => array(
                     'PublishedCourse.id' => $publishedCourseId
@@ -1492,12 +1527,11 @@ class PublishedCoursesTable extends Table
             if (!empty($pubList)) {
                 $publishedList[''] = '[ Select Section to Assign ]';
                 foreach ($pubList as $key => $value) {
-                    $publishedList[$value['PublishedCourse']['id']] = $value['Course']['course_title'] . ' (' . $value['Course']['course_code'] . ') ' . $value['Section']['name'] . ' (' . (!empty($value['YearLevel']['name']) ? $value['YearLevel']['name'] : ($value['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial': 'Pre/1st')).', '. $value['Section']['academicyear']. ') ' . (isset($value['CourseInstructorAssignment'][0]) ? $value['CourseInstructorAssignment'][0]['Staff']['Title']['title'] . ' ' . $value['CourseInstructorAssignment'][0]['Staff']['full_name'] . ' (' . $value['CourseInstructorAssignment'][0]['Staff']['Department']['name'] . ')' : '');
+                    $publishedList[$value['PublishedCourse']['id']] = $value['Course']['course_title'] . ' (' . $value['Course']['course_code'] . ') ' . $value['Section']['name'] . ' (' . (!empty($value['YearLevel']['name']) ? $value['YearLevel']['name'] : ($value['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $value['Section']['academicyear'] . ') ' . (isset($value['CourseInstructorAssignment'][0]) ? $value['CourseInstructorAssignment'][0]['Staff']['Title']['title'] . ' ' . $value['CourseInstructorAssignment'][0]['Staff']['full_name'] . ' (' . $value['CourseInstructorAssignment'][0]['Staff']['Department']['name'] . ')' : '');
                 }
             }
         }
 
         return $publishedList;
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class AcademicRulesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class AcademicRulesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('academic_rules');
@@ -27,12 +30,9 @@ class AcademicRulesTable extends Table
         $this->belongsTo('AcademicStands', [
             'foreignKey' => 'academic_stand_id',
             'joinType' => 'INNER',
+            'propertyName'=>'AcademicStand'
         ]);
-        $this->belongsToMany('AcademicStands', [
-            'foreignKey' => 'academic_rule_id',
-            'targetForeignKey' => 'academic_stand_id',
-            'joinTable' => 'academic_stands_academic_rules',
-        ]);
+
     }
 
     /**
@@ -43,6 +43,7 @@ class AcademicRulesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->allowEmptyString('id', null, 'create');
 
@@ -108,19 +109,23 @@ class AcademicRulesTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['academic_stand_id'], 'AcademicStands'));
 
         return $rules;
     }
 
-    function checkExeclusiveNessOFGradeRule($academic_year=null) {
+    public function checkExeclusiveNessOFGradeRule($academic_year = null)
+    {
 
         /*$already_recorded_range=$this->find('all',
                      array('conditions'=>array(
                  'AcademicStand.academic_year_from'=>$academic_year)));*/
 
-        $already_recorded_range=$this->AcademicStand->find('all',
-            array('conditions'=>array('AcademicStand.academic_year_from'=>$academic_year)));
+        $already_recorded_range = $this->AcademicStand->find(
+            'all',
+            array('conditions' => array('AcademicStand.academic_year_from' => $academic_year))
+        );
         debug($already_recorded_range);
         /*
         foreach($already_recorded_range as $ar=>$sr) {
@@ -138,6 +143,5 @@ class AcademicRulesTable extends Table
                  }
         }
         */
-
     }
 }

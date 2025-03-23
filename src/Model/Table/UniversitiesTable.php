@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -118,7 +119,6 @@ class UniversitiesTable extends Table
                     }
                     $dv['model'] = 'University';
                 }
-
             }
 
             if (empty($data['Attachment'])) {
@@ -175,7 +175,6 @@ class UniversitiesTable extends Table
             }])
             ->order(['Universities.academic_year' => 'DESC'])
             ->first() ?: [];
-
     }
     function getAcceptedStudentUnivrsity($acceptedStudentId = null)
     {

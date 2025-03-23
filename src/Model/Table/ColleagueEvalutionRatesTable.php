@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -27,14 +28,17 @@ class ColleagueEvalutionRatesTable extends Table
         $this->belongsTo('InstructorEvalutionQuestions', [
             'foreignKey' => 'instructor_evalution_question_id',
             'joinType' => 'INNER',
+            'propertyName' => 'InstructorEvalutionQuestion',
         ]);
         $this->belongsTo('Staffs', [
             'foreignKey' => 'staff_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Staff',
         ]);
         $this->belongsTo('Evaluators', [
             'foreignKey' => 'evaluator_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Evaluator',
         ]);
     }
 
@@ -98,10 +102,10 @@ class ColleagueEvalutionRatesTable extends Table
             return array();
         }
 
-        if(isset($data['Search']['name']) && !empty($data['Search']['name'])){
+        if (isset($data['Search']['name']) && !empty($data['Search']['name'])) {
             $staffs = $this->Staff->find('all', array(
                 'conditions' => array(
-                    'Staff.first_name LIKE ' => (trim($data['Search']['name'])). '%',
+                    'Staff.first_name LIKE ' => (trim($data['Search']['name'])) . '%',
                     'Staff.id <> ' . $evaluatorStaff['Staff']['id'] . '',
                     'Staff.active' => 1,
                     'Staff.department_id' => $evaluatorStaff['Staff']['department_id'],
@@ -187,7 +191,7 @@ class ColleagueEvalutionRatesTable extends Table
 
                 //debug($checkIfEvaluated);
                 if ($checkIfEvaluated == 0 && !empty($value['ColleagueEvalutionRate'])) {
-                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position']. ')' . (empty($value['CourseInstructorAssignment']) ? ' - No Course Assignment' : '');
+                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')' . (empty($value['CourseInstructorAssignment']) ? ' - No Course Assignment' : '');
                 }
             }
         }
@@ -287,14 +291,13 @@ class ColleagueEvalutionRatesTable extends Table
         $staffList = array();
 
         if (!empty($staffs)) {
-
             $head_department_id = $evaluatorStaff['Staff']['department_id'];
 
             debug($head_department_id);
 
             $totalCourseAssignedInstructors = ClassRegistry::init('CourseInstructorAssignment')->find('count', array(
                 'conditions' => array(
-                    'CourseInstructorAssignment.staff_id in (select id from staffs where active = 1 and department_id = ' . $evaluatorStaff['Staff']['department_id']. ')',
+                    'CourseInstructorAssignment.staff_id in (select id from staffs where active = 1 and department_id = ' . $evaluatorStaff['Staff']['department_id'] . ')',
                     'CourseInstructorAssignment.academic_year' => $data['Search']['acadamic_year'],
                     'CourseInstructorAssignment.semester' => $data['Search']['semester'],
                 ),
@@ -341,13 +344,22 @@ class ColleagueEvalutionRatesTable extends Table
 
                 if ($checkIfEvaluatedByColleagues && !empty($value['ColleagueEvalutionRate']) && count($value['ColleagueEvalutionRate']) > 0) {
                     $headEvaluaated = 1;
-                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~'.$studentsEvaluated.'~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round((( (int) $checkIfEvaluatedByColleagues/$totalCourseAssignedInstructors) * 100) , 2) . '%)~'. $headEvaluaated . '~1';
-                } else if ($checkIfEvaluatedByColleagues && empty($value['ColleagueEvalutionRate'])) {
-                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~'.$studentsEvaluated.'~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round((( (int) $checkIfEvaluatedByColleagues/$totalCourseAssignedInstructors) * 100) , 2) . '%)~'. $headEvaluaated . '~0';
-                } else if ($checkIfEvaluatedByColleagues) {
-                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~'.$studentsEvaluated.'~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round((( (int) $checkIfEvaluatedByColleagues/$totalCourseAssignedInstructors) * 100) , 2) . '%)~'. $headEvaluaated . '~0';
+                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~' . $studentsEvaluated . '~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round(
+                            (((int)$checkIfEvaluatedByColleagues / $totalCourseAssignedInstructors) * 100),
+                            2
+                        ) . '%)~' . $headEvaluaated . '~1';
+                } elseif ($checkIfEvaluatedByColleagues && empty($value['ColleagueEvalutionRate'])) {
+                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~' . $studentsEvaluated . '~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round(
+                            (((int)$checkIfEvaluatedByColleagues / $totalCourseAssignedInstructors) * 100),
+                            2
+                        ) . '%)~' . $headEvaluaated . '~0';
+                } elseif ($checkIfEvaluatedByColleagues) {
+                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~' . $studentsEvaluated . '~' . ($checkIfEvaluatedByColleagues . '/' . $totalCourseAssignedInstructors) . ' (' . round(
+                            (((int)$checkIfEvaluatedByColleagues / $totalCourseAssignedInstructors) * 100),
+                            2
+                        ) . '%)~' . $headEvaluaated . '~0';
                 } else {
-                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~'.$studentsEvaluated.'~' . ('0/' . $totalCourseAssignedInstructors) . '(0%)~'. $headEvaluaated . '~0';
+                    $staffList[$value['Staff']['id']] = $value['Title']['title'] . '. ' . $value['Staff']['full_name'] . ' (' . $value['Position']['position'] . ')~' . $studentsEvaluated . '~' . ('0/' . $totalCourseAssignedInstructors) . '(0%)~' . $headEvaluaated . '~0';
                 }
             }
         }
@@ -409,9 +421,7 @@ class ColleagueEvalutionRatesTable extends Table
         $evalutionResult = array();
 
         if (!empty($courseInstructorAssignments)) {
-
             foreach ($courseInstructorAssignments as $key => $value) {
-
                 $totalObjectiveStudentQuestion = ClassRegistry::init('InstructorEvalutionQuestion')->totalObjectiveStudentQuestion($data['Search']['acadamic_year'], $data['Search']['semester']);
 
                 $totalEvaluterStudents = ClassRegistry::init('StudentEvalutionRate')->find('count', array(
@@ -424,12 +434,11 @@ class ColleagueEvalutionRatesTable extends Table
 
                 //student evaluation
                 if ($totalEvaluterStudents) {
-
                     $maximumSumPossibleForInstructor = $totalEvaluterStudents * $totalObjectiveStudentQuestion * $maxEvaluationRate;
 
-                    debug('Maximum Possible point for instructor: '. $maximumSumPossibleForInstructor);
-                    debug('Total Objective Questions for Students: '. $totalObjectiveStudentQuestion);
-                    debug('Total evaluated Students: '. $totalEvaluterStudents);
+                    debug('Maximum Possible point for instructor: ' . $maximumSumPossibleForInstructor);
+                    debug('Total Objective Questions for Students: ' . $totalObjectiveStudentQuestion);
+                    debug('Total evaluated Students: ' . $totalEvaluterStudents);
 
                     $allStudentEvaluation = ClassRegistry::init('StudentEvalutionRate')->find('all', array(
                         'conditions' => array(
@@ -445,7 +454,6 @@ class ColleagueEvalutionRatesTable extends Table
 
 
                     if (!empty($allStudentEvaluation)) {
-
                         foreach ($allStudentEvaluation as $rd => $rv) {
                             //remove duplicate evaluation result for same question of student evaluation if exists
                             $allDuplicatedList = ClassRegistry::init('StudentEvalutionRate')->find('list', array(
@@ -523,9 +531,7 @@ class ColleagueEvalutionRatesTable extends Table
                 ));
 
                 if (!empty($allcolleagueEvalution)) {
-
                     foreach ($allcolleagueEvalution as $key => $value2) {
-
                         $allDuplicatedList = $this->find('list', array(
                             'conditions' => array(
                                 'ColleagueEvalutionRate.staff_id' => $value['CourseInstructorAssignment']['staff_id'],
@@ -584,7 +590,6 @@ class ColleagueEvalutionRatesTable extends Table
 
                 if (!empty($colleagueEvalution)) {
                     foreach ($colleagueEvalution as $key => $value2) {
-
                         /* $colleagueEvalutionSum = $this->find('all', array(
                             'conditions' => array(
                                 'ColleagueEvalutionRate.staff_id' => $value['CourseInstructorAssignment']['staff_id'],
@@ -598,7 +603,7 @@ class ColleagueEvalutionRatesTable extends Table
 
                         if ($value2['InstructorEvalutionQuestion']['active'] == 0) {
                             $sumColleagueEvaluationDeactivate += $value2['ColleagueEvalutionRate']['rating'];
-                        } else if ($value2['InstructorEvalutionQuestion']['active'] == 1) {
+                        } elseif ($value2['InstructorEvalutionQuestion']['active'] == 1) {
                             $sumColleagueEvaluationActive += $value2['ColleagueEvalutionRate']['rating'];
                         }
 
@@ -610,7 +615,7 @@ class ColleagueEvalutionRatesTable extends Table
                 if ($sumColleagueEvaluationDeactivate >= $sumColleagueEvaluationActive) {
                     $totalObjectiveColleagueQuestion =  (isset($totalObjectiveQuestionArr[0]) ? count($totalObjectiveQuestionArr[0]) : $totalObjectiveColleagueQuestion);
                     $sumColleagueEvaluation = $sumColleagueEvaluationDeactivate;
-                } else if ($sumColleagueEvaluationActive >= $sumColleagueEvaluationDeactivate) {
+                } elseif ($sumColleagueEvaluationActive >= $sumColleagueEvaluationDeactivate) {
                     $totalObjectiveColleagueQuestion = (isset($totalObjectiveQuestionArr[1]) ? count($totalObjectiveQuestionArr[1]) : $totalObjectiveColleagueQuestion);
                     $sumColleagueEvaluation = $sumColleagueEvaluationActive;
                 }
@@ -655,7 +660,7 @@ class ColleagueEvalutionRatesTable extends Table
                                 'ColleagueEvalutionRate.evaluator_id' => $hv['ColleagueEvalutionRate']['evaluator_id'],
                                 'ColleagueEvalutionRate.academic_year' => $hv['ColleagueEvalutionRate']['academic_year'],
                                 'ColleagueEvalutionRate.semester' => $hv['ColleagueEvalutionRate']['semester'],
-                                'ColleagueEvalutionRate.instructor_evalution_question_id' => $hv['ColleagueEvalutionRate']['instructor_evalution_question_id'], 				'ColleagueEvalutionRate.dept_head' => 1
+                                'ColleagueEvalutionRate.instructor_evalution_question_id' => $hv['ColleagueEvalutionRate']['instructor_evalution_question_id'],                 'ColleagueEvalutionRate.dept_head' => 1
                             ),
                             'fields' => array('ColleagueEvalutionRate.id', 'ColleagueEvalutionRate.id')
 
@@ -709,12 +714,11 @@ class ColleagueEvalutionRatesTable extends Table
 
                 if (!empty($headEv)) {
                     foreach ($headEv as $hs => $hv) {
-
                         $headSum += $hv['ColleagueEvalutionRate']['rating'];
 
                         if ($hv['InstructorEvalutionQuestion']['active'] == 0) {
                             $headSumDeactivate += $hv['ColleagueEvalutionRate']['rating'];
-                        } else if ($hv['InstructorEvalutionQuestion']['active'] == 1) {
+                        } elseif ($hv['InstructorEvalutionQuestion']['active'] == 1) {
                             $headSumActive += $hv['ColleagueEvalutionRate']['rating'];
                         }
 
@@ -730,7 +734,7 @@ class ColleagueEvalutionRatesTable extends Table
                 if ($headSumDeactivate >= $headSumActive) {
                     $totalObjectiveHeadQuestion = (isset($totalObjectiveQuestionHeadArr[0]) ? count($totalObjectiveQuestionHeadArr[0]) : $totalObjectiveHeadQuestion);
                     $headSum = $headSumDeactivate;
-                } else if ($headSumActive >= $headSumDeactivate) {
+                } elseif ($headSumActive >= $headSumDeactivate) {
                     $totalObjectiveHeadQuestion = (isset($totalObjectiveQuestionHeadArr[1]) ? count($totalObjectiveQuestionHeadArr[1]) : $totalObjectiveHeadQuestion);
                     $headSum = $headSumActive;
                 }
@@ -817,7 +821,6 @@ class ColleagueEvalutionRatesTable extends Table
         $evalutionResult['Head'][0]['headTotalRate'] = $headSum[0][0]['sum(`ColleagueEvalutionRate`.`rating`)'];
         $evalutionResult['Head'][0]['rateconverted5percent'] = (5 * $headSum[0][0]['sum(`ColleagueEvalutionRate`.`rating`)']) / ($totalObjectiveHeadQuestion * 5);
         $evalutionResult['InstructorEvalutionSetting'] = $readEvaluationSettings['InstructorEvalutionSetting']; */
-
     }
 
     public function remove_duplicate_staff_evaluation($department_id = "All", $academic_year, $semester)
@@ -839,9 +842,7 @@ class ColleagueEvalutionRatesTable extends Table
 
 
         if (!empty($staffs)) {
-
             foreach ($staffs as $sk => $sv) {
-
                 $allcolleagueEvalution = $this->find('all', array(
                     'conditions' => array(
                         'ColleagueEvalutionRate.staff_id' => $sv['Staff']['id'],
@@ -864,9 +865,7 @@ class ColleagueEvalutionRatesTable extends Table
 
                 //remove duplicate entry of evaluation of staffs
                 if (!empty($allcolleagueEvalution)) {
-
                     foreach ($allcolleagueEvalution as $key => $value2) {
-
                         $allDuplicatedList = $this->find('list', array(
                             'conditions' => array(
                                 'ColleagueEvalutionRate.staff_id' => $sv['Staff']['id'],
@@ -901,7 +900,9 @@ class ColleagueEvalutionRatesTable extends Table
                             if (count($allDuplicatedList)) {
                                 //debug($allDuplicatedList);
                                 //die;
-                                $this->deleteAll(array('ColleagueEvalutionRate.id' => $allDuplicatedList ), false, false );
+                                $this->deleteAll(array('ColleagueEvalutionRate.id' => $allDuplicatedList),
+                                    false,
+                                    false);
                             }
                         }
                     }
@@ -947,9 +948,7 @@ class ColleagueEvalutionRatesTable extends Table
         }
 
         if (!empty($courseInstructorAssignments)) {
-
             foreach ($courseInstructorAssignments as $key => $value) {
-
                 $totalObjectiveStudentQuestion = ClassRegistry::init('InstructorEvalutionQuestion')->totalObjectiveStudentQuestion($academic_year, $semester);
 
                 $totalEvaluterStudents = ClassRegistry::init('StudentEvalutionRate')->find('count', array(
@@ -975,9 +974,7 @@ class ColleagueEvalutionRatesTable extends Table
 
                     //remove duplicate evaluation result for same question of student evaluation if exists
                     if (!empty($allStudentEvaluation)) {
-
                         foreach ($allStudentEvaluation as $rd => $rv) {
-
                             $allDuplicatedList = ClassRegistry::init('StudentEvalutionRate')->find('list', array(
                                 'conditions' => array(
                                     'StudentEvalutionRate.published_course_id' => $value['CourseInstructorAssignment']['published_course_id'],
@@ -1048,10 +1045,8 @@ class ColleagueEvalutionRatesTable extends Table
         }
 
         if (!empty($courseInstructorAssignments)) {
-
             foreach ($courseInstructorAssignments as $key => $value) {
-
-                $totalCoursesThought ++;
+                $totalCoursesThought++;
 
                 $totalObjectiveStudentQuestion = ClassRegistry::init('InstructorEvalutionQuestion')->totalObjectiveStudentQuestion($academic_year, $semester);
 
@@ -1067,7 +1062,6 @@ class ColleagueEvalutionRatesTable extends Table
 
                 //student evaluation
                 if ($totalEvaluterStudents) {
-
                     $maximumSumPossibleForInstructor = $totalEvaluterStudents * $totalObjectiveStudentQuestion * $maxEvaluationRate;
 
                     $allStudentEvaluation = ClassRegistry::init('StudentEvalutionRate')->find('all', array(
@@ -1082,9 +1076,7 @@ class ColleagueEvalutionRatesTable extends Table
                     //remove duplicate evaluation result for same question of student evaluation if exists
 
                     if (!empty($allStudentEvaluation)) {
-
                         foreach ($allStudentEvaluation as $rd => $rv) {
-
                             $allDuplicatedList = ClassRegistry::init('StudentEvalutionRate')->find('list', array(
                                 'conditions' => array(
                                     'StudentEvalutionRate.published_course_id' => $value['CourseInstructorAssignment']['published_course_id'],
@@ -1097,7 +1089,6 @@ class ColleagueEvalutionRatesTable extends Table
                             //debug(count($allDuplicatedList));
 
                             if (count($allDuplicatedList) > 1) {
-
                                 $totalduplicatedEntries += count($allDuplicatedList);
 
                                 // perform deletion except one instance

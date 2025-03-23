@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class GraduateListsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class GraduateListsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('graduate_lists');
@@ -33,13 +36,13 @@ class GraduateListsTable extends Table
 
     function getListOfStudentsForGraduateList($program_id = null, $program_type_id = null, $department_id = null)
     {
-        // 1. Get all students in the department who are in the senate list but not in the graduate list
 
+        // 1. Get all students in the department who are in the senate list but not in the graduate list
 
 
         if (is_array($program_type_id)) {
             $options['conditions']['Student.program_type_id'] = $program_type_id;
-        } else if ($program_type_id != 0) {
+        } elseif ($program_type_id != 0) {
             $options['conditions']['Student.program_type_id'] = $program_type_id;
         } else {
             $options['conditions']['Student.program_type_id'] = 0;
@@ -47,7 +50,7 @@ class GraduateListsTable extends Table
 
         if (is_array($program_id)) {
             $options['conditions']['Student.program_id'] = $program_id;
-        } else if ($program_type_id != 0) {
+        } elseif ($program_type_id != 0) {
             $options['conditions']['Student.program_id'] = $program_id;
         } else {
             $options['conditions']['Student.program_id'] = 0;
@@ -63,7 +66,18 @@ class GraduateListsTable extends Table
         $options['contain'] = array(
             //'Curriculum.minimum_credit_points' => array('CourseCategory'),
             'Curriculum' => array(
-                'fields' => array('id', 'minimum_credit_points', 'certificate_name', 'amharic_degree_nomenclature', 'specialization_amharic_degree_nomenclature', 'english_degree_nomenclature', 'specialization_english_degree_nomenclature', 'minimum_credit_points', 'name', 'type_credit'),
+                'fields' => array(
+                    'id',
+                    'minimum_credit_points',
+                    'certificate_name',
+                    'amharic_degree_nomenclature',
+                    'specialization_amharic_degree_nomenclature',
+                    'english_degree_nomenclature',
+                    'specialization_english_degree_nomenclature',
+                    'minimum_credit_points',
+                    'name',
+                    'type_credit'
+                ),
                 'Department',
                 'CourseCategory' => array('id', 'curriculum_id')
             ),
@@ -72,12 +86,12 @@ class GraduateListsTable extends Table
             'ProgramType.name',
             'CourseRegistration.id' => array(
                 'PublishedCourse.id' => array(
-                    'Course.credit' => array('CourseCategory','GradeType')
+                    'Course.credit' => array('CourseCategory', 'GradeType')
                 )
             ),
             'CourseAdd.id' => array(
                 'PublishedCourse.id' => array(
-                    'Course.credit' => array('CourseCategory','GradeType')
+                    'Course.credit' => array('CourseCategory', 'GradeType')
                 )
             ),
             'StudentExamStatus'
@@ -176,9 +190,12 @@ class GraduateListsTable extends Table
                 if (!empty($all_exempted_courses) && !empty($student_curriculum_course_id_list)) {
                     foreach ($all_exempted_courses as $ec_key => $all_exempted_course) {
                         //Check if the exempted course is from their curriculum
-                        if (in_array($all_exempted_course['CourseExemption']['course_id'], $student_curriculum_course_id_list)) {
+                        if (in_array(
+                            $all_exempted_course['CourseExemption']['course_id'],
+                            $student_curriculum_course_id_list
+                        )) {
                             // why course_id ? we need to replace with course_taken_credit
-                            $only_exempted_credit+=$student_curriculum_course_list[$all_exempted_course['CourseExemption']['course_id']];
+                            $only_exempted_credit += $student_curriculum_course_list[$all_exempted_course['CourseExemption']['course_id']];
                             $credit_sum += $all_exempted_course['Course']['credit'];
                             $course_categories[$all_exempted_course['Course']['CourseCategory']['name']]['taken_credit'] += $all_exempted_course['Course']['credit'];
                         }
@@ -188,7 +205,7 @@ class GraduateListsTable extends Table
                 if ($credit_sum >= $student['Curriculum']['minimum_credit_points']) {
                     $cid = $student['Curriculum']['id'];
 
-                    if(!isset($organized_students[$cid])) {
+                    if (!isset($organized_students[$cid])) {
                         $organized_students[$cid][0]['Curriculum'] = $student['Curriculum'];
                         $organized_students[$cid][0]['Program'] = $student['Program'];
                         $organized_students[$cid][0]['Department'] = $student['Department'];
@@ -222,8 +239,9 @@ class GraduateListsTable extends Table
         return $organized_students;
     }
 
-    function temporaryDegree($student_id = null,$ctype = null)
+    public function temporaryDegree($student_id = null, $ctype = null)
     {
+
         $temporary_degree = array();
 
         if (isset($ctype) && !empty($ctype)) {
@@ -233,7 +251,6 @@ class GraduateListsTable extends Table
         }
 
         if (!empty($student_id)) {
-
             //App::import('Component', 'Auth');
             //$Auth = new AuthComponent();
 
@@ -253,7 +270,6 @@ class GraduateListsTable extends Table
             ));
 
             if ($student_detail['Student']['graduated'] == 1 || !empty($student_detail['GraduateList'])) {
-
                 //debug($student_detail['Student']['program_id']);
 
                 $university_detail = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
@@ -262,8 +278,8 @@ class GraduateListsTable extends Table
                     'conditions' => array(
                         'CertificateVerificationCode.student_id' => $student_id,
                         'OR' => array(
-                            'CertificateVerificationCode.user' => '"'. AuthComponent::user('id') . '"',
-                            'CertificateVerificationCode.user' => '"'. AuthComponent::user('full_name') . '"',
+                            'CertificateVerificationCode.user' => '"' . AuthComponent::user('id') . '"',
+                            'CertificateVerificationCode.user' => '"' . AuthComponent::user('full_name') . '"',
                         ),
                         'CertificateVerificationCode.type' => $certificate_type,
                     ),
@@ -287,14 +303,18 @@ class GraduateListsTable extends Table
                 $approvedThesisGrade = '';
 
                 if ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE) {
-
                     $approvedExitExamGrade = ClassRegistry::init('ExamGrade')->getApprovedExitExamGrade($student_id);
 
                     if (isset($approvedExitExamGrade) && !empty($approvedExitExamGrade['grade'])) {
-
                         $ExitExam['course'] = $approvedExitExamGrade['Course']['course_code_title'];
                         //debug($approvedExitExamGrade['Course']['course_code_title']);
-                        $gradeForDocument = ((strcasecmp($approvedExitExamGrade['grade'], 'P') == 0 || strcasecmp($approvedExitExamGrade['grade'], 'Pass') == 0) ? 'Pass' : ((strcasecmp($approvedExitExamGrade['grade'], 'F') == 0 || strcasecmp($approvedExitExamGrade['grade'], 'Fail') == 0) ? 'Fail' : '---'));
+                        $gradeForDocument = ((strcasecmp($approvedExitExamGrade['grade'], 'P') == 0 || strcasecmp(
+                                $approvedExitExamGrade['grade'],
+                                'Pass'
+                            ) == 0) ? 'Pass' : ((strcasecmp($approvedExitExamGrade['grade'], 'F') == 0 || strcasecmp(
+                                $approvedExitExamGrade['grade'],
+                                'Fail'
+                            ) == 0) ? 'Fail' : '---'));
 
                         $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
                             'conditions' => array(
@@ -314,7 +334,6 @@ class GraduateListsTable extends Table
 
                         $ExitExam['result_formated'] = $gradeForDocument;
                     } else {
-
                         $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
                             'conditions' => array(
                                 'ExitExam.student_id' => $student_id,
@@ -325,13 +344,12 @@ class GraduateListsTable extends Table
                         ));
 
                         if ($exitExamresult) {
-
                             if (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] >= 50) {
                                 $gradeForDocument = 'Pass (' . $exitExamresult['ExitExam']['result'] . '%)';
                                 $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
                                 $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
                                 $ExitExam['result_formated'] = $gradeForDocument;
-                            } else if (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] < 50) {
+                            } elseif (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] < 50) {
                                 $gradeForDocument = 'Fail (' . $exitExamresult['ExitExam']['result'] . '%)';
                                 $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
                                 $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
@@ -339,9 +357,11 @@ class GraduateListsTable extends Table
                             }
                         }
                     }
-                } else if ($student_detail['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student_detail['Student']['program_id'] == PROGRAM_PhD ) {
+                } elseif ($student_detail['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student_detail['Student']['program_id'] == PROGRAM_PhD) {
                     //$approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisGrade($student_id);
-                    $approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisTitleAndGrade($student_id);
+                    $approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisTitleAndGrade(
+                        $student_id
+                    );
                 }
 
                 //Student profile
@@ -355,7 +375,9 @@ class GraduateListsTable extends Table
                 $temporary_degree['student_detail']['ProgramType'] = $student_detail['ProgramType'];
                 $temporary_degree['student_detail']['GraduateList'] = $student_detail['GraduateList'];
                 $temporary_degree['student_detail']['StudentExamStatus'] = $student_detail['StudentExamStatus'][0];
-                $temporary_degree['student_detail']['GraduationStatuse'] = ClassRegistry::init('GraduationStatus')->getStudentGraduationStatus($student_id);
+                $temporary_degree['student_detail']['GraduationStatuse'] = ClassRegistry::init(
+                    'GraduationStatus'
+                )->getStudentGraduationStatus($student_id);
 
                 $temporary_degree['student_detail']['ExitExam'] = $ExitExam;
                 debug($temporary_degree['student_detail']['ExitExam']);
@@ -371,6 +393,7 @@ class GraduateListsTable extends Table
 
     function getTemporaryDegreeCertificateForMassPrint($student_ids = array(), $ctype = null)
     {
+
         $temporary_degree = array();
         $temporary_degree_mass = array();
 
@@ -389,9 +412,7 @@ class GraduateListsTable extends Table
         $ethiopicDateTime = new EthiopicDateTimeComponent();
 
         if (!empty($student_ids)) {
-
             foreach ($student_ids as $k => $student_id) {
-
                 $student_detail = $this->Student->find('first', array(
                     'conditions' => array(
                         'Student.id' => $student_id,
@@ -410,15 +431,16 @@ class GraduateListsTable extends Table
 
 
                 if ($student_detail['Student']['graduated'] == 1 || !empty($student_detail['GraduateList'])) {
-
                     $university_detail = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
 
                     $recentCode = ClassRegistry::init('CertificateVerificationCode')->find('first', array(
                         'conditions' => array(
                             'CertificateVerificationCode.student_id' => $student_id,
                             'OR' => array(
-                                'CertificateVerificationCode.user LIKE ' => '"'. AuthComponent::user('id') . '"',
-                                'CertificateVerificationCode.user LIKE ' => '"'. AuthComponent::user('full_name') . '"',
+                                'CertificateVerificationCode.user LIKE ' => '"' . AuthComponent::user('id') . '"',
+                                'CertificateVerificationCode.user LIKE ' => '"' . AuthComponent::user(
+                                        'full_name'
+                                    ) . '"',
                             ),
                             'CertificateVerificationCode.type' => $certificate_type
                         ),
@@ -450,14 +472,20 @@ class GraduateListsTable extends Table
                     $approvedThesisGrade = '';
 
                     if ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE) {
-
-                        $approvedExitExamGrade = ClassRegistry::init('ExamGrade')->getApprovedExitExamGrade($student_id);
+                        $approvedExitExamGrade = ClassRegistry::init('ExamGrade')->getApprovedExitExamGrade(
+                            $student_id
+                        );
 
                         if (isset($approvedExitExamGrade)) {
-
                             $ExitExam['course'] = $approvedExitExamGrade['Course']['course_code_title'];
                             //debug($approvedExitExamGrade['Course']['course_code_title']);
-                            $gradeForDocument = ((strcasecmp($approvedExitExamGrade['grade'], 'P') == 0 || strcasecmp($approvedExitExamGrade['grade'], 'Pass') == 0) ? 'Pass' : ((strcasecmp($approvedExitExamGrade['grade'], 'F') == 0 || strcasecmp($approvedExitExamGrade['grade'], 'Fail') == 0) ? 'Fail' : '---'));
+                            $gradeForDocument = ((strcasecmp($approvedExitExamGrade['grade'], 'P') == 0 || strcasecmp(
+                                    $approvedExitExamGrade['grade'],
+                                    'Pass'
+                                ) == 0) ? 'Pass' : ((strcasecmp(
+                                    $approvedExitExamGrade['grade'],
+                                    'F'
+                                ) == 0 || strcasecmp($approvedExitExamGrade['grade'], 'Fail') == 0) ? 'Fail' : '---'));
 
                             $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
                                 'conditions' => array(
@@ -477,7 +505,6 @@ class GraduateListsTable extends Table
 
                             $ExitExam['result_formated'] = $gradeForDocument;
                         } else {
-
                             $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
                                 'conditions' => array(
                                     'ExitExam.student_id' => $student_id,
@@ -488,13 +515,12 @@ class GraduateListsTable extends Table
                             ));
 
                             if ($exitExamresult) {
-
                                 if (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] >= 50) {
                                     $gradeForDocument = 'Pass (' . $exitExamresult['ExitExam']['result'] . '%)';
                                     $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
                                     $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
                                     $ExitExam['result_formated'] = $gradeForDocument;
-                                } else if (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] < 50) {
+                                } elseif (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] < 50) {
                                     $gradeForDocument = 'Fail (' . $exitExamresult['ExitExam']['result'] . '%)';
                                     $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
                                     $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
@@ -502,9 +528,11 @@ class GraduateListsTable extends Table
                                 }
                             }
                         }
-                    } else if ($student_detail['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student_detail['Student']['program_id'] == PROGRAM_PhD ) {
+                    } elseif ($student_detail['Student']['program_id'] == PROGRAM_POST_GRADUATE || $student_detail['Student']['program_id'] == PROGRAM_PhD) {
                         //$approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisGrade($student_id);
-                        $approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisTitleAndGrade($student_id);
+                        $approvedThesisGrade = ClassRegistry::init('ExamGrade')->getApprovedThesisTitleAndGrade(
+                            $student_id
+                        );
                     }
 
                     //Student profile
@@ -518,7 +546,9 @@ class GraduateListsTable extends Table
                     $temporary_degree['student_detail']['ProgramType'] = $student_detail['ProgramType'];
                     $temporary_degree['student_detail']['GraduateList'] = $student_detail['GraduateList'];
                     $temporary_degree['student_detail']['StudentExamStatus'] = $student_detail['StudentExamStatus'][0];
-                    $temporary_degree['student_detail']['GraduationStatuse'] = ClassRegistry::init('GraduationStatus')->getStudentGraduationStatus($student_id);
+                    $temporary_degree['student_detail']['GraduationStatuse'] = ClassRegistry::init(
+                        'GraduationStatus'
+                    )->getStudentGraduationStatus($student_id);
 
                     $temporary_degree['student_detail']['ExitExam'] = $ExitExam;
                     debug($temporary_degree['student_detail']['ExitExam']);
@@ -533,22 +563,41 @@ class GraduateListsTable extends Table
                     $e_year = $ethiopicDateTime->GetEthiopicYear(date('j'), date('n'), date('Y'));
                     $e_month_name = $ethiopicDateTime->GetEthiopicMonthName(date('j'), date('n'), date('Y'));
                     $g_d = $temporary_degree['student_detail']['GraduateList']['graduate_date'];
-                    $e_g_day = $ethiopicDateTime->GetEthiopicDay(substr($g_d, 8, 2), substr($g_d, 5, 2), substr($g_d, 0, 4));
-                    $e_g_month = $ethiopicDateTime->GetEthiopicMonth(substr($g_d, 8, 2), substr($g_d, 5, 2), substr($g_d, 0, 4));
-                    $e_g_year = $ethiopicDateTime->GetEthiopicYear(substr($g_d, 8, 2), substr($g_d, 5, 2), substr($g_d, 0, 4));
-                    $e_g_month_name = $ethiopicDateTime->GetEthiopicMonthName(substr($g_d, 8, 2), substr($g_d, 5, 2), substr($g_d, 0, 4));
+                    $e_g_day = $ethiopicDateTime->GetEthiopicDay(
+                        substr($g_d, 8, 2),
+                        substr($g_d, 5, 2),
+                        substr($g_d, 0, 4)
+                    );
+                    $e_g_month = $ethiopicDateTime->GetEthiopicMonth(
+                        substr($g_d, 8, 2),
+                        substr($g_d, 5, 2),
+                        substr($g_d, 0, 4)
+                    );
+                    $e_g_year = $ethiopicDateTime->GetEthiopicYear(
+                        substr($g_d, 8, 2),
+                        substr($g_d, 5, 2),
+                        substr($g_d, 0, 4)
+                    );
+                    $e_g_month_name = $ethiopicDateTime->GetEthiopicMonthName(
+                        substr($g_d, 8, 2),
+                        substr($g_d, 5, 2),
+                        substr($g_d, 0, 4)
+                    );
 
-                    $graduate_date = date('d F, Y',
-                        mktime(0, 0, 0,
-                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'],5 ,2),
-                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'],8 ,2),
-                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'],0 ,4)
+                    $graduate_date = date(
+                        'd F, Y',
+                        mktime(
+                            0,
+                            0,
+                            0,
+                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'], 5, 2),
+                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'], 8, 2),
+                            substr($temporary_degree['student_detail']['GraduateList']['graduate_date'], 0, 4)
                         )
                     );
 
 
-                    if($temporary_degree['student_detail']['GraduationStatuse']) {
-
+                    if ($temporary_degree['student_detail']['GraduationStatuse']) {
                         $temporary_degree['student_detail']['e_day'] = $e_day;
                         $temporary_degree['student_detail']['e_month'] = $e_month;
                         $temporary_degree['student_detail']['e_year'] = $e_year;
@@ -561,7 +610,6 @@ class GraduateListsTable extends Table
                         $temporary_degree['student_detail']['graduated_date'] = $graduate_date;
                         //$temporary_degree['student_detail']['graduated_ethiopic_date'] = $this->getEthiopicGraduationDate($graduate_date);
                     } else {
-
                         $temporary_degree['student_detail']['e_day'] = $e_day;
                         $temporary_degree['student_detail']['e_month'] = $e_month;
                         $temporary_degree['student_detail']['e_year'] = $e_year;
@@ -581,8 +629,19 @@ class GraduateListsTable extends Table
         return $temporary_degree_mass;
     }
 
-    function getStudentListGraduated($admission_year = null, $program_id, $program_type_id, $department_id, $year_level_id = null, $studentNumber = null, $studentName = null, $graduated = 1, $graduate_date_from = null, $graduate_date_to = null)
-    {
+    function getStudentListGraduated(
+        $admission_year = null,
+        $program_id,
+        $program_type_id,
+        $department_id,
+        $year_level_id = null,
+        $studentNumber = null,
+        $studentName = null,
+        $graduated = 1,
+        $graduate_date_from = null,
+        $graduate_date_to = null
+    ) {
+
         // 1. Get all students in the department who are in  in the graduate list
 
         $options['conditions']['Student.program_id'] = $program_id;
@@ -594,7 +653,9 @@ class GraduateListsTable extends Table
                 if ($program_type_id == 0) {
                     $userPermissions = ClassRegistry::init('User')->getUserDetails(AuthComponent::user('id'));
                     if (!empty($userPermissions['StaffAssigne']['program_type_id'])) {
-                        $options['conditions']['Student.program_type_id'] = unserialize($userPermissions['StaffAssigne']['program_type_id']);
+                        $options['conditions']['Student.program_type_id'] = unserialize(
+                            $userPermissions['StaffAssigne']['program_type_id']
+                        );
                     } else {
                         $options['conditions']['Student.program_type_id'] = 0;
                     }
@@ -607,7 +668,7 @@ class GraduateListsTable extends Table
         $options['conditions'][] = 'Student.curriculum_id <> 0';
 
 
-        if ($graduated == 0 ) {
+        if ($graduated == 0) {
             $options['conditions'][] = 'Student.graduated = 0';
         } else {
             $options['conditions'][] = 'Student.graduated = 1';
@@ -616,13 +677,12 @@ class GraduateListsTable extends Table
         $options['contain'] = array('GraduateList', 'Department' => array('id', 'name'));
 
         if ($graduated == 1 && !empty($graduate_date_from) && !empty($graduate_date_to)) {
-
-            $minDate = $graduate_date_from['year'].'-'.$graduate_date_from['month'].'-'.$graduate_date_from['day'];
-            $maxDate = $graduate_date_to['year'].'-'.$graduate_date_to['month'].'-'.$graduate_date_to['day'];
+            $minDate = $graduate_date_from['year'] . '-' . $graduate_date_from['month'] . '-' . $graduate_date_from['day'];
+            $maxDate = $graduate_date_to['year'] . '-' . $graduate_date_to['month'] . '-' . $graduate_date_to['day'];
             //debug($minDate);
             //debug($maxDate);
 
-            $options['conditions'][] = 'GraduateList.graduate_date BETWEEN "'. $minDate.'" AND "'. $maxDate .'"';
+            $options['conditions'][] = 'GraduateList.graduate_date BETWEEN "' . $minDate . '" AND "' . $maxDate . '"';
         }
 
         if ($graduated == 0 && !empty($admission_year)) {
@@ -633,7 +693,7 @@ class GraduateListsTable extends Table
 
         if (!empty($studentName)) {
             //$options['conditions']['Student.name LIKE '] = '%'.$studentName.'%';
-            $options['conditions'][] = 'Student.name LIKE %'.$studentName.'%';
+            $options['conditions'][] = 'Student.name LIKE %' . $studentName . '%';
         }
 
         if (!empty($studentNumber)) {
@@ -643,14 +703,36 @@ class GraduateListsTable extends Table
 
         //debug($options);
 
-        $options['fields'] = array('Student.id', 'Student.curriculum_id', 'Student.full_name', 'Student.first_name', 'Student.middle_name', 'Student.last_name', 'Student.studentnumber', 'Student.admissionyear', 'Student.gender', 'Student.department_id', 'Student.college_id', 'Student.program_id', 'Student.program_type_id', 'Student.graduated', 'Student.academicyear', 'Student.admissionyear');
-        $options['order'] = array('Student.first_name ASC', 'Student.middle_name ASC', 'Student.last_name ASC', 'Student.academicyear ASC');
+        $options['fields'] = array(
+            'Student.id',
+            'Student.curriculum_id',
+            'Student.full_name',
+            'Student.first_name',
+            'Student.middle_name',
+            'Student.last_name',
+            'Student.studentnumber',
+            'Student.admissionyear',
+            'Student.gender',
+            'Student.department_id',
+            'Student.college_id',
+            'Student.program_id',
+            'Student.program_type_id',
+            'Student.graduated',
+            'Student.academicyear',
+            'Student.admissionyear'
+        );
+        $options['order'] = array(
+            'Student.first_name ASC',
+            'Student.middle_name ASC',
+            'Student.last_name ASC',
+            'Student.academicyear ASC'
+        );
 
         $options['contain'] = array(
             'GraduateList',
             'Curriculum' => array('id', 'name'),
             'College' => array('id', 'name'),
-            'Department'=> array('id', 'name'),
+            'Department' => array('id', 'name'),
             'Program' => array('id', 'name', 'shortname'),
             'ProgramType' => array('id', 'name', 'shortname')
         );
@@ -660,13 +742,14 @@ class GraduateListsTable extends Table
 
     function getEthiopicGraduationDate($graduationDate)
     {
-        App::import('Component','EthiopicDateTime');
+
+        App::import('Component', 'EthiopicDateTime');
 
         $EthiopicDateTime = new EthiopicDateTimeComponent();
 
         $ethiopicDate['e_day'] = $EthiopicDateTime->GetEthiopicDay(date('j'), date('n'), date('Y'));
         $ethiopicDate['e_month'] = $EthiopicDateTime->GetEthiopicMonth(date('j'), date('n'), date('Y'));
-        $ethiopicDate['e_year']  = $EthiopicDateTime->GetEthiopicYear(date('j'), date('n'), date('Y'));
+        $ethiopicDate['e_year'] = $EthiopicDateTime->GetEthiopicYear(date('j'), date('n'), date('Y'));
         $ethiopicDate['e_month_name'] = $EthiopicDateTime->GetEthiopicMonthName(date('j'), date('n'), date('Y'));
 
         $g_d = $graduationDate;
@@ -674,15 +757,33 @@ class GraduateListsTable extends Table
         $g_d_obj = new DateTime($g_d);
         //debug($date->format('j'));
 
-        $ethiopicDate['e_g_day']= $EthiopicDateTime->GetEthiopicDay($g_d_obj->format('j'),$g_d_obj->format('n'), $g_d_obj->format('Y'));
-        $ethiopicDate['e_g_month'] = $EthiopicDateTime->GetEthiopicMonth($g_d_obj->format('j'),$g_d_obj->format('n'), $g_d_obj->format('Y'));
-        $ethiopicDate['e_g_year'] = $EthiopicDateTime->GetEthiopicYear($g_d_obj->format('j'),$g_d_obj->format('n'), $g_d_obj->format('Y'));
-        $ethiopicDate['e_g_month_name'] = $EthiopicDateTime->GetEthiopicMonthName($g_d_obj->format('j'),$g_d_obj->format('n'), $g_d_obj->format('Y'));
+        $ethiopicDate['e_g_day'] = $EthiopicDateTime->GetEthiopicDay(
+            $g_d_obj->format('j'),
+            $g_d_obj->format('n'),
+            $g_d_obj->format('Y')
+        );
+        $ethiopicDate['e_g_month'] = $EthiopicDateTime->GetEthiopicMonth(
+            $g_d_obj->format('j'),
+            $g_d_obj->format('n'),
+            $g_d_obj->format('Y')
+        );
+        $ethiopicDate['e_g_year'] = $EthiopicDateTime->GetEthiopicYear(
+            $g_d_obj->format('j'),
+            $g_d_obj->format('n'),
+            $g_d_obj->format('Y')
+        );
+        $ethiopicDate['e_g_month_name'] = $EthiopicDateTime->GetEthiopicMonthName(
+            $g_d_obj->format('j'),
+            $g_d_obj->format('n'),
+            $g_d_obj->format('Y')
+        );
 
-        return 	$ethiopicDate;
+        return $ethiopicDate;
     }
 
-    function isGraduated($studentId) {
+    public function isGraduated($studentId)
+    {
+
         $result = $this->find('count', array(
             'conditions' => array(
                 'GraduateList.student_id' => $studentId

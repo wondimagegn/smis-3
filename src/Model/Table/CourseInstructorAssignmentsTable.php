@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -24,23 +25,18 @@ class CourseInstructorAssignmentsTable extends Table
 
         $this->addBehavior('Timestamp');
 
-        $this->belongsTo('Sections', [
-            'foreignKey' => 'section_id',
-            'joinType' => 'INNER',
-        ]);
-        $this->belongsTo('Staffs', [
-            'foreignKey' => 'staff_id',
-            'joinType' => 'INNER',
-        ]);
-        $this->belongsTo('PublishedCourses', [
-            'foreignKey' => 'published_course_id',
-            'joinType' => 'INNER',
-        ]);
-        $this->belongsTo('CourseSplitSections', [
-            'foreignKey' => 'course_split_section_id',
-        ]);
+
+        $this->belongsTo('Sections',
+        ['propertyName' => 'Section']);
+        $this->belongsTo('CourseSplitSections',
+            ['propertyName' => 'CourseSplitSection']);
+        $this->belongsTo('Staffs', ['propertyName' => 'Staff']);
+        $this->belongsTo('PublishedCourses',
+            ['propertyName' => 'PublishedCourse']);
+
         $this->hasMany('ExamGrades', [
             'foreignKey' => 'course_instructor_assignment_id',
+            'propertyName' => 'ExamGrade'
         ]);
 
     }
@@ -121,7 +117,6 @@ class CourseInstructorAssignmentsTable extends Table
 
         if (!empty($published_course_details)) {
             foreach ($published_course_details as $key => $published_course_detail) {
-
                 $section_detail = $this->Section->find('all', array(
                     'conditions' => array('Section.id' => $published_course_detail['PublishedCourse']['section_id']),
                     'contain' => array('Department', 'Program', 'ProgramType')
@@ -132,7 +127,6 @@ class CourseInstructorAssignmentsTable extends Table
                 }
 
                 if (isset($section_detail[0]['Section'])) {
-
                     $sections_formated[$section_detail[0]['Section']['id']] = $section_detail[0]['Section']['name'] . ' (' . $section_detail[0]['Program']['name'] . ', ' . $section_detail[0]['ProgramType']['name'];
 
                     if (!empty($section_detail[0]['Department']['name'])) {
@@ -145,7 +139,6 @@ class CourseInstructorAssignmentsTable extends Table
         }
 
         return $sections_formated;
-
     }
 
     function listOfDepartmentSections($department_id = null, $acadamic_year = null, $semester = null, $program_id = null, $program_type_id = null, $yearLevel = null)
@@ -412,13 +405,13 @@ class CourseInstructorAssignmentsTable extends Table
 
         if ($selectible_section == 0) {
             if (!empty($published_courses_by_section)) {
-                foreach ($published_courses_by_section  as $pc_key => $published_course) {
+                foreach ($published_courses_by_section as $pc_key => $published_course) {
                     $organized_Published_courses_by_sections[$published_course['Section']['name'] . ' (' . (isset($published_course['Section']['YearLevel']['name']) ? $published_course['Section']['YearLevel']['name'] : (isset($published_course['PublishedCourse']['YearLevel']['name']) ? $published_course['PublishedCourse']['YearLevel']['name'] : ($published_course['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st'))) . ', ' . (isset($published_course['Section']['academicyear']) ? $published_course['Section']['academicyear'] : $published_course['PublishedCourse']['academic_year']) . ')'][$published_course['PublishedCourse']['id']] = ((trim($published_course['Course']['course_title'])) . ' (' . (trim($published_course['Course']['course_code'])) . ')');
                 }
             }
         } else {
             if (!empty($published_courses_by_section)) {
-                foreach ($published_courses_by_section  as $pc_key => $published_course) {
+                foreach ($published_courses_by_section as $pc_key => $published_course) {
                     $organized_Published_courses_by_sections['s~' . $published_course['Section']['id']] = $published_course['Section']['name'] . ' (' . (isset($published_course['Section']['YearLevel']['name']) ? $published_course['Section']['YearLevel']['name'] : (isset($published_course['PublishedCourse']['YearLevel']['name']) ? $published_course['PublishedCourse']['YearLevel']['name'] : ($published_course['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st'))) . ', ' . (isset($published_course['Section']['academicyear']) ? $published_course['Section']['academicyear'] : $published_course['PublishedCourse']['academic_year']) . ')';
                     $organized_Published_courses_by_sections[$published_course['PublishedCourse']['id']] = ' --> ' . (trim($published_course['Course']['course_title'])) . ' (' . (trim($published_course['Course']['course_code'])) . ')';
                 }
@@ -508,7 +501,9 @@ class CourseInstructorAssignmentsTable extends Table
                 foreach ($published_courses_by_section as $key => $published_course_by_section) {
                     /* $organized_Published_courses_by_sections[$published_course_by_section['Section']['name']] = array(); */
                     foreach ($published_course_by_section['PublishedCourse'] as $pc_key => $published_course) {
-                        $organized_Published_courses_by_sections[$published_course_by_section['Section']['name'] . ' (Pre/1st, ' . $published_course_by_section['Section']['academicyear'] .')'][$published_course['id']] = ((trim($published_course['Course']['course_title'])) . ' (' . (trim($published_course['Course']['course_code'])) . ')');
+                        $organized_Published_courses_by_sections[$published_course_by_section['Section']['name'] . ' (Pre/1st, ' . $published_course_by_section['Section']['academicyear'] . ')'][$published_course['id']] = ((trim(
+                                $published_course['Course']['course_title']
+                            )) . ' (' . (trim($published_course['Course']['course_code'])) . ')');
                     }
                 }
             }
@@ -577,7 +572,7 @@ class CourseInstructorAssignmentsTable extends Table
                 if (!empty($publishedcourse['PublishedCourse']['department_id'])) {
                     $department_name = $publishedcourse['Department']['name'];
                     $year_level_name = $publishedcourse['YearLevel']['name'];
-                } else if (empty($publishedcourse['PublishedCourse']['department_id']) && !empty($publishedcourse['PublishedCourse']['college_id'])) {
+                } elseif (empty($publishedcourse['PublishedCourse']['department_id']) && !empty($publishedcourse['PublishedCourse']['college_id'])) {
                     $department_name = $publishedcourse['College']['name'];
                     if ($publishedcourse['Program']['id'] == PROGRAM_REMEDIAL) {
                         $year_level_name = 'Remedial';
@@ -626,7 +621,7 @@ class CourseInstructorAssignmentsTable extends Table
                             if ($publishedcourse['Course']['lecture_hours'] > 0) {
                                 $course_type_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$split_section_for_course['section_name']]["Lecture+Tutorial"] = "Lect.+Tut.";
                             }
-                        } else if ($publishedcourse['Course']['laboratory_hours'] > 0) {
+                        } elseif ($publishedcourse['Course']['laboratory_hours'] > 0) {
                             $course_type_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$split_section_for_course['section_name']]["Lab"] = "Lab";
                             if ($publishedcourse['Course']['lecture_hours'] > 0) {
                                 $course_type_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$split_section_for_course['section_name']]["Lecture+Lab"] = "Lec.+Lab";
@@ -635,9 +630,7 @@ class CourseInstructorAssignmentsTable extends Table
                             $course_type_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$split_section_for_course['section_name']]["Other"] = "Other";
                         }
                     }
-
                 } else {
-
                     $sections_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$key]['course_title'] = $publishedcourse['Course']['course_title'];
                     $sections_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$key]['course_id'] = $publishedcourse['Course']['id'];
                     $sections_array[$department_name][$publishedcourse['Program']['name']][$publishedcourse['ProgramType']['name']][$year_level_name][$publishedcourse['Section']['name'] . ' (' . $year_level_name  . ', ' . $publishedcourse['Section']['academicyear'] . ')'][$key]['course_code'] = $publishedcourse['Course']['course_code'];
@@ -870,7 +863,6 @@ class CourseInstructorAssignmentsTable extends Table
 
         if (!empty($academicCalendarDetails)) {
             foreach ($academicCalendarDetails as $k => $value) {
-
                 $department_ids = unserialize($value['AcademicCalendar']['department_id']);
                 $year_level_ids = unserialize($value['AcademicCalendar']['year_level_id']);
 
@@ -881,7 +873,6 @@ class CourseInstructorAssignmentsTable extends Table
                 if (!empty($year_level_ids) && !empty($department_ids)) {
                     foreach ($year_level_ids as $yk => $yv) {
                         foreach ($department_ids as $dpk => $dpv) {
-
                             $pre_college_ids = explode('pre_', $dpv);
                             if (count($pre_college_ids) > 1) {
                                 array_push($pre_c, $pre_college_ids[1]);
@@ -910,15 +901,12 @@ class CourseInstructorAssignmentsTable extends Table
 
         if (!empty($assignmentList)) {
             foreach ($assignmentList as $kk => $kkvalue) {
-
                 $gradeSubmitteddate = ClassRegistry::init('ExamGrade')->getGradeSubmmissionDate($kkvalue['CourseInstructorAssignment']['published_course_id']);
                 debug($gradeSubmitteddate);
 
                 // if grade is not submitted, check if the deadline is passed against the current time, if it does calculate the number of days passed
                 if (empty($gradeSubmitteddate)) {
-
                     if (isset($kkvalue['PublishedCourse']['YearLevel']['name']) && !empty($kkvalue['PublishedCourse']['YearLevel']['name'])) {
-
                         $grade_submission_end_date = $gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'];
 
                         debug($kkvalue['PublishedCourse']['department_id']);
@@ -961,11 +949,8 @@ class CourseInstructorAssignmentsTable extends Table
                 // the submitted date is less than the deadline, it is fine, nothing to do
 
                 if (!empty($gradeSubmitteddate)) {
-
                     if (isset($kkvalue['PublishedCourse']['YearLevel']['name']) && !empty($kkvalue['PublishedCourse']['YearLevel']['name'])) {
-
                         if (isset($gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date']) && !empty($gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'])) {
-
                             $grade_submission_end_date = $gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'];
 
                             debug($grade_submission_end_date);
@@ -975,7 +960,7 @@ class CourseInstructorAssignmentsTable extends Table
 
                                 if ($gradeSubmitteddate['ExamGrade']['created'] < $grade_submission_end_date_formatted) {
                                     $noDaysDelayed = 0;
-                                } else if ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
+                                } elseif ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
                                     // $reformattedGradeSubmissionStat=$this->TimeAgoFormat($grade_submission_end_date);
                                     $noDaysDelayed = $this->TimeAgoFormat($gradeSubmitteddate['ExamGrade']['created'], $grade_submission_end_date_formatted);
 
@@ -993,7 +978,7 @@ class CourseInstructorAssignmentsTable extends Table
                                 $grade_submission_end_date_formatted = date('Y-m-d H:i:s', strtotime($grade_submission_end_date));
                                 if ($gradeSubmitteddate['ExamGrade']['created'] < $grade_submission_end_date_formatted) {
                                     $noDaysDelayed = 0;
-                                } else if ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
+                                } elseif ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
                                     $noDaysDelayed = $this->TimeAgoFormat($gradeSubmitteddate['ExamGrade']['created'], $grade_submission_end_date_formatted);
                                     $reformattedGradeSubmissionStat[$kkvalue['PublishedCourse']['Program']['name']][$kkvalue['PublishedCourse']['ProgramType']['name']][$kkvalue['Staff']['College']['name']][$kkvalue['Staff']['Department']['name']][$kkvalue['Staff']['full_name']][$kkvalue['PublishedCourse']['Course']['course_title'] . " (" . $kkvalue['PublishedCourse']['Course']['course_code'] . ")"]['noDaysDelayed'] = $noDaysDelayed;
                                 }
@@ -1041,7 +1026,6 @@ class CourseInstructorAssignmentsTable extends Table
 
 
         if (isset($department_id) && !empty($department_id)) {
-
             $college_id = explode('~', $department_id);
 
             if (count($college_id) > 1) {
@@ -1130,15 +1114,12 @@ class CourseInstructorAssignmentsTable extends Table
         $noDaysDelayed = 0;
 
         if (!empty($assignmentList)) {
-
             foreach ($assignmentList as $kk => $kkvalue) {
-
                 $gradeSubmitteddate = ClassRegistry::init('ExamGrade')->getGradeSubmmissionDate($kkvalue['PublishedCourse']['id']);
 
                 // if grade is not submitted, check if the deadline is passed against the current time, if it does calculate the number of days elapsed
                 if (empty($gradeSubmitteddate)) {
                     if (isset($kkvalue['YearLevel']['name']) && !empty($kkvalue['YearLevel']['name'])) {
-
                         $grade_submission_end_date = $gradeSubmissionDateOfYearLevel[$kkvalue['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'];
 
                         if (isset($grade_submission_end_date) && !empty($grade_submission_end_date)) {
@@ -1159,7 +1140,6 @@ class CourseInstructorAssignmentsTable extends Table
                     } else {
                         // preengineering
                         if (isset($kkvalue['College']['id']) && !empty($kkvalue['College']['id'])) {
-
                             $grade_submission_end_date = $gradeSubmissionDateOfYearLevel['1st']['pre_' . $kkvalue['College']['id']]['grade_submission_end_date'];
                             $current_date = date('Y-m-d H:i:s');
                             $grade_submission_end_date_formatted = date('Y-m-d H:i:s', strtotime($grade_submission_end_date));
@@ -1186,7 +1166,7 @@ class CourseInstructorAssignmentsTable extends Table
         return $reformattedGradeSubmissionStat;
     }
 
-    public  function TimeAgoFormat($time, $grade_submission_date)
+    public function TimeAgoFormat($time, $grade_submission_date)
     {
         $time_array  =
             array(
@@ -1296,10 +1276,8 @@ published_courses where id is not null)'
         }
 
         if (isset($department_id) && !empty($department_id)) {
-
             $college_id = explode('~', $department_id);
             if (count($college_id) > 1) {
-
                 $instructorAssignmentOptions['contain']['Staff'] = array(
                     'conditions' => array(
                         'Staff.college_id' => $college_id[1],
@@ -1384,7 +1362,6 @@ published_courses where id is not null)'
         $noDaysDelayed = 0;
         $count = 0;
         foreach ($assignmentList as $kk => $kkvalue) {
-
             $gradeSubmitteddate = ClassRegistry::init('ExamGrade')->getGradeSubmmissionDate(
                 $kkvalue['CourseInstructorAssignment']['published_course_id']
             );
@@ -1412,7 +1389,6 @@ published_courses where id is not null)'
                             $reformattedGradeSubmissionStat['Instructor']['noInstDelayedSub'] += 1;
                         }
                     } else {
-
                         debug($grade_submission_end_date);
                     }
                 } else {
@@ -1436,7 +1412,6 @@ published_courses where id is not null)'
                             }
                         }
                     } else {
-
                         debug($kkvalue['PublishedCourse']);
                     }
                 }
@@ -1451,9 +1426,7 @@ published_courses where id is not null)'
                     isset($kkvalue['PublishedCourse']['YearLevel']['name'])
                     && !empty($kkvalue['PublishedCourse']['YearLevel']['name'])
                 ) {
-
                     if (isset($gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date']) && !empty($gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'])) {
-
                         $grade_submission_end_date = $gradeSubmissionDateOfYearLevel[$kkvalue['PublishedCourse']['YearLevel']['name']][$kkvalue['PublishedCourse']['department_id']]['grade_submission_end_date'];
 
 
@@ -1464,7 +1437,7 @@ published_courses where id is not null)'
                             if ($gradeSubmitteddate['ExamGrade']['created'] < $grade_submission_end_date_formatted) {
                                 $noDaysDelayed = 0;
                                 $reformattedGradeSubmissionStat['Instructor']['noInstNotDelayedSub'] += 1;
-                            } else if ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
+                            } elseif ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
                                 // $reformattedGradeSubmissionStat=$this->TimeAgoFormat($grade_submission_end_date);
                                 $noDaysDelayed = $this->TimeAgoFormat(
                                     $gradeSubmitteddate['ExamGrade']['created'],
@@ -1488,7 +1461,7 @@ published_courses where id is not null)'
                             if ($gradeSubmitteddate['ExamGrade']['created'] < $grade_submission_end_date_formatted) {
                                 $noDaysDelayed = 0;
                                 $reformattedGradeSubmissionStat['Instructor']['noInstNotDelayedSub'] += 1;
-                            } else if ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
+                            } elseif ($gradeSubmitteddate['ExamGrade']['created'] > $grade_submission_end_date_formatted) {
                                 $noDaysDelayed = $this->TimeAgoFormat(
                                     $gradeSubmitteddate['ExamGrade']['created'],
                                     $grade_submission_end_date_formatted
@@ -1503,7 +1476,6 @@ published_courses where id is not null)'
 
             // if the grade submitted is greater than grade submission deadline,
             // calculate the number of days delyed after the deadline passed
-
         }
         debug($count);
         //  debug($reformattedGradeSubmissionStat);
@@ -1627,7 +1599,7 @@ published_courses where id is not null)'
                             $yearLevel[$yykey] = $yyvalue;
                         }
                     }
-                } else if (empty($year_level_id)) {
+                } elseif (empty($year_level_id)) {
                     $yearLevel = $value['YearLevel'];
                 }
 
@@ -1671,7 +1643,7 @@ published_courses where id is not null)'
                         ),
                         'fields' => array('College.id', 'College.id')
                     ));
-                } else if ($department_id == 0) {
+                } elseif ($department_id == 0) {
                     $college_id = $this->PublishedCourse->College->find('list', array(
                         'conditions' => array(
                             'College.active' => 1
@@ -1683,7 +1655,6 @@ published_courses where id is not null)'
 
 
             if (isset($college_id) && !empty($college_id)) {
-
                 $colleges = $this->PublishedCourse->College->find('all', array(
                     'conditions' => array(
                         'College.id' => $college_id,
@@ -1693,7 +1664,6 @@ published_courses where id is not null)'
                 ));
 
                 if (!empty($colleges)) {
-
                     foreach ($colleges as $key => $value) {
                         $options['conditions'] = array(
                             'PublishedCourse.department_id is null',
@@ -1725,5 +1695,4 @@ published_courses where id is not null)'
         //debug($notAssignedCourseList);
         return $notAssignedCourseList;
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class PlacementPreferencesTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class PlacementPreferencesTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('placement_preferences');
@@ -47,6 +50,7 @@ class PlacementPreferencesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -82,6 +86,7 @@ class PlacementPreferencesTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['accepted_student_id'], 'AcceptedStudents'));
         $rules->add($rules->existsIn(['student_id'], 'Students'));
         $rules->add($rules->existsIn(['placement_round_participant_id'], 'PlacementRoundParticipants'));
@@ -92,6 +97,7 @@ class PlacementPreferencesTable extends Table
 
     function getPreferenceStat($placementRoundParticipant, $type2 = null)
     {
+
         //Get participating departments
         $stat = array();
 
@@ -103,22 +109,33 @@ class PlacementPreferencesTable extends Table
         ));
 
         /* $placementsResultSettings = ClassRegistry::init('PlacementResultSetting')->find('all', array(
-			'conditions' => array(
-				'PlacementResultSetting.group_identifier' => $placementRoundParticipant['PlacementRoundParticipant']['group_identifier'],
-			),
-			'recursive' => -1
-		)); */
+            'conditions' => array(
+                'PlacementResultSetting.group_identifier' => $placementRoundParticipant['PlacementRoundParticipant']['group_identifier'],
+            ),
+            'recursive' => -1
+        )); */
 
         if (!empty($participatingDepartments)) {
             foreach ($participatingDepartments as $participatingDepartment) {
-
                 $index = count($stat);
                 $type = $placementRoundParticipant['PlacementRoundParticipant']['type'];
 
                 if ($type == "College") {
-                    $name = ClassRegistry::init('College')->find('first', array('conditions' => array('College.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
-                } else if ($type == "Department") {
-                    $name = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
+                    $name = ClassRegistry::init('College')->find(
+                        'first',
+                        array(
+                            'conditions' => array('College.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']),
+                            'recursive' => -1
+                        )
+                    );
+                } elseif ($type == "Department") {
+                    $name = ClassRegistry::init('Department')->find(
+                        'first',
+                        array(
+                            'conditions' => array('Department.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']),
+                            'recursive' => -1
+                        )
+                    );
                 }
 
                 $stat[$index]['foreign_key'] = $participatingDepartment['PlacementRoundParticipant']['foreign_key'];
@@ -139,56 +156,61 @@ class PlacementPreferencesTable extends Table
                     );
 
                     $forcollege = explode('c~', $placementRoundParticipant['PlacementRoundParticipant']['applied_for']);
-                    $fordepartment = explode('d~', $placementRoundParticipant['PlacementRoundParticipant']['applied_for']);
+                    $fordepartment = explode(
+                        'd~',
+                        $placementRoundParticipant['PlacementRoundParticipant']['applied_for']
+                    );
 
                     if (isset($forcollege[1]) && !empty($forcollege[1])) {
                         $options['conditions'][0] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE department_id is null and academicyear = \'' . $placementRoundParticipant['PlacementRoundParticipant']['academic_year'] . '\' AND college_id = \'' . $forcollege[1] . '\'';
-                    } else if (isset($fordepartment[1]) && !empty($fordepartment[1])) {
+                    } elseif (isset($fordepartment[1]) && !empty($fordepartment[1])) {
                         $options['conditions'][0] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE academicyear = \'' . $placementRoundParticipant['PlacementRoundParticipant']['academic_year'] . '\' AND department_id = \'' . $fordepartment[1] . '\'';
                     }
 
                     if (strcasecmp($type2, 'female') == 0) {
                         $options['conditions'][0] .= ' AND (sex LIKE \'%female%\' OR sex LIKE \'%f%\'))';
-                    } else if (strcasecmp($type2, 'disable') == 0) {
+                    } elseif (strcasecmp($type2, 'disable') == 0) {
                         $options['conditions'][0] .= ' AND disability IS NOT NULL AND disability <> \'\')';
-                    } else if (!empty($participatingDepartment['PlacementRoundParticipant']['developing_region']) && strcasecmp($type2, 'region') == 0) {
+                    } elseif (!empty($participatingDepartment['PlacementRoundParticipant']['developing_region']) && strcasecmp(
+                            $type2,
+                            'region'
+                        ) == 0) {
                         $options['conditions'][0] .= ' AND region_id IN (\'' . $participatingDepartment['PlacementRoundParticipant']['developing_region'] . '\'))';
                     } else {
                         $options['conditions'][0] .= ')';
                     }
 
                     $stat[$index]['count'][$i]['~total~'] = $this->find('count', $options);
-
                     /* foreach ($placementsResultSettings as $placementsResultsCriteria) {
-						//after finishing settings result
-						$options = array(
-							'conditions' => array(
-								'Preference.department_id' => $participatingDepartment['ParticipatingDepartment']['department_id'],
-								'Preference.college_id' => $college_id,
-								'Preference.academicyear' => $academic_year,
-								'Preference.preferences_order' => $i
-							)
-						);
+                        //after finishing settings result
+                        $options = array(
+                            'conditions' => array(
+                                'Preference.department_id' => $participatingDepartment['ParticipatingDepartment']['department_id'],
+                                'Preference.college_id' => $college_id,
+                                'Preference.academicyear' => $academic_year,
+                                'Preference.preferences_order' => $i
+                            )
+                        );
 
-						if ($isPrepartory) {
-							$options['conditions'][0] = 'Preference.accepted_student_id IN (SELECT id FROM accepted_students WHERE academicyear = \'' . $academic_year . '\' AND college_id = \'' . $college_id . '\' AND EHEECE_total_results >= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_from'] . ' AND EHEECE_total_results <= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_to'];
-						} else {
-							$options['conditions'][0] = 'Preference.accepted_student_id IN (SELECT id FROM accepted_students WHERE academicyear = \'' . $academic_year . '\' AND college_id = \'' . $college_id . '\' AND freshman_result >= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_from'] . ' AND freshman_result <= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_to'];
-						}
+                        if ($isPrepartory) {
+                            $options['conditions'][0] = 'Preference.accepted_student_id IN (SELECT id FROM accepted_students WHERE academicyear = \'' . $academic_year . '\' AND college_id = \'' . $college_id . '\' AND EHEECE_total_results >= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_from'] . ' AND EHEECE_total_results <= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_to'];
+                        } else {
+                            $options['conditions'][0] = 'Preference.accepted_student_id IN (SELECT id FROM accepted_students WHERE academicyear = \'' . $academic_year . '\' AND college_id = \'' . $college_id . '\' AND freshman_result >= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_from'] . ' AND freshman_result <= ' . $placementsResultsCriteria['PlacementsResultsCriteria']['result_to'];
+                        }
 
-						if (strcasecmp($type, 'female') == 0) {
-							$options['conditions'][0] .= ' AND (sex = \'female\' OR sex = \'f\'))';
-						} else if (strcasecmp($type, 'disable') == 0) {
-							$options['conditions'][0] .= ' AND disability IS NOT NULL AND disability <> \'\')';
-						} else if (!empty($participatingDepartment['ParticipatingDepartment']['developing_regions_id']) && strcasecmp($type, 'region') == 0) {
-							$options['conditions'][0] .= ' AND region_id IN (\'' . $participatingDepartment['ParticipatingDepartment']['developing_regions_id'] . '\'))';
-						} else {
-							$options['conditions'][0] .= ')';
-						}
+                        if (strcasecmp($type, 'female') == 0) {
+                            $options['conditions'][0] .= ' AND (sex = \'female\' OR sex = \'f\'))';
+                        } else if (strcasecmp($type, 'disable') == 0) {
+                            $options['conditions'][0] .= ' AND disability IS NOT NULL AND disability <> \'\')';
+                        } else if (!empty($participatingDepartment['ParticipatingDepartment']['developing_regions_id']) && strcasecmp($type, 'region') == 0) {
+                            $options['conditions'][0] .= ' AND region_id IN (\'' . $participatingDepartment['ParticipatingDepartment']['developing_regions_id'] . '\'))';
+                        } else {
+                            $options['conditions'][0] .= ')';
+                        }
 
-						$stat[$index]['count'][$i][$placementsResultsCriteria['PlacementsResultsCriteria']['name']] = $this->find('count', $options);
+                        $stat[$index]['count'][$i][$placementsResultsCriteria['PlacementsResultsCriteria']['name']] = $this->find('count', $options);
 
-					} */
+                    } */
                 }
             }
         }
@@ -198,6 +220,7 @@ class PlacementPreferencesTable extends Table
 
     function getPreparedPreferenceStat($placementRoundParticipant, $type = null)
     {
+
         //Get participating departments
         $stat = array();
 
@@ -214,7 +237,10 @@ class PlacementPreferencesTable extends Table
                 'PlacementParticipatingStudent.academic_year' => $placementRoundParticipant['PlacementRoundParticipant']['academic_year'],
                 'PlacementParticipatingStudent.applied_for' => $placementRoundParticipant['PlacementRoundParticipant']['applied_for']
             ),
-            'fields' => array('PlacementParticipatingStudent.accepted_student_id','PlacementParticipatingStudent.accepted_student_id')
+            'fields' => array(
+                'PlacementParticipatingStudent.accepted_student_id',
+                'PlacementParticipatingStudent.accepted_student_id'
+            )
         ));
 
         if (!empty($participatingDepartments) && !empty($accepted_student_ids)) {
@@ -223,10 +249,10 @@ class PlacementPreferencesTable extends Table
                 //$type = $placementRoundParticipant['PlacementRoundParticipant']['type'];
 
                 /* if ($type == "College") {
-					$name = ClassRegistry::init('College')->find('first', array('conditions' => array('College.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
-				} else if ($type == "Department") {
-					$name = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
-				} */
+                    $name = ClassRegistry::init('College')->find('first', array('conditions' => array('College.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
+                } else if ($type == "Department") {
+                    $name = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.id' => $participatingDepartment['PlacementRoundParticipant']['foreign_key']), 'recursive' => -1));
+                } */
 
                 $stat[$index]['foreign_key'] = $participatingDepartment['PlacementRoundParticipant']['foreign_key'];
 
@@ -250,15 +276,30 @@ class PlacementPreferencesTable extends Table
 
                     if (strcasecmp($type, 'female') == 0) {
                         //$options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE (sex = \'female\' OR sex = \'f\') )';
-                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(',', $accepted_student_ids) . ') and (sex LIKE \'female%\' OR sex LIKE \'f%\') )';
-                    } else if (strcasecmp($type, 'disable') == 0) {
+                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(
+                                ',',
+                                $accepted_student_ids
+                            ) . ') and (sex LIKE \'female%\' OR sex LIKE \'f%\') )';
+                    } elseif (strcasecmp($type, 'disable') == 0) {
                         //$options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE disability IS NOT NULL AND disability <> \'\' )';
-                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(',', $accepted_student_ids) . ') and disability IS NOT NULL AND disability <> \'\' )';
-                    } else if (!empty($participatingDepartment['PlacementRoundParticipant']['developing_region']) && strcasecmp($type, 'region') == 0) {
+                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(
+                                ',',
+                                $accepted_student_ids
+                            ) . ') and disability IS NOT NULL AND disability <> \'\' )';
+                    } elseif (!empty($participatingDepartment['PlacementRoundParticipant']['developing_region']) && strcasecmp(
+                            $type,
+                            'region'
+                        ) == 0) {
                         //$options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE region_id IN (\'' . $participatingDepartment['PlacementRoundParticipant']['developing_region'] . '\'))';
-                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(',', $accepted_student_ids) . ') and region_id IN (\'' . $participatingDepartment['PlacementRoundParticipant']['developing_region'] . '\'))';
+                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (SELECT id FROM accepted_students WHERE id IN (' . join(
+                                ',',
+                                $accepted_student_ids
+                            ) . ') and region_id IN (\'' . $participatingDepartment['PlacementRoundParticipant']['developing_region'] . '\'))';
                     } else {
-                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (' . join(',', $accepted_student_ids) . ')';
+                        $options['conditions'][] = 'PlacementPreference.accepted_student_id IN (' . join(
+                                ',',
+                                $accepted_student_ids
+                            ) . ')';
                     }
 
                     $stat[$index]['count'][$i]['~total~'] = $this->find('count', $options);
@@ -271,18 +312,24 @@ class PlacementPreferencesTable extends Table
     // This function will validate the student has entered his preference once.
     function isAlreadyEnteredPreference($data = null)
     {
-        $countUser = $this->find('count', array('conditions' => array(
-            'PlacementPreference.accepted_student_id' => $data['accepted_student_id'],
-            'PlacementPreference.academic_year' => $data['academic_year'],
-            'PlacementPreference.round' => $data['round']
-        )));
+
+        $countUser = $this->find('count', array(
+            'conditions' => array(
+                'PlacementPreference.accepted_student_id' => $data['accepted_student_id'],
+                'PlacementPreference.academic_year' => $data['academic_year'],
+                'PlacementPreference.round' => $data['round']
+            )
+        ));
 
         $isEditing = false;
         if ($data['id']) {
             $isEditing = true;
         }
         if ($countUser && !$isEditing) {
-            $this->invalidate('alreadypreferencerecorded', 'Validation Error: You have already recorded preference for selected student.');
+            $this->invalidate(
+                'alreadypreferencerecorded',
+                'Validation Error: You have already recorded preference for selected student.'
+            );
             return true;
         } else {
             return false;
@@ -292,6 +339,7 @@ class PlacementPreferencesTable extends Table
     //This function will validate student has selected orderely their department choice
     function isAllPreferenceSelectedDifferent($data = null, $require_all_selected_switch = 0)
     {
+
         $array = array();
 
         if ($require_all_selected_switch) {
@@ -300,7 +348,10 @@ class PlacementPreferencesTable extends Table
                     if (!empty($value['placement_round_participant_id'])) {
                         $array[] = $value['placement_round_participant_id'];
                     } else {
-                        $this->invalidate('department', 'Validation Error: Please select program preference for each preference order.');
+                        $this->invalidate(
+                            'department',
+                            'Validation Error: Please select program preference for each preference order.'
+                        );
                         return false;
                     }
                 }
@@ -322,19 +373,24 @@ class PlacementPreferencesTable extends Table
 
 
         if (!empty($array)) {
-
             $arrayvaluecount = array();
             $arrayvaluecount = array_count_values($array);
 
             //return $arrayvaluecount;
             foreach ($arrayvaluecount as $k => $v) {
                 if ($v > 1) {
-                    $this->invalidate('preference', 'Validation Error: Please select different program preference for each preference order.');
+                    $this->invalidate(
+                        'preference',
+                        'Validation Error: Please select different program preference for each preference order.'
+                    );
                     return false;
                 }
             }
         } else {
-            $this->invalidate('preference', 'Validation Error: Empty Preference. You did not selected any preference. Please select program preference for each preference order.');
+            $this->invalidate(
+                'preference',
+                'Validation Error: Empty Preference. You did not selected any preference. Please select program preference for each preference order.'
+            );
             return false;
         }
 
@@ -343,6 +399,7 @@ class PlacementPreferencesTable extends Table
 
     public function getStudentWhoFilledPreference($data = array(), $searchAble = "")
     {
+
         debug($data);
 
         if (isset($data) && !empty($data)) {
@@ -395,6 +452,7 @@ class PlacementPreferencesTable extends Table
 
     public function getPlacementCriteriaSummary($data = array())
     {
+
         $placementSummary = array();
 
         if (isset($data) && !empty($data)) {
@@ -410,7 +468,6 @@ class PlacementPreferencesTable extends Table
             ));
 
             if (!empty($firstData)) {
-
                 $allRoundParticipants = ClassRegistry::init('PlacementRoundParticipant')->find('all', array(
                     'conditions' => array('PlacementRoundParticipant.group_identifier' => $firstData['PlacementRoundParticipant']['group_identifier']),
                     'recursive' => -1
@@ -424,35 +481,49 @@ class PlacementPreferencesTable extends Table
                 $targetUnit = explode('~', $data['PlacementSetting']['applied_for']);
 
                 if ($targetUnit[0] == "c") {
-                    $name = ClassRegistry::init('College')->find('first', array('conditions' => array('College.id' => $targetUnit[1]), 'recursive' => -1));
+                    $name = ClassRegistry::init('College')->find(
+                        'first',
+                        array('conditions' => array('College.id' => $targetUnit[1]), 'recursive' => -1)
+                    );
                     $targetUnitName = $name['College']['name'];
-                } else if ($targetUnit[0] == "d") {
-                    $name = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.id' => $targetUnit[1]), 'recursive' => -1));
+                } elseif ($targetUnit[0] == "d") {
+                    $name = ClassRegistry::init('Department')->find(
+                        'first',
+                        array('conditions' => array('Department.id' => $targetUnit[1]), 'recursive' => -1)
+                    );
                     $targetUnitName = $name['Department']['name'];
-                } else if ($targetUnit[0] == "s") {
-                    $name = ClassRegistry::init('Specialization')->find('first', array('conditions' => array('Specialization.id' => $targetUnit[1]), 'recursive' => -1));
+                } elseif ($targetUnit[0] == "s") {
+                    $name = ClassRegistry::init('Specialization')->find(
+                        'first',
+                        array('conditions' => array('Specialization.id' => $targetUnit[1]), 'recursive' => -1)
+                    );
                     $targetUnitName = $name['Specialization']['name'];
                 }
 
                 $placementSummary['targetStudentInUnit'] = $targetUnitName;
                 $placementSummary['round'] = $data['PlacementSetting']['round'];
 
-                $placementSummary['placementAlreadyRun'] = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
-                    'conditions' => array(
-                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                        'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-                        'PlacementParticipatingStudent.placement_round_participant_id is not null',
-                    ),
-                    'recursive' => -1
-                ));
+                $placementSummary['placementAlreadyRun'] = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                    'count',
+                    array(
+                        'conditions' => array(
+                            'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                            'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                            'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                            'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                            'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                            'PlacementParticipatingStudent.placement_round_participant_id is not null',
+                        ),
+                        'recursive' => -1
+                    )
+                );
 
                 debug($placementSummary);
 
                 $placementSummary['academic_year'] = $data['PlacementSetting']['academic_year'];
-                $placementSummary['totalStudentReadyForPlacement'] = ClassRegistry::init('PlacementParticipatingStudent')->find("count", array(
+                $placementSummary['totalStudentReadyForPlacement'] = ClassRegistry::init(
+                    'PlacementParticipatingStudent'
+                )->find("count", array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
                         'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
@@ -569,6 +640,7 @@ class PlacementPreferencesTable extends Table
 
     public function getStudentWhoTookEntranceExam($data = array())
     {
+
         if (isset($data) && !empty($data)) {
             $firstData = ClassRegistry::init('PlacementRoundParticipant')->find("first", array(
                 'conditions' => array(
@@ -616,39 +688,57 @@ class PlacementPreferencesTable extends Table
             }
 
             if ($data['PlacementSetting']['include'] == 0) {
-                $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementEntranceExamResultEntry')->find('all', array(
-                    'conditions' => array(
-                        'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants,
-                        'PlacementEntranceExamResultEntry.accepted_student_id not in (select accepted_student_id from placement_participating_students where applied_for="' . $data['PlacementSetting']['applied_for'] . '" and academic_year="' . $data['PlacementSetting']['academic_year'] . '" and round="' . $data['PlacementSetting']['round'] . '" )'
-                    ),
-                    'contain' => array('Student', 'AcceptedStudent'),
-                    'group' => array('PlacementEntranceExamResultEntry.student_id'),
-                    'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC'),
-                    'limit' => $limit,
-                    'maxLimit' => 5000
-                ));
+                $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementEntranceExamResultEntry')->find(
+                    'all',
+                    array(
+                        'conditions' => array(
+                            'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants,
+                            'PlacementEntranceExamResultEntry.accepted_student_id not in (select accepted_student_id from placement_participating_students where applied_for="' . $data['PlacementSetting']['applied_for'] . '" and academic_year="' . $data['PlacementSetting']['academic_year'] . '" and round="' . $data['PlacementSetting']['round'] . '" )'
+                        ),
+                        'contain' => array('Student', 'AcceptedStudent'),
+                        'group' => array('PlacementEntranceExamResultEntry.student_id'),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC'
+                        ),
+                        'limit' => $limit,
+                        'maxLimit' => 5000
+                    )
+                );
             } else {
-                $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementEntranceExamResultEntry')->find('all', array(
-                    'conditions' => array(
-                        'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants
-                    ),
-                    'contain' => array('Student', 'AcceptedStudent'),
-                    'group' => array('PlacementEntranceExamResultEntry.student_id'),
-                    'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC'),
-                    'limit' => $limit,
-                    'maxLimit' => 5000
-                ));
+                $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementEntranceExamResultEntry')->find(
+                    'all',
+                    array(
+                        'conditions' => array(
+                            'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants
+                        ),
+                        'contain' => array('Student', 'AcceptedStudent'),
+                        'group' => array('PlacementEntranceExamResultEntry.student_id'),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC'
+                        ),
+                        'limit' => $limit,
+                        'maxLimit' => 5000
+                    )
+                );
             }
 
             if (empty($allStudentsWhoEntranceExam)) {
                 //debug($allRoundParticipants);
-                $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementPreference')->find('all', array(
+                $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementPreference')->find('all', array(
                     'conditions' => array(
                         'PlacementPreference.placement_round_participant_id' => $allRoundParticipants,
                     ),
                     'contain' => array('PlacementRoundParticipant', 'Student', 'AcceptedStudent'),
                     'group' => array('PlacementPreference.student_id'),
-                    'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC'),
+                    'order' => array(
+                        'Student.id' => 'ASC',
+                        'Student.program_id' => 'ASC',
+                        'Student.program_type_id' => 'ASC'
+                    ),
                     'limit' => $limit,
                     'maxLimit' => $limit
                 ));
@@ -656,14 +746,25 @@ class PlacementPreferencesTable extends Table
             //debug($allStudentsWhoEntranceExam);
 
             if (!empty($allStudentsWhoEntranceExam)) {
-
-                $selected_program_name = classRegistry::init('Program')->field('Program.name', array('Program.id' => $allStudentsWhoEntranceExam[0]['Student']['program_id']));
-                $selected_program_type_name = classRegistry::init('ProgramType')->field('ProgramType.name', array('ProgramType.id' => $allStudentsWhoEntranceExam[0]['Student']['program_type_id']));
+                $selected_program_name = classRegistry::init('Program')->field(
+                    'Program.name',
+                    array('Program.id' => $allStudentsWhoEntranceExam[0]['Student']['program_id'])
+                );
+                $selected_program_type_name = classRegistry::init('ProgramType')->field(
+                    'ProgramType.name',
+                    array('ProgramType.id' => $allStudentsWhoEntranceExam[0]['Student']['program_type_id'])
+                );
 
                 if (!isset($allStudentsWhoEntranceExam[0]['Student']['department_id'])) {
-                    $selected_applied_unit_name = classRegistry::init('College')->field('College.name', array('College.id' => $allStudentsWhoEntranceExam[0]['Student']['college_id']));
+                    $selected_applied_unit_name = classRegistry::init('College')->field(
+                        'College.name',
+                        array('College.id' => $allStudentsWhoEntranceExam[0]['Student']['college_id'])
+                    );
                 } else {
-                    $selected_applied_unit_name = classRegistry::init('Department')->field('Department.name', array('Department.id' => $allStudentsWhoEntranceExam[0]['Student']['department_id']));
+                    $selected_applied_unit_name = classRegistry::init('Department')->field(
+                        'Department.name',
+                        array('Department.id' => $allStudentsWhoEntranceExam[0]['Student']['department_id'])
+                    );
                 }
 
                 foreach ($allStudentsWhoEntranceExam as $p => &$v) {
@@ -767,15 +868,21 @@ class PlacementPreferencesTable extends Table
                     if (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id']) && $freshManresult['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
                         unset($allStudentsWhoEntranceExam[$p]);
                         continue;
-                    } else if (empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
+                    } elseif (empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
                         unset($allStudentsWhoEntranceExam[$p]);
                         continue;
-                    } else if (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
+                    } elseif (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
                         //unset($allStudentsWhoEntranceExam[$p]);
                         //continue;
                     }
 
-                    $placementResultSettings = ClassRegistry::init('PlacementResultSetting')->find('all', array('conditions' => array('PlacementResultSetting.group_identifier' => $firstData['PlacementRoundParticipant']['group_identifier']), 'recursive' => -1));
+                    $placementResultSettings = ClassRegistry::init('PlacementResultSetting')->find(
+                        'all',
+                        array(
+                            'conditions' => array('PlacementResultSetting.group_identifier' => $firstData['PlacementRoundParticipant']['group_identifier']),
+                            'recursive' => -1
+                        )
+                    );
                     $allPlacementResultSetting = array();
                     $allMaxPlacementResultSetting = array();
 
@@ -786,8 +893,8 @@ class PlacementPreferencesTable extends Table
                         }
                     } else {
                         /* $this->invalidate('NO_PLACEMENT_SETTING_FOUND', 'No Placement Setting is found for the selected search criteria. Please define it first.');
-						return false; */
-                        $error1 = 'No placement setting is defined for round ' . $data['PlacementSetting']['round'] . ' of '  . $selected_program_name .  ' - ' . $selected_program_type_name .  ' in ' . $selected_applied_unit_name .' This is for view only and it is generated with default placement settings(' . DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT . '% for Freshman CGPA out of 4.00, ' . DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT. '% for Preparatory EHEECE total results out of 700 and ' . DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT . '% for Department Entrance Exam out of 30) . Please define Placement Setting first and try to Prepare.';
+                        return false; */
+                        $error1 = 'No placement setting is defined for round ' . $data['PlacementSetting']['round'] . ' of ' . $selected_program_name . ' - ' . $selected_program_type_name . ' in ' . $selected_applied_unit_name . ' This is for view only and it is generated with default placement settings(' . DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT . '% for Freshman CGPA out of 4.00, ' . DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT . '% for Preparatory EHEECE total results out of 700 and ' . DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT . '% for Department Entrance Exam out of 30) . Please define Placement Setting first and try to Prepare.';
                         $this->invalidate('NO_PLACEMENT_SETTING_FOUND', $error1);
                         //return false;
                     }
@@ -821,11 +928,11 @@ class PlacementPreferencesTable extends Table
 
                     if (!empty($allPlacementResultSetting)) {
                         foreach ($allPlacementResultSetting as $setkey => $setvalue) {
-                            if($setkey == 'freshman_result') {
+                            if ($setkey == 'freshman_result') {
                                 $freshamnResltSetting = $setvalue;
-                            } else if($setkey == 'EHEECE_total_results') {
+                            } elseif ($setkey == 'EHEECE_total_results') {
                                 $preparatoryResltSetting = $setvalue;
-                            } else if($setkey == 'entrance_result') {
+                            } elseif ($setkey == 'entrance_result') {
                                 $entranceResltSetting = $setvalue;
                             }
                         }
@@ -865,7 +972,9 @@ class PlacementPreferencesTable extends Table
                         // check here ignores readmitted students we can use academicyear from placement preferences table for applied student
                         if ($data['PlacementSetting']['academic_year'] == $v['AcceptedStudent']['academicyear']) {
                             if (isset($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]) && !empty($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']])) {
-                                debug($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]);
+                                debug(
+                                    $allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]
+                                );
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / $allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']];
                             } else {
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
@@ -883,33 +992,39 @@ class PlacementPreferencesTable extends Table
                     ));
 
                     if (isset($freshman_settings) && !empty($freshman_settings)) {
-                        $fresh = ($freshman_settings['PlacementResultSetting']['percent']  * $freshmanResult) / FRESHMANMAXIMUM;
+                        $fresh = ($freshman_settings['PlacementResultSetting']['percent'] * $freshmanResult) / FRESHMANMAXIMUM;
                         // check here
                         if (isset($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]) && !empty($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']])) {
-                            debug($allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]);
-                            $fresh = ($freshman_settings['PlacementResultSetting']['percent']  * $freshmanResult) / $allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']];
+                            debug(
+                                $allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']]
+                            );
+                            $fresh = ($freshman_settings['PlacementResultSetting']['percent'] * $freshmanResult) / $allMaxPlacementResultSetting[$prepartory_settings['PlacementResultSetting']['result_type']];
                         } else {
-                            $fresh = ($freshman_settings['PlacementResultSetting']['percent']  * $freshmanResult) / FRESHMANMAXIMUM;
+                            $fresh = ($freshman_settings['PlacementResultSetting']['percent'] * $freshmanResult) / FRESHMANMAXIMUM;
                         }
                     } else {
-
-                        if (isset($v['Student']['cgpa']) && $v['Student']['cgpa'] > 0 ) {
-                            $fresh = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT  * $v['Student']['cgpa']) / FRESHMANMAXIMUM;
+                        if (isset($v['Student']['cgpa']) && $v['Student']['cgpa'] > 0) {
+                            $fresh = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT * $v['Student']['cgpa']) / FRESHMANMAXIMUM;
                         }
 
-                        if (isset($v['AcceptedStudent']['EHEECE_total_results']) && $v['AcceptedStudent']['EHEECE_total_results'] > 100 ) {
-                            $prep = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT  * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
+                        if (isset($v['AcceptedStudent']['EHEECE_total_results']) && $v['AcceptedStudent']['EHEECE_total_results'] > 100) {
+                            $prep = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
                         }
 
                         if (isset($v['PlacementEntranceExamResultEntry']['result']) && $v['PlacementEntranceExamResultEntry']['result'] >= 0) {
-                            $entrance = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT  * $v['PlacementEntranceExamResultEntry']['result']) / ENTRANCEMAXIMUM;
+                            $entrance = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT * $v['PlacementEntranceExamResultEntry']['result']) / ENTRANCEMAXIMUM;
                         }
                     }
 
-                    if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp($v['AcceptedStudent']['sex'], "female") == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
+                    if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp(
+                                $v['AcceptedStudent']['sex'],
+                                "female"
+                            ) == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
                         if (isset($points['female']) && !empty($points['female'])) {
                             $female_placement_weight = $points['female'];
-                        } else if (is_numeric(INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT) && INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT == 1) {
+                        } elseif (is_numeric(
+                                INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT
+                            ) && INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT == 1) {
                             $female_placement_weight = DEFAULT_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT;
                         } else {
                             $female_placement_weight = 0;
@@ -924,11 +1039,17 @@ class PlacementPreferencesTable extends Table
 
                     $v['PlacementEntranceExamResultEntry']['disability_weight'] = $disability_weight;
 
-                    if (isset($v['AcceptedStudent']['region_id']) && !empty($v['AcceptedStudent']['region_id']) && in_array($v['AcceptedStudent']['region_id'], $region_ids)) {
+                    if (isset($v['AcceptedStudent']['region_id']) && !empty($v['AcceptedStudent']['region_id']) && in_array(
+                            $v['AcceptedStudent']['region_id'],
+                            $region_ids
+                        )) {
                         //$developing_region_weight = 0;
-                        if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp($v['AcceptedStudent']['sex'], "female") == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
+                        if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp(
+                                    $v['AcceptedStudent']['sex'],
+                                    "female"
+                                ) == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
                             $developing_region_weight = 5;
-                        } else if (isset($v['AcceptedStudent']['disability']) && !empty($v['AcceptedStudent']['disability'])) {
+                        } elseif (isset($v['AcceptedStudent']['disability']) && !empty($v['AcceptedStudent']['disability'])) {
                             $developing_region_weight = 10;
                         }
                     }
@@ -943,12 +1064,18 @@ class PlacementPreferencesTable extends Table
                     $v['PlacementEntranceExamResultEntry']['academic_year'] = $data['PlacementSetting']['academic_year'];
                     $v['PlacementEntranceExamResultEntry']['applied_for'] = $data['PlacementSetting']['applied_for'];
 
-                    $v['PlacementEntranceExamResultEntry']['round'] =  $data['PlacementSetting']['round'];
-                    $v['PlacementEntranceExamResultEntry']['program_id'] =  $data['PlacementSetting']['program_id'];
-                    $v['PlacementEntranceExamResultEntry']['program_type_id'] =  $data['PlacementSetting']['program_type_id'];
+                    $v['PlacementEntranceExamResultEntry']['round'] = $data['PlacementSetting']['round'];
+                    $v['PlacementEntranceExamResultEntry']['program_id'] = $data['PlacementSetting']['program_id'];
+                    $v['PlacementEntranceExamResultEntry']['program_type_id'] = $data['PlacementSetting']['program_type_id'];
 
-                    $v['PlacementEntranceExamResultEntry']['total_weight'] = round(($v['PlacementEntranceExamResultEntry']['developing_region_weight'] + $v['PlacementEntranceExamResultEntry']['disability_weight'] + $v['PlacementEntranceExamResultEntry']['female_placement_weight'] + $v['PlacementEntranceExamResultEntry']['result_weight']), 2);
-                    $v['PlacementEntranceExamResultEntry']['total_placement_weight'] = 	round(($v['PlacementEntranceExamResultEntry']['developing_region_weight'] + $v['PlacementEntranceExamResultEntry']['disability_weight'] + $v['PlacementEntranceExamResultEntry']['female_placement_weight'] + $v['PlacementEntranceExamResultEntry']['result_weight']), 2);
+                    $v['PlacementEntranceExamResultEntry']['total_weight'] = round(
+                        ($v['PlacementEntranceExamResultEntry']['developing_region_weight'] + $v['PlacementEntranceExamResultEntry']['disability_weight'] + $v['PlacementEntranceExamResultEntry']['female_placement_weight'] + $v['PlacementEntranceExamResultEntry']['result_weight']),
+                        2
+                    );
+                    $v['PlacementEntranceExamResultEntry']['total_placement_weight'] = round(
+                        ($v['PlacementEntranceExamResultEntry']['developing_region_weight'] + $v['PlacementEntranceExamResultEntry']['disability_weight'] + $v['PlacementEntranceExamResultEntry']['female_placement_weight'] + $v['PlacementEntranceExamResultEntry']['result_weight']),
+                        2
+                    );
 
 
                     if (isset($alreadyPrepared) && !empty($alreadyPrepared)) {
@@ -968,6 +1095,7 @@ class PlacementPreferencesTable extends Table
 
     public function auto_placement_algorithm($data = array())
     {
+
         if (isset($data) && !empty($data)) {
             $units = $this->getListOfUnitNeedByPrivilageStudentMost($data);
 
@@ -977,21 +1105,24 @@ class PlacementPreferencesTable extends Table
                     //simply read quota for each deparment
                     $adjusted_privilaged_quota = array();
 
-                    $detail_of_participating_unit = ClassRegistry::init('PlacementRoundParticipant')->find('first', array(
-                        'conditions' => array(
-                            'PlacementRoundParticipant.id' => $department_id,
-                            'PlacementRoundParticipant.applied_for' => $data['PlacementSetting']['applied_for'],
-                            'PlacementRoundParticipant.academic_year' =>  $data['PlacementSetting']['academic_year'],
-                            'PlacementRoundParticipant.placement_round' =>  $data['PlacementSetting']['round'],
-                            'PlacementRoundParticipant.program_id' => $data['PlacementSetting']['program_id'],
-                            'PlacementRoundParticipant.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                    $detail_of_participating_unit = ClassRegistry::init('PlacementRoundParticipant')->find(
+                        'first',
+                        array(
+                            'conditions' => array(
+                                'PlacementRoundParticipant.id' => $department_id,
+                                'PlacementRoundParticipant.applied_for' => $data['PlacementSetting']['applied_for'],
+                                'PlacementRoundParticipant.academic_year' => $data['PlacementSetting']['academic_year'],
+                                'PlacementRoundParticipant.placement_round' => $data['PlacementSetting']['round'],
+                                'PlacementRoundParticipant.program_id' => $data['PlacementSetting']['program_id'],
+                                'PlacementRoundParticipant.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                            )
                         )
-                    ));
+                    );
 
                     $intake_capacity = $detail_of_participating_unit['PlacementRoundParticipant']['intake_capacity'];
                     $adjusted_privilaged_quota['female'] = $detail_of_participating_unit['PlacementRoundParticipant']['female_quota'];
 
-                    $adjusted_privilaged_quota['regions'] =  $detail_of_participating_unit['PlacementRoundParticipant']['region_quota'];
+                    $adjusted_privilaged_quota['regions'] = $detail_of_participating_unit['PlacementRoundParticipant']['region_quota'];
                     $adjusted_privilaged_quota['disability'] = $detail_of_participating_unit['PlacementRoundParticipant']['disability_quota'];
 
                     //// adjusted privilaged  quota
@@ -1011,10 +1142,12 @@ class PlacementPreferencesTable extends Table
 
 
                     if (!empty($sortedStudentByPreferenceAndGrade)) {
-                        $n = ($intake_capacity <= count($sortedStudentByPreferenceAndGrade) ? $intake_capacity : count($sortedStudentByPreferenceAndGrade));
+                        $n = ($intake_capacity <= count($sortedStudentByPreferenceAndGrade) ? $intake_capacity : count(
+                            $sortedStudentByPreferenceAndGrade
+                        ));
 
                         // send the other to quote
-                        $notQualifedInCompetitive=array();
+                        $notQualifedInCompetitive = array();
                         //$n = $intake_capacity;
                         $lastIndex = $n;
                         for ($i = 0; $i < $n; $i++) {
@@ -1023,8 +1156,8 @@ class PlacementPreferencesTable extends Table
 
                         // cut quote qualified
                         /* for ($j = $n; $j <= count($sortedStudentByPreferenceAndGrade); $j++) {
-							$notQualifedInCompetitive[] = $sortedStudentByPreferenceAndGrade[$j]['PlacementPreference']['accepted_student_id'];
-						} */
+                            $notQualifedInCompetitive[] = $sortedStudentByPreferenceAndGrade[$j]['PlacementPreference']['accepted_student_id'];
+                        } */
 
                         unset($sortedStudentByPreferenceAndGrade);
                     }
@@ -1036,32 +1169,31 @@ class PlacementPreferencesTable extends Table
 
                     foreach ($preReadyNormalPrivilagedDepartmentAllocation[0] as $privilage_type => &$quota) {
                         if ($quota > 0) {
-
                             $privilaged_selected = $this->privilagedStudentsFilterOut(
+                                $data,
+                                $department_id,
+                                $preReadyNormalPrivilagedDepartmentAllocation[0],
+                                $placedStudents,
+                                $privilage_type
+                            );
+
+                            /*$privilaged_selected = $this->privilagedStudentsFilterOut(
                                 $data,
                                 $department_id,
                                 $preReadyNormalPrivilagedDepartmentAllocation[0],
 
                                 $placedStudents,
-                                $privilage_type
+                                $privilage_type,
+                                $notQualifedInCompetitive
 
-                            );
-
-                            /*$privilaged_selected = $this->privilagedStudentsFilterOut(
-								$data,
-								$department_id,
-								$preReadyNormalPrivilagedDepartmentAllocation[0],
-
-								$placedStudents,
-								$privilage_type,
-								$notQualifedInCompetitive
-
-							);*/
+                            );*/
 
 
                             //debug($quota);
                             //debug($privilaged_selected[$privilage_type]);
-                            if (!empty($privilaged_selected) && $quota <= count($privilaged_selected[$privilage_type])) {
+                            if (!empty($privilaged_selected) && $quota <= count(
+                                    $privilaged_selected[$privilage_type]
+                                )) {
                                 $n = $quota;
                                 for ($i = 0; $i < $n; $i++) {
                                     $placedStudents['Q'][] = $privilaged_selected[$privilage_type][$i];
@@ -1075,14 +1207,13 @@ class PlacementPreferencesTable extends Table
                     $lastCA = count($placedStudents['C']);
 
                     if ($quotaBalanceForCompetitive > 0) {
-
                         $remain = $quotaBalanceForCompetitive;
 
                         for ($i = $lastCA; $remain > 0; $i++) {
                             $placedStudents['C'][] = $sortedStudentByPreferenceAndGrade[$i]['PlacementPreference']['accepted_student_id'];
                             $remain--;
                         }
-                    } else if ($lastCA < $intake_capacity) {
+                    } elseif ($lastCA < $intake_capacity) {
                         $remain = ($intake_capacity - $lastCA);
 
                         for ($i = $lastCA; $remain > 0; $i++) {
@@ -1110,24 +1241,37 @@ class PlacementPreferencesTable extends Table
                                 $ittCount++;
                                 //find prepared students
 
-                                $preparedStudent = ClassRegistry::init('PlacementParticipatingStudent')->find('first', array(
-                                    'conditions' => array(
-                                        'PlacementParticipatingStudent.accepted_student_id' => $student_id,
-                                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                                        'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id']
-                                    ),
-                                    'recursive' => -1
-                                ));
+                                $preparedStudent = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                                    'first',
+                                    array(
+                                        'conditions' => array(
+                                            'PlacementParticipatingStudent.accepted_student_id' => $student_id,
+                                            'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                                            'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                                            'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                                            'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                                            'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id']
+                                        ),
+                                        'recursive' => -1
+                                    )
+                                );
 
                                 if (isset($preparedStudent['PlacementParticipatingStudent']['id']) && !empty($preparedStudent['PlacementParticipatingStudent']['id'])) {
-
-                                    ClassRegistry::init('PlacementParticipatingStudent')->id = $preparedStudent['PlacementParticipatingStudent']['id'];
-                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField('placementtype', AUTO_PLACEMENT);
-                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField('placement_based', $key);
-                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField('placement_round_participant_id', $department_id);
+                                    ClassRegistry::init(
+                                        'PlacementParticipatingStudent'
+                                    )->id = $preparedStudent['PlacementParticipatingStudent']['id'];
+                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                        'placementtype',
+                                        AUTO_PLACEMENT
+                                    );
+                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                        'placement_based',
+                                        $key
+                                    );
+                                    ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                        'placement_round_participant_id',
+                                        $department_id
+                                    );
 
                                     $count++;
                                 } else {
@@ -1149,12 +1293,15 @@ class PlacementPreferencesTable extends Table
                 $count = 0;
 
                 if (!empty($unitUnderQuota)) {
-
                     foreach ($unitUnderQuota as $department_id => $weight) {
                         $placedStudentss = array();
 
                         if ($count == $groupLength) {
-                            $notassignedList = $this->sortOutForRandomAssignmentForNonAssigned($data, $department_id, true);
+                            $notassignedList = $this->sortOutForRandomAssignmentForNonAssigned(
+                                $data,
+                                $department_id,
+                                true
+                            );
                         } else {
                             $notassignedList = $this->sortOutForRandomAssignmentForNonAssigned($data, $department_id);
                         }
@@ -1166,8 +1313,9 @@ class PlacementPreferencesTable extends Table
                         $count++;
 
                         if (!empty($notassignedList)) {
-
-                            $n = ($weight['weight'] <= count($notassignedList) ? $weight['weight'] : count($notassignedList));
+                            $n = ($weight['weight'] <= count($notassignedList) ? $weight['weight'] : count(
+                                $notassignedList
+                            ));
                             //$n = $intake_capacity;
                             $lastIndex = $n;
                             for ($i = 0; $i < $n; $i++) {
@@ -1182,7 +1330,9 @@ class PlacementPreferencesTable extends Table
                                 $failed = 0;
                                 foreach ($placedStudentss as $key => $value) {
                                     foreach ($value as $k => $student_id) {
-                                        $preparedStudent = ClassRegistry::init('PlacementParticipatingStudent')->find('first', array(
+                                        $preparedStudent = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                                            'first',
+                                            array(
                                                 'conditions' => array(
                                                     'PlacementParticipatingStudent.accepted_student_id' => $student_id,
                                                     'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
@@ -1197,10 +1347,21 @@ class PlacementPreferencesTable extends Table
                                         debug($preparedStudent);
 
                                         if (isset($preparedStudent['PlacementParticipatingStudent']['id']) && !empty($preparedStudent['PlacementParticipatingStudent']['id']) && empty($preparedStudent['PlacementParticipatingStudent']['placement_round_participant_id'])) {
-                                            ClassRegistry::init('PlacementParticipatingStudent')->id = $preparedStudent['PlacementParticipatingStudent']['id'];
-                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField('placementtype', AUTO_PLACEMENT);
-                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField('placement_based', $key);
-                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField('placement_round_participant_id', $department_id);
+                                            ClassRegistry::init(
+                                                'PlacementParticipatingStudent'
+                                            )->id = $preparedStudent['PlacementParticipatingStudent']['id'];
+                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                                'placementtype',
+                                                AUTO_PLACEMENT
+                                            );
+                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                                'placement_based',
+                                                $key
+                                            );
+                                            ClassRegistry::init('PlacementParticipatingStudent')->saveField(
+                                                'placement_round_participant_id',
+                                                $department_id
+                                            );
                                         } else {
                                             $failed++;
                                         }
@@ -1212,9 +1373,7 @@ class PlacementPreferencesTable extends Table
                         }
                     }
                 }
-
             } // nothing to execute since there is no defined unit
-
         }
 
         $result_order_by = 'PlacementParticipatingStudent.total_placement_weight desc';
@@ -1250,7 +1409,10 @@ class PlacementPreferencesTable extends Table
         ));
 
         $dep_id = array_keys($units);
-        $dep_name = ClassRegistry::init('PlacementRoundParticipant')->find('list', array('conditions' => array('PlacementRoundParticipant.id' => $dep_id)));
+        $dep_name = ClassRegistry::init('PlacementRoundParticipant')->find(
+            'list',
+            array('conditions' => array('PlacementRoundParticipant.id' => $dep_id))
+        );
         $newly_placed_student = array();
 
         if (!empty($dep_name)) {
@@ -1263,7 +1425,9 @@ class PlacementPreferencesTable extends Table
                     }
                 }
 
-                $newly_placed_student['auto_summery'][$dv]['C'] = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
+                $newly_placed_student['auto_summery'][$dv]['C'] = ClassRegistry::init(
+                    'PlacementParticipatingStudent'
+                )->find('count', array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
                         'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
@@ -1275,7 +1439,9 @@ class PlacementPreferencesTable extends Table
                     )
                 ));
 
-                $newly_placed_student['auto_summery'][$dv]['Q'] = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
+                $newly_placed_student['auto_summery'][$dv]['Q'] = ClassRegistry::init(
+                    'PlacementParticipatingStudent'
+                )->find('count', array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
                         'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
@@ -1294,6 +1460,7 @@ class PlacementPreferencesTable extends Table
 
     public function getAssignedStudentsForDirectPlacement($data)
     {
+
         $units = $this->getListOfUnitNeedByPrivilageStudentMost($data);
         $options = array();
 
@@ -1344,7 +1511,10 @@ class PlacementPreferencesTable extends Table
                 'ProgramType',
                 'PlacementRoundParticipant'
             ),
-            'order' => array('PlacementParticipatingStudent.placement_round_participant_id' => 'ASC', 'PlacementParticipatingStudent.total_placement_weight' => 'DESC')
+            'order' => array(
+                'PlacementParticipatingStudent.placement_round_participant_id' => 'ASC',
+                'PlacementParticipatingStudent.total_placement_weight' => 'DESC'
+            )
         ));
 
         return $placedstudent;
@@ -1352,6 +1522,7 @@ class PlacementPreferencesTable extends Table
 
     public function getAssignedStudents($data)
     {
+
         $result_order_by = 'PlacementParticipatingStudent.total_placement_weight desc';
         //$units = $this->getListOfUnitNeedByPrivilageStudentMost($data);
 
@@ -1421,7 +1592,10 @@ class PlacementPreferencesTable extends Table
 
         debug($placedstudent);
         $dep_id = array_keys($units);
-        $dep_name = ClassRegistry::init('PlacementRoundParticipant')->find('list', array('conditions' => array('PlacementRoundParticipant.id' => $dep_id)));
+        $dep_name = ClassRegistry::init('PlacementRoundParticipant')->find(
+            'list',
+            array('conditions' => array('PlacementRoundParticipant.id' => $dep_id))
+        );
         $newly_placed_student = array();
 
 
@@ -1435,7 +1609,9 @@ class PlacementPreferencesTable extends Table
                     }
                 }
 
-                $newly_placed_student['auto_summery'][$dv]['C'] = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
+                $newly_placed_student['auto_summery'][$dv]['C'] = ClassRegistry::init(
+                    'PlacementParticipatingStudent'
+                )->find('count', array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
                         'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
@@ -1447,7 +1623,9 @@ class PlacementPreferencesTable extends Table
                     )
                 ));
 
-                $newly_placed_student['auto_summery'][$dv]['Q'] = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
+                $newly_placed_student['auto_summery'][$dv]['Q'] = ClassRegistry::init(
+                    'PlacementParticipatingStudent'
+                )->find('count', array(
                     'conditions' => array(
                         'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
                         'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
@@ -1466,6 +1644,7 @@ class PlacementPreferencesTable extends Table
 
     public function cancel_placement_algorithm($data = array())
     {
+
         if (isset($data) && !empty($data)) {
             ClassRegistry::init('PlacementParticipatingStudent')->unbindModel(
                 array(
@@ -1502,8 +1681,8 @@ class PlacementPreferencesTable extends Table
 
     public function approve_placement($data = array(), $type = 1)
     {
-        if (isset($data) && !empty($data)) {
 
+        if (isset($data) && !empty($data)) {
             ClassRegistry::init('PlacementParticipatingStudent')->unbindModel(array(
                 'belongsTo' => array(
                     'AcceptedStudent',
@@ -1515,16 +1694,15 @@ class PlacementPreferencesTable extends Table
             ));
 
             $alreadyApproved = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
-                    'conditions' => array(
-                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                        'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-                        'PlacementParticipatingStudent.status' => 1
-                    )
+                'conditions' => array(
+                    'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                    'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                    'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                    'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                    'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                    'PlacementParticipatingStudent.status' => 1
                 )
-            );
+            ));
 
             if ($alreadyApproved) {
                 //return 2;
@@ -1566,12 +1744,12 @@ class PlacementPreferencesTable extends Table
                     'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id']
                     //'placement_round_participant_id'
                     /*
-					array("OR" => array(
-						"PlacementParticipatingStudent.placement_round_participant_id" => 0,
-						"PlacementParticipatingStudent.placement_round_participant_id is null",
-						"PlacementParticipatingStudent.placement_round_participant_id = ''"
-					)),
-					*/
+                    array("OR" => array(
+                        "PlacementParticipatingStudent.placement_round_participant_id" => 0,
+                        "PlacementParticipatingStudent.placement_round_participant_id is null",
+                        "PlacementParticipatingStudent.placement_round_participant_id = ''"
+                    )),
+                    */
 
                 ),
                 'contain' => array(
@@ -1585,11 +1763,23 @@ class PlacementPreferencesTable extends Table
 
             $clgexp = explode('~', $data['PlacementSetting']['applied_for']);
 
-            $campuses = ClassRegistry::init('Campus')->find('list', array('conditions' => array('Campus.available_for_college' => $clgexp[1]), 'fields' => array('Campus.id', 'Campus.id')));
+            $campuses = ClassRegistry::init('Campus')->find(
+                'list',
+                array(
+                    'conditions' => array('Campus.available_for_college' => $clgexp[1]),
+                    'fields' => array('Campus.id', 'Campus.id')
+                )
+            );
             debug($campuses);
             debug($clgexp);
 
-            $collegeIds = ClassRegistry::init('College')->find('list', array('conditions' => array('College.campus_id' => $campuses), 'fields' => array('College.id', 'College.id')));
+            $collegeIds = ClassRegistry::init('College')->find(
+                'list',
+                array(
+                    'conditions' => array('College.campus_id' => $campuses),
+                    'fields' => array('College.id', 'College.id')
+                )
+            );
             debug($collegeIds);
             //start the updating process
             $sectionAttendedInStudent = array();
@@ -1602,7 +1792,6 @@ class PlacementPreferencesTable extends Table
                     debug($pv);
 
                     if ($pv['PlacementRoundParticipant']['type'] == "College") {
-
                         $collegePlacement = true;
 
                         $sectionAttended = ClassRegistry::init('StudentsSection')->find('list', array(
@@ -1616,59 +1805,113 @@ class PlacementPreferencesTable extends Table
                         //update the current college accepted students
 
                         ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                        ClassRegistry::init('AcceptedStudent')->saveField('college_id', $pv['PlacementRoundParticipant']['foreign_key']);
-                        ClassRegistry::init('AcceptedStudent')->saveField('original_college_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'college_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'original_college_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
 
                         //update the current college students
                         ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                        ClassRegistry::init('Student')->saveField('college_id', $pv['PlacementRoundParticipant']['foreign_key']);
-                        ClassRegistry::init('Student')->saveField('original_college_id', $pv['PlacementRoundParticipant']['foreign_key']);
-
-                    } else if ($pv['PlacementRoundParticipant']['type'] == "Department") {
+                        ClassRegistry::init('Student')->saveField(
+                            'college_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
+                        ClassRegistry::init('Student')->saveField(
+                            'original_college_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
+                    } elseif ($pv['PlacementRoundParticipant']['type'] == "Department") {
                         $collegePlacement = false;
 
-                        $collegeID = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.id' => $pv['PlacementRoundParticipant']['foreign_key']), 'contain' => array('College')));
+                        $collegeID = ClassRegistry::init('Department')->find(
+                            'first',
+                            array(
+                                'conditions' => array('Department.id' => $pv['PlacementRoundParticipant']['foreign_key']),
+                                'contain' => array('College')
+                            )
+                        );
                         debug($pv);
 
                         //update department and college id accepted students
                         ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                        ClassRegistry::init('AcceptedStudent')->saveField('department_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'department_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
 
                         if (isset($collegeID['College']['id']) && !empty($collegeID['College']['id'])) {
-                            ClassRegistry::init('AcceptedStudent')->saveField('college_id', $collegeID['College']['id']);
-                            ClassRegistry::init('AcceptedStudent')->saveField('original_college_id', $collegeID['College']['id']);
+                            ClassRegistry::init('AcceptedStudent')->saveField(
+                                'college_id',
+                                $collegeID['College']['id']
+                            );
+                            ClassRegistry::init('AcceptedStudent')->saveField(
+                                'original_college_id',
+                                $collegeID['College']['id']
+                            );
                         }
 
                         //update department and college id accepted students
                         ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                        ClassRegistry::init('Student')->saveField('department_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                        ClassRegistry::init('Student')->saveField(
+                            'department_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
 
                         if (isset($collegeID['College']['id']) && !empty($collegeID['College']['id'])) {
-                            ClassRegistry::init('Student')->saveField('college_id',  $collegeID['College']['id']);
-                            ClassRegistry::init('Student')->saveField('original_college_id',  $collegeID['College']['id']);
+                            ClassRegistry::init('Student')->saveField('college_id', $collegeID['College']['id']);
+                            ClassRegistry::init('Student')->saveField(
+                                'original_college_id',
+                                $collegeID['College']['id']
+                            );
                         }
-
-                    } else if ($pv['PlacementRoundParticipant']['type'] == "Specialization") {
-
+                    } elseif ($pv['PlacementRoundParticipant']['type'] == "Specialization") {
                         $collegePlacement = false;
-                        $departmentID = ClassRegistry::init('Specialization')->find('first', array('conditions' => array('Specialization.department_id' => $pv['PlacementRoundParticipant']['foreign_key']), 'contain' => array('Department')));
+                        $departmentID = ClassRegistry::init('Specialization')->find(
+                            'first',
+                            array(
+                                'conditions' => array('Specialization.department_id' => $pv['PlacementRoundParticipant']['foreign_key']),
+                                'contain' => array('Department')
+                            )
+                        );
 
                         //update specialization
                         ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                        ClassRegistry::init('AcceptedStudent')->saveField('specialization_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'specialization_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
 
                         if (isset($departmentID['Department']['id']) && !empty($departmentID['Department']['id'])) {
-                            ClassRegistry::init('AcceptedStudent')->saveField('department_id',  $departmentID['Department']['id']);
-                            ClassRegistry::init('AcceptedStudent')->saveField('college_id',  $departmentID['Department']['college_id']);
+                            ClassRegistry::init('AcceptedStudent')->saveField(
+                                'department_id',
+                                $departmentID['Department']['id']
+                            );
+                            ClassRegistry::init('AcceptedStudent')->saveField(
+                                'college_id',
+                                $departmentID['Department']['college_id']
+                            );
                         }
 
                         //update specialization
                         ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                        ClassRegistry::init('Student')->saveField('specialization_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                        ClassRegistry::init('Student')->saveField(
+                            'specialization_id',
+                            $pv['PlacementRoundParticipant']['foreign_key']
+                        );
 
                         if (isset($departmentID['Department']['id']) && !empty($departmentID['Department']['id'])) {
-                            ClassRegistry::init('Student')->saveField('department_id',  $departmentID['Department']['id']);
-                            ClassRegistry::init('Student')->saveField('college_id',  $departmentID['Department']['college_id']);
+                            ClassRegistry::init('Student')->saveField(
+                                'department_id',
+                                $departmentID['Department']['id']
+                            );
+                            ClassRegistry::init('Student')->saveField(
+                                'college_id',
+                                $departmentID['Department']['college_id']
+                            );
                         }
                     }
 
@@ -1680,7 +1923,10 @@ class PlacementPreferencesTable extends Table
                                 'conditions' => array(
                                     'StudentsSection.student_id' => $pv['Student']['id'],
                                     // 'StudentsSection.archive' => 0,
-                                    'StudentsSection.section_id in (select id from sections where academicyear="' . $pv['PlacementRoundParticipant']['academic_year'] . '" and program_id="' . $pv['PlacementRoundParticipant']['program_id'] . '" and program_type_id="' . $pv['PlacementRoundParticipant']['program_type_id'] . '" and college_id in (' . implode(',', $collegeIds) . '))'
+                                    'StudentsSection.section_id in (select id from sections where academicyear="' . $pv['PlacementRoundParticipant']['academic_year'] . '" and program_id="' . $pv['PlacementRoundParticipant']['program_id'] . '" and program_type_id="' . $pv['PlacementRoundParticipant']['program_type_id'] . '" and college_id in (' . implode(
+                                        ',',
+                                        $collegeIds
+                                    ) . '))'
                                 ),
                                 'fields' => array('StudentsSection.section_id', 'StudentsSection.section_id')
                             ));
@@ -1692,7 +1938,8 @@ class PlacementPreferencesTable extends Table
                                 'StudentsSection.student_id' => $pv['Student']['id'],
                                 'StudentsSection.archive' => 0,
                                 'StudentsSection.section_id in (select id from sections where academicyear="' . $pv['PlacementRoundParticipant']['academic_year'] . '" and program_id="' . $pv['PlacementRoundParticipant']['program_id'] . '" and program_type_id="' . $pv['PlacementRoundParticipant']['program_type_id'] . '")'
-                            ), 'fields' => array(
+                            ),
+                            'fields' => array(
                                 'StudentsSection.section_id',
                                 'StudentsSection.section_id'
                             )
@@ -1703,17 +1950,19 @@ class PlacementPreferencesTable extends Table
 
                     //debug($pv['Student']['id']);
                     if (isset($sectionAttended) && !empty($sectionAttended)) {
-
                         if ($pv['PlacementRoundParticipant']['type'] == "College") {
                             if ($clgexp[1] == 2) {
                                 $intoconsideration[] = 1;
                                 $intoconsideration[] = 11;
-                            } else if ($clgexp[1] == 6) {
+                            } elseif ($clgexp[1] == 6) {
                                 $intoconsideration[] = 6;
                                 $intoconsideration[] = 5;
                             }
 
-                            $sectionsDetails = ClassRegistry::init('Section')->find('all', array('conditions' => array('Section.id' => $sectionAttended), 'recursive' => -1));
+                            $sectionsDetails = ClassRegistry::init('Section')->find(
+                                'all',
+                                array('conditions' => array('Section.id' => $sectionAttended), 'recursive' => -1)
+                            );
 
                             if (!empty($sectionsDetails)) {
                                 foreach ($sectionsDetails as $sedk => $secv) {
@@ -1721,7 +1970,10 @@ class PlacementPreferencesTable extends Table
                                     $sectionArchived[$secv['Section']['id']] = $secv['Section']['id'];
                                     debug($secv);
 
-                                    if ($pv['PlacementRoundParticipant']['foreign_key'] == $secv['Section']['college_id'] || in_array($secv['Section']['college_id'], $intoconsideration)) {
+                                    if ($pv['PlacementRoundParticipant']['foreign_key'] == $secv['Section']['college_id'] || in_array(
+                                            $secv['Section']['college_id'],
+                                            $intoconsideration
+                                        )) {
                                         $notarchived = ClassRegistry::init('StudentsSection')->updateAll(
                                             array(
                                                 'StudentsSection.archive' => 0,
@@ -1764,7 +2016,6 @@ class PlacementPreferencesTable extends Table
             // archive remaining only for those who are placed to college
 
             if (isset($sectionAttendedInStudent) && !empty($sectionAttendedInStudent) && isset($sectionArchived) && !empty($sectionArchived) && $collegePlacement) {
-
                 $archived = ClassRegistry::init('StudentsSection')->updateAll(
                     array(
                         'StudentsSection.archive' => 1,
@@ -1789,18 +2040,20 @@ class PlacementPreferencesTable extends Table
                 ));
 
                 if (isset($studentsNotAssignedToEngineeringScience) && !empty($studentsNotAssignedToEngineeringScience)) {
-                    $acceptedStudentNotAssignedToEngineeringScience = ClassRegistry::init('Student')->find('list', array(
-                        'conditions' => array('Student.id ' => $studentsNotAssignedToEngineeringScience),
-                        'fields' => array('Student.accepted_student_id','Student.accepted_student_id')
-                    ));
+                    $acceptedStudentNotAssignedToEngineeringScience = ClassRegistry::init('Student')->find(
+                        'list',
+                        array(
+                            'conditions' => array('Student.id ' => $studentsNotAssignedToEngineeringScience),
+                            'fields' => array('Student.accepted_student_id', 'Student.accepted_student_id')
+                        )
+                    );
                 }
 
                 if (isset($acceptedStudentNotAssignedToEngineeringScience) && !empty($acceptedStudentNotAssignedToEngineeringScience) && isset($studentsNotAssignedToEngineeringScience) && !empty($studentsNotAssignedToEngineeringScience) && isset($clgexp[1]) && !empty($clgexp[1])) {
-
                     $update = ClassRegistry::init('Student')->updateAll(
                         array(
-                            'Student.college_id' =>  $clgexp[1],
-                            'Student.original_college_id' =>  $clgexp[1]
+                            'Student.college_id' => $clgexp[1],
+                            'Student.original_college_id' => $clgexp[1]
                         ),
                         array(
                             'Student.id' => $studentsNotAssignedToEngineeringScience
@@ -1809,8 +2062,8 @@ class PlacementPreferencesTable extends Table
 
                     $update = ClassRegistry::init('AcceptedStudent')->updateAll(
                         array(
-                            'AcceptedStudent.college_id' =>  $clgexp[1],
-                            'AcceptedStudent.original_college_id' =>  $clgexp[1]
+                            'AcceptedStudent.college_id' => $clgexp[1],
+                            'AcceptedStudent.original_college_id' => $clgexp[1]
                         ),
                         array(
                             'AcceptedStudent.id' => $acceptedStudentNotAssignedToEngineeringScience
@@ -1822,7 +2075,7 @@ class PlacementPreferencesTable extends Table
                         $collegeConsideration[] = $clgexp[1];
                         $collegeConsideration[] = 4;
                         $collegeConsideration[] = 3;
-                    } else if ($clgexp[1] == 6) {
+                    } elseif ($clgexp[1] == 6) {
                         $collegeConsideration[] = $clgexp[1];
                         $collegeConsideration[] = 9;
                     } else {
@@ -1841,7 +2094,6 @@ class PlacementPreferencesTable extends Table
                     ));
 
                     if (isset($targetCollegeSectionIds) && !empty($targetCollegeSectionIds)) {
-
                         $unarchive = ClassRegistry::init('StudentsSection')->updateAll(
                             array(
                                 'StudentsSection.archive' => 0,
@@ -1895,8 +2147,10 @@ class PlacementPreferencesTable extends Table
 
                 if (!empty($studentsNotAssignedToEngineeringScience)) {
                     foreach ($studentsNotAssignedToEngineeringScience as $sk => $sv) {
-
-                        $studentdetail = ClassRegistry::init('Student')->find('first', array('conditions' => array('Student.id' => $sv), 'recursive' => -1));
+                        $studentdetail = ClassRegistry::init('Student')->find(
+                            'first',
+                            array('conditions' => array('Student.id' => $sv), 'recursive' => -1)
+                        );
 
                         $studentsection = ClassRegistry::init('StudentsSection')->find('first', array(
                             'conditions' => array(
@@ -1907,11 +2161,19 @@ class PlacementPreferencesTable extends Table
                         ));
 
                         if (isset($studentdetail) && !empty($studentdetail) && isset($studentsection['Section']['college_id']) && !empty($studentsection['Section']['college_id'])) {
-                            ClassRegistry::init('AcceptedStudent')->id = $studentdetail['Student']['accepted_student_id'];
-                            ClassRegistry::init('AcceptedStudent')->saveField('college_id', $studentsection['Section']['college_id']);
+                            ClassRegistry::init(
+                                'AcceptedStudent'
+                            )->id = $studentdetail['Student']['accepted_student_id'];
+                            ClassRegistry::init('AcceptedStudent')->saveField(
+                                'college_id',
+                                $studentsection['Section']['college_id']
+                            );
                             //update the current college
                             ClassRegistry::init('Student')->id = $studentdetail['Student']['id'];
-                            ClassRegistry::init('Student')->saveField('college_id', $studentsection['Section']['college_id']);
+                            ClassRegistry::init('Student')->saveField(
+                                'college_id',
+                                $studentsection['Section']['college_id']
+                            );
                         }
                     }
                 }
@@ -1926,6 +2188,7 @@ class PlacementPreferencesTable extends Table
 
     public function direct_placement($data = array(), $type = "")
     {
+
         if (isset($data) && !empty($data)) {
             ClassRegistry::init('PlacementParticipatingStudent')->unbindModel(
                 array(
@@ -1994,20 +2257,33 @@ class PlacementPreferencesTable extends Table
                     //engineering
 
                     ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                    ClassRegistry::init('AcceptedStudent')->saveField('college_id', $pv['PlacementRoundParticipant']['foreign_key']);
-                    ClassRegistry::init('AcceptedStudent')->saveField('original_college_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('AcceptedStudent')->saveField(
+                        'college_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
+                    ClassRegistry::init('AcceptedStudent')->saveField(
+                        'original_college_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
                     ClassRegistry::init('AcceptedStudent')->saveField('department_id', null);
 
                     //update the current college
                     ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                    ClassRegistry::init('Student')->saveField('college_id', $pv['PlacementRoundParticipant']['foreign_key']);
-                    ClassRegistry::init('Student')->saveField('original_college_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('Student')->saveField(
+                        'college_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
+                    ClassRegistry::init('Student')->saveField(
+                        'original_college_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
                     ClassRegistry::init('Student')->saveField('department_id', null);
 
 
                     $sectionAttended = ClassRegistry::init('StudentsSection')->find('list', array(
                         'conditions' => array(
-                            'StudentsSection.student_id' => $pv['Student']['id'], 'StudentsSection.archive' => 1,
+                            'StudentsSection.student_id' => $pv['Student']['id'],
+                            'StudentsSection.archive' => 1,
                             'StudentsSection.section_id in (select id from sections where academicyear="' . $pv['PlacementRoundParticipant']['academic_year'] . '" and program_id="' . $pv['PlacementRoundParticipant']['program_id'] . '" and program_type_id="' . $pv['PlacementRoundParticipant']['program_type_id'] . '")'
                         )
                     ));
@@ -2015,7 +2291,7 @@ class PlacementPreferencesTable extends Table
                     if (isset($sectionAttended) && !empty($sectionAttended)) {
                         $archived = ClassRegistry::init('StudentsSection')->updateAll(
                             array(
-                                'StudentsSection.archive'=> 1,
+                                'StudentsSection.archive' => 1,
                             ),
                             array(
                                 'StudentsSection.student_id' => $pv['Student']['id'],
@@ -2023,45 +2299,77 @@ class PlacementPreferencesTable extends Table
                             )
                         );
                     }
-                } else if ($pv['PlacementRoundParticipant']['type'] == "Department") {
-                    $collegeID = ClassRegistry::init('Department')->find('first', array('conditions' => array('Department.college_id' => $pv['PlacementRoundParticipant']['foreign_key'])));
+                } elseif ($pv['PlacementRoundParticipant']['type'] == "Department") {
+                    $collegeID = ClassRegistry::init('Department')->find(
+                        'first',
+                        array('conditions' => array('Department.college_id' => $pv['PlacementRoundParticipant']['foreign_key']))
+                    );
                     //update department
                     ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                    ClassRegistry::init('AcceptedStudent')->saveField('department_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('AcceptedStudent')->saveField(
+                        'department_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
 
                     if (isset($collegeID['College']['id']) && !empty($collegeID['College']['id'])) {
                         ClassRegistry::init('AcceptedStudent')->saveField('college_id', $collegeID['College']['id']);
-                        ClassRegistry::init('AcceptedStudent')->saveField('original_college_id', $collegeID['College']['id']);
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'original_college_id',
+                            $collegeID['College']['id']
+                        );
                     }
 
                     //update department
                     ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                    ClassRegistry::init('Student')->saveField('department_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('Student')->saveField(
+                        'department_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
 
                     if (isset($collegeID['College']['id']) && !empty($collegeID['College']['id'])) {
-                        ClassRegistry::init('Student')->saveField('college_id',  $collegeID['College']['id']);
-                        ClassRegistry::init('Student')->saveField('original_college_id',  $collegeID['College']['id']);
+                        ClassRegistry::init('Student')->saveField('college_id', $collegeID['College']['id']);
+                        ClassRegistry::init('Student')->saveField('original_college_id', $collegeID['College']['id']);
                     }
-
-                } else if ($pv['PlacementRoundParticipant']['type'] == "Specialization") {
-                    $departmentID = ClassRegistry::init('Specialization')->find('first', array('conditions' => array('Specialization.department_id' => $pv['PlacementRoundParticipant']['foreign_key']), 'contain' => array('Department')));
+                } elseif ($pv['PlacementRoundParticipant']['type'] == "Specialization") {
+                    $departmentID = ClassRegistry::init('Specialization')->find(
+                        'first',
+                        array(
+                            'conditions' => array('Specialization.department_id' => $pv['PlacementRoundParticipant']['foreign_key']),
+                            'contain' => array('Department')
+                        )
+                    );
 
                     //update specialization
                     ClassRegistry::init('AcceptedStudent')->id = $pv['AcceptedStudent']['id'];
-                    ClassRegistry::init('AcceptedStudent')->saveField('specialization_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('AcceptedStudent')->saveField(
+                        'specialization_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
 
                     if (isset($departmentID['Department']['id']) && !empty($departmentID['Department']['id'])) {
-                        ClassRegistry::init('AcceptedStudent')->saveField('department_id',  $departmentID['Department']['id']);
-                        ClassRegistry::init('AcceptedStudent')->saveField('college_id',  $departmentID['Department']['college_id']);
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'department_id',
+                            $departmentID['Department']['id']
+                        );
+                        ClassRegistry::init('AcceptedStudent')->saveField(
+                            'college_id',
+                            $departmentID['Department']['college_id']
+                        );
                     }
 
                     //update specialization
                     ClassRegistry::init('Student')->id = $pv['Student']['id'];
-                    ClassRegistry::init('Student')->saveField('specialization_id', $pv['PlacementRoundParticipant']['foreign_key']);
+                    ClassRegistry::init('Student')->saveField(
+                        'specialization_id',
+                        $pv['PlacementRoundParticipant']['foreign_key']
+                    );
 
                     if (isset($departmentID['Department']['id']) && !empty($departmentID['Department']['id'])) {
-                        ClassRegistry::init('Student')->saveField('department_id',  $departmentID['Department']['id']);
-                        ClassRegistry::init('Student')->saveField('college_id',  $departmentID['Department']['college_id']);
+                        ClassRegistry::init('Student')->saveField('department_id', $departmentID['Department']['id']);
+                        ClassRegistry::init('Student')->saveField(
+                            'college_id',
+                            $departmentID['Department']['college_id']
+                        );
                     }
                 }
             }
@@ -2072,14 +2380,15 @@ class PlacementPreferencesTable extends Table
 
     public function getAppliedUnitsId($appliedFor)
     {
+
         $targetUnit = explode('~', $appliedFor);
         $restoringUnits = array();
 
         if ($targetUnit[0] == "c") {
             $restoringUnits['college_id'] = $targetUnit[1];
-        } else if ($targetUnit[0] == "d") {
+        } elseif ($targetUnit[0] == "d") {
             $restoringUnits['department_id'] = $targetUnit[1];
-        } else if ($targetUnit[0] == "s") {
+        } elseif ($targetUnit[0] == "s") {
             $restoringUnits['specialization_id'] = $targetUnit[1];
         }
 
@@ -2087,9 +2396,14 @@ class PlacementPreferencesTable extends Table
     }
 
 
+    function privilagedStudentsFilterOut(
+        $data,
+        $department_id,
+        $adjusted_privilaged_quota,
+        $placedStudents,
+        $privilage_type
+    ) {
 
-    function privilagedStudentsFilterOut($data, $department_id, $adjusted_privilaged_quota, $placedStudents, $privilage_type)
-    {
         $competitivly_assigned_students = (empty($placedStudents['C']) ? array() : $placedStudents['C']);
         $quota_assigned_students = (empty($placedStudents['Q']) ? array() : $placedStudents['Q']);
 
@@ -2134,38 +2448,46 @@ class PlacementPreferencesTable extends Table
         if (count($number_of_participating_department) && $adjusted_privilaged_quota[$privilage_type] > 0) {
             // the logic is unkown ?
             for ($i = 1; $i <= $number_of_participating_department; $i++) {
-                $list_students_in_x_preference = ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
-                    'joins' => array(array(
-                        'table' => 'placement_preferences',
-                        'alias' => 'PlacementPreference',
-                        'type' => 'LEFT',
-                        'conditions' => array('PlacementPreference.accepted_student_id = PlacementParticipatingStudent.accepted_student_id')
-                    )),
-                    'fields' => array(
-                        'PlacementPreference.preference_order',
-                        'PlacementParticipatingStudent.id',
-                        'PlacementPreference.accepted_student_id',
-                        'PlacementParticipatingStudent.total_placement_weight',
-                    ),
-                    'contain' => array('AcceptedStudent'),
-                    'conditions' => array(
-                        "OR" => array(
-                            'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
-                            'PlacementParticipatingStudent.placement_round_participant_id = ""',
-                            'PlacementParticipatingStudent.placement_round_participant_id = 0'
+                $list_students_in_x_preference = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                    'all',
+                    array(
+                        'joins' => array(
+                            array(
+                                'table' => 'placement_preferences',
+                                'alias' => 'PlacementPreference',
+                                'type' => 'LEFT',
+                                'conditions' => array('PlacementPreference.accepted_student_id = PlacementParticipatingStudent.accepted_student_id')
+                            )
                         ),
-                        "PlacementPreference.academic_year LIKE " => $data['PlacementSetting']['academic_year'] . '%',
-                        "PlacementPreference.round" => $data['PlacementSetting']['round'],
-                        "PlacementPreference.placement_round_participant_id" => $department_id,
-                        'PlacementPreference.preference_order' => $i,
-                        $privilagedcondition,
-                    ),
-                    'order' => array('PlacementPreference.preference_order' => 'ASC', 'PlacementParticipatingStudent.total_placement_weight' => 'DESC'),
-                    'group' => array(
-                        'PlacementPreference.preference_order',
-                        'PlacementPreference.accepted_student_id',
-                    ),
-                ));
+                        'fields' => array(
+                            'PlacementPreference.preference_order',
+                            'PlacementParticipatingStudent.id',
+                            'PlacementPreference.accepted_student_id',
+                            'PlacementParticipatingStudent.total_placement_weight',
+                        ),
+                        'contain' => array('AcceptedStudent'),
+                        'conditions' => array(
+                            "OR" => array(
+                                'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
+                                'PlacementParticipatingStudent.placement_round_participant_id = ""',
+                                'PlacementParticipatingStudent.placement_round_participant_id = 0'
+                            ),
+                            "PlacementPreference.academic_year LIKE " => $data['PlacementSetting']['academic_year'] . '%',
+                            "PlacementPreference.round" => $data['PlacementSetting']['round'],
+                            "PlacementPreference.placement_round_participant_id" => $department_id,
+                            'PlacementPreference.preference_order' => $i,
+                            $privilagedcondition,
+                        ),
+                        'order' => array(
+                            'PlacementPreference.preference_order' => 'ASC',
+                            'PlacementParticipatingStudent.total_placement_weight' => 'DESC'
+                        ),
+                        'group' => array(
+                            'PlacementPreference.preference_order',
+                            'PlacementPreference.accepted_student_id',
+                        ),
+                    )
+                );
 
                 // simply count privilaged students in preference 1
 
@@ -2173,7 +2495,13 @@ class PlacementPreferencesTable extends Table
                     //if the students is not in competitive list, please consider me in the quota.
                     if (!empty($list_students_in_x_preference)) {
                         foreach ($list_students_in_x_preference as $student) {
-                            if (in_array($student['PlacementPreference']['accepted_student_id'], $competitivly_assigned_students) === false && in_array($student['PlacementPreference']['accepted_student_id'], $quota_assigned_students) === false) {
+                            if (in_array(
+                                    $student['PlacementPreference']['accepted_student_id'],
+                                    $competitivly_assigned_students
+                                ) === false && in_array(
+                                    $student['PlacementPreference']['accepted_student_id'],
+                                    $quota_assigned_students
+                                ) === false) {
                                 $list_of_students_selected[] = $student['PlacementPreference']['accepted_student_id'];
                                 //echo "Giba = ".$student['PlacementPreference']['accepted_student_id'];
                             }
@@ -2208,7 +2536,7 @@ class PlacementPreferencesTable extends Table
                 ));
 
                 if (!empty($list_of_departments_id)) {
-                    foreach ($list_of_departments_id  as $key => $value) {
+                    foreach ($list_of_departments_id as $key => $value) {
                         $reformat_list_of_department_ids[] = $value['PlacementParticipatingStudent']['placement_round_participant_id'];
                     }
                 }
@@ -2234,8 +2562,13 @@ class PlacementPreferencesTable extends Table
 
                             // is her/his previous preference selected department was processed ? Exclude from selecting, wait till her preference runs.
 
-                            if (!empty($reformat_list_of_department_ids) && isset($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && is_numeric($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'] > 0) {
-                                if (in_array($department_id_accepted_student['PlacementPreference']['placement_round_participant_id'], $reformat_list_of_department_ids) === false) {
+                            if (!empty($reformat_list_of_department_ids) && isset($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && is_numeric(
+                                    $department_id_accepted_student['PlacementPreference']['placement_round_participant_id']
+                                ) && $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'] > 0) {
+                                if (in_array(
+                                        $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'],
+                                        $reformat_list_of_department_ids
+                                    ) === false) {
                                     $exclude_student = true;
                                     break;
                                 }
@@ -2251,7 +2584,10 @@ class PlacementPreferencesTable extends Table
 
                     if (!empty($preliminary_students_filter)) {
                         foreach ($preliminary_students_filter as $student_id) {
-                            if (in_array($student_id, $competitivly_assigned_students) === false && in_array($student_id, $quota_assigned_students) === false) {
+                            if (in_array($student_id, $competitivly_assigned_students) === false && in_array(
+                                    $student_id,
+                                    $quota_assigned_students
+                                ) === false) {
                                 $list_of_students_selected[] = $student_id;
                             }
                         }
@@ -2271,13 +2607,13 @@ class PlacementPreferencesTable extends Table
     }
 
 
-
     function getListOfUnitNeedByPrivilageStudentMost($data = array())
     {
 
         $prefrenceMatrixOfDepartments = $this->find('all', array(
             'fields' => array(
-                'PlacementPreference.placement_round_participant_id', 'PlacementPreference.preference_order',
+                'PlacementPreference.placement_round_participant_id',
+                'PlacementPreference.preference_order',
                 'count(PlacementPreference.accepted_student_id) as student_count'
             ),
             'limit' => 100000,
@@ -2289,8 +2625,14 @@ class PlacementPreferencesTable extends Table
                 "PlacementRoundParticipant.applied_for" => $data['PlacementSetting']['applied_for']
             ),
 
-            'group' => array('PlacementPreference.placement_round_participant_id', 'PlacementPreference.preference_order'),
-            'order' => array('PlacementPreference.placement_round_participant_id', 'PlacementPreference.preference_order asc'),
+            'group' => array(
+                'PlacementPreference.placement_round_participant_id',
+                'PlacementPreference.preference_order'
+            ),
+            'order' => array(
+                'PlacementPreference.placement_round_participant_id',
+                'PlacementPreference.preference_order asc'
+            ),
             'contain' => array('PlacementRoundParticipant')
         ));
 
@@ -2327,16 +2669,13 @@ class PlacementPreferencesTable extends Table
 
         $unitssprivilagedorder = array();
         if (!empty($prefrenceMatrix)) {
-
             foreach ($prefrenceMatrix as $key => $value) {
                 $sum = 0;
                 $total_student = array_sum($value);
                 //multipied each number of students by weight
                 foreach ($value as $preference_key => $number_students) {
                     foreach ($weight as $weight_preference_key => $weight_preference_point) {
-
                         if ($preference_key == $weight_preference_key) {
-
                             $sum = $sum + ($weight_preference_point * $number_students);
                         }
                     }
@@ -2362,6 +2701,7 @@ class PlacementPreferencesTable extends Table
 
     function getListOfUnitsNotFullyAssignedQuota($data = array())
     {
+
         //unit capacity
         $department_capacity = ClassRegistry::init('PlacementRoundParticipant')->find("all", array(
             "conditions" => array(
@@ -2409,8 +2749,9 @@ class PlacementPreferencesTable extends Table
 
     function sortOutForRandomAssignmentForNonAssigned($data, $department_id = null, $lastRound = false)
     {
+
         // students who completed their preference on time
-        $partcipantsOrderByResult =  ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
+        $partcipantsOrderByResult = ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
             'conditions' => array(
                 "OR" => array(
                     'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
@@ -2450,18 +2791,20 @@ class PlacementPreferencesTable extends Table
                 if (isset($x['PlacementPreference']) && !empty($x['PlacementPreference'])) {
                     $pk['PlacementPreference'] = $x['PlacementPreference'];
                     $partcipantsOrderByResultNew[] = $pk;
-                } else if (empty($x['PlacementPreference'])) {
+                } elseif (empty($x['PlacementPreference'])) {
                     $withoutPreference[] = $pk;
                 }
             }
         }
 
-        $sortOutStudentsResultCategory =  $partcipantsOrderByResultNew;
+        $sortOutStudentsResultCategory = $partcipantsOrderByResultNew;
         $failed = 0;
 
         if (!empty($sortOutStudentsResultCategory)) {
             foreach ($sortOutStudentsResultCategory as $k => &$v) {
-                if (!empty($v['PlacementPreference']['preference_order']) && is_numeric($v['PlacementPreference']['preference_order']) && $v['PlacementPreference']['preference_order'] > 1) {
+                if (!empty($v['PlacementPreference']['preference_order']) && is_numeric(
+                        $v['PlacementPreference']['preference_order']
+                    ) && $v['PlacementPreference']['preference_order'] > 1) {
                     $previous_preferences = $this->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.accepted_student_id' => $v['PlacementPreference']['accepted_student_id'],
@@ -2476,17 +2819,20 @@ class PlacementPreferencesTable extends Table
 
                     if (!empty($previous_preferences)) {
                         foreach ($previous_preferences as $pp_v) {
-                            $placed_students_count = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
-                                'conditions' => array(
-                                    'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                                    'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                                    'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                                    'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                                    'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-                                    'PlacementParticipatingStudent.placement_round_participant_id' => $pp_v['PlacementPreference']['placement_round_participant_id'],
-                                ),
-                                'recursive' => -1
-                            ));
+                            $placed_students_count = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                                'count',
+                                array(
+                                    'conditions' => array(
+                                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                                        'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                                        'PlacementParticipatingStudent.placement_round_participant_id' => $pp_v['PlacementPreference']['placement_round_participant_id'],
+                                    ),
+                                    'recursive' => -1
+                                )
+                            );
 
                             if ($placed_students_count == 0) {
                                 $placement_pp_dept_done = 0;
@@ -2498,10 +2844,10 @@ class PlacementPreferencesTable extends Table
                     if ($placement_pp_dept_done == 1) {
                         //Sort the student to keep more competitive
                         $students_to_be_sorted[] = $v;
-                    } else  if ($placement_pp_dept_done == 0) {
+                    } elseif ($placement_pp_dept_done == 0) {
                         $students_to_be_removed[] = $v['PlacementPreference']['accepted_student_id'];
                     }
-                } else if (empty($v['PlacementPreference'])) {
+                } elseif (empty($v['PlacementPreference'])) {
                     $failed++;
                 } else { //dont want first choice to be consider since the last random assignment
                     unset($sortOutStudentsResultCategory[$k]);
@@ -2512,16 +2858,16 @@ class PlacementPreferencesTable extends Table
         debug($failed);
 
         /* $notAssignedDifference = ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
-			'conditions' => array(
-				"NOT" => array("PlacementParticipatingStudent.accepted_student_id" => $students_to_be_removed),
-				"PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
-				"PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
-				"PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
-				"PlacementParticipatingStudent.placement_round_participant_id is null"
-			),
-			//'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
-			'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
-		)); */
+            'conditions' => array(
+                "NOT" => array("PlacementParticipatingStudent.accepted_student_id" => $students_to_be_removed),
+                "PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
+                "PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
+                "PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
+                "PlacementParticipatingStudent.placement_round_participant_id is null"
+            ),
+            //'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
+            'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
+        )); */
 
         if (isset($students_to_be_removed) && !empty($students_to_be_removed)) {
             $notAssignedDifference = ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
@@ -2533,7 +2879,10 @@ class PlacementPreferencesTable extends Table
                     "PlacementParticipatingStudent.placement_round_participant_id is null"
                 ),
                 //'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
-                'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
+                'fields' => array(
+                    'PlacementParticipatingStudent.accepted_student_id',
+                    'PlacementParticipatingStudent.accepted_student_id'
+                ),
             ));
         } else {
             $notAssignedDifference = ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
@@ -2544,11 +2893,14 @@ class PlacementPreferencesTable extends Table
                     "PlacementParticipatingStudent.placement_round_participant_id is null"
                 ),
                 //'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
-                'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
+                'fields' => array(
+                    'PlacementParticipatingStudent.accepted_student_id',
+                    'PlacementParticipatingStudent.accepted_student_id'
+                ),
             ));
         }
 
-        $partcipantsOrderByResultt =  ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
+        $partcipantsOrderByResultt = ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
             'conditions' => array(
                 "OR" => array(
                     'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
@@ -2582,7 +2934,10 @@ class PlacementPreferencesTable extends Table
 
             if (!empty($sortOutStudentsResultCategory)) {
                 foreach ($sortOutStudentsResultCategory as $for_sort_k => $for_sort_v) {
-                    if (!in_array($for_sort_v['PlacementParticipatingStudent']['accepted_student_id'], $students_to_be_removed)) {
+                    if (!in_array(
+                        $for_sort_v['PlacementParticipatingStudent']['accepted_student_id'],
+                        $students_to_be_removed
+                    )) {
                         $tmp[] = $for_sort_v;
                     }
                 }
@@ -2599,8 +2954,9 @@ class PlacementPreferencesTable extends Table
 
     function sortOutStudentByPreference($data, $department_id = null)
     {
+
         // students who completed their preference on time
-        $partcipantsOrderByResult =  ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
+        $partcipantsOrderByResult = ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
             'conditions' => array(
                 "OR" => array(
                     'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
@@ -2625,17 +2981,17 @@ class PlacementPreferencesTable extends Table
         $partcipantsOrderByResultNewFirstPreferenceNotRun = array();
 
         /* $thoseDepartmentAlreadyPlaced = ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
-			'conditions' => array(
-				'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-				'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-				'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-				'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-				'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-				'PlacementParticipatingStudent.placement_round_participant_id is not null',
-				'PlacementParticipatingStudent.status' => 1
-			),
-			'fields' => array('PlacementParticipatingStudent.placement_round_participant_id', 'PlacementParticipatingStudent.placement_round_participant_id')
-		)); */
+            'conditions' => array(
+                'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                'PlacementParticipatingStudent.placement_round_participant_id is not null',
+                'PlacementParticipatingStudent.status' => 1
+            ),
+            'fields' => array('PlacementParticipatingStudent.placement_round_participant_id', 'PlacementParticipatingStudent.placement_round_participant_id')
+        )); */
 
         $students_to_be_sorted = array();
 
@@ -2657,7 +3013,9 @@ class PlacementPreferencesTable extends Table
                     $partcipantsOrderByResultNew[] = $pk;
                 }
 
-                if (!empty($pk['PlacementPreference']['preference_order']) && is_numeric($pk['PlacementPreference']['preference_order']) && $pk['PlacementPreference']['preference_order'] > 1) {
+                if (!empty($pk['PlacementPreference']['preference_order']) && is_numeric(
+                        $pk['PlacementPreference']['preference_order']
+                    ) && $pk['PlacementPreference']['preference_order'] > 1) {
                     $previous_preferences = $this->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.accepted_student_id' => $pk['PlacementPreference']['accepted_student_id'],
@@ -2674,29 +3032,32 @@ class PlacementPreferencesTable extends Table
 
                     if (!empty($previous_preferences)) {
                         foreach ($previous_preferences as $pp_v) {
-                            $placed_students_count = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
-                                'conditions' => array(
-                                    'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                                    'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                                    'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                                    'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                                    'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-                                    'PlacementParticipatingStudent.placement_round_participant_id' => $pp_v['PlacementPreference']['placement_round_participant_id'],
-                                ),
-                                'recursive' => -1
-                            ));
+                            $placed_students_count = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                                'count',
+                                array(
+                                    'conditions' => array(
+                                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                                        'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                                        'PlacementParticipatingStudent.placement_round_participant_id' => $pp_v['PlacementPreference']['placement_round_participant_id'],
+                                    ),
+                                    'recursive' => -1
+                                )
+                            );
 
-                            if ($placed_students_count == 0 ) {
+                            if ($placed_students_count == 0) {
                                 $placement_pp_dept_done = 0;
                                 break;
                             }
                         }
                     }
 
-                    if ($placement_pp_dept_done == 1 ) {
+                    if ($placement_pp_dept_done == 1) {
                         //Sort the student to keep more competitive
                         //$students_to_be_sorted[] = $pk;
-                    } else  if ($placement_pp_dept_done == 0) {
+                    } elseif ($placement_pp_dept_done == 0) {
                         $students_to_be_removed[] = $pk['PlacementPreference']['accepted_student_id'];
                     }
                 }
@@ -2706,38 +3067,38 @@ class PlacementPreferencesTable extends Table
         //$sortOutStudentsResultCategory =  $partcipantsOrderByResultNew;
 
         /* $notAssignedDifference = ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
-			'conditions' => array(
-				"NOT" => array("PlacementParticipatingStudent.accepted_student_id" => $students_to_be_removed),
-				"PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
-				"PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
-				"PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
-				"PlacementParticipatingStudent.placement_round_participant_id is null"
-			),
-			//'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
-			'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
-		));
+            'conditions' => array(
+                "NOT" => array("PlacementParticipatingStudent.accepted_student_id" => $students_to_be_removed),
+                "PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
+                "PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
+                "PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
+                "PlacementParticipatingStudent.placement_round_participant_id is null"
+            ),
+            //'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.placement_round_participant_id'),
+            'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.accepted_student_id'),
+        ));
 
-		$partcipantsOrderByResultt =  ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
-			'conditions' => array(
-				"OR" => array(
-					'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
-					'PlacementParticipatingStudent.placement_round_participant_id = ""',
-					'PlacementParticipatingStudent.placement_round_participant_id = 0',
-				),
-				"PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
-				"PlacementParticipatingStudent.accepted_student_id" => $notAssignedDifference,
-				"PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
-				"PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
-			),
-			'fields' => array(
-				'PlacementParticipatingStudent.id',
-				'PlacementParticipatingStudent.total_placement_weight',
-				'PlacementParticipatingStudent.accepted_student_id'
-			),
-			'recursive' => -1,
-			'order' => array('PlacementParticipatingStudent.total_placement_weight' => 'DESC'),
-			'limit' => 100000
-		)); */
+        $partcipantsOrderByResultt =  ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
+            'conditions' => array(
+                "OR" => array(
+                    'PlacementParticipatingStudent.placement_round_participant_id IS NULL',
+                    'PlacementParticipatingStudent.placement_round_participant_id = ""',
+                    'PlacementParticipatingStudent.placement_round_participant_id = 0',
+                ),
+                "PlacementParticipatingStudent.academic_year" => $data['PlacementSetting']['academic_year'],
+                "PlacementParticipatingStudent.accepted_student_id" => $notAssignedDifference,
+                "PlacementParticipatingStudent.round" => $data['PlacementSetting']['round'],
+                "PlacementParticipatingStudent.applied_for" => $data['PlacementSetting']['applied_for'],
+            ),
+            'fields' => array(
+                'PlacementParticipatingStudent.id',
+                'PlacementParticipatingStudent.total_placement_weight',
+                'PlacementParticipatingStudent.accepted_student_id'
+            ),
+            'recursive' => -1,
+            'order' => array('PlacementParticipatingStudent.total_placement_weight' => 'DESC'),
+            'limit' => 100000
+        )); */
 
 
         if (!empty($partcipantsOrderByResult)) {
@@ -2760,7 +3121,7 @@ class PlacementPreferencesTable extends Table
             }
         }
 
-        $sortOutStudentsResultCategory =  $partcipantsOrderByResultNew;
+        $sortOutStudentsResultCategory = $partcipantsOrderByResultNew;
         $resorted = array();
 
         if (isset($students_to_be_removed) && !empty($students_to_be_removed)) {
@@ -2783,16 +3144,25 @@ class PlacementPreferencesTable extends Table
             if (!empty($sortOutStudentsResultCategory)) {
                 foreach ($sortOutStudentsResultCategory as $for_sort_k => $for_sort_v) {
                     if ($quoteDefined) {
-                        if (!in_array($for_sort_v['PlacementParticipatingStudent']['accepted_student_id'], $students_to_be_removed)) {
+                        if (!in_array(
+                            $for_sort_v['PlacementParticipatingStudent']['accepted_student_id'],
+                            $students_to_be_removed
+                        )) {
                             $resorted[] = $for_sort_v;
                         }
                     } else {
-                        $propabilityCheck = $this->getPropabilityOfPreviousPreference($data, $department_id, $for_sort_v['PlacementPreference']['accepted_student_id']);
-                        if (!in_array($for_sort_v['PlacementParticipatingStudent']['accepted_student_id'], $students_to_be_removed) || ($propabilityCheck == 0)) {
+                        $propabilityCheck = $this->getPropabilityOfPreviousPreference(
+                            $data,
+                            $department_id,
+                            $for_sort_v['PlacementPreference']['accepted_student_id']
+                        );
+                        if (!in_array(
+                                $for_sort_v['PlacementParticipatingStudent']['accepted_student_id'],
+                                $students_to_be_removed
+                            ) || ($propabilityCheck == 0)) {
                             $resorted[] = $for_sort_v;
                         }
                     }
-
                 }
             }
 
@@ -2804,11 +3174,12 @@ class PlacementPreferencesTable extends Table
     }
 
     /*
-	* 0 consider in the current department , dont remove it
-	* 1 has chance so remove it for other consideration
-	*/
-    function getPropabilityOfPreviousPreference($data, $current_department_id,$accepted_student_id)
+    * 0 consider in the current department , dont remove it
+    * 1 has chance so remove it for other consideration
+    */
+    public function getPropabilityOfPreviousPreference($data, $current_department_id, $accepted_student_id)
     {
+
         $currentDepartmentPreferenceofStudent = ClassRegistry::init('PlacementPreference')->find('first', array(
             'conditions' => array(
                 "PlacementPreference.academic_year" => $data['PlacementSetting']['academic_year'],
@@ -2831,7 +3202,7 @@ class PlacementPreferencesTable extends Table
             'order' => array('PlacementPreference.preference_order' => 'ASC')
         ));
 
-        if(!empty($previous_preference_lists)){
+        if (!empty($previous_preference_lists)) {
             foreach ($previous_preference_lists as $prrl => $prrv) {
                 //check if placement run already for the iterted department
                 $placed_students_count = ClassRegistry::init('PlacementParticipatingStudent')->find('count', array(
@@ -2846,7 +3217,7 @@ class PlacementPreferencesTable extends Table
                     'recursive' => -1
                 ));
 
-                if($placed_students_count > 0){
+                if ($placed_students_count > 0) {
                     continue;
                 }
 
@@ -2861,7 +3232,7 @@ class PlacementPreferencesTable extends Table
                     )
                 ));
 
-                $intake_capacity = $detail_of_participating_unit['PlacementRoundParticipant']['intake_capacity'] + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['female_quota'])? $detail_of_participating_unit['PlacementRoundParticipant']['female_quota'] : 0 ) + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['disability_quota']) ? $detail_of_participating_unit['PlacementRoundParticipant']['disability_quota'] : 0) + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['region_quota'])? $detail_of_participating_unit['PlacementRoundParticipant']['region_quota'] : 0);
+                $intake_capacity = $detail_of_participating_unit['PlacementRoundParticipant']['intake_capacity'] + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['female_quota']) ? $detail_of_participating_unit['PlacementRoundParticipant']['female_quota'] : 0) + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['disability_quota']) ? $detail_of_participating_unit['PlacementRoundParticipant']['disability_quota'] : 0) + (!empty($detail_of_participating_unit['PlacementRoundParticipant']['region_quota']) ? $detail_of_participating_unit['PlacementRoundParticipant']['region_quota'] : 0);
 
                 // list of students who are prefered it as first the iterated department
                 $those_who_prefered_it_as_first = $this->find('list', array(
@@ -2872,7 +3243,10 @@ class PlacementPreferencesTable extends Table
                         "PlacementPreference.preference_order <= " => $prrv['PlacementPreference']['preference_order']
                     ),
                     //'fields' => array('PlacementPreference.placement_round_participant_id', 'PlacementPreference.preference_order'),
-                    'fields' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.accepted_student_id')
+                    'fields' => array(
+                        'PlacementPreference.accepted_student_id',
+                        'PlacementPreference.accepted_student_id'
+                    )
                 ));
 
                 // students who completed their preference on time
@@ -2913,6 +3287,7 @@ class PlacementPreferencesTable extends Table
 
     function multi_unique($src)
     {
+
         $output = array_map("unserialize", array_unique(array_map("serialize", $src)));
         return $output;
     }
@@ -2923,11 +3298,12 @@ class PlacementPreferencesTable extends Table
      */
     function checkAndAdjustPrivilagedQuota($data, $department_id, $adjusted_privilaged_quota = array(), $resevedquote)
     {
+
         if (isset($data) && !empty($data)) {
-            //$studentPreparednessCondition =	"PlacementPreference.accepted_student_id IN (select accepted_student_id from placement_participating_students where applied_for='" . $data['PlacementSetting']['applied_for'] . "' and  academic_year='" . $data['PlacementSetting']['academic_year'] . "' and round=" . $data['PlacementSetting']['round'] . " and program_id=" . $data['PlacementSetting']['program_id'] . " and program_type_id=" . $data['PlacementSetting']['program_type_id'] . " )";
+            //$studentPreparednessCondition =   "PlacementPreference.accepted_student_id IN (select accepted_student_id from placement_participating_students where applied_for='" . $data['PlacementSetting']['applied_for'] . "' and  academic_year='" . $data['PlacementSetting']['academic_year'] . "' and round=" . $data['PlacementSetting']['round'] . " and program_id=" . $data['PlacementSetting']['program_id'] . " and program_type_id=" . $data['PlacementSetting']['program_type_id'] . " )";
             /* if (count(explode('c~', $data['PlacementSetting']['applied_for'])) > 1) {
-		 	} */
-            $studentPreparednessCondition =	"PlacementPreference.accepted_student_id IN (select accepted_student_id from placement_participating_students where applied_for = '" . $data['PlacementSetting']['applied_for'] . "' and  academic_year = '" . $data['PlacementSetting']['academic_year'] . "' and round = " . $data['PlacementSetting']['round'] . " )";
+            } */
+            $studentPreparednessCondition = "PlacementPreference.accepted_student_id IN (select accepted_student_id from placement_participating_students where applied_for = '" . $data['PlacementSetting']['applied_for'] . "' and  academic_year = '" . $data['PlacementSetting']['academic_year'] . "' and round = " . $data['PlacementSetting']['round'] . " )";
         } else {
             return;
         }
@@ -2946,7 +3322,6 @@ class PlacementPreferencesTable extends Table
         // do for the three privilaged
         if (!empty($adjusted_privilaged_quota)) {
             foreach ($adjusted_privilaged_quota as $privilage_type => &$quota) {
-
                 $privilagedcondition = null;
 
                 if (strcasecmp($privilage_type, "female") == 0) {
@@ -2988,7 +3363,10 @@ class PlacementPreferencesTable extends Table
                                 $studentPreparednessCondition
                             ),
                             'contain' => array('AcceptedStudent'),
-                            'fields' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.placement_round_participant_id'),
+                            'fields' => array(
+                                'PlacementPreference.accepted_student_id',
+                                'PlacementPreference.placement_round_participant_id'
+                            ),
                         ));
 
                         // simply count privilaged students in preference 1 for a particular department
@@ -3006,26 +3384,29 @@ class PlacementPreferencesTable extends Table
                         // we need to have already allocated departments_id
                         $reformat_list_of_department_ids = array();
 
-                        $list_of_departments_id = ClassRegistry::init('PlacementParticipatingStudent')->find('all', array(
-                            'conditions' => array(
-                                'PlacementParticipatingStudent.academic_year LIKE ' => $data['PlacementSetting']['academic_year'] . '%',
-                                'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                                'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
-                                'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                                //'PlacementParticipatingStudent.placement_round_participant_id is not null ',
-                                //'PlacementParticipatingStudent.placement_round_participant_id not ' => array('', 0)
-                                'OR' => array(
-                                    'PlacementParticipatingStudent.placement_round_participant_id is not null',
-                                    'PlacementParticipatingStudent.placement_round_participant_id != ""',
-                                    'PlacementParticipatingStudent.placement_round_participant_id != 0',
-                                )
-                            ),
-                            'fields' => array('DISTINCT PlacementParticipatingStudent.placement_round_participant_id'),
-                            'recursive' => -1
-                        ));
+                        $list_of_departments_id = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                            'all',
+                            array(
+                                'conditions' => array(
+                                    'PlacementParticipatingStudent.academic_year LIKE ' => $data['PlacementSetting']['academic_year'] . '%',
+                                    'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                                    'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id'],
+                                    'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                                    //'PlacementParticipatingStudent.placement_round_participant_id is not null ',
+                                    //'PlacementParticipatingStudent.placement_round_participant_id not ' => array('', 0)
+                                    'OR' => array(
+                                        'PlacementParticipatingStudent.placement_round_participant_id is not null',
+                                        'PlacementParticipatingStudent.placement_round_participant_id != ""',
+                                        'PlacementParticipatingStudent.placement_round_participant_id != 0',
+                                    )
+                                ),
+                                'fields' => array('DISTINCT PlacementParticipatingStudent.placement_round_participant_id'),
+                                'recursive' => -1
+                            )
+                        );
 
                         if (!empty($list_of_departments_id)) {
-                            foreach ($list_of_departments_id  as $key => $value) {
+                            foreach ($list_of_departments_id as $key => $value) {
                                 $reformat_list_of_department_ids[] = $value['PlacementParticipatingStudent']['placement_round_participant_id'];
                             }
                         }
@@ -3045,8 +3426,13 @@ class PlacementPreferencesTable extends Table
                                     ));
 
                                     // is her/his previous preference selected department was processed?
-                                    if (!empty($reformat_list_of_department_ids) && isset($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && is_numeric($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'] > 0) {
-                                        if (in_array($department_id_accepted_student['PlacementPreference']['placement_round_participant_id'], $reformat_list_of_department_ids) === false) {
+                                    if (!empty($reformat_list_of_department_ids) && isset($department_id_accepted_student['PlacementPreference']['placement_round_participant_id']) && is_numeric(
+                                            $department_id_accepted_student['PlacementPreference']['placement_round_participant_id']
+                                        ) && $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'] > 0) {
+                                        if (in_array(
+                                                $department_id_accepted_student['PlacementPreference']['placement_round_participant_id'],
+                                                $reformat_list_of_department_ids
+                                            ) === false) {
                                             $excluded_student_count++;
                                             break;
                                         }
@@ -3055,7 +3441,9 @@ class PlacementPreferencesTable extends Table
                             }
                         }
 
-                        $sum_available_students_privilaged += (count($list_students_in_x_preference) - $excluded_student_count);
+                        $sum_available_students_privilaged += (count(
+                                $list_students_in_x_preference
+                            ) - $excluded_student_count);
 
                         if ($sum_available_students_privilaged >= $quota) {
                             break;
@@ -3079,6 +3467,7 @@ class PlacementPreferencesTable extends Table
 
     public function getStudentWhoToPrepareForPlacement($data = array())
     {
+
         debug($data);
 
         if (isset($data) && !empty($data)) {
@@ -3134,12 +3523,20 @@ class PlacementPreferencesTable extends Table
             $student_ids_that_have_exam_result_entries_for_the_round = array();
 
             if ($data['PlacementSetting']['with_entrance'] == 1) {
-                $student_ids_that_have_exam_result_entries_for_the_round = ClassRegistry::init('PlacementEntranceExamResultEntry')->find('list', array(
+                $student_ids_that_have_exam_result_entries_for_the_round = ClassRegistry::init(
+                    'PlacementEntranceExamResultEntry'
+                )->find('list', array(
                     'conditions' => array(
                         'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants,
                     ),
-                    'group' => array('PlacementEntranceExamResultEntry.accepted_student_id', 'PlacementEntranceExamResultEntry.student_id'),
-                    'fields' => array('PlacementEntranceExamResultEntry.accepted_student_id', 'PlacementEntranceExamResultEntry.student_id'),
+                    'group' => array(
+                        'PlacementEntranceExamResultEntry.accepted_student_id',
+                        'PlacementEntranceExamResultEntry.student_id'
+                    ),
+                    'fields' => array(
+                        'PlacementEntranceExamResultEntry.accepted_student_id',
+                        'PlacementEntranceExamResultEntry.student_id'
+                    ),
                 ));
             }
 
@@ -3147,46 +3544,90 @@ class PlacementPreferencesTable extends Table
 
 
             if ($data['PlacementSetting']['include'] == 0) {
-
-                $already_prepared_students_for_the_round =  ClassRegistry::init('PlacementParticipatingStudent')->find('list', array(
-                    'conditions' => array(
-                        'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
-                        'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
-                        'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
-                        'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
-                        'PlacementParticipatingStudent.program_type_id' =>$data['PlacementSetting']['program_type_id']
-                    ),
-                    'fields' => array('PlacementParticipatingStudent.accepted_student_id', 'PlacementParticipatingStudent.student_id'),
-                ));
+                $already_prepared_students_for_the_round = ClassRegistry::init('PlacementParticipatingStudent')->find(
+                    'list',
+                    array(
+                        'conditions' => array(
+                            'PlacementParticipatingStudent.applied_for' => $data['PlacementSetting']['applied_for'],
+                            'PlacementParticipatingStudent.academic_year' => $data['PlacementSetting']['academic_year'],
+                            'PlacementParticipatingStudent.round' => $data['PlacementSetting']['round'],
+                            'PlacementParticipatingStudent.program_id' => $data['PlacementSetting']['program_id'],
+                            'PlacementParticipatingStudent.program_type_id' => $data['PlacementSetting']['program_type_id']
+                        ),
+                        'fields' => array(
+                            'PlacementParticipatingStudent.accepted_student_id',
+                            'PlacementParticipatingStudent.student_id'
+                        ),
+                    )
+                );
 
                 debug(count($already_prepared_students_for_the_round));
 
                 if ($data['PlacementSetting']['with_entrance'] == 1 && !empty($student_ids_that_have_exam_result_entries_for_the_round)) {
-                    $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementPreference')->find('all', array(
+                    $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementPreference')->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.placement_round_participant_id' => $allRoundParticipants,
                             'PlacementPreference.academic_year' => $data['PlacementSetting']['academic_year'],
                             'PlacementPreference.round' => $data['PlacementSetting']['round'],
                             'PlacementPreference.student_id' => $student_ids_that_have_exam_result_entries_for_the_round,
                             'NOT' => array(
-                                'PlacementPreference.accepted_student_id' =>  array_keys($already_prepared_students_for_the_round),
+                                'PlacementPreference.accepted_student_id' => array_keys(
+                                    $already_prepared_students_for_the_round
+                                ),
                                 //'PlacementPreference.student_id' => $already_prepared_students_for_the_round
                             ),
                         ),
                         'contain' => array(
                             //'PlacementRoundParticipant',
-                            'Student' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name',  */'gender', 'full_name', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'college_id', 'department_id')),
-                            'AcceptedStudent' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'sex', 'full_name', 'EHEECE_total_results', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'region_id', 'college_id', 'department_id', 'disability')),
+                            'Student' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name',  */
+                                    'gender',
+                                    'full_name',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'college_id',
+                                    'department_id'
+                                )
+                            ),
+                            'AcceptedStudent' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'sex',
+                                    'full_name',
+                                    'EHEECE_total_results',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'region_id',
+                                    'college_id',
+                                    'department_id',
+                                    'disability'
+                                )
+                            ),
                         ),
-                        'group' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.student_id', 'PlacementPreference.academic_year', 'PlacementPreference.round'),
-                        'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC', 'PlacementPreference.preference_order' => 'ASC'),
+                        'group' => array(
+                            'PlacementPreference.accepted_student_id',
+                            'PlacementPreference.student_id',
+                            'PlacementPreference.academic_year',
+                            'PlacementPreference.round'
+                        ),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC',
+                            'PlacementPreference.preference_order' => 'ASC'
+                        ),
                         'limit' => $limit,
                         'maxLimit' => $limit
                     ));
-
                 } else {
-
-                    $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementPreference')->find('all', array(
+                    $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementPreference')->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.placement_round_participant_id' => $allRoundParticipants,
                             'PlacementPreference.academic_year' => $data['PlacementSetting']['academic_year'],
@@ -3198,44 +3639,118 @@ class PlacementPreferencesTable extends Table
                         ),
                         'contain' => array(
                             //'PlacementRoundParticipant',
-                            'Student' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'gender', 'full_name', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'college_id', 'department_id')),
-                            'AcceptedStudent' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'sex', 'full_name', 'EHEECE_total_results', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'region_id', 'college_id', 'department_id', 'disability')),
+                            'Student' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'gender',
+                                    'full_name',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'college_id',
+                                    'department_id'
+                                )
+                            ),
+                            'AcceptedStudent' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'sex',
+                                    'full_name',
+                                    'EHEECE_total_results',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'region_id',
+                                    'college_id',
+                                    'department_id',
+                                    'disability'
+                                )
+                            ),
                         ),
-                        'group' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.student_id', 'PlacementPreference.academic_year', 'PlacementPreference.round'),
-                        'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC', 'PlacementPreference.preference_order' => 'ASC'),
+                        'group' => array(
+                            'PlacementPreference.accepted_student_id',
+                            'PlacementPreference.student_id',
+                            'PlacementPreference.academic_year',
+                            'PlacementPreference.round'
+                        ),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC',
+                            'PlacementPreference.preference_order' => 'ASC'
+                        ),
                         'limit' => $limit,
                         'maxLimit' => $limit
                     ));
                 }
-
             } else {
-
                 if ($data['PlacementSetting']['with_entrance'] == 1 && !empty($student_ids_that_have_exam_result_entries_for_the_round)) {
-                    $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementPreference')->find('all', array(
+                    $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementPreference')->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.placement_round_participant_id' => $allRoundParticipants,
                             'PlacementPreference.academic_year' => $data['PlacementSetting']['academic_year'],
                             'PlacementPreference.round' => $data['PlacementSetting']['round'],
                             'PlacementPreference.student_id' => $student_ids_that_have_exam_result_entries_for_the_round,
                             /* 'NOT' => array(
-								'PlacementPreference.accepted_student_id' =>  array_keys($already_prepared_students_for_the_round),
-								//'PlacementPreference.student_id' => $already_prepared_students_for_the_round
-							), */
+                                'PlacementPreference.accepted_student_id' =>  array_keys($already_prepared_students_for_the_round),
+                                //'PlacementPreference.student_id' => $already_prepared_students_for_the_round
+                            ), */
                         ),
                         'contain' => array(
                             //'PlacementRoundParticipant',
-                            'Student' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'gender', 'full_name', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'college_id', 'department_id')),
-                            'AcceptedStudent' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'sex', 'full_name', 'EHEECE_total_results', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'region_id', 'college_id', 'department_id', 'disability')),
+                            'Student' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'gender',
+                                    'full_name',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'college_id',
+                                    'department_id'
+                                )
+                            ),
+                            'AcceptedStudent' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'sex',
+                                    'full_name',
+                                    'EHEECE_total_results',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'region_id',
+                                    'college_id',
+                                    'department_id',
+                                    'disability'
+                                )
+                            ),
                         ),
-                        'group' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.student_id', 'PlacementPreference.academic_year', 'PlacementPreference.round'),
-                        'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC', 'PlacementPreference.preference_order' => 'ASC'),
+                        'group' => array(
+                            'PlacementPreference.accepted_student_id',
+                            'PlacementPreference.student_id',
+                            'PlacementPreference.academic_year',
+                            'PlacementPreference.round'
+                        ),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC',
+                            'PlacementPreference.preference_order' => 'ASC'
+                        ),
                         'limit' => $limit,
                         'maxLimit' => $limit
                     ));
-
                 } else {
-
-                    $allStudentsWhoEntranceExam =  ClassRegistry::init('PlacementPreference')->find('all', array(
+                    $allStudentsWhoEntranceExam = ClassRegistry::init('PlacementPreference')->find('all', array(
                         'conditions' => array(
                             'PlacementPreference.placement_round_participant_id' => $allRoundParticipants,
                             'PlacementPreference.academic_year' => $data['PlacementSetting']['academic_year'],
@@ -3243,16 +3758,54 @@ class PlacementPreferencesTable extends Table
                         ),
                         'contain' => array(
                             //'PlacementRoundParticipant',
-                            'Student' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'gender', 'full_name', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'college_id', 'department_id')),
-                            'AcceptedStudent' => array('fields' => array('id', /* 'first_name', 'middle_name', 'last_name', */ 'sex', 'full_name', 'EHEECE_total_results', 'studentnumber', 'program_id', 'program_type_id', 'academicyear', 'region_id', 'college_id', 'department_id', 'disability')),
+                            'Student' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'gender',
+                                    'full_name',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'college_id',
+                                    'department_id'
+                                )
+                            ),
+                            'AcceptedStudent' => array(
+                                'fields' => array(
+                                    'id',
+                                    /* 'first_name', 'middle_name', 'last_name', */
+                                    'sex',
+                                    'full_name',
+                                    'EHEECE_total_results',
+                                    'studentnumber',
+                                    'program_id',
+                                    'program_type_id',
+                                    'academicyear',
+                                    'region_id',
+                                    'college_id',
+                                    'department_id',
+                                    'disability'
+                                )
+                            ),
                         ),
-                        'group' => array('PlacementPreference.accepted_student_id', 'PlacementPreference.student_id', 'PlacementPreference.academic_year', 'PlacementPreference.round'),
-                        'order' => array('Student.id' => 'ASC', 'Student.program_id' => 'ASC', 'Student.program_type_id' => 'ASC', 'PlacementPreference.preference_order' => 'ASC'),
+                        'group' => array(
+                            'PlacementPreference.accepted_student_id',
+                            'PlacementPreference.student_id',
+                            'PlacementPreference.academic_year',
+                            'PlacementPreference.round'
+                        ),
+                        'order' => array(
+                            'Student.id' => 'ASC',
+                            'Student.program_id' => 'ASC',
+                            'Student.program_type_id' => 'ASC',
+                            'PlacementPreference.preference_order' => 'ASC'
+                        ),
                         'limit' => $limit,
                         'maxLimit' => $limit
                     ));
                 }
-
             }
 
             //debug($allStudentsWhoEntranceExam);
@@ -3261,18 +3814,35 @@ class PlacementPreferencesTable extends Table
 
 
             if (!empty($allStudentsWhoEntranceExam)) {
-
-                $selected_program_name = classRegistry::init('Program')->field('Program.name', array('Program.id' => $allStudentsWhoEntranceExam[0]['Student']['program_id']));
-                $selected_program_type_name = classRegistry::init('ProgramType')->field('ProgramType.name', array('ProgramType.id' => $allStudentsWhoEntranceExam[0]['Student']['program_type_id']));
+                $selected_program_name = classRegistry::init('Program')->field(
+                    'Program.name',
+                    array('Program.id' => $allStudentsWhoEntranceExam[0]['Student']['program_id'])
+                );
+                $selected_program_type_name = classRegistry::init('ProgramType')->field(
+                    'ProgramType.name',
+                    array('ProgramType.id' => $allStudentsWhoEntranceExam[0]['Student']['program_type_id'])
+                );
 
                 if (!isset($allStudentsWhoEntranceExam[0]['Student']['department_id'])) {
-                    $selected_applied_unit_name = classRegistry::init('College')->field('College.name', array('College.id' => $allStudentsWhoEntranceExam[0]['Student']['college_id']));
+                    $selected_applied_unit_name = classRegistry::init('College')->field(
+                        'College.name',
+                        array('College.id' => $allStudentsWhoEntranceExam[0]['Student']['college_id'])
+                    );
                 } else {
-                    $selected_applied_unit_name = classRegistry::init('Department')->field('Department.name', array('Department.id' => $allStudentsWhoEntranceExam[0]['Student']['department_id']));
+                    $selected_applied_unit_name = classRegistry::init('Department')->field(
+                        'Department.name',
+                        array('Department.id' => $allStudentsWhoEntranceExam[0]['Student']['department_id'])
+                    );
                 }
 
 
-                $placementResultSettings = ClassRegistry::init('PlacementResultSetting')->find('all', array('conditions' => array('PlacementResultSetting.group_identifier' => $firstData['PlacementRoundParticipant']['group_identifier']), 'recursive' => -1));
+                $placementResultSettings = ClassRegistry::init('PlacementResultSetting')->find(
+                    'all',
+                    array(
+                        'conditions' => array('PlacementResultSetting.group_identifier' => $firstData['PlacementRoundParticipant']['group_identifier']),
+                        'recursive' => -1
+                    )
+                );
                 debug($placementResultSettings);
 
                 $freshman_settings = ClassRegistry::init('PlacementResultSetting')->find('first', array(
@@ -3314,8 +3884,8 @@ class PlacementPreferencesTable extends Table
 
                 if ((empty($freshman_settings['PlacementResultSetting']) && empty($prepartory_settings['PlacementResultSetting']) && empty($entrance_settings['PlacementResultSetting'])) || empty($placementResultSettings)) {
                     /* $this->invalidate('NO_PLACEMENT_SETTING_FOUND', 'No Placement Setting is found for the selected search criteria. Please define it first.');
-					return false; */
-                    $error1 = 'No placement setting is defined for round ' . $data['PlacementSetting']['round'] . ' of '  . $selected_program_name .  ' - ' . $selected_program_type_name .  ' in ' . $selected_applied_unit_name .' This is for view only and it is generated with default placement settings(' . DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT . '% for Freshman CGPA out of 4.00, ' . DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT. '% for Preparatory EHEECE total results out of 700 and ' . DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT . '% for Department Entrance Exam out of 30) . Please define Placement Setting first and try to Prepare.';
+                    return false; */
+                    $error1 = 'No placement setting is defined for round ' . $data['PlacementSetting']['round'] . ' of ' . $selected_program_name . ' - ' . $selected_program_type_name . ' in ' . $selected_applied_unit_name . ' This is for view only and it is generated with default placement settings(' . DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT . '% for Freshman CGPA out of 4.00, ' . DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT . '% for Preparatory EHEECE total results out of 700 and ' . DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT . '% for Department Entrance Exam out of 30) . Please define Placement Setting first and try to Prepare.';
                     $this->invalidate('NO_PLACEMENT_SETTING_FOUND', $error1);
                     //return false;
                 }
@@ -3334,9 +3904,9 @@ class PlacementPreferencesTable extends Table
                     ));
 
                     /* if ($data['PlacementSetting']['include'] == 0 && isset($alreadyPrepared) && !empty($alreadyPrepared)) {
-						unset($allStudentsWhoEntranceExam[$p]);
-						continue;
-					} */
+                        unset($allStudentsWhoEntranceExam[$p]);
+                        continue;
+                    } */
 
                     $prep = 0;
                     $fresh = 0;
@@ -3397,7 +3967,10 @@ class PlacementPreferencesTable extends Table
                                     'StudentExamStatus.semester',
                                     'StudentExamStatus.academic_year',
                                 ),
-                                'order' => array('StudentExamStatus.id' => 'DESC', 'StudentExamStatus.created' => 'DESC'),
+                                'order' => array(
+                                    'StudentExamStatus.id' => 'DESC',
+                                    'StudentExamStatus.created' => 'DESC'
+                                ),
                                 'recursive' => -1
                             ));
                             debug($freshManresult);
@@ -3424,7 +3997,10 @@ class PlacementPreferencesTable extends Table
                                     'StudentExamStatus.semester',
                                     'StudentExamStatus.academic_year',
                                 ),
-                                'order' => array('StudentExamStatus.id' => 'DESC', 'StudentExamStatus.created' => 'DESC'),
+                                'order' => array(
+                                    'StudentExamStatus.id' => 'DESC',
+                                    'StudentExamStatus.created' => 'DESC'
+                                ),
                                 'recursive' => -1
                             ));
                             debug($freshManresult);
@@ -3448,13 +4024,17 @@ class PlacementPreferencesTable extends Table
                     }
 
                     if ($firstData['PlacementRoundParticipant']['require_cgpa'] == 1) {
-                        if (!isset($freshManresult['StudentExamStatus']['cgpa']) || !is_numeric($freshManresult['StudentExamStatus']['cgpa'])) {
+                        if (!isset($freshManresult['StudentExamStatus']['cgpa']) || !is_numeric(
+                                $freshManresult['StudentExamStatus']['cgpa']
+                            )) {
                             unset($allStudentsWhoEntranceExam[$p]);
                             continue;
-                        } else if (isset($freshManresult['StudentExamStatus']['academic_status_id']) && $freshManresult['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
+                        } elseif (isset($freshManresult['StudentExamStatus']['academic_status_id']) && $freshManresult['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
                             unset($allStudentsWhoEntranceExam[$p]);
                             continue;
-                        } else if (is_numeric($freshManresult['StudentExamStatus']['cgpa']) && $freshManresult['StudentExamStatus']['cgpa'] < DEFAULT_MINIMUM_CGPA_FOR_PLACEMENT) {
+                        } elseif (is_numeric(
+                                $freshManresult['StudentExamStatus']['cgpa']
+                            ) && $freshManresult['StudentExamStatus']['cgpa'] < DEFAULT_MINIMUM_CGPA_FOR_PLACEMENT) {
                             unset($allStudentsWhoEntranceExam[$p]);
                             continue;
                         } else {
@@ -3463,7 +4043,7 @@ class PlacementPreferencesTable extends Table
                                     unset($allStudentsWhoEntranceExam[$p]);
                                     continue;
                                 }
-                            } else if (isset($firstData['PlacementRoundParticipant']['minimum_cgpa']) && isset($firstData['PlacementRoundParticipant']['maximum_cgpa'])) {
+                            } elseif (isset($firstData['PlacementRoundParticipant']['minimum_cgpa']) && isset($firstData['PlacementRoundParticipant']['maximum_cgpa'])) {
                                 if ($freshManresult['StudentExamStatus']['cgpa'] < $firstData['PlacementRoundParticipant']['minimum_cgpa'] || $freshManresult['StudentExamStatus']['cgpa'] > $firstData['PlacementRoundParticipant']['maximum_cgpa']) {
                                     unset($allStudentsWhoEntranceExam[$p]);
                                     continue;
@@ -3475,10 +4055,10 @@ class PlacementPreferencesTable extends Table
                     if (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id']) && $freshManresult['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
                         unset($allStudentsWhoEntranceExam[$p]);
                         continue;
-                    } else if (empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
+                    } elseif (empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
                         unset($allStudentsWhoEntranceExam[$p]);
                         continue;
-                    } else if (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
+                    } elseif (isset($freshManresult['StudentExamStatus']['academic_status_id']) && !empty($freshManresult['StudentExamStatus']['academic_status_id'])) {
                         //unset($allStudentsWhoEntranceExam[$p]);
                         //continue;
                     }
@@ -3488,27 +4068,30 @@ class PlacementPreferencesTable extends Table
                     }
 
 
-
-
                     if (isset($entrance_settings['PlacementResultSetting']['percent']) && !empty($entrance_settings['PlacementResultSetting']['percent']) && isset($v['PlacementEntranceExamResultEntry']['result'])) {
-
-                        $entranceExamResult = ClassRegistry::init('PlacementEntranceExamResultEntry')->find('first', array(
-                            'conditions' => array(
-                                'OR' => array(
-                                    'PlacementEntranceExamResultEntry.accepted_student_id' => $v['AcceptedStudent']['id'],
-                                    'PlacementEntranceExamResultEntry.student_id' => $v['Student']['id'],
+                        $entranceExamResult = ClassRegistry::init('PlacementEntranceExamResultEntry')->find(
+                            'first',
+                            array(
+                                'conditions' => array(
+                                    'OR' => array(
+                                        'PlacementEntranceExamResultEntry.accepted_student_id' => $v['AcceptedStudent']['id'],
+                                        'PlacementEntranceExamResultEntry.student_id' => $v['Student']['id'],
+                                    ),
+                                    'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants,
                                 ),
-                                'PlacementEntranceExamResultEntry.placement_round_participant_id' => $allRoundParticipants,
-                            ),
-                            'group' => array('PlacementEntranceExamResultEntry.accepted_student_id', 'PlacementEntranceExamResultEntry.student_id'),
-                            'order' => array('PlacementEntranceExamResultEntry.result' => 'DESC'),
-                            'recursive' => -1
-                        ));
+                                'group' => array(
+                                    'PlacementEntranceExamResultEntry.accepted_student_id',
+                                    'PlacementEntranceExamResultEntry.student_id'
+                                ),
+                                'order' => array('PlacementEntranceExamResultEntry.result' => 'DESC'),
+                                'recursive' => -1
+                            )
+                        );
 
                         debug($entranceExamResult['PlacementEntranceExamResultEntry']['result']);
 
                         if (isset($entranceExamResult['PlacementEntranceExamResultEntry']['result']) && !empty($entranceExamResult['PlacementEntranceExamResultEntry']['result'])) {
-                            if (isset($entrance_settings['PlacementResultSetting']['max_result']) && $entrance_settings['PlacementResultSetting']['max_result'] <= ENTRANCEMAXIMUM && $entrance_settings['PlacementResultSetting']['max_result'] >= 0 ) {
+                            if (isset($entrance_settings['PlacementResultSetting']['max_result']) && $entrance_settings['PlacementResultSetting']['max_result'] <= ENTRANCEMAXIMUM && $entrance_settings['PlacementResultSetting']['max_result'] >= 0) {
                                 $entrance = ($entrance_settings['PlacementResultSetting']['percent'] * $v['PlacementEntranceExamResultEntry']['result']) / $entrance_settings['PlacementResultSetting']['max_result'];
                             } else {
                                 $entrance = ($entrance_settings['PlacementResultSetting']['percent'] * $v['PlacementEntranceExamResultEntry']['result']) / ENTRANCEMAXIMUM;
@@ -3519,21 +4102,33 @@ class PlacementPreferencesTable extends Table
                     if (isset($prepartory_settings['PlacementResultSetting']['percent']) && !empty($prepartory_settings['PlacementResultSetting']['percent'])) {
                         // check here ignores readmitted students we can use academicyear from placement preferences table for applied student
                         if ($data['PlacementSetting']['academic_year'] == $v['AcceptedStudent']['academicyear']) {
-                            if (isset($prepartory_settings['PlacementResultSetting']['max_result']) && $prepartory_settings['PlacementResultSetting']['max_result'] <= PREPARATORYMAXIMUM && $prepartory_settings['PlacementResultSetting']['max_result'] >= 0 ) {
+                            if (isset($prepartory_settings['PlacementResultSetting']['max_result']) && $prepartory_settings['PlacementResultSetting']['max_result'] <= PREPARATORYMAXIMUM && $prepartory_settings['PlacementResultSetting']['max_result'] >= 0) {
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / $prepartory_settings['PlacementResultSetting']['max_result'];
                             } else {
-                                if (in_array($v['AcceptedStudent']['college_id'], Configure::read('social_stream_college_ids'))) {
+                                if (in_array(
+                                    $v['AcceptedStudent']['college_id'],
+                                    Configure::read('social_stream_college_ids')
+                                )) {
                                     $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / SOCIAL_STREAM_PREPARATORY_MAXIMUM;
-                                } else if (in_array($v['AcceptedStudent']['college_id'], Configure::read('natural_stream_college_ids'))) {
+                                } elseif (in_array(
+                                    $v['AcceptedStudent']['college_id'],
+                                    Configure::read('natural_stream_college_ids')
+                                )) {
                                     $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / NATURAL_STREAM_PREPARATORY_MAXIMUM;
                                 } else {
                                     $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
                                 }
                             }
                         } else {
-                            if (in_array($v['AcceptedStudent']['college_id'], Configure::read('social_stream_college_ids'))) {
+                            if (in_array(
+                                $v['AcceptedStudent']['college_id'],
+                                Configure::read('social_stream_college_ids')
+                            )) {
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / SOCIAL_STREAM_PREPARATORY_MAXIMUM;
-                            } else if (in_array($v['AcceptedStudent']['college_id'], Configure::read('natural_stream_college_ids'))) {
+                            } elseif (in_array(
+                                $v['AcceptedStudent']['college_id'],
+                                Configure::read('natural_stream_college_ids')
+                            )) {
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / NATURAL_STREAM_PREPARATORY_MAXIMUM;
                             } else {
                                 $prep = ($prepartory_settings['PlacementResultSetting']['percent'] * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
@@ -3543,25 +4138,29 @@ class PlacementPreferencesTable extends Table
 
                     if (isset($freshman_settings['PlacementResultSetting']['percent']) && !empty($freshman_settings['PlacementResultSetting']['percent'])) {
                         if (isset($freshman_settings['PlacementResultSetting']['max_result']) && $freshman_settings['PlacementResultSetting']['max_result'] <= FRESHMANMAXIMUM && $freshman_settings['PlacementResultSetting']['max_result'] >= 0) {
-                            $fresh = ($freshman_settings['PlacementResultSetting']['percent']  * $freshmanResult) / $freshman_settings['PlacementResultSetting']['max_result'];
+                            $fresh = ($freshman_settings['PlacementResultSetting']['percent'] * $freshmanResult) / $freshman_settings['PlacementResultSetting']['max_result'];
                         } else {
-                            $fresh = ($freshman_settings['PlacementResultSetting']['percent']  * $freshmanResult) / FRESHMANMAXIMUM;
+                            $fresh = ($freshman_settings['PlacementResultSetting']['percent'] * $freshmanResult) / FRESHMANMAXIMUM;
                         }
                     }
 
                     // No placement setting is defined, default placement settings from smis.conf file are being used.
 
-                    if (empty($freshman_settings['PlacementResultSetting']) && empty($prepartory_settings['PlacementResultSetting']) && empty($entrance_settings['PlacementResultSetting']) ) {
-
-                        if (isset($v['Student']['cgpa']) && $v['Student']['cgpa'] > 0 ) {
-                            $fresh = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT  * $v['Student']['cgpa']) / FRESHMANMAXIMUM;
+                    if (empty($freshman_settings['PlacementResultSetting']) && empty($prepartory_settings['PlacementResultSetting']) && empty($entrance_settings['PlacementResultSetting'])) {
+                        if (isset($v['Student']['cgpa']) && $v['Student']['cgpa'] > 0) {
+                            $fresh = (DEFAULT_FRESHMAN_RESULT_PERCENT_FOR_PLACEMENT * $v['Student']['cgpa']) / FRESHMANMAXIMUM;
                         }
 
-                        if (isset($v['AcceptedStudent']['EHEECE_total_results']) && $v['AcceptedStudent']['EHEECE_total_results'] > 100 ) {
-
-                            if (in_array($v['AcceptedStudent']['college_id'], Configure::read('social_stream_college_ids'))) {
+                        if (isset($v['AcceptedStudent']['EHEECE_total_results']) && $v['AcceptedStudent']['EHEECE_total_results'] > 100) {
+                            if (in_array(
+                                $v['AcceptedStudent']['college_id'],
+                                Configure::read('social_stream_college_ids')
+                            )) {
                                 $prep = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT * $v['AcceptedStudent']['EHEECE_total_results']) / SOCIAL_STREAM_PREPARATORY_MAXIMUM;
-                            } else if (in_array($v['AcceptedStudent']['college_id'], Configure::read('natural_stream_college_ids'))) {
+                            } elseif (in_array(
+                                $v['AcceptedStudent']['college_id'],
+                                Configure::read('natural_stream_college_ids')
+                            )) {
                                 $prep = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT * $v['AcceptedStudent']['EHEECE_total_results']) / NATURAL_STREAM_PREPARATORY_MAXIMUM;
                             } else {
                                 $prep = (DEFAULT_PREPARATORY_RESULT_PERCENT_FOR_PLACEMENT * $v['AcceptedStudent']['EHEECE_total_results']) / PREPARATORYMAXIMUM;
@@ -3569,14 +4168,19 @@ class PlacementPreferencesTable extends Table
                         }
 
                         if (isset($v['PlacementEntranceExamResultEntry']['result']) && $v['PlacementEntranceExamResultEntry']['result'] >= 0) {
-                            $entrance = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT  * $v['PlacementEntranceExamResultEntry']['result']) / ENTRANCEMAXIMUM;
+                            $entrance = (DEFAULT_DEPARTMENT_ENTRANCE_RESULT_PERCENT_FOR_PLACEMENT * $v['PlacementEntranceExamResultEntry']['result']) / ENTRANCEMAXIMUM;
                         }
                     }
 
-                    if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp($v['AcceptedStudent']['sex'], "female") == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
+                    if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp(
+                                $v['AcceptedStudent']['sex'],
+                                "female"
+                            ) == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
                         if (isset($points['female']) && !empty($points['female'])) {
                             $female_placement_weight = $points['female'];
-                        } else if (is_numeric(INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT) && INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT == 1) {
+                        } elseif (is_numeric(
+                                INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT
+                            ) && INCLUDE_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT_BY_DEFAULT == 1) {
                             $female_placement_weight = DEFAULT_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT;
                         } else {
                             $female_placement_weight = 0;
@@ -3591,11 +4195,17 @@ class PlacementPreferencesTable extends Table
 
                     $v['PlacementParticipatingStudent']['disability_weight'] = $disability_weight;
 
-                    if (isset($v['AcceptedStudent']['region_id']) && !empty($v['AcceptedStudent']['region_id']) && in_array($v['AcceptedStudent']['region_id'], $region_ids)) {
+                    if (isset($v['AcceptedStudent']['region_id']) && !empty($v['AcceptedStudent']['region_id']) && in_array(
+                            $v['AcceptedStudent']['region_id'],
+                            $region_ids
+                        )) {
                         //$developing_region_weight = 0;
-                        if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp($v['AcceptedStudent']['sex'], "female") == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
+                        if (isset($v['AcceptedStudent']['sex']) && !empty($v['AcceptedStudent']['sex']) && (strcasecmp(
+                                    $v['AcceptedStudent']['sex'],
+                                    "female"
+                                ) == 0 || strcasecmp($v['AcceptedStudent']['sex'], "f") == 0)) {
                             $developing_region_weight = 5;
-                        } else if (isset($v['AcceptedStudent']['disability']) && !empty($v['AcceptedStudent']['disability'])) {
+                        } elseif (isset($v['AcceptedStudent']['disability']) && !empty($v['AcceptedStudent']['disability'])) {
                             $developing_region_weight = 10;
                         }
                     }
@@ -3610,12 +4220,18 @@ class PlacementPreferencesTable extends Table
                     $v['PlacementParticipatingStudent']['academic_year'] = $data['PlacementSetting']['academic_year'];
                     $v['PlacementParticipatingStudent']['applied_for'] = $data['PlacementSetting']['applied_for'];
 
-                    $v['PlacementParticipatingStudent']['round'] =  $data['PlacementSetting']['round'];
-                    $v['PlacementParticipatingStudent']['program_id'] =  $data['PlacementSetting']['program_id'];
-                    $v['PlacementParticipatingStudent']['program_type_id'] =  $data['PlacementSetting']['program_type_id'];
+                    $v['PlacementParticipatingStudent']['round'] = $data['PlacementSetting']['round'];
+                    $v['PlacementParticipatingStudent']['program_id'] = $data['PlacementSetting']['program_id'];
+                    $v['PlacementParticipatingStudent']['program_type_id'] = $data['PlacementSetting']['program_type_id'];
 
-                    $v['PlacementParticipatingStudent']['total_weight'] = round(($v['PlacementParticipatingStudent']['developing_region_weight'] + $v['PlacementParticipatingStudent']['disability_weight'] + $v['PlacementParticipatingStudent']['female_placement_weight'] + $v['PlacementParticipatingStudent']['result_weight']), 2);
-                    $v['PlacementParticipatingStudent']['total_placement_weight'] = 	round(($v['PlacementParticipatingStudent']['developing_region_weight'] + $v['PlacementParticipatingStudent']['disability_weight'] + $v['PlacementParticipatingStudent']['female_placement_weight'] + $v['PlacementParticipatingStudent']['result_weight']), 2);
+                    $v['PlacementParticipatingStudent']['total_weight'] = round(
+                        ($v['PlacementParticipatingStudent']['developing_region_weight'] + $v['PlacementParticipatingStudent']['disability_weight'] + $v['PlacementParticipatingStudent']['female_placement_weight'] + $v['PlacementParticipatingStudent']['result_weight']),
+                        2
+                    );
+                    $v['PlacementParticipatingStudent']['total_placement_weight'] = round(
+                        ($v['PlacementParticipatingStudent']['developing_region_weight'] + $v['PlacementParticipatingStudent']['disability_weight'] + $v['PlacementParticipatingStudent']['female_placement_weight'] + $v['PlacementParticipatingStudent']['result_weight']),
+                        2
+                    );
 
 
                     if (isset($alreadyPrepared) && !empty($alreadyPrepared)) {
@@ -3638,6 +4254,7 @@ class PlacementPreferencesTable extends Table
 
     function cmp($a, $b)
     {
+
         // return strcmp($a['PlacementParticipatingStudent']['total_weight'], $b['PlacementParticipatingStudent']['total_weight']);
         if (isset($a['PlacementParticipatingStudent']['total_weight']) && isset($b['PlacementParticipatingStudent']['total_weight']) && $a['PlacementParticipatingStudent']['total_weight'] == $b['PlacementParticipatingStudent']['total_weight']) {
             return 0;
@@ -3647,6 +4264,7 @@ class PlacementPreferencesTable extends Table
 
     function compareweight($x, $y)
     {
+
         if ($x['weight'] < $y['weight']) {
             return true;
         } else {
@@ -3657,12 +4275,12 @@ class PlacementPreferencesTable extends Table
     function cmpTotalPlacementWeight($a, $b)
     {
         /* if ($a['PlacementEntranceExamResultEntry']['total_weight'] == $b['PlacementEntranceExamResultEntry']['total_weight']) {
-			return 0;
-		}
-		return $a['PlacementEntranceExamResultEntry']['total_weight'] < $b['PlacementEntranceExamResultEntry']['total_weight'] ? 1 : -1; */
+            return 0;
+        }
+        return $a['PlacementEntranceExamResultEntry']['total_weight'] < $b['PlacementEntranceExamResultEntry']['total_weight'] ? 1 : -1; */
     }
 
-    public function get_defined_list_of_applied_for($data = null, $curr_acy= null)
+    public function get_defined_list_of_applied_for($data = null, $curr_acy = null)
     {
 
         if (isset($curr_acy) && !empty($curr_acy)) {
@@ -3675,19 +4293,22 @@ class PlacementPreferencesTable extends Table
                 ),
                 'fields' => array('PlacementRoundParticipant.applied_for')
             ));
-        } else if (!empty($data)) {
+        } elseif (!empty($data)) {
             //debug($data);
             $placementRoundParticipants = classRegistry::init('PlacementRoundParticipant')->find('list', array(
                 'conditions' => array(
                     'PlacementRoundParticipant.program_id' => $data['program_id'],
                     'PlacementRoundParticipant.program_type_id' => $data['program_type_id'],
                     'PlacementRoundParticipant.academic_year' => $data['academic_year'],
-                    'PlacementRoundParticipant.placement_round' => (isset($data['round']) ? $data['round'] : (isset($data['placement_round']) ? $data['placement_round'] : 1 )),
+                    'PlacementRoundParticipant.placement_round' => (isset($data['round']) ? $data['round'] : (isset($data['placement_round']) ? $data['placement_round'] : 1)),
                 ),
                 'fields' => array('PlacementRoundParticipant.applied_for')
             ));
         } else {
-            $placementRoundParticipants = classRegistry::init('PlacementRoundParticipant')->find('list', array('fields' => array('PlacementRoundParticipant.applied_for')));
+            $placementRoundParticipants = classRegistry::init('PlacementRoundParticipant')->find(
+                'list',
+                array('fields' => array('PlacementRoundParticipant.applied_for'))
+            );
         }
 
         $dept_ids = array();
@@ -3698,10 +4319,10 @@ class PlacementPreferencesTable extends Table
             $prtpnt = array_values(array_unique(array_values($placementRoundParticipants)));
             if (!empty($prtpnt)) {
                 foreach ($prtpnt as $prk => $prval) {
-                    if(explode('~', $prval)[0] == 'd') {
+                    if (explode('~', $prval)[0] == 'd') {
                         array_push($dept_ids, explode('~', $prval)[1]);
                     }
-                    if(explode('~', $prval)[0] == 'c') {
+                    if (explode('~', $prval)[0] == 'c') {
                         array_push($coll_ids, explode('~', $prval)[1]);
                     }
                 }
@@ -3709,7 +4330,10 @@ class PlacementPreferencesTable extends Table
         }
 
         if (!empty($coll_ids)) {
-            $colls = classRegistry::init('College')->find('list', array('conditions' => array('College.id' => $coll_ids, 'College.active' => 1)));
+            $colls = classRegistry::init('College')->find(
+                'list',
+                array('conditions' => array('College.id' => $coll_ids, 'College.active' => 1))
+            );
             if (!empty($colls)) {
                 foreach ($colls as $colkey => $colval) {
                     $appliedForList[$colval]['c~' . $colkey] = 'All ' . $colval;
@@ -3740,5 +4364,4 @@ class PlacementPreferencesTable extends Table
 
         return $appliedForList;
     }
-
 }

@@ -27,15 +27,12 @@
 
     <?= $this->Html->css(['foundation.min']); ?>
 
-    <?php if (Configure::read('debug') || true): ?>
         <?= $this->Html->css([
             'dripicon', 'typicons', 'font-awesome',
             'pace-theme-flash', 'theme', 'login', 'style',
             'slicknav', 'sass/css/theme', 'common1'
         ]) ?>
-    <?php else: ?>
-        <?= $this->AssetCompress->css('login.css', ['full' => true]) ?>
-    <?php endif; ?>
+
 
     <?= $this->Html->script('vendor/modernizr'); ?>
 
@@ -66,16 +63,12 @@
     </div>
 </div>
 
-<?php if (Configure::read('debug') || true): ?>
     <?= $this->Html->script([
         'jquery', 'waypoints.min', 'preloader-script',
         'pace/pace', 'foundation.min',
         'foundation/foundation.abide', 'inputMask/jquery.maskedinput',
         'circle-progress/jquery.circliful'
     ]) ?>
-<?php else: ?>
-    <?= $this->AssetCompress->script('login.js', ['full' => true]) ?>
-<?php endif; ?>
 
 <!-- Foundation Validation -->
 <script type="text/javascript">

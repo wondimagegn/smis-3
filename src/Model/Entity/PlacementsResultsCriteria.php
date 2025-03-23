@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
@@ -26,10 +27,9 @@ class PlacementsResultsCriteria extends Entity
         'college' => true,
         'reserved_places' => true,
     ];
-    protected  $_virtual = ['result_category'];
+    protected $_virtual = ['result_category'];
     protected function _getResultCategory()
     {
         return trim("{$this->name} ( {$this->result_from} - {$this->result_to}) ");
     }
-
 }

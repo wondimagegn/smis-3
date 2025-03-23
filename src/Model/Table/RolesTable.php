@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,7 +9,6 @@ use Cake\Validation\Validator;
 use Cake\Datasource\EntityInterface;
 use Cake\Datasource\Exception\RecordNotFoundException;
 use Cake\Utility\Text;
-
 
 class RolesTable extends Table
 {
@@ -32,11 +32,6 @@ class RolesTable extends Table
 
         // ✅ Load AclBehavior
         $this->addBehavior('Acl.Acl', ['type' => 'requester']);
-
-
-
-
-
     }
     public function validationDefault(Validator $validator)
     {
@@ -63,6 +58,4 @@ class RolesTable extends Table
     {
         return null;
     }
-
-
 }

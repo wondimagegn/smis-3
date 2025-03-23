@@ -1,163 +1,91 @@
-<?php ?>
 <div class="box">
-     <div class="box-body">
-       <div class="row">
-		<div class="large-12 columns">
-                     <h2 class="box-title">
-			Academic Calendars
-		      </h2>
-		</div>
-		<div class="large-12 columns">
-		  <dl style="float:left"><?php $i = 0; $class = ' class="altrow"';?>
-	    <dt><div class="smallheading"><?php echo __('Academic Calendar');?></div></dt>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Academic Year'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $academicCalendar['AcademicCalendar']['academic_year']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Semester'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $academicCalendar['AcademicCalendar']['semester']; ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Program'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Html->link($academicCalendar['Program']['name'], array('controller' => 'programs', 'action' => 'view', $academicCalendar['Program']['id'])); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Program Type'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Html->link($academicCalendar['ProgramType']['name'], array('controller' => 'program_types', 'action' => 'view', $academicCalendar['ProgramType']['id'])); ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Registration Start Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_registration_start_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Registration End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_registration_end_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Add Start Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_add_start_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Add End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_add_end_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Drop Start Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_drop_start_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Course Drop End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['course_drop_end_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Grade Submission Start Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['grade_submission_start_date']); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Grade Submission End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['grade_submission_end_date']); ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Fx Grade Submission End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['grade_fx_submission_end_date']); ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Senate Meeting Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['senate_meeting_date']); ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Graduation Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['graduation_date']); ?>
-			&nbsp;
-		</dd>
-		
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Online Admission Start Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['online_admission_start_date']); ?>
-			&nbsp;
-		</dd>
-		
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Online Admission End Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Format->humanize_date($academicCalendar['AcademicCalendar']['online_admission_end_date']); ?>
-			&nbsp;
-		</dd>
-		
-		
-		
-		<dt> <div class="smallheading"> <?php echo __('Year Level'); ?></div></dt>
-		<br/>
-		<?php 
-		echo "<ul>";
-		foreach ($academicCalendar['AcademicCalendar']['year_level_id'] as $year_level_id=>$year_level_name) {
-		?>
-		 <li<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $year_level_name; ?>
-			&nbsp;
-		</li>
-		<?php 
-		}
-		echo "</ul>";
-		?>
-		
-	    
-	</dl>
-	<dl style="float:left;width:35%">
-	
-	   <dt><div class="smallheading"><?php echo __('College and Department which has this calendar');?></div></dt>
-	    <?php 
-	  echo "<ul>";
-	  foreach($colleges as $college_id=>$college_name){
+    <div class="box-body">
+        <div class="row">
+            <div class="large-12 columns">
+                <h2 class="box-title">
+                    <?= __('Academic Calendars'); ?>
+                </h2>
+            </div>
+            <div class="large-12 columns">
+                <dl style="float:left">
+                    <dt>
+                        <div class="smallheading"><?= __('Academic Calendar'); ?></div>
+                    </dt>
+                    <dt><?= __('Academic Year'); ?></dt>
+                    <dd><?= h($academicCalendar->academic_year); ?></dd>
+                    <dt><?= __('Semester'); ?></dt>
+                    <dd><?= h($academicCalendar->semester); ?></dd>
+                    <dt><?= __('Program'); ?></dt>
+                    <dd><?= $this->Html->link(
+                            $academicCalendar->program->name,
+                            ['controller' => 'Programs', 'action' => 'view', $academicCalendar->program->id]
+                        ); ?></dd>
+                    <dt><?= __('Program Type'); ?></dt>
+                    <dd><?= $this->Html->link(
+                            $academicCalendar->program_type->name,
+                            ['controller' => 'ProgramTypes', 'action' => 'view', $academicCalendar->program_type->id]
+                        ); ?></dd>
 
-  
-         //check
-          if (isset($this->request->data['AcademicCalendar']['college_id']) && !empty($this->request->data['AcademicCalendar']['college_id']) && in_array($college_id,$this->request->data['AcademicCalendar']['college_id'])) {
-            echo '<li>'.$college_name.'<ul>';         
-         
-         } else {
-              echo '<li>'.$college_name.'<ul>';  
-         }
+                    <?php
+                    $fields = [
+                        'course_registration_start_date' => __('Course Registration Start Date'),
+                        'course_registration_end_date' => __('Course Registration End Date'),
+                        'course_add_start_date' => __('Course Add Start Date'),
+                        'course_add_end_date' => __('Course Add End Date'),
+                        'course_drop_start_date' => __('Course Drop Start Date'),
+                        'course_drop_end_date' => __('Course Drop End Date'),
+                        'grade_submission_start_date' => __('Grade Submission Start Date'),
+                        'grade_submission_end_date' => __('Grade Submission End Date'),
+                        'grade_fx_submission_end_date' => __('Fx Grade Submission End Date'),
+                        'senate_meeting_date' => __('Senate Meeting Date'),
+                        'graduation_date' => __('Graduation Date'),
+                        'online_admission_start_date' => __('Online Admission Start Date'),
+                        'online_admission_end_date' => __('Online Admission End Date'),
+                    ];
+                    foreach ($fields as $field => $label): ?>
+                        <dt><?= $label; ?></dt>
+                        <dd><?= $academicCalendar->{$field} ? $this->Time->format($academicCalendar->{$field}) : __(
+                                'N/A'
+                            ); ?></dd>
+                    <?php
+                    endforeach; ?>
 
-         if (!empty($college_department[$college_id])){
-              foreach($college_department[$college_id] as $department_id=>$department_name){
-             
-               if (in_array($department_id,$academicCalendar['AcademicCalendar']['department_id'])) {
-                 echo '<li>'.$department_name.'</li>';
-
-                } else {
-                   echo '<li>'.$department_name.'</li>';
-                }
-             }
-         }
-         echo "</ul></li>";
-         
-         }
-         echo "</ul>";
-         ?>
-</dl>
-		 </div>
-	</div>
-      </div>
+                    <dt>
+                        <div class="smallheading"><?= __('Year Level'); ?></div>
+                    </dt>
+                    <ul>
+                        <?php
+                        foreach ($academicCalendar->year_level_id as $yearLevel): ?>
+                            <li><?= h($yearLevel); ?></li>
+                        <?php
+                        endforeach; ?>
+                    </ul>
+                </dl>
+                <dl style="float:left;width:35%">
+                    <dt>
+                        <div class="smallheading"><?= __('College and Department which has this calendar'); ?></div>
+                    </dt>
+                    <ul>
+                        <?php
+                        foreach ($colleges as $college_id => $college_name): ?>
+                            <li><?= h($college_name); ?>
+                                <ul>
+                                    <?php
+                                    if (!empty($college_department[$college_id])): ?>
+                                        <?php
+                                        foreach ($college_department[$college_id] as $department_id => $department_name): ?>
+                                            <li><?= h($department_name); ?></li>
+                                        <?php
+                                        endforeach; ?>
+                                    <?php
+                                    endif; ?>
+                                </ul>
+                            </li>
+                        <?php
+                        endforeach; ?>
+                    </ul>
+                </dl>
+            </div>
+        </div>
+    </div>
 </div>

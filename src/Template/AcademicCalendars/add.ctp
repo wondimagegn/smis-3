@@ -1,3 +1,9 @@
+<?php
+
+use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+
+?>
 <div class="box">
     <div class="box-header bg-transparent">
         <div class="box-title" style="margin-top: 10px;"><i class="fontello-calendar" style="font-size: larger; font-weight: bold;"></i>
@@ -14,7 +20,19 @@
                         <!-- <legend>&nbsp;&nbsp; Search / Filter &nbsp;&nbsp;</legend> -->
                         <div class="row">
                             <div class="large-2 columns">
-                            <?= $this->Form->input('academic_year', array('id' => 'academicYear', 'label' => 'Academic Year: ', 'style' => 'width:90%', 'type' => 'select', 'options' => $acyear_array_data, 'required', /* 'empty' => "[ Select ]",  */ 'default' => isset($defaultacademicyear) ? $defaultacademicyear : '')); ?>
+                                <?= $this->Form->input(
+                                    'academic_year',
+                                    array(
+                                        'id' => 'academicYear',
+                                        'label' => 'Academic Year: ',
+                                        'style' => 'width:90%',
+                                        'type' => 'select',
+                                        'options' => $acyearArrayData,
+                                        'required',
+                                        /* 'empty' => "[ Select ]",  */
+                                        'default' => isset($defaultacademicyear) ? $defaultacademicyear : ''
+                                    )
+                                ); ?>
                             </div>
 							<div class="large-2 columns">
                                 <?= $this->Form->input('semester', array('id' => 'semester', 'label' => 'Semester: ', 'style' => 'width:90%', 'options' => Configure::read('semesters'), 'required', 'empty' => '[ Select ]')); ?>
@@ -50,91 +68,64 @@
 </div>
 
 <script type="text/javascript">
-	function getDepartmentsOnProgramChange() {
+    function getDepartmentsOnProgramChange() {
+        let academicyearValue = document.getElementById("academicYear").value;
+        let semesterValue = document.getElementById("semester").value;
+        let programTypeValue = document.getElementById("programType").value;
+        let programTypeIdValue = document.getElementById("programTypeId").value;
 
-		var academicyear = document.getElementById("academicYear");
-		var  academicyearValue = academicyear.options[academicyear.selectedIndex].value;
+        $("#ExclusionInclusion").empty().append('<p>Loading ...</p>');
+        let formUrl = '/academic-calendars/get-departments-that-have-the-selected-program';
 
-		var semester = document.getElementById("semester");
-		var semesterValue = semester.options[semester.selectedIndex].value;
+        $.ajax({
+            type: 'POST',
+            url: formUrl,
+            data: $('form').serialize(),
+            success: function (response) {
+                $("#ExclusionInclusion").empty().append(response);
+                $("#AppliedFor").prop('disabled', false);
+            },
+            error: function (xhr, textStatus) {
+                alert("Error: " + textStatus);
+            }
+        });
+    }
 
-		var programType = document.getElementById("programType");
-		var  programTypeValue = programType.options[programType.selectedIndex].value; 
-        
-        var programTypeId = document.getElementById("programTypeId");
-		var  programTypeIdValue = programTypeId.options[programTypeId.selectedIndex].value;
-
-		//alert(programTypeIdValue);
-
-		//if (typeof semesterValue != 'undefined' && semesterValue != '' && typeof programTypeIdValue != 'undefined' && programTypeIdValue != '') {
-			$("#ExclusionInclusion").empty();
-			$("#ExclusionInclusion").append('<p>Loading ...</p>');
-			//get form action
-			var formUrl = '/AcademicCalendars/get_departments_that_have_the_selected_program';
-			$.ajax({
-				type: 'POST',
-				url: formUrl,
-				data: $('form').serialize(),
-				success: function(data, textStatus, xhr) {
-					$("#ExclusionInclusion").empty();
-					$("#ExclusionInclusion").append(data);
-					$("#AppliedFor").attr('disabled', false);
-				},
-				error: function(xhr, textStatus, error) {
-					alert(textStatus);
-				}
-			});
-			return false;
-		/* } else {
-			//window.location.replace("/AcademicCalendars/add/");
-		} */
-	
-	}
-
-	function refreshDiv(chkPassport) {
-		getDepartmentsOnProgramChange();
-	}
-
-    $("input[type='checkbox']").change(function () { 
+    function refreshDiv() {
         getDepartmentsOnProgramChange();
-    });
-	
-	const validationMessageNonSelectedYearLevel = document.getElementById('validation-message_non_selected');
-	const validationMessageNonSelectedDepartment = document.getElementById('validation-message_non_selected_department');
+    }
 
-	var form_being_submitted = false; 
+    $("input[type='checkbox']").change(getDepartmentsOnProgramChange);
 
-    var checkForm = function(form) {
-		
-		var checkboxesYearLevels =  document.getElementsByName('data[AcademicCalendar][year_level_id][]'); //$("#yearLevels"); //document.querySelectorAll('input[type="checkbox"]');
-		var checkedOneYearLevel = Array.prototype.slice.call(checkboxesYearLevels).some(x => x.checked);
+    let formBeingSubmitted = false;
 
-		var checkboxesDepartments =  document.getElementsByName('data[AcademicCalendar][department_id][]');
-		var checkedOneDepartment = Array.prototype.slice.call(checkboxesDepartments).some(x => x.checked);
+    function checkForm(form) {
+        let yearLevelCheckboxes = document.getElementsByName('data[AcademicCalendar][year_level_id][]');
+        let checkedYearLevel = Array.from(yearLevelCheckboxes).some(x => x.checked);
 
-		//alert(checkedOneYearLevel);
-		//alert(checkedOneDepartment);
+        let departmentCheckboxes = document.getElementsByName('data[AcademicCalendar][department_id][]');
+        let checkedDepartment = Array.from(departmentCheckboxes).some(x => x.checked);
 
-		if (!checkedOneYearLevel) {
-			alert('At least one year level must be selected.');
-			validationMessageNonSelectedYearLevel.innerHTML = 'Select Year Level';
-			return false;
-		}
+        if (!checkedYearLevel) {
+            alert('At least one year level must be selected.');
+            document.getElementById('validation-message_non_selected').textContent = 'Select Year Level';
+            return false;
+        }
 
-		if (!checkedOneDepartment) {
-			alert('At least one department must be selected.');
-			validationMessageNonSelectedDepartment.innerHTML = 'Select at least one department';
-			return false;
-		}
-	
-		if (form_being_submitted) {
-			alert("Setting Academic Calendar, please wait a moment...");
-			form.setCalendar.disabled = true;
-			return false;
-		}
+        if (!checkedDepartment) {
+            alert('At least one department must be selected.');
+            document.getElementById('validation-message_non_selected_department').textContent = 'Select at least one department';
+            return false;
+        }
+
+        if (formBeingSubmitted) {
+            alert("Setting Academic Calendar, please wait a moment...");
+            form.setCalendar.disabled = true;
+            return false;
+        }
 
         form.setCalendar.value = 'Setting Academic Calendar...';
-		form_being_submitted = true;
-		return true; 
-	};
+        formBeingSubmitted = true;
+        return true;
+    }
 </script>

@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
 class AcademicStand extends Entity
 {
-
     protected $_accessible = [
         'program_id' => true,
         'year_level_id' => true,
@@ -22,6 +22,4 @@ class AcademicStand extends Entity
         'academic_status' => true,
         'academic_rules' => true,
     ];
-
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -140,8 +141,8 @@ class CourseExemptionsTable extends Table
                     'CourseExemption.course_id' => $course_id,
                     'registrar_confirm_deny' => 1,
                     'department_accept_reject' => 1
-                ))
-        );
+                )
+        ));
         return $count;
     }
 
@@ -176,9 +177,12 @@ class CourseExemptionsTable extends Table
                 'Student.department_id' => $department_ids,
                 'Student.graduated' => 0,
                 'CourseExemption.department_accept_reject is null',
-                'CourseExemption.request_date >= ' => date("Y-m-d", strtotime("-".DAYS_BACK_COURSE_SUBSTITUTION." day")),
+                'CourseExemption.request_date >= ' => date(
+                    "Y-m-d",
+                    strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
+                ),
             );
-        } else if ($role_id == ROLE_REGISTRAR) {
+        } elseif ($role_id == ROLE_REGISTRAR) {
             if (!empty($department_ids)) {
                 $options['conditions'] = array(
                     'Student.department_id is not null',
@@ -186,16 +190,22 @@ class CourseExemptionsTable extends Table
                     'Student.graduated' => 0,
                     'CourseExemption.department_accept_reject is not null',
                     'CourseExemption.registrar_confirm_deny is null',
-                    'CourseExemption.request_date >= ' => date("Y-m-d", strtotime("-".DAYS_BACK_COURSE_SUBSTITUTION." day")),
+                    'CourseExemption.request_date >= ' => date(
+                        "Y-m-d",
+                        strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
+                    ),
                 );
-            } else if (!empty($college_ids)) {
+            } elseif (!empty($college_ids)) {
                 $options['conditions'] = array(
                     'Student.department_id is null',
                     'Student.college_id' => $college_ids,
                     'Student.graduated' => 0,
                     'CourseExemption.department_accept_reject is not null',
                     'CourseExemption.registrar_confirm_deny is null',
-                    'CourseExemption.request_date >= ' => date("Y-m-d", strtotime("-".DAYS_BACK_COURSE_SUBSTITUTION." day")),
+                    'CourseExemption.request_date >= ' => date(
+                        "Y-m-d",
+                        strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
+                    ),
                 );
             }
         }

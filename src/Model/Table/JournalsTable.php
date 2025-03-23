@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -6,9 +7,9 @@ use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
-
 class JournalsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -17,6 +18,7 @@ class JournalsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('journals');
@@ -38,6 +40,7 @@ class JournalsTable extends Table
 
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->notEmptyString('journal_title', 'Please provide journal title, it is required.')
             ->notEmptyString('article_title', 'Please provide journal article title, it is required.')
@@ -46,26 +49,30 @@ class JournalsTable extends Table
         return $validator;
     }
 
-    function deleteJournalList ($course_id=null,$data=null) {
-        $dontdeleteids=array();
-        $deleteids=array();
-        $deleteids=$this->find('list',
-            array('conditions'=>array('Journal.course_id'=>$course_id),
-                'fields'=>'id'));
-        if (!empty($data['Journal'])) {
-            foreach ($data['Journal'] as $in=>$va) {
-                if (!empty($va['id'])) {
-                    if (in_array($va['id'],$deleteids)) {
-                        $dontdeleteids[]=$va['id'];
-                    }
+    public function deleteJournalList($course_id = null, $data = null)
+    {
 
+        $dontdeleteids = array();
+        $deleteids = array();
+        $deleteids = $this->find(
+            'list',
+            array(
+                'conditions' => array('Journal.course_id' => $course_id),
+                'fields' => 'id'
+            )
+        );
+        if (!empty($data['Journal'])) {
+            foreach ($data['Journal'] as $in => $va) {
+                if (!empty($va['id'])) {
+                    if (in_array($va['id'], $deleteids)) {
+                        $dontdeleteids[] = $va['id'];
+                    }
                 }
             }
-
         }
         if (!empty($dontdeleteids)) {
-            foreach ($deleteids as $in=>&$va) {
-                if (in_array($va,$dontdeleteids)) {
+            foreach ($deleteids as $in => &$va) {
+                if (in_array($va, $dontdeleteids)) {
                     unset($deleteids[$in]);
                 }
             }
@@ -74,10 +81,8 @@ class JournalsTable extends Table
 
         if (!empty($deleteids)) {
             $this->deleteAll(array(
-                'Journal.id'=>$deleteids), false);
+                'Journal.id' => $deleteids
+            ), false);
         }
-
-
     }
-
 }

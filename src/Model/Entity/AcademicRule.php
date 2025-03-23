@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
@@ -30,6 +31,4 @@ class AcademicRule extends Entity
     {
         return $this->ccmo . $this->cgpa; // Concatenating fields
     }
-
-
 }

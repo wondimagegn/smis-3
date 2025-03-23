@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -44,10 +45,12 @@ class AcademicStandsAcademicRulesTable extends Table
         $this->belongsTo('AcademicStands', [
             'foreignKey' => 'academic_stand_id',
             'joinType' => 'INNER',
+            'propertyName'=>'AcademicStand'
         ]);
         $this->belongsTo('AcademicRules', [
             'foreignKey' => 'academic_rule_id',
             'joinType' => 'INNER',
+            'propertyName'=>'AcademicRule'
         ]);
     }
 

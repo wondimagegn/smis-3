@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -40,5 +41,4 @@ class OffersTable extends Table
 
         return $validator;
     }
-
 }

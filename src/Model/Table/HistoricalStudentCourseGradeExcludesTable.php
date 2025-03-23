@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -39,5 +40,4 @@ class HistoricalStudentCourseGradeExcludesTable extends Table
             'foreignKey' => 'course_add_id',
         ]);
     }
-
 }

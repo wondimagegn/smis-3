@@ -1,7 +1,7 @@
 <?php
+
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
@@ -106,5 +106,4 @@ class ExtendingAcademicCalendarsTable extends Table
 
         return $days->days ?? 0;
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -80,7 +81,6 @@ class GeneralSettingsTable extends Table
         ));
 
         if (!empty($publishedCourses)) {
-
             $settings = $this->find('first', array(
                 'conditions' => array(
                     'GeneralSetting.program_id like' => '%s:_:"' . $publishedCourses['PublishedCourse']['program_id'] . '"%',
@@ -147,7 +147,6 @@ class GeneralSettingsTable extends Table
         ));
 
         if (!empty($gradeDetail['CourseRegistration'])) {
-
             $settings = $this->find('first', array(
                 'conditions' => array(
                     'GeneralSetting.program_id like' => '%s:_:"' . $gradeDetail['CourseRegistration']['PublishedCourse']['program_id'] . '"%',
@@ -160,9 +159,7 @@ class GeneralSettingsTable extends Table
             if (!empty($settings)) {
                 return $settings['GeneralSetting']['notifyStudentsGradeByEmail'];
             }
-
-        } else if (!empty($gradeDetail['CourseAdd'])) {
-
+        } elseif (!empty($gradeDetail['CourseAdd'])) {
             $settings = $this->find('first', array(
                 'conditions' => array(
                     'GeneralSetting.program_id like' => '%s:_:"' . $gradeDetail['CourseAdd']['PublishedCourse']['program_id'] . '"%',
@@ -175,9 +172,7 @@ class GeneralSettingsTable extends Table
             if (!empty($settings)) {
                 return $settings['GeneralSetting']['notifyStudentsGradeByEmail'];
             }
-
-        } else if (!empty($gradeDetail['MakeupExam'])) {
-
+        } elseif (!empty($gradeDetail['MakeupExam'])) {
             $settings = $this->find('first', array(
                 'conditions' => array(
                     'GeneralSetting.program_id like' => '%s:_:"' . $gradeDetail['MakeupExam']['PublishedCourse']['program_id'] . '"%',
@@ -245,7 +240,7 @@ class GeneralSettingsTable extends Table
                 'recursive' => -1
             ));
 
-            if (!empty($studentDetail)){
+            if (!empty($studentDetail)) {
                 $program = $studentDetail['Student']['program_id'];
                 $program_type = $studentDetail['Student']['program_type_id'];
 
@@ -272,7 +267,7 @@ class GeneralSettingsTable extends Table
                     $section_curriculum = ClassRegistry::init('Section')->getSectionCurriculum($section_id);
                     //debug($section_curriculum);
                     if (!empty($section_curriculum) && is_numeric($section_curriculum)) {
-                        $curriculumDetail= ClassRegistry::init('Curriculum')->find('first', array(
+                        $curriculumDetail = ClassRegistry::init('Curriculum')->find('first', array(
                             'conditions' => array(
                                 'Curriculum.id' => $section_curriculum
                             ),
@@ -285,7 +280,6 @@ class GeneralSettingsTable extends Table
                     }
                 }
             }
-
         }
 
         if (!empty($program) && !empty($program_type)) {
@@ -304,7 +298,7 @@ class GeneralSettingsTable extends Table
                     $settings['GeneralSetting']['minimumCreditForStatus'] =  (int) round($settings['GeneralSetting']['minimumCreditForStatus'] * CREDIT_TO_ECTS);
                     $settings['GeneralSetting']['maximumCreditPerSemester'] =  (int) round($settings['GeneralSetting']['maximumCreditPerSemester'] * CREDIT_TO_ECTS);
                 }
-            } else if (isset($sectionDetail['Curriculum']['id']) && is_numeric($sectionDetail['Curriculum']['id'])) {
+            } elseif (isset($sectionDetail['Curriculum']['id']) && is_numeric($sectionDetail['Curriculum']['id'])) {
                 //debug($sectionDetail);
                 if (count(explode('ECTS', $sectionDetail['Curriculum']['type_credit'])) >= 2) {
                     $settings['GeneralSetting']['minimumCreditForStatus'] =  (int) round($settings['GeneralSetting']['minimumCreditForStatus'] * CREDIT_TO_ECTS);
@@ -313,9 +307,7 @@ class GeneralSettingsTable extends Table
             }
 
             return $settings;
-
         } else {
-
             $settings['GeneralSetting']['daysAvaiableForGradeChange'] = DEFAULT_DAYS_AVAILABLE_FOR_GRADE_CHANGE;
             $settings['GeneralSetting']['daysAvaiableForNgToF'] = DEFAULT_DAYS_AVAILABLE_FOR_NG_TO_F;
             $settings['GeneralSetting']['daysAvaiableForDoToF'] = DEFAULT_DAYS_AVAILABLE_FOR_DO_TO_F;
@@ -378,7 +370,7 @@ class GeneralSettingsTable extends Table
                 if (!empty($duplicateProgram)) {
                     $programName = $this->Program->field('name', array('Program.id' => $duplicateProgram));
                     $programTypeName = $this->ProgramType->field('name', array('ProgramType.id' => $prty_id));
-                    $duplicateEntries[] = 'There is existing general setting for '. $programName. ' with ' . $programTypeName . ' program type.';
+                    $duplicateEntries[] = 'There is existing general setting for ' . $programName . ' with ' . $programTypeName . ' program type.';
                     $this->invalidate('duplicateEntries', $duplicateEntries);
                     //$this->invalidate('duplicate', 'There is existing general setting for '. $programName. ' with ' . $programTypeName . ' program type.');
                     //$duplicateProgramTypes[] = $prty_id;

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -40,10 +41,12 @@ class ClassRoomClassPeriodConstraintsTable extends Table
         $this->belongsTo('ClassRooms', [
             'foreignKey' => 'class_room_id',
             'joinType' => 'INNER',
+            'propertyName' => 'ClassRoom',
         ]);
         $this->belongsTo('ClassPeriods', [
             'foreignKey' => 'class_period_id',
             'joinType' => 'INNER',
+            'propertyName' => 'ClassPeriod',
         ]);
     }
 

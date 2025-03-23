@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -8,6 +9,7 @@ use Cake\Validation\Validator;
 
 class GraduationRequirementsTable extends Table
 {
+
     /**
      * Initialize method
      *
@@ -16,6 +18,7 @@ class GraduationRequirementsTable extends Table
      */
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
         $this->setTable('graduation_requirements');
@@ -38,6 +41,7 @@ class GraduationRequirementsTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
@@ -64,19 +68,23 @@ class GraduationRequirementsTable extends Table
      */
     public function buildRules(RulesChecker $rules)
     {
+
         $rules->add($rules->existsIn(['program_id'], 'Programs'));
 
         return $rules;
     }
 
 
-    function getMinimumGraduationCGPA($program_id = null, $admission_year = null) {
-        $gr_detail = $this->find('first',
+    public function getMinimumGraduationCGPA($program_id = null, $admission_year = null)
+    {
+
+        $gr_detail = $this->find(
+            'first',
             array(
                 'conditions' =>
                     array(
                         'GraduationRequirement.program_id' => $program_id,
-                        'GraduationRequirement.academic_year <= '.substr($admission_year, 0, 4)
+                        'GraduationRequirement.academic_year <= ' . substr($admission_year, 0, 4)
                     ),
                 'order' =>
                     array(
@@ -85,10 +93,10 @@ class GraduationRequirementsTable extends Table
                 'recursive' => -1
             )
         );
-        if(isset($gr_detail['GraduationRequirement']['cgpa']))
+        if (isset($gr_detail['GraduationRequirement']['cgpa'])) {
             return $gr_detail['GraduationRequirement']['cgpa'];
-        else
+        } else {
             return 0;
+        }
     }
-
 }

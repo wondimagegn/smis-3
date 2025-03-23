@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Model\Table;
 
 use Cake\ORM\Query;
@@ -36,8 +37,11 @@ class DisabilitiesTable extends Table
             ->notEmptyString('code', 'Code is required.')
             ->add('code', 'unique', [
                 'rule' => function ($value, $context) {
-                    $query = $this->find('all',
-                        ['conditions' => ['code' => $value]]);
+
+                    $query = $this->find(
+                        'all',
+                        ['conditions' => ['code' => $value]]
+                    );
                     return $query->isEmpty();
                 },
                 'message' => 'The code must be unique.'
