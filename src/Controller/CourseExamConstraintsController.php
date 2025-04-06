@@ -33,7 +33,7 @@ class CourseExamConstraintsController extends AppController
     {
 
         parent::beforeFilter($event);
-        $this->Auth->allow('get_year_level', 'get_course_exam_constraints_details');
+        $this->Auth->allow('getYearLevel', 'get_course_exam_constraints_details');
     }
 
     public function beforeRender(Event $event)
@@ -471,7 +471,7 @@ class CourseExamConstraintsController extends AppController
         }
     }
 
-    public function get_year_level($department_id = null)
+    public function getYearLevel($department_id = null)
     {
 
         if (!empty($department_id)) {
@@ -601,7 +601,7 @@ class CourseExamConstraintsController extends AppController
         }
     }
 
-    public function get_course_exam_constraints_details($published_course_id = null)
+    public function getCourseExamConstraintsDetails($published_course_id = null)
     {
 
         if (!empty($published_course_id)) {

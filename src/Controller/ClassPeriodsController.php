@@ -10,7 +10,7 @@ class ClassPeriodsController extends AppController
     public $name = 'ClassPeriods';
     public $menuOptions = array(
         'parent' => 'scheduleSetting',
-        'exclude' => array('get_already_recorded_periods'),
+        'exclude' => array('getAlreadyRecordedPeriods'),
         'alias' => array(
             'index' => 'List Class Period',
             'add' => 'Add Class Period '
@@ -134,7 +134,7 @@ class ClassPeriodsController extends AppController
         $this->set(compact('periodSettings', 'colleges', 'programTypes', 'programs'));
     }
 
-    public function get_already_recorded_periods($data = null)
+    public function getAlreadyRecordedPeriods($data = null)
     {
 
         //$this->layout = 'ajax';

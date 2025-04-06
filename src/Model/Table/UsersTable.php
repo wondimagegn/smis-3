@@ -46,66 +46,87 @@ class UsersTable extends Table
         $this->belongsTo('Roles', [
             'foreignKey' => 'role_id',
             'joinType' => 'INNER',
+            'propertyName' => 'Role',
         ]);
         $this->hasMany('AcceptedStudents', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'AcceptedStudent',
         ]);
         $this->hasMany('Announcements', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Announcement',
         ]);
         $this->hasMany('AutoMessages', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'AutoMessage',
         ]);
         $this->hasMany('Logs', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Log',
         ]);
         $this->hasMany('MedicalHistories', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'MedicalHistory',
         ]);
         $this->hasMany('Messages', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Message',
         ]);
         $this->hasMany('MoodleUsers', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'MoodleUser',
         ]);
         $this->hasMany('Notes', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Note',
         ]);
         $this->hasMany('NumberProcesses', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'NumberProcess',
         ]);
         $this->hasMany('OnlineUsers', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'OnlineUser',
         ]);
         $this->hasMany('PasswordChanageVotes', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'PasswordChanageVote',
         ]);
         $this->hasMany('PasswordHistories', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'PasswordHistory',
         ]);
         $this->hasMany('PlacementPreferences', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'PlacementPreference',
         ]);
         $this->hasMany('PreferenceDeadlines', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'PreferenceDeadline',
         ]);
         $this->hasMany('Preferences', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Preference',
         ]);
         $this->hasMany('StaffAssignes', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'StaffAssign',
         ]);
         $this->hasMany('Staffs', [
             'foreignKey' => 'user_id',
+            'propertyName'=>'Staff'
         ]);
         $this->hasMany('Students', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'Student',
         ]);
         $this->hasMany('UserDormAssignments', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'UserDormAssignment',
         ]);
         $this->hasMany('UserMealAssignments', [
             'foreignKey' => 'user_id',
+            'propertyName' => 'UserMealAssignment',
         ]);
 
 
@@ -114,6 +135,18 @@ class UsersTable extends Table
 
       //  $this->addBehavior('Acl.Acl', ['requester']);
         $this->addBehavior('Acl.Acl', ['type' => 'requester']);
+    }
+
+    public function parentNode()
+    {
+        if (!$this->id) {
+            return null;
+        }
+        $data = $this->findById($this->id)->first();
+        if (!$data->role_id) {
+            return null;
+        }
+        return ['Roles' => ['id' => $data->role_id]];
     }
 
 
@@ -1443,7 +1476,7 @@ class UsersTable extends Table
             if (stripos($row->parent_alias, 'controllers') === false) {
                 $parentAlias = 'controllers/' . $row->parent_alias;
             } else {
-                $parentAlias = $row->parent_alias;
+               $parentAlias = $row->parent_alias;
             }
             // Build the full route.
             $route = $parentAlias . '/' . $row->alias;
@@ -1488,7 +1521,7 @@ class UsersTable extends Table
                 $permissions[] = 'controllers/Acls/Acos/delete';
                 $permissions[] = 'controllers/Acls/Acos/rebuild';
             }
-            $permissions[] = 'controllers/Securitysettings/permission_management';
+            $permissions[] = 'controllers/Securitysettings/permissionManagement';
             $permissions[] = 'controllers/Securitysettings/index';
             $permissions[] = 'controllers/Acls/Permissions/add';
             $permissions[] = 'controllers/Acls/Permissions/delete';
@@ -1651,6 +1684,7 @@ class UsersTable extends Table
                 }
             }
         }
+
 
         $result['permission'] = $permissions;
         $result['reformatePermission'] = $reformatePermission;

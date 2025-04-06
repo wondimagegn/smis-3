@@ -113,7 +113,6 @@ use Cake\Utility\Inflector;
     'number-progress-bar/number-pb',
     'app',
     'loader/loader',
-    'loader/demo',
     'angular',
     'smisangularapp'
 ]); ?>

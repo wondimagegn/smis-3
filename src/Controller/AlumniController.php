@@ -21,9 +21,9 @@ class AlumniController extends AppController
         'weight' => 2,
 
         'alias' => array(
-            'check_alumni_survey' => 'Check Alumni Survey',
-            'alumni_survey_view' => 'Baseline Survey View',
-            'add_baselinesurvey_onbehalf' => 'Fill Baseline Survey On Behalf of Student'
+            'checkAlumniSurvey' => 'Check Alumni Survey',
+            'alumniSurveyView' => 'Baseline Survey View',
+            'addBaselinesurveyOnbehalf' => 'Fill Baseline Survey On Behalf of Student'
         )
     );
 
@@ -72,7 +72,7 @@ class AlumniController extends AppController
         );
     }
 
-    public function alumni_survey_view()
+    public function alumniSurveyView()
     {
 
         $this->paginate = array('contain' => array('Student' => array('SenateList'), 'AlumniResponse'));
@@ -322,22 +322,6 @@ class AlumniController extends AppController
             return $this->redirect('/');
         }
 
-        /*
-        if (isset($id) && !empty($id)) {
-            //check if it exists
-            $student=$this->Alumnus->Student->find('first',
-            array('conditions'=>array('Student.id'=>$id),
-            'contain'=>array('User')));
-            if(isset($student['Student']['id']) && !empty($student['Student']['id'])){
-              $student_id=$student['Student']['id'];
-            }
-        } else if(isset($this->student_id) && !empty($this->student_id)) {
-          $student_id=$this->student_id;
-        } else {
-           $this->Session->setFlash('<span></span>'.__('You are not elegible to fill survey. The baseline survey is only available for graduting students.'),'default',array('class'=>'warning-box warning-message'));
-           return $this->redirect('/');
-        }
-        */
 
 
         if ($this->Alumnus->checkIfStudentGradutingClass($student_id) == false) {
@@ -420,7 +404,7 @@ class AlumniController extends AppController
         $this->set(compact('surveyQuestions', 'sexes', 'university', 'student', 'regions', 'student_id'));
     }
 
-    public function add_baselinesurvey_onbehalf()
+    public function addBaselinesurveyOnbehalf()
     {
 
         $student_id = 0;
@@ -583,7 +567,7 @@ class AlumniController extends AppController
     }
 
 
-    public function check_alumni_survey()
+    public function checkAlumniSurvey()
     {
 
         debug($this->request->data);
@@ -652,7 +636,7 @@ class AlumniController extends AppController
         }
     }
 
-    public function member_registration()
+    public function memberRegistration()
     {
 
         $this->layout = 'login';

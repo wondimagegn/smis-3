@@ -20,24 +20,24 @@ class StudentsController extends AppController
         'exclude' => array(
             'add',
             'search',
-            'search_profile',
-            'name_change',
-            'correct_name',
-            'profile_not_build_list',
-            'get_course_registered_and_add',
-            'get_possible_sup_registered_and_add',
-            'delete_student_from_graduate_list_for_correction',
-            'activate_deactivate_profile'
+            'searchProfile',
+            'nameChange',
+            'correctName',
+            'profileNotBuildList',
+            'getCourseRegisteredAndAdd',
+            'getPossibleSupRegisteredAndAdd',
+            'deleteStudentFromGraduateListForCorrection',
+            'activateDeactivateProfile'
         ),
         'alias' => array(
             'index' => 'List Admitted Students',
-            'department_issue_password' => 'Issue/Reset Password',
-            'freshman_issue_password' => 'Issue/Reset Password',
-            'name_list' => 'Correct Student Name',
-            'id_card_print' => 'Print Student ID Card',
-            'move_batch_student_to_department' => 'Move Batch Student to Other Department',
-            'admit_all' => 'Admit Accepted Students',
-            'mass_import_one_time_passwords' => 'Import One Time Password'
+            'departmentIssuePassword' => 'Issue/Reset Password',
+            'freshmanIssuePassword' => 'Issue/Reset Password',
+            'nameList' => 'Correct Student Name',
+            'idCardPrint' => 'Print Student ID Card',
+            'moveBatchStudentToDepartment' => 'Move Batch Student to Other Department',
+            'admitAll' => 'Admit Accepted Students',
+            'massImportOneTimePasswords' => 'Import One Time Password'
         )
     );
 
@@ -50,7 +50,7 @@ class StudentsController extends AppController
         $this->loadComponent('AcademicYear');
         $this->loadComponent('EthiopicDateTime');
         $this->loadComponent('Paginator'); // Ensure Paginator is loaded
-        $this->viewBuilder()->setHelpers(['DatePicker', 'Media.Media', 'Xls']);
+      //  $this->viewBuilder()->setHelpers(['DatePicker', 'Media.Media', 'Xls']);
     }
 
     public function beforeFilter(Event $event)
@@ -58,29 +58,23 @@ class StudentsController extends AppController
 
         parent::beforeFilter($event);
         $this->Auth->allow(
-            'ajax_get_department',
+            'ajaxGetDepartment',
             'change',
-            'get_regions',
-            'get_cities',
-            'ajax_update',
-            'ajax_check_ecardnumber',
-            'get_course_registered_and_add',
-            'get_possible_sup_registered_and_add',
-            'auto_yearlevel_update',
-            'student_lists',
+            'getRegions',
+            'getCities',
+            'ajaxUpdate',
+            'ajaxCheckEcardnumber',
+            'getCourseRegisteredAndAdd',
+            'getPossibleSupRegisteredAndAdd',
+            'autoYearlevelUpdate',
+            'studentLists',
             'search',
-            'search_profile',
-            'get_modal_box',
-            //'id_card_print',
-            //'update_koha_db',
-            'print_record',
-            //'update_lms_db',
-            //'move_batch_student_to_department',
-            //'mass_import_student_national_id',
-            //'mass_import_one_time_passwords',
-            'get_countries',
-            'get_zones',
-            'get_woredas'
+            'searchProfile',
+            'getModalBox',
+            'printRecord',
+            'getCountries',
+            'getZones',
+            'getWoredas'
         );
     }
 
@@ -89,2794 +83,758 @@ class StudentsController extends AppController
     {
 
         parent::beforeRender($event);
-
+        // Get current academic year
         $current_academicyear = $defaultacademicyear = $this->AcademicYear->currentAcademicYear();
-
+        // Generate academic year arrays
         $acyear_array_data = $this->AcademicYear->academicYearInArray(
             APPLICATION_START_YEAR,
-            (explode('/', $current_academicyear)[0])
+            explode('/', $current_academicyear)[0]
         );
         $acYearMinuSeparated = $this->AcademicYear->acYearMinuSeparated(
             APPLICATION_START_YEAR,
-            (explode('/', $current_academicyear)[0]) + 1
+            explode('/', $current_academicyear)[0] + 1
         );
-
-        // debug($acyear_array_data);
-        // debug($acYearMinuSeparated);
 
         $defaultacademicyearMinusSeparted = str_replace('/', '-', $defaultacademicyear);
 
-        // $this->set('defaultacademicyear', $defaultacademicyear);
-        // $this->set('defaultacademicyearMinusSeparted', $defaultacademicyearMinusSeparted);
+        // Fetch Programs
+        $programs = $this->Students->Programs->find('list', [
+            'conditions' => [
+                'Programs.id IN' => $this->program_ids,
+                'Programs.active' => 1
+            ]
+        ])->toArray();
 
-        $programs = $this->Student->Program->find(
-            'list',
-            array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-        );
-        $program_types = $programTypes = $this->Student->ProgramType->find(
-            'list',
-            array('conditions' => array('ProgramType.id' => $this->program_type_ids, 'ProgramType.active' => 1))
-        );
+        // Fetch Program Types
+        $program_types = $programTypes = $this->Students->ProgramTypes->find('list', [
+            'conditions' => [
+                'ProgramTypes.id IN' => $this->program_type_ids,
+                'ProgramTypes.active' => 1
+            ]
+        ])->toArray();
 
+        // Fetch Year Levels
         $yearLevels = $this->year_levels;
 
         if ($this->role_id == ROLE_DEPARTMENT) {
-            $yearLevels = ClassRegistry::init('YearLevel')->find(
-                'list',
-                array(
-                    'conditions' => array(
-                        'YearLevel.department_id' => $this->department_ids,
-                        'YearLevel.name' => $yearLevels
-                    )
-                )
-            );
+            $YearLevelTable = TableRegistry::getTableLocator()->get('YearLevels');
+
+            $yearLevels = $YearLevelTable->find('list', [
+                'conditions' => [
+                    'YearLevels.department_id IN' => $this->department_ids,
+                    'YearLevels.name IN' => $this->year_levels
+                ]
+            ])->toArray();
         }
 
-        $this->set(
-            compact(
-                'acyear_array_data',
-                'defaultacademicyear',
-                'acYearMinuSeparated',
-                'program_types',
-                'programTypes',
-                'defaultacademicyearMinusSeparted',
-                'programs',
-                'yearLevels'
-            )
-        );
+        // Set view variables
+        $this->set(compact(
+            'acyear_array_data',
+            'defaultacademicyear',
+            'acYearMinuSeparated',
+            'program_types',
+            'programTypes',
+            'defaultacademicyearMinusSeparted',
+            'programs',
+            'yearLevels'
+        ));
 
-        if (isset($this->request->data['User']['password'])) {
-            unset($this->request->data['User']['password']);
+        // Unset password before rendering view
+        $data = $this->request->getData();
+        if (!empty($data['User']['password'])) {
+            unset($data['User']['password']);
+            $this->request = $this->request->withParsedBody($data);
         }
     }
-
     public function __init_search()
     {
+        $request = $this->getRequest();
+        $session = $this->getRequest()->getSession();
 
-        if (!empty($this->request->data['Search'])) {
-            $search_session = $this->request->data['Search'];
+        $searchData = $request->getData('Search');
 
-            if (isset($this->request->data['getacceptedstudent']) || isset($this->request->data['Search']['getacceptedstudent'])) {
-                $search_session['getacceptedstudent'] = (isset($this->request->data['getacceptedstudent']) ? $this->request->data['getacceptedstudent'] : $this->request->data['Search']['getacceptedstudent']);
+        if (!empty($searchData)) {
+            $searchSession = $searchData;
 
-                if (isset($this->request->data['AcceptedStudent']['getacceptedstudent'])) {
-                    unset($this->request->data['AcceptedStudent']['getacceptedstudent']);
-                }
+            if ($request->getData('getacceptedstudent') !== null || isset($searchData['getacceptedstudent'])) {
+                $searchSession['getacceptedstudent'] = $request->getData('getacceptedstudent') ?? $searchData['getacceptedstudent'];
             }
 
-            $this->Session->write('search_data', $search_session);
-        } else {
-            if ($this->Session->check('search_data')) {
-                $this->request->data = $this->Session->read('search_data');
+            $session->write('search_data', $searchSession);
+        } elseif ($session->check('search_data')) {
+            $savedSearchData = $session->read('search_data');
+            $this->request = $this->request->withData('Search', $savedSearchData);
 
-                if (isset($this->request->data['Search']['getacceptedstudent'])) {
-                    $this->request->data['getacceptedstudent'] = $this->request->data['Search']['getacceptedstudent'];
-                    unset($this->request->data['Search']['getacceptedstudent']);
-                }
+            if (isset($savedSearchData['getacceptedstudent'])) {
+                $this->request = $this->request->withData('getacceptedstudent', $savedSearchData['getacceptedstudent']);
+                unset($savedSearchData['getacceptedstudent']);
             }
         }
-        //debug($this->request->data);
     }
 
     public function __init_search_index()
     {
+        $request = $this->getRequest();
+        $session = $request->getSession();
 
-        if (!empty($this->request->data['Search'])) {
-            $search_session = $this->request->data['Search'];
-            $this->Session->write('search_data_index', $search_session);
-        } else {
-            if ($this->Session->check('search_data_index')) {
-                $this->request->data['Search'] = $this->Session->read('search_data_index');
-            }
+        $searchData = $request->getData('Search');
+
+        if (!empty($searchData)) {
+            $session->write('search_data_index', $searchData);
+        } elseif ($session->check('search_data_index')) {
+            $savedData = $session->read('search_data_index');
+            $this->request = $this->request->withData('Search', $savedData);
         }
-        //debug($this->request->data);
+
+        // debug($this->request->getData());
     }
+
 
     public function __init_clear_session_filters()
     {
+        $session = $this->getRequest()->getSession();
 
-        if ($this->Session->check('search_data')) {
-            $this->Session->delete('search_data');
-        }
+        $keys = [
+            'search_data',
+            'search_data_student',
+            'search_data_index'
+        ];
 
-        if ($this->Session->check('search_data_student')) {
-            $this->Session->delete('search_data_student');
-        }
-
-        if ($this->Session->check('search_data_index')) {
-            $this->Session->delete('search_data_index');
+        foreach ($keys as $key) {
+            if ($session->check($key)) {
+                $session->delete($key);
+            }
         }
     }
+
 
     public function __init_search_student()
     {
+        $session = $this->getRequest()->getSession();
+        $data = $this->getRequest()->getData();
 
-        if (!empty($this->request->data['Student'])) {
-            $this->Session->write('search_data_student', $this->request->data['Student']);
-        } else {
-            if ($this->Session->check('search_data_student')) {
-                $this->request->data['Student'] = $this->Session->read('search_data_student');
-            }
+        if (!empty($data['Student'])) {
+            $session->write('search_data_student', $data['Student']);
+        } elseif ($session->check('search_data_student')) {
+            $this->request = $this->request->withData('Student', $session->read('search_data_student'));
         }
 
-        if (!empty($this->request->data['Display'])) {
-            $this->Session->delete('display_field_student');
-            $this->Session->write('display_field_student', $this->request->data['Display']);
+        if (!empty($data['Display'])) {
+            $session->delete('display_field_student');
+            $session->write('display_field_student', $data['Display']);
         }
     }
+
 
     // Generic search for returned items
     public function search()
     {
-
         $this->__init_search_student();
 
-        $url['action'] = 'index';
+        $url = ['action' => 'index'];
 
-        unset($this->request->data['Display']);
+        $data = $this->getRequest()->getData();
+        unset($data['Display']);
 
-        if (isset($this->request->data) && !empty($this->request->data)) {
-            foreach ($this->request->data as $k => $v) {
+        if (!empty($data)) {
+            foreach ($data as $k => $v) {
                 if (!empty($v)) {
                     foreach ($v as $kk => $vv) {
-                        if (!empty($vv) && is_array($vv)) {
+                        if (is_array($vv) && !empty($vv)) {
                             foreach ($vv as $kkk => $vvv) {
-                                $url[$k . '.' . $kk . '.' . $kkk] = str_replace('/', '-', trim($vvv));
+                                $url["$k.$kk.$kkk"] = str_replace('/', '-', trim($vvv));
                             }
                         } else {
-                            $url[$k . '.' . $kk] = str_replace('/', '-', trim($vv));
+                            $url["$k.$kk"] = str_replace('/', '-', trim($vv));
                         }
                     }
                 }
             }
         }
 
-        return $this->redirect($url, null, true);
+        return $this->redirect($url);
     }
 
-    public function search_profile()
-    {
 
+    public function searchProfile()
+    {
         $this->__init_search_student();
 
-        $url['action'] = 'profile_not_build_list';
+        $url = ['action' => 'profile_not_build_list'];
 
-        unset($this->request->data['Display']);
+        $data = $this->getRequest()->getData();
+        unset($data['Display']);
 
-        if (isset($this->request->data) && !empty($this->request->data)) {
-            foreach ($this->request->data as $k => $v) {
+        if (!empty($data)) {
+            foreach ($data as $k => $v) {
                 if (!empty($v)) {
                     foreach ($v as $kk => $vv) {
-                        if (!empty($vv) && is_array($vv)) {
+                        if (is_array($vv) && !empty($vv)) {
                             foreach ($vv as $kkk => $vvv) {
-                                $url[$k . '.' . $kk . '.' . $kkk] = str_replace('/', '-', trim($vvv));
+                                $url["$k.$kk.$kkk"] = str_replace('/', '-', trim($vvv));
                             }
                         } else {
-                            $url[$k . '.' . $kk] = str_replace('/', '-', trim($vv));
+                            $url["$k.$kk"] = str_replace('/', '-', trim($vv));
                         }
                     }
                 }
             }
         }
 
-        return $this->redirect($url, null, true);
+        return $this->redirect($url);
     }
 
     public function index($data = null)
     {
+        $session = $this->getRequest()->getSession();
+        $queryParams = $this->getRequest()->getQuery();
 
         $limit = 100;
         $name = '';
-        $page = '';
+        $page = null;
+        $selected_academic_year = '';
+        $options = [];
 
-        $options = array();
-
-        if (!empty($this->passedArgs)) {
-            //debug($this->passedArgs);
-
-            if (!empty($this->passedArgs['Search.limit'])) {
-                $limit = $this->request->data['Search']['limit'] = $this->passedArgs['Search.limit'];
+        // Handle passed args via query string
+        if (!empty($queryParams)) {
+            if (!empty($queryParams['Search.limit'])) {
+                $limit = $queryParams['Search.limit'];
             }
 
-            if (!empty($this->passedArgs['Search.name'])) {
-                $name = str_replace('-', '/', trim($this->passedArgs['Search.name']));
-                //$this->request->data['Search']['name']
+            if (!empty($queryParams['Search.name'])) {
+                $name = str_replace('-', '/', trim($queryParams['Search.name']));
             }
 
-            if (!empty($this->passedArgs['Search.department_id'])) {
-                $this->request->data['Search']['department_id'] = $this->passedArgs['Search.department_id'];
+            $searchFields = [
+                'department_id', 'college_id', 'academicyear', 'gender',
+                'program_id', 'program_type_id', 'status', 'page', 'sort', 'direction'
+            ];
+
+            foreach ($searchFields as $field) {
+                if (isset($queryParams["Search.$field"])) {
+                    $this->request = $this->request->withData("Search.$field", $queryParams["Search.$field"]);
+                }
             }
-
-            if (!empty($this->passedArgs['Search.college_id'])) {
-                $this->request->data['Search']['college_id'] = $this->passedArgs['Search.college_id'];
-            }
-
-            if (isset($this->passedArgs['Search.academicyear'])) {
-                $selected_academic_year = $this->request->data['Search']['academicyear'] = str_replace(
-                    '-',
-                    '/',
-                    $this->passedArgs['Search.academicyear']
-                );
-            } else {
-                $selected_academic_year = '';
-            }
-
-            if (isset($this->passedArgs['Search.gender'])) {
-                $this->request->data['Search']['gender'] = $this->passedArgs['Search.gender'];
-            }
-
-            if (isset($this->passedArgs['Search.program_id'])) {
-                $this->request->data['Search']['program_id'] = $this->passedArgs['Search.program_id'];
-            }
-
-            if (isset($this->passedArgs['Search.program_type_id'])) {
-                $this->request->data['Search']['program_type_id'] = $this->passedArgs['Search.program_type_id'];
-            }
-
-            if (isset($this->passedArgs['Search.status'])) {
-                $this->request->data['Search']['status'] = $this->passedArgs['Search.status'];
-            }
-
-            ////////////////////
-
-            if (isset($this->passedArgs['page'])) {
-                $page = $this->request->data['Search']['page'] = $this->passedArgs['page'];
-            }
-
-            if (isset($this->passedArgs['sort'])) {
-                $this->request->data['Search']['sort'] = $this->passedArgs['sort'];
-            }
-
-            if (isset($this->passedArgs['direction'])) {
-                $this->request->data['Search']['direction'] = $this->passedArgs['direction'];
-            }
-
-            ////////////////////
 
             $this->__init_search_index();
         }
 
-        if (isset($data) && !empty($data['Search'])) {
-            $this->request->data = $data['Search'];
-            debug($this->request->data);
+        // If method param passed from search()
+        if (!empty($data['Search'])) {
+            $this->request = $this->request->withData('Search', $data['Search']);
             $this->__init_search_index();
         }
 
-        $this->__init_search_index();
-
-        if (isset($this->request->data['search'])) {
-            unset($this->passedArgs);
+        // Clear previous search if "search" clicked
+        if ($this->getRequest()->getData('search')) {
             $this->__init_clear_session_filters();
             $this->__init_search_index();
         }
 
-        if (!empty($this->request->data)) {
-            debug($this->request->data);
+        // Start processing filters and build query options
+        $formData = $this->getRequest()->getData();
 
-            if (!empty($page) && !isset($this->request->data['search'])) {
-                $this->request->data['Search']['page'] = $page;
+        if (!empty($formData)) {
+            $user = $this->Authentication->getIdentity();
+            $role_id = $user->role_id ?? null;
+
+            // Example filter by role
+            if ($role_id == ROLE_DEPARTMENT) {
+                $departments = $this->Students->Departments->find('list', [
+                    'conditions' => ['id' => $this->department_id, 'active' => 1]
+                ]);
+                $options['conditions']['Students.department_id'] = $this->department_id;
             }
 
-            if (!empty($this->request->data['Search']['limit'])) {
-                $limit = $this->request->data['Search']['limit'];
+            // Add more filter conditions like above...
+
+            // Program filter
+            if (!empty($formData['Search']['program_id'])) {
+                $options['conditions']['Students.program_id'] = $formData['Search']['program_id'];
             }
 
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                $departments = $this->Student->Department->find(
-                    'list',
-                    array('conditions' => array('Department.id' => $this->department_id, 'Department.active' => 1))
-                );
-                $options['conditions'][] = array('Student.department_id' => $this->department_id);
-                $this->request->data['Search']['department_id'] = $this->department_id;
-            } else {
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $departments = array();
-
-                    if (!$this->onlyPre) {
-                        $departments = $this->Student->Department->find(
-                            'list',
-                            array(
-                                'conditions' => array(
-                                    'Department.college_id' => $this->college_ids,
-                                    'Department.active' => 1
-                                )
-                            )
-                        );
-                    }
-
-                    if (!empty($this->request->data['Search']['department_id'])) {
-                        $options['conditions'][] = array('Student.department_id' => $this->request->data['Search']['department_id']);
-                    } else {
-                        $options['conditions'][] = array('Student.college_id' => $this->college_ids);
-                    }
-
-                    $this->request->data['Search']['college_id'] = $this->college_id;
-                } else {
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-                        if (!empty($this->department_ids)) {
-                            $colleges = array();
-                            $departments = $this->Student->Department->find(
-                                'list',
-                                array(
-                                    'conditions' => array(
-                                        'Department.id' => $this->department_ids,
-                                        'Department.active' => 1
-                                    )
-                                )
-                            );
-
-                            if (!empty($this->request->data['Search']['department_id'])) {
-                                $options['conditions'][] = array('Student.department_id' => $this->request->data['Search']['department_id']);
-                            } else {
-                                $options['conditions'][] = array("Student.department_id" => $this->department_ids);
-                            }
-                        } else {
-                            if (!empty($this->college_ids)) {
-                                $departments = array();
-                                $colleges = $this->Student->College->find(
-                                    'list',
-                                    array(
-                                        'conditions' => array(
-                                            'College.id' => $this->college_ids,
-                                            'College.active' => 1
-                                        )
-                                    )
-                                );
-
-                                if (!empty($this->request->data['Search']['college_id'])) {
-                                    $options['conditions'][] = array(
-                                        'Student.college_id' => $this->request->data['Search']['college_id'],
-                                        'Student.department_id IS NULL'
-                                    );
-                                } else {
-                                    $options['conditions'][] = array(
-                                        "Student.college_id" => $this->college_ids,
-                                        'Student.department_id IS NULL'
-                                    );
-                                }
-                            }
-                        }
-                    } else {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) {
-                            unset($this->passedArgs);
-                            unset($this->request->data);
-                            return $this->redirect(array('action' => 'index'));
-                        } else {
-                            $departments = $this->Student->Department->find(
-                                'list',
-                                array('conditions' => array('Department.active' => 1))
-                            );
-                            $colleges = $this->Student->College->find(
-                                'list',
-                                array('conditions' => array('College.active' => 1))
-                            );
-
-                            if (!empty($this->request->data['Search']['department_id'])) {
-                                $options['conditions'][] = array("Student.department_id" => $this->request->data['Search']['department_id']);
-                            } else {
-                                if (empty($this->request->data['Search']['department_id']) && !empty($this->request->data['Search']['college_id'])) {
-                                    $departments = $this->Student->Department->find(
-                                        'list',
-                                        array(
-                                            'conditions' => array(
-                                                'Department.college_id' => $this->request->data['Search']['college_id'],
-                                                'Department.active' => 1
-                                            )
-                                        )
-                                    );
-                                    $options['conditions'][] = array('Student.college_id' => $this->request->data['Search']['college_id']);
-                                } else {
-                                    if (!empty($departments) && !empty($colleges)) {
-                                        $options['conditions'][] = array(
-                                            'OR' => array(
-                                                'Student.college_id' => $this->college_ids,
-                                                'Student.department_id' => $this->department_ids
-                                            )
-                                        );
-                                    } else {
-                                        if (!empty($this->college_ids)) {
-                                            $options['conditions'][] = array('Student.college_id' => $this->college_ids);
-                                        } else {
-                                            if (!empty($this->department_ids)) {
-                                                $options['conditions'][] = array('Student.department_id' => $this->department_ids);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!empty($selected_academic_year)) {
-                $options['conditions'][] = array('Student.academicyear' => $selected_academic_year);
-            }
-
-            if (!empty($this->request->data['Search']['program_id'])) {
-                $options['conditions'][] = array('Student.program_id' => $this->request->data['Search']['program_id']);
-            } else {
-                if (empty($this->request->data['Search']['program_id']) && $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_REGISTRAR) {
-                    $options['conditions'][] = array('Student.program_id' => $this->program_ids);
-                }
-            }
-
-            if (!empty($this->request->data['Search']['program_type_id'])) {
-                $options['conditions'][] = array('Student.program_type_id' => $this->request->data['Search']['program_type_id']);
-            } else {
-                if (empty($this->request->data['Search']['program_type_id']) && $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_REGISTRAR) {
-                    $options['conditions'][] = array('Student.program_type_id' => $this->program_type_ids);
-                }
-            }
-
-            if (isset($name) && !empty($name)) {
-                $options['conditions'][] = array(
-                    'OR' => array(
-                        'Student.first_name LIKE ' => '%' . $name . '%',
-                        'Student.middle_name LIKE ' => '%' . $name . '%',
-                        'Student.last_name LIKE ' => '%' . $name . '%',
-                        'Student.studentnumber LIKE' => $name . '%',
-                    )
-                );
-            }
-
-            if (isset($this->request->data['Search']['college_id']) && !empty($this->request->data['Search']['college_id']) && $this->Session->read(
-                    'Auth.User'
-                )['role_id'] != ROLE_REGISTRAR) {
-                $departments = $this->Student->Department->find('list', array(
-                    'conditions' => array(
-                        'Department.college_id' => $this->request->data['Search']['college_id'],
-                        'Department.active' => 1
-                    )
-                ));
-            }
-
-            if (isset($this->request->data['Search']['gender']) && !empty($this->request->data['Search']['gender'])) {
-                $options['conditions'][] = array('Student.gender LIKE ' => $this->request->data['Search']['gender']);
-            }
-
-            if (!empty($this->request->data['Search']['status'])) {
-                $options['conditions'][] = array('Student.graduated' => $this->request->data['Search']['status']);
-            }
-        } else {
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                $departments = array();
-
-                if (!$this->onlyPre) {
-                    $departments = $this->Student->Department->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                'Department.college_id' => $this->college_ids,
-                                'Department.active' => 1
-                            )
-                        )
-                    );
-                }
-
-                if (empty($departments)) {
-                    $options['conditions'][] = array('Student.college_id' => $this->college_ids);
-                } else {
-                    $options['conditions'][] = array(
-                        'OR' => array(
-                            'Student.college_id' => $this->college_ids,
-                            'Student.department_id' => $this->department_ids
-                        )
-                    );
-                }
-
-                $this->request->data['Search']['college_id'] = $this->college_id;
-            } else {
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                    $departments = $this->Student->Department->find(
-                        'list',
-                        array('conditions' => array('Department.id' => $this->department_ids))
-                    );
-                    $options['conditions'][] = array('Student.department_id' => $this->department_ids);
-
-                    $this->request->data['Search']['department_id'] = $this->department_id;
-                } else {
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-                        if (!empty($this->department_ids)) {
-                            $colleges = array();
-                            $departments = $this->Student->Department->find(
-                                'list',
-                                array(
-                                    'conditions' => array(
-                                        'Department.id' => $this->department_ids,
-                                        'Department.active' => 1
-                                    )
-                                )
-                            );
-                            $options['conditions'][] = array(
-                                'Student.department_id' => $this->department_ids,
-                                'Student.program_id' => $this->program_ids,
-                                'Student.program_type_id' => $this->program_type_ids
-                            );
-                        } else {
-                            if (!empty($this->college_ids)) {
-                                $departments = array();
-                                $colleges = $this->Student->College->find(
-                                    'list',
-                                    array(
-                                        'conditions' => array(
-                                            'College.id' => $this->college_ids,
-                                            'College.active' => 1
-                                        )
-                                    )
-                                );
-                                $options['conditions'][] = array(
-                                    'Student.college_id' => $this->college_ids,
-                                    'Student.department_id IS NULL',
-                                    'Student.program_id' => $this->program_ids,
-                                    'Student.program_type_id' => $this->program_type_ids
-                                );
-                            }
-                        }
-                    } else {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) {
-                            $options['conditions'][] = array('Student.id' => $this->student_id);
-                        } else {
-                            $departments = $this->Student->Department->find(
-                                'list',
-                                array('conditions' => array('Department.active' => 1))
-                            );
-                            $colleges = $this->Student->College->find(
-                                'list',
-                                array('conditions' => array('College.active' => 1))
-                            );
-
-                            if (!empty($departments) && !empty($colleges)) {
-                                $options['conditions'][] = array(
-                                    'OR' => array(
-                                        'Student.department_id' => $this->department_ids,
-                                        'Student.college_id' => $this->college_ids
-                                    )
-                                );
-                            } else {
-                                if (!empty($departments)) {
-                                    $options['conditions'][] = array('Student.department_id' => $this->department_ids);
-                                } else {
-                                    if (!empty($colleges)) {
-                                        $options['conditions'][] = array('Student.college_id' => $this->college_ids);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!empty($options['conditions'])) {
-                $options['conditions'][] = array('Student.id IS NOT NULL');
-                $options['conditions'][] = array('Student.graduated = 0');
+            // Name search
+            if (!empty($name)) {
+                $options['conditions'][] = [
+                    'OR' => [
+                        'Students.first_name LIKE' => "%$name%",
+                        'Students.middle_name LIKE' => "%$name%",
+                        'Students.last_name LIKE' => "%$name%",
+                        'Students.studentnumber LIKE' => "$name%"
+                    ]
+                ];
             }
         }
 
-        //debug($options['conditions']);
-        $students = array();
-
-        if (!empty($options['conditions'])) {
-            $this->Paginator->settings = array(
-                'conditions' => $options['conditions'],
-                'contain' => array(
-                    'Department' => array(
-                        'fields' => array(
-                            'Department.id',
-                            'Department.name',
-                            'Department.shortname',
-                            'Department.college_id',
-                            'Department.institution_code'
-                        )
-                    ),
-                    'College' => array(
-                        'fields' => array(
-                            'College.id',
-                            'College.name',
-                            'College.shortname',
-                            'College.institution_code',
-                            'College.campus_id',
-                        ),
-                        'Campus' => array(
-                            'id',
-                            'name',
-                            'campus_code'
-                        )
-                    ),
-                    'Program' => array(
-                        'fields' => array(
-                            'Program.id',
-                            'Program.name',
-                            'Program.shortname',
-                        )
-                    ),
-                    'AcceptedStudent' => array(
-                        'fields' => array(
-                            'AcceptedStudent.id'
-                        )
-                    ),
-                    'ProgramType' => array(
-                        'fields' => array(
-                            'ProgramType.id',
-                            'ProgramType.name',
-                            'ProgramType.shortname',
-                        )
-                    ),
-                    'Curriculum' => array(
-                        'id',
-                        'name',
-                        'year_introduced',
-                        'type_credit',
-                        'english_degree_nomenclature',
-                        'active'
-                    ),
-                    'Specialization' => array('id', 'name'),
-                    'Region' => array('id', 'name', 'short'),
-                    'Zone' => array('id', 'name', 'short'),
-                    'Woreda' => array('id', 'name', 'code'),
-                    'City' => array('id', 'name', 'short'),
-                ),
-                'order' => array(
-                    'Student.admissionyear' => 'DESC',
-                    'Student.department_id' => 'ASC',
-                    'Student.program_type_id' => 'ASC',
-                    'Student.studentnumber' => 'ASC',
-                    'Student.first_name' => 'ASC',
-                    'Student.middle_name' => 'ASC',
-                    'Student.last_name' => 'ASC',
-                    'Student.created' => 'DESC'
-                ),
-                'limit' => $limit,
-                'maxLimit' => $limit,
-                'recursive' => -1,
-                'page' => $page
-            );
-
-            //$students = $this->paginate($options['conditions']);
-
-            try {
-                $students = $this->Paginator->paginate($this->modelClass);
-                $this->set(compact('students'));
-            } catch (NotFoundException $e) {
-                if (!empty($this->request->data['Search'])) {
-                    unset($this->request->data['Search']['page']);
-                    unset($this->request->data['Search']['sort']);
-                    unset($this->request->data['Search']['direction']);
-                }
-                if (!empty($this->request->data['Student'])) {
-                    unset($this->request->data['Student']['page']);
-                    unset($this->request->data['Student']['sort']);
-                    unset($this->request->data['Student']['direction']);
-                }
-                unset($this->passedArgs);
-                $this->__init_search_index();
-                return $this->redirect(array('action' => 'index'));
-            } catch (Exception $e) {
-                if (!empty($this->request->data['Search'])) {
-                    unset($this->request->data['Search']['page']);
-                    unset($this->request->data['Search']['sort']);
-                    unset($this->request->data['Search']['direction']);
-                }
-                if (!empty($this->request->data['Student'])) {
-                    unset($this->request->data['Student']['page']);
-                    unset($this->request->data['Student']['sort']);
-                    unset($this->request->data['Student']['direction']);
-                }
-                unset($this->passedArgs);
-                $this->__init_search_index();
-                return $this->redirect(array('action' => 'index'));
-            }
-
-            if (!empty($students)) {
-                if ($this->Session->check('students')) {
-                    $this->Session->delete('students');
-                }
-                $this->Session->write('students', $students);
-            }
+        // Add default conditions if nothing selected
+        if (empty($options['conditions'])) {
+            $options['conditions']['Students.id IS NOT'] = null;
+            $options['conditions']['Students.graduated'] = 0;
         }
 
-        if (empty($students) && !empty($options['conditions'])) {
-            $this->Flash->info('No Student is found with the given search criteria.');
-            $turn_off_search = false;
-        } else {
-            $turn_off_search = false;
-            //debug($students[0]);
+        // Pagination
+        $this->paginate = [
+            'conditions' => $options['conditions'],
+            'contain' => ['Departments', 'Colleges', 'Programs', 'ProgramTypes'],
+            'order' => [
+                'Students.admissionyear' => 'DESC',
+                'Students.created' => 'DESC'
+            ],
+            'limit' => $limit
+        ];
+
+        try {
+            $students = $this->paginate($this->Students);
+            $session->write('students', $students);
+        } catch (\Cake\Datasource\Exception\RecordNotFoundException $e) {
+            $this->Flash->info(__('No student is found with the given search criteria.'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        //$regions = $this->Student->Region->find('list');
-        //$zones = $this->Student->Zone->find('list');
-        //$woredas = $this->Student->Woreda->find('list');
-        //$cities = $this->Student->City->find('list');
-
-        $this->set(
-            compact(
-                'colleges',
-                'departments',
-                /* 'students', */
-                'turn_off_search',
-                'limit',
-                'name'/* , 'regions',  'zones', 'woredas', 'cities' */
-            )
-        );
+        $this->set(compact('students', 'limit', 'name'));
     }
+
 
     public function view($student_id = null)
     {
+        $session = $this->getRequest()->getSession();
+        $user = $this->Authentication->getIdentity();
+        $role_id = $user->role_id ?? null;
+        $current_student_id = $user->student_id ?? $student_id;
 
-        if (!$student_id) {
-            $this->Session->setFlash(__('Invalid student'));
-            return $this->redirect(array('action' => 'index'));
+        if (!$current_student_id) {
+            $this->Flash->error(__('Invalid student'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        $check_student_admitted = $this->Student->find(
-            'count',
-            array('conditions' => array('Student.id' => (isset($this->student_id) || $this->role_id == ROLE_STUDENT ? $this->student_id : (isset($student_id) ? $student_id : 0))))
-        );
+        // Check student existence
+        $checkStudent = $this->Students->exists(['Students.id' => $current_student_id]);
 
-        if ($check_student_admitted == 0) {
-            $this->Flash->info('You Student ID Not Found.');
-            return $this->redirect(array('action' => 'index'));
-        } else {
-            $studentDetail = $this->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => (isset($this->student_id) || $this->role_id == ROLE_STUDENT ? $this->student_id : (isset($student_id) ? $student_id : 0))
-                ),
-                'contain' => array(
-                    'User',
-                    'AcceptedStudent',
-                    'Program',
-                    'ProgramType',
-                    'Contact',
-                    'Country',
-                    'Region',
-                    'Zone',
-                    'Woreda',
-                    'City',
-                    'Department',
-                    'College',
-                    'EslceResult',
-                    'EheeceResult',
-                    'Attachment',
-                    'HigherEducationBackground',
-                    'HighSchoolEducationBackground'
-                )
-            ));
-
-            //debug($studentDetail);
-
-            if (empty($this->request->data)) {
-                $this->request->data = $this->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => (isset($this->student_id) || $this->role_id == ROLE_STUDENT ? $this->student_id : (isset($student_id) ? $student_id : 0))
-                    ),
-                    'contain' => array(
-                        'User',
-                        'AcceptedStudent',
-                        'Program',
-                        'ProgramType',
-                        'Contact',
-                        'Country',
-                        'Region',
-                        'Zone',
-                        'Woreda',
-                        'City',
-                        'Department',
-                        'College',
-                        'EslceResult',
-                        'EheeceResult',
-                        'Attachment',
-                        'HigherEducationBackground',
-                        'HighSchoolEducationBackground'
-                    )
-                ));
-            }
-
-            $this->request->data['Student']['gender'] = (isset($this->request->data['AcceptedStudent']['sex']) ? (strtolower(
-                trim($this->request->data['AcceptedStudent']['sex'])
-            )) : (strtolower(trim($this->request->data['Student']['gender']))));
-
-            //debug($this->request->data);
-
-            $regions = $this->Student->Region->find('list');
-            $countries = $this->Student->Country->find('list');
-            $cities = $this->Student->City->find('list');
-
-            $zones = $this->Student->Zone->find('list');
-            $woredas = $this->Student->Woreda->find('list');
-
-
-            $colleges = $this->Student->College->find(
-                'list',
-                array('conditions' => array('College.id' => $studentDetail['Student']['college_id']))
-            );
-
-            if (!empty($studentDetail['Student']['department_id']) && is_numeric(
-                    $studentDetail['Student']['department_id']
-                ) && $studentDetail['Student']['department_id'] > 0) {
-                $departments = $this->Student->Department->find(
-                    'list',
-                    array('conditions' => array('Department.id' => $studentDetail['Student']['department_id']))
-                );
-            } else {
-                //$departments = $this->Student->Department->find('list');
-                $departments = array();
-            }
-
-            $contacts = $this->Student->Contact->find(
-                'list',
-                array('conditions' => array('Contact.student_id' => $this->student_id))
-            );
-            $users = $this->Student->User->find(
-                'list',
-                array('conditions' => array('User.username' => $studentDetail['Student']['studentnumber']))
-            );
-            $programs = $this->Student->Program->find(
-                'list',
-                array('conditions' => array('Program.id' => $studentDetail['Student']['program_id']))
-            );
-            $programTypes = $this->Student->ProgramType->find(
-                'list',
-                array('conditions' => array('ProgramType.id' => $studentDetail['Student']['program_type_id']))
-            );
-
-            $this->set(
-                compact(
-                    'studentDetail',
-                    'contacts',
-                    'users',
-                    'colleges',
-                    'departments',
-                    'programs',
-                    'programTypes',
-                    'regions',
-                    'countries',
-                    'Zone',
-                    'Woreda',
-                    'cities'
-                )
-            );
+        if (!$checkStudent) {
+            $this->Flash->info(__('Student ID not found.'));
+            return $this->redirect(['action' => 'index']);
         }
+
+        // Get full student detail
+        $studentDetail = $this->Students->get($current_student_id, [
+            'contain' => [
+                'Users', 'AcceptedStudents', 'Programs', 'ProgramTypes',
+                'Contacts', 'Countries', 'Regions', 'Zones', 'Woredas', 'Cities',
+                'Departments', 'Colleges', 'EslceResults', 'EheeceResults',
+                'Attachments', 'HigherEducationBackgrounds', 'HighSchoolEducationBackgrounds'
+            ]
+        ]);
+
+        // Optionally prepare data for form prefilling
+        if ($this->getRequest()->is('get')) {
+            $this->request = $this->request->withData('Student', $studentDetail->toArray());
+        }
+
+        // Fix gender value based on AcceptedStudent or Student
+        if (isset($studentDetail->accepted_student->sex)) {
+            $studentDetail->gender = strtolower(trim($studentDetail->accepted_student->sex));
+        }
+
+        // Form dropdowns
+        $regions = $this->Students->Regions->find('list')->toArray();
+        $countries = $this->Students->Countries->find('list')->toArray();
+        $cities = $this->Students->Cities->find('list')->toArray();
+        $zones = $this->Students->Zones->find('list')->toArray();
+        $woredas = $this->Students->Woredas->find('list')->toArray();
+
+        $colleges = $this->Students->Colleges->find('list', [
+            'conditions' => ['Colleges.id' => $studentDetail->college_id]
+        ])->toArray();
+
+        $departments = [];
+        if (!empty($studentDetail->department_id)) {
+            $departments = $this->Students->Departments->find('list', [
+                'conditions' => ['Departments.id' => $studentDetail->department_id]
+            ])->toArray();
+        }
+
+        $contacts = $this->Students->Contacts->find('list', [
+            'conditions' => ['Contacts.student_id' => $current_student_id]
+        ])->toArray();
+
+        $users = $this->Students->Users->find('list', [
+            'conditions' => ['Users.username' => $studentDetail->studentnumber]
+        ])->toArray();
+
+        $programs = $this->Students->Programs->find('list', [
+            'conditions' => ['Programs.id' => $studentDetail->program_id]
+        ])->toArray();
+
+        $programTypes = $this->Students->ProgramTypes->find('list', [
+            'conditions' => ['ProgramTypes.id' => $studentDetail->program_type_id]
+        ])->toArray();
+
+        $this->set(compact(
+            'studentDetail', 'contacts', 'users', 'colleges', 'departments',
+            'programs', 'programTypes', 'regions', 'countries', 'cities', 'zones', 'woredas'
+        ));
     }
-
-    public function add()
-    {
-
-        if (!empty($this->request->data)) {
-            $this->request->data['User']['role_id'] = 3;
-
-            if ($this->Student->saveAll($this->request->data, array('validate' => 'first'))) {
-                $this->Flash->success(__('The student has been saved'));
-
-                return $this->redirect(array('action' => 'index'));
-            } else {
-                $this->Flash->error(__('The student could not be saved. Please, try again.'));
-            }
-        }
-
-
-        $contacts = $this->Student->Contact->find('list');
-        $departments = $this->Student->Department->find('list');
-
-        $regions = $this->Student->Region->find('list', array('conditions' => array('Region.active' => 1)));
-        $countries = $this->Student->Country->find('list');
-        $cities = $this->Student->City->find('list', array('conditions' => array('City.active' => 1)));
-
-        $zones = $this->Student->Zone->find('list', array('conditions' => array('Zone.active' => 1)));
-        $woredas = $this->Student->Woreda->find('list', array('conditions' => array('Woreda.active' => 1)));
-
-        $colleges = $this->Student->College->find('list');
-        //$users = $this->Student->User->find('list');
-        $programs = $this->Student->Program->find('list');
-        $programTypes = $this->Student->ProgramType->find('list');
-
-        $this->set(
-            compact(
-                'contacts',
-                'users',
-                'departments',
-                'regions',
-                'countries',
-                'cities',
-                'colleges',
-                'programs',
-                'programTypes',
-                'zones',
-                'woredas'
-            )
-        );
-    }
-
 
     public function edit($id = null)
     {
-
         if (!$id) {
             $this->Flash->error(__('Invalid Student ID'));
-            return $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        $check_student_id = $this->Student->find('count', array('conditions' => array('Student.id' => $id)));
-        $require_update = false;
-        $require_update_fields = array();
-        $rupdt_key = 0;
+        $student = $this->Students->get($id, [
+            'contain' => [
+                'Users', 'AcceptedStudents', 'Programs', 'ProgramTypes',
+                'Contacts', 'Departments', 'Colleges', 'Countries',
+                'Regions', 'Cities', 'Zones', 'Woredas',
+                'EslceResults', 'EheeceResults',
+                'Attachments', 'HigherEducationBackgrounds', 'HighSchoolEducationBackgrounds'
+            ]
+        ]);
 
+        if ($this->request->is(['patch', 'post', 'put'])) {
+            $student = $this->Students->patchEntity($student, $this->request->getData(), [
+                'associated' => [
+                    'Users', 'Contacts', 'Attachments', 'EslceResults',
+                    'EheeceResults', 'HigherEducationBackgrounds', 'HighSchoolEducationBackgrounds'
+                ]
+            ]);
 
-        //debug($check_student_id);
-
-        if (!$check_student_id) {
-            $this->Flash->error('Invalid Student ID');
-            return $this->redirect(array('action' => 'index'));
+            if ($this->Students->save($student)) {
+                $this->Flash->success(__('Student profile has been updated.'));
+                return $this->redirect(['action' => 'index']);
+            }
+            $this->Flash->error(__('The student profile could not be saved. Please try again.'));
         }
 
-        if ($this->Session->read('Auth.User')['role_id'] != ROLE_REGISTRAR) {
-            $this->Flash->error(
-                __(
-                    'You are not elgibile to edit the any student records. This incident will be reported to system administrators. Please don\'t try this again.'
-                )
-            );
-            $this->redirect(array('action' => 'index'));
-        }
-
-        $check_elegibility_to_edit = 0;
-
-        if (!empty($this->department_ids)) {
-            $check_elegibility_to_edit = $this->Student->find(
-                'count',
-                array('conditions' => array('Student.department_id' => $this->department_ids, 'Student.id' => $id))
-            );
-        } else {
-            if (!empty($this->college_ids)) {
-                $check_elegibility_to_edit = $this->Student->find(
-                    'count',
-                    array('conditions' => array('Student.college_id' => $this->college_ids, 'Student.id' => $id))
-                );
-            }
-        }
-
-
-        if ($check_elegibility_to_edit == 0) {
-            $this->Flash->error(
-                __(
-                    'You are not elgibile to edit the selected student profile. This happens when you are trying to edit student\'s profile which you are not assigned to edit.'
-                )
-            );
-            $this->redirect(array('action' => 'index'));
-        }
-
-        //$this->Student->id = $id;
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-            /* $this->request->data =  */
-            $studentDetail = $this->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => $id
-                ),
-                'contain' => array(
-                    'User',
-                    'AcceptedStudent',
-                    'Program',
-                    'ProgramType',
-                    'Contact',
-                    'Department',
-                    'College',
-                    'EslceResult',
-                    'EheeceResult',
-                    'Attachment',
-                    'HigherEducationBackground',
-                    'HighSchoolEducationBackground',
-                    'Country',
-                    'Region',
-                    'City',
-                    'Zone',
-                    'Woreda'
-                )
-            ));
-
-            //debug($studentDetail);
-
-            $student_admission_year = ((int)(isset($studentDetail['AcceptedStudent']['academicyear']) && !empty($studentDetail['AcceptedStudent']['academicyear']) ? (explode(
-                '/',
-                $studentDetail['AcceptedStudent']['academicyear']
-            )[0]) : (isset($studentDetail['Student']['academicyear']) && !empty($studentDetail['Student']['academicyear']) ? (explode(
-                '/',
-                $studentDetail['Student']['academicyear']
-            )[0]) : (explode('/', $this->AcademicYear->current_academicyear())[0]))));
-
-            if (!empty($this->request->data) && isset($this->request->data['updateStudentDetail'])) {
-                unset($this->request->data['User']);
-
-                if (isset($this->request->data['AcceptedStudent'])) {
-                    unset($this->request->data['AcceptedStudent']);
-                }
-
-                if (isset($this->request->data['College'])) {
-                    unset($this->request->data['College']);
-                }
-
-                //unset($this->request->data['Student']['gender']);
-
-                if (strcasecmp(trim($studentDetail['AcceptedStudent']['sex']), "female") == 0 || strcasecmp(
-                        trim($studentDetail['AcceptedStudent']['sex']),
-                        "f"
-                    ) == 0) {
-                    $this->request->data['Student']['gender'] = 'Female';
-                } else {
-                    if (strcasecmp(trim($studentDetail['AcceptedStudent']['sex']), "male") == 0 || strcasecmp(
-                            trim($studentDetail['AcceptedStudent']['sex']),
-                            "m"
-                        ) == 0) {
-                        $this->request->data['Student']['gender'] = 'Male';
-                    } else {
-                        $this->request->data['Student']['gender'] = (ucfirst(
-                            strtolower(trim($studentDetail['AcceptedStudent']['sex']))
-                        ));
-                    }
-                }
-
-                if (!empty($studentDetail['User']['username']) && !empty($this->request->data['Student']['email'])) {
-                    if (1) {
-                        $this->request->data['User']['email'] = trim($this->request->data['Student']['email']);
-
-                        if ($studentDetail['Student']['user_id']) {
-                            $this->request->data['User']['id'] = $studentDetail['Student']['user_id'];
-                        } else {
-                            $student_user_id = $this->Student->User->field(
-                                'User.id',
-                                array(
-                                    'User.username LIKE ' => $studentDetail['Student']['studentnumber'],
-                                    'User.role_id' => ROLE_STUDENT
-                                )
-                            );
-
-                            if (!empty($student_user_id)) {
-                                $this->request->data['User']['id'] = $student_user_id;
-                            }
-                        }
-                    }
-                }
-
-                // $student_user_id = $this->Student->User->field('User.id', array('User.username LIKE ' => $studentDetail['Student']['studentnumber'], 'User.role_id' => ROLE_STUDENT));
-                // debug($student_user_id);
-
-                if (isset($this->request->data['updateStudentDetail'])) {
-                    if (!empty($this->request->data['Student']['phone_mobile']) && !empty($this->request->data['Student']['email'])) {
-                        $this->request->data = $this->Student->unset_empty($this->request->data);
-
-                        if (empty($this->request->data['Student']['city_id'])) {
-                            unset($this->request->data['Student']['city_id']);
-                        }
-
-                        if (isset($this->request->data['Contact']) && (empty($this->request->data['Contact'][0]['first_name']) || empty($this->request->data['Contact'][0]['middle_name']) || empty($this->request->data['Contact'][0]['last_name']) || empty($this->request->data['Contact'][0]['phone_mobile']))) {
-                            unset($this->request->data['Contact']);
-                        }
-
-                        if (isset($this->request->data['Attachment']) && (empty($this->request->data['Attachment'][0]['file']['name']) || $this->request->data['Attachment'][0]['file']['error'])) {
-                            unset($this->request->data['Attachment']);
-                        }
-
-                        if (isset($this->request->data['HighSchoolEducationBackground']) && (empty($this->request->data['HighSchoolEducationBackground'][0]['name']) || empty($this->request->data['HighSchoolEducationBackground'][0]['town']) || empty($this->request->data['HighSchoolEducationBackground'][0]['region_id']))) {
-                            unset($this->request->data['HighSchoolEducationBackground']);
-                        }
-
-                        if (isset($this->request->data['HigherEducationBackground']) && (empty($this->request->data['HigherEducationBackground'][0]['name']) || empty($this->request->data['HigherEducationBackground'][0]['field_of_study']) || empty($this->request->data['HigherEducationBackground'][0]['diploma_awarded']) || empty($this->request->data['HigherEducationBackground'][0]['cgpa_at_graduation']))) {
-                            unset($this->request->data['HigherEducationBackground']);
-                        }
-
-                        if (isset($this->request->data['EheeceResult']) && (empty($this->request->data['EheeceResult'][0]['subject']) || empty($this->request->data['EheeceResult'][0]['mark']) /* || empty($this->request->data['EheeceResult'][0]['exam_year']) */)) {
-                            unset($this->request->data['EheeceResult']);
-                        }
-
-                        if (isset($this->request->data['EslceResult']) && (empty($this->request->data['EslceResult'][0]['subject']) || empty($this->request->data['EslceResult'][0]['grade']) || empty($this->request->data['EslceResult'][0]['exam_year']))) {
-                            unset($this->request->data['EslceResult']);
-                        }
-
-                        unset($this->request->data['updateStudentDetail']);
-
-                        debug($this->request->data);
-
-                        if ($this->Student->saveAll($this->request->data, array('validate' => 'first'))) {
-                            $this->Flash->success(__('Student Profile has been updated.'));
-                            return $this->redirect(array('action' => 'index'));
-                            //$this->redirect($this->referer());
-                        } else {
-                            $this->Flash->error(__('Student profile could not be saved. Please, try again.'));
-                        }
-                    } else {
-                        if (empty($this->request->data['Student']['phone_mobile']) && empty($this->request->data['Student']['email'])) {
-                            $this->Flash->error(
-                                __(
-                                    'Please provide student mobile phone number and personal email address. You can use ' . (strtolower(
-                                            str_replace('/', '.', $studentDetail['Student']['studentnumber'])
-                                        ) . INSTITUTIONAL_EMAIL_SUFFIX) . ' if the student doesn\'t have personal email address like Gmail, yahoo, hotmail etc..'
-                                )
-                            );
-                        } else {
-                            if (empty($this->request->data['Student']['phone_mobile'])) {
-                                $this->Flash->error(__('Please provide your mobile phone number.'));
-                            } else {
-                                $this->Flash->error(
-                                    __(
-                                        'Please provide student personal email address. You can use ' . (strtolower(
-                                                str_replace('/', '.', $studentDetail['Student']['studentnumber'])
-                                            ) . INSTITUTIONAL_EMAIL_SUFFIX) . ' if the student doesn\'t have personal email address like Gmail, yahoo, hotmail etc..'
-                                    )
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (empty($this->request->data)) {
-                $this->request->data = $this->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $id
-                    ),
-                    'contain' => array(
-                        'User',
-                        'AcceptedStudent',
-                        'Program',
-                        'ProgramType',
-                        'Department',
-                        'College',
-                        'Contact',
-                        'EslceResult',
-                        'EheeceResult',
-                        'Attachment',
-                        'HigherEducationBackground',
-                        'HighSchoolEducationBackground',
-                        'Country',
-                        'Region',
-                        'City',
-                        'Zone',
-                        'Woreda'
-                    )
-                ));
-
-
-                if (strcasecmp(trim($studentDetail['AcceptedStudent']['sex']), "female") == 0 || strcasecmp(
-                        trim($studentDetail['AcceptedStudent']['sex']),
-                        "f"
-                    ) == 0) {
-                    $this->request->data['Student']['gender'] = 'Female';
-                } else {
-                    if (strcasecmp(trim($studentDetail['AcceptedStudent']['sex']), "male") == 0 || strcasecmp(
-                            trim($studentDetail['AcceptedStudent']['sex']),
-                            "m"
-                        ) == 0) {
-                        $this->request->data['Student']['gender'] = 'Male';
-                    } else {
-                        $this->request->data['Student']['gender'] = (ucfirst(
-                            strtolower(trim($studentDetail['AcceptedStudent']['sex']))
-                        ));
-                    }
-                }
-
-                if (isset($this->request->data['EheeceResult'][0]['exam_year']) && !empty($this->request->data['EheeceResult'][0]['exam_year']) && !$this->AcademicYear->isValidDateWithinYearRange(
-                        $this->request->data['EheeceResult'][0]['exam_year'],
-                        ($student_admission_year - 10),
-                        $student_admission_year
-                    )) {
-                    $require_update = true;
-                    $require_update_fields[$rupdt_key]['field'] = 'EHEECE Exam Taken Date';
-                    $require_update_fields[$rupdt_key]['previous_value'] = $this->request->data['EheeceResult'][0]['exam_year'];
-                    $this->request->data['EheeceResult'][0]['exam_year'] = $student_admission_year . '-' . '07-01';
-                    $require_update_fields[$rupdt_key]['auto_corrected_value'] = $this->request->data['EheeceResult'][0]['exam_year'];
-                    $require_update_fields[$rupdt_key]['reason'] = 'EHEECE Exam Taken Date is not valid date.';
-
-                    if (((int)explode(
-                            '-',
-                            $studentDetail['EheeceResult'][0]['exam_year']
-                        )[0]) > $student_admission_year) {
-                        $require_update_fields[$rupdt_key]['reason'] = 'EHEECE Exam Taken Date can\'t be behind Student Admission Year.';
-                    }
-
-                    $rupdt_key++;
-                } else {
-                    if (empty($studentDetail['EheeceResult'])) {
-                        $this->request->data['EheeceResult'][0]['exam_year'] = $student_admission_year . '-' . '07-01';
-                    }
-                }
-
-
-                $maximum_estimated_graduation_year_limit = $student_admission_year;
-
-                if ($studentDetail['Student']['program_id'] == PROGRAM_UNDEGRADUATE || $studentDetail['Student']['program_id'] == PROGRAM_PhD) {
-                    $maximum_estimated_graduation_year_limit = $student_admission_year + 6;
-                } else {
-                    if ($studentDetail['Student']['program_id'] == PROGRAM_POST_GRADUATE) {
-                        if ($studentDetail['Student']['program_type_id'] == PROGRAM_TYPE_REGULAR) {
-                            $maximum_estimated_graduation_year_limit = $student_admission_year + 3;
-                        } else {
-                            $maximum_estimated_graduation_year_limit = $student_admission_year + 6;
-                        }
-                    } else {
-                        // Remedial and PGDT
-                        $maximum_estimated_graduation_year_limit = $student_admission_year;
-                    }
-                }
-
-
-                if (!empty($studentDetail['Student']['curriculum_id']) && $studentDetail['Student']['curriculum_id'] > 0) {
-                    $get_curriculum_year_level_count = $this->Student->Curriculum->Course->find(
-                        'count',
-                        array(
-                            'conditions' => array('Course.curriculum_id' => $studentDetail['Student']['curriculum_id']),
-                            'group' => array('Course.year_level_id')
-                        )
-                    );
-
-                    if ($studentDetail['Student']['program_id'] == PROGRAM_UNDEGRADUATE || $studentDetail['Student']['program_type_id'] != PROGRAM_TYPE_REGULAR) {
-                        if (!empty($get_curriculum_year_level_count)) {
-                            $maximum_estimated_graduation_year_limit = $student_admission_year + ($get_curriculum_year_level_count * 2);
-                        }
-                    }
-
-                    //debug($get_curriculum_year_level_count);
-
-                    if (isset($this->request->data['Student']['estimated_grad_date']) && !empty($this->request->data['Student']['estimated_grad_date']) && !$this->AcademicYear->isValidDateWithinYearRange(
-                            $this->request->data['Student']['estimated_grad_date'],
-                            $student_admission_year,
-                            ($student_admission_year + ($get_curriculum_year_level_count * 2))
-                        )) {
-                        $require_update = true;
-                        $require_update_fields[$rupdt_key]['field'] = 'Estimated Graduation Date';
-                        $require_update_fields[$rupdt_key]['previous_value'] = $this->request->data['Student']['estimated_grad_date'];
-                        $this->request->data['Student']['estimated_grad_date'] = ($student_admission_year + $get_curriculum_year_level_count) . '-08-01';
-                        $require_update_fields[$rupdt_key]['auto_corrected_value'] = $this->request->data['Student']['estimated_grad_date'];
-                        $require_update_fields[$rupdt_key]['reason'] = 'Estimated Graduation Date is not valid date.';
-
-                        if (((int)explode(
-                                '-',
-                                $studentDetail['Student']['estimated_grad_date']
-                            )[0]) > ($student_admission_year + ($get_curriculum_year_level_count * 2))) {
-                            $require_update_fields[$rupdt_key]['reason'] = 'Estimated Graduation Date can\'t be behind ' . ($student_admission_year + ($get_curriculum_year_level_count * 2)) . ' G.C. (Double of student\'s attached curriculum year levels, ' . $get_curriculum_year_level_count . ' X 2 years)';
-                        } elseif (((int)explode(
-                                '-',
-                                $studentDetail['Student']['estimated_grad_date']
-                            )[0]) < ($student_admission_year + $get_curriculum_year_level_count)) {
-                            $require_update_fields[$rupdt_key]['reason'] = 'Estimated Graduation Date can\'t be before ' . ($student_admission_year + $get_curriculum_year_level_count) . ' G.C.';
-                        }
-
-                        $rupdt_key++;
-                    } else {
-                        if (empty($studentDetail['Student']['estimated_grad_date'])) {
-                            $this->request->data['Student']['estimated_grad_date'] = ($student_admission_year + $get_curriculum_year_level_count) . '-08-01';
-                        }
-                    }
-                } else {
-                    if (empty($studentDetail['Student']['estimated_grad_date']) || is_null(
-                            $studentDetail['Student']['estimated_grad_date']
-                        )) {
-                        $this->request->data['Student']['estimated_grad_date'] = $maximum_estimated_graduation_year_limit . '-08-01';
-                    }
-                }
-            }
-
-            //$this->request->data['Student']['gender'] = (isset($this->request->data['AcceptedStudent']['sex']) ?  (strtolower(trim($this->request->data['AcceptedStudent']['sex']))) : (strtolower(trim($this->request->data['Student']['gender']))));
-
-            //debug($this->request->data);
-
-            //$foriegn_students_region_ids = Configure::read('foriegn_students_region_ids');
-
-            $foriegn_students_region_ids = $this->Student->Region->find(
-                'list',
-                array(
-                    'conditions' => array('Region.country_id <> ' => COUNTRY_ID_OF_ETHIOPIA),
-                    'fields' => array('Region.id', 'Region.id')
-                )
-            );
-
-            debug($foriegn_students_region_ids);
-
-            $regions = array();
-            $zones = array();
-            $woredas = array();
-            $cities = array();
-
-            $foriegn_student = 0;
-
-            $country_id_of_region = COUNTRY_ID_OF_ETHIOPIA;
-
-            $region_id_of_student = '';
-
-            if (!empty($studentDetail['AcceptedStudent']['region_id']) || !empty($studentDetail['Student']['region_id'])) {
-                $region_id_of_student = (!empty($studentDetail['AcceptedStudent']['region_id']) ? $studentDetail['AcceptedStudent']['region_id'] : $studentDetail['Student']['region_id']);
-
-                $country_id_of_region = $this->Student->Region->field(
-                    'country_id',
-                    array('Region.id' => $region_id_of_student)
-                );
-
-                $countries = $this->Student->Country->find(
-                    'list',
-                    array('conditions' => array('Country.id' => $country_id_of_region))
-                );
-
-                $regions = $this->Student->Region->find('list', array(
-                    'conditions' => array(
-                        'Region.id' => $region_id_of_student,
-                        'Region.country_id' => $country_id_of_region
-                    )
-                ));
-
-                $zones = $this->Student->Zone->find(
-                    'list',
-                    array('conditions' => array('Zone.region_id' => $region_id_of_student))
-                );
-
-                $city_zone_ids = $this->Student->City->find('list', array(
-                    'conditions' => array(
-                        'City.region_id' => $region_id_of_student
-                    ),
-                    'fields' => array('City.zone_id', 'City.zone_id')
-                ));
-
-                $woredas = $this->Student->Woreda->find('list', array(
-                    'conditions' => array(
-                        'Woreda.zone_id' => (!empty($zones) ? array_keys(
-                            $zones
-                        ) : (!empty($city_zone_ids) ? $city_zone_ids : null)),
-                    )
-                ));
-
-                $cities = $this->Student->City->find('list', array(
-                    'conditions' => array(
-                        'OR' => array(
-                            'City.id' => $studentDetail['Student']['city_id'],
-                            'City.zone_id' => (!empty($zones) ? array_keys(
-                                $zones
-                            ) : (!empty($studentDetail['AcceptedStudent']['zone_id']) ? $studentDetail['AcceptedStudent']['zone_id'] : $studentDetail['Student']['zone_id'])),
-                            'City.region_id' => $region_id_of_student,
-                        )
-                    )
-                ));
-            } else {
-                $countries = $this->Student->Country->find('list');
-                $regions = $this->Student->Region->find('list', array('conditions' => array('Region.active' => 1)));
-                $zones = $this->Student->Zone->find('list', array('conditions' => array('Zone.active' => 1)));
-                $woredas = $this->Student->Woreda->find('list', array('conditions' => array('Woreda.active' => 1)));
-                $cities = $this->Student->City->find('list', array('conditions' => array('City.active' => 1)));
-            }
-
-            if (empty($regions)) {
-                $regions = $this->Student->Region->find(
-                    'list',
-                    array('conditions' => array('Region.country_id' => $country_id_of_region))
-                );
-            }
-
-            if (empty($zones)) {
-                $zones = $this->Student->Zone->find('list');
-            }
-
-            if (empty($woredas)) {
-                $woredas = $this->Student->Woreda->find('list');
-            }
-
-            if (empty($cities)) {
-                if (!empty($region_id_of_student)) {
-                    $cities = $this->Student->City->find(
-                        'list',
-                        array('conditions' => array('City.region_id' => $region_id_of_student))
-                    );
-                } else {
-                    if (!empty($regions)) {
-                        $cities = $this->Student->City->find(
-                            'list',
-                            array('conditions' => array('City.region_id' => array_keys($regions)))
-                        );
-                    } else {
-                        $cities = $this->Student->City->find('list');
-                    }
-                }
-            }
-
-            if (!empty($foriegn_students_region_ids) && ((isset($studentDetail['AcceptedStudent']['region_id']) && !empty($studentDetail['AcceptedStudent']['region_id']) && in_array(
-                            $studentDetail['AcceptedStudent']['region_id'],
-                            $foriegn_students_region_ids
-                        )) || (isset($studentDetail['Student']['region_id']) && !empty($studentDetail['Student']['region_id']) && in_array(
-                            $studentDetail['Student']['region_id'],
-                            $foriegn_students_region_ids
-                        )))) {
-                $foriegn_student = 1;
-            }
-
-            $colleges = $this->Student->College->find(
-                'list',
-                array('conditions' => array('College.id' => $studentDetail['Student']['college_id']))
-            );
-
-            if (!empty($studentDetail['Student']['department_id']) && is_numeric(
-                    $studentDetail['Student']['department_id']
-                ) && $studentDetail['Student']['department_id'] > 0) {
-                $departments = $this->Student->Department->find(
-                    'list',
-                    array('conditions' => array('Department.id' => $studentDetail['Student']['department_id']))
-                );
-            } else {
-                //$departments = $this->Student->Department->find('list');
-                $departments = array();
-            }
-
-
-            $regionsAll = $this->Student->Region->find(
-                'list',
-                array('conditions' => array('Region.active' => 1, 'Region.country_id' => $country_id_of_region))
-            );
-            $zonesAll = $this->Student->Zone->find('list', array('conditions' => array('Zone.active' => 1)));
-            $woredasAll = $this->Student->Woreda->find('list', array('conditions' => array('Woreda.active' => 1)));
-            $citiesAll = $this->Student->City->find('list', array('conditions' => array('City.active' => 1)));
-
-            if (isset($this->request->data['Contact'][0]['region_id']) && !empty($this->request->data['Contact'][0]['region_id'])) {
-                $citiesAll = $this->Student->City->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'City.region_id' => $this->request->data['Contact'][0]['region_id'],
-                            'City.active' => 1
-                        )
-                    )
-                );
-            }
-
-            $contacts = $this->Student->Contact->find(
-                'list',
-                array('conditions' => array('Contact.student_id' => $this->student_id))
-            );
-            $users = $this->Student->User->find(
-                'list',
-                array('conditions' => array('User.username' => $studentDetail['Student']['studentnumber']))
-            );
-            $programs = $this->Student->Program->find(
-                'list',
-                array('conditions' => array('Program.id' => $studentDetail['Student']['program_id']))
-            );
-            $programTypes = $this->Student->ProgramType->find(
-                'list',
-                array('conditions' => array('ProgramType.id' => $studentDetail['Student']['program_type_id']))
-            );
-
-            $studentDetail['Student']['country_id'] = $country_id_of_region;
-
-            $this->set(
-                compact(
-                    'studentDetail',
-                    'contacts',
-                    'users',
-                    'colleges',
-                    'departments',
-                    'programs',
-                    'programTypes',
-                    'countries',
-                    'regions',
-                    'zones',
-                    'woredas',
-                    'cities',
-                    'regionsAll',
-                    'zonesAll',
-                    'woredasAll',
-                    'citiesAll',
-                    'foriegn_student'
-                )
-            );
-        } else {
-            $this->Flash->warning('You are not allowed to edit or view any student profile.');
-            $this->redirect('/');
-        }
-
-        $this->set(
-            compact(
-                'studentDetail',
-                'contacts',
-                'users',
-                'colleges',
-                'departments',
-                'programs',
-                'programTypes',
-                'countries',
-                'regions',
-                'zones',
-                'woredas',
-                'cities',
-                'regionsAll',
-                'zonesAll',
-                'woredasAll',
-                'citiesAll',
-                'foriegn_student',
-                'require_update',
-                'require_update_fields',
-                'student_admission_year',
-                'maximum_estimated_graduation_year_limit'
-            )
-        );
-
-        // below is the old implementation, neway
-        /* if (!empty($this->request->data)) {
-
-			// Higher education information won't be present in many cases, do not store it if nothing is entered.
-
-			if (isset($this->request->data['HigherEducationBackground'])) {
-				foreach ($this->request->data['HigherEducationBackground'] as $k => $v) {
-					if (empty($v['name']) && empty($v['diploma_awarded']) && empty($v['name']) && empty($v['cgpa_at_graduation']) && empty($v['city'])) {
-						unset($this->request->data['HigherEducationBackground'][$k]);
-					}
-				}
-			}
-
-			// High school information won't be present, do not store it if nothing is entered.
-
-			if ($this->request->data['Student']['program_id'] != PROGRAM_UNDEGRADUATE || $this->request->data['Student']['program_type_id'] != PROGRAM_TYPE_REGULAR) {
-				if (isset($this->request->data['HighSchoolEducationBackground'])) {
-					$save_highschool_education = false;
-					foreach ($this->request->data['HighSchoolEducationBackground'] as $k => $v) {
-						if (!empty($v['name']) || !empty($v['region_id']) || !empty($v['town']) || !empty($v['zone']) || !empty($v['school_level'])) {
-							$save_highschool_education = true;
-						}
-					}
-
-					if (!$save_highschool_education) {
-						unset($this->request->data['HighSchoolEducationBackground']);
-					}
-				}
-			}
-
-			unset($this->request->data['User']);
-
-			$this->Student->HighSchoolEducationBackground->deleteHighSchoolEducationBackgroundList($id, $this->request->data);
-			$this->Student->HigherEducationBackground->deleteHigherEducationList($id, $this->request->data);
-			$this->Student->EslceResult->deleteEslceResultList($id, $this->request->data);
-			$this->Student->EheeceResult->deleteEheeceResultList($id, $this->request->data);
-
-			debug($this->request->data);
-
-			$this->request->data = $this->Student->unset_empty($this->request->data);
-			$check_elegibility_to_edit = 0;
-
-			// unset($this->request->data['Student']['first_name']);
-			// TODO dont allow multiple national exam taken
-			// debug($this->request->data);
-
-			if ($this->Student->saveAll($this->request->data, array('validate' => 'first'))) {
-				$this->Flash->success( __('The student profile has been updated'));
-				$this->redirect(array('action' => 'index'));
-			} else {
-				$this->Flash->error( __('The student could not be saved. Please, try again.'));
-				//  debug($this->Student->invalidFields());
-				// debug($this->request->data);
-			}
-
-
-			// $this->request->data = $this->Student->read(null, $id);
-			$data = $this->Student->find('first', array(
-				'conditions' => array(
-					'Student.id' => $id
-				),
-				'contain' => array(
-					'Contact',
-					'AcceptedStudent',
-					'EslceResult',
-					'EheeceResult',
-					'Attachment',
-					'HigherEducationBackground',
-					'HighSchoolEducationBackground',
-					'User'
-				)
-			));
-
-			$this->request->data['Student']['studentnumber'] = $data['Student']['studentnumber'];
-			$this->request->data['Student']['program_id'] = $data['Student']['program_id'];
-			$this->request->data['Student']['program_type_id'] = $data['Student']['program_type_id'];
-			$this->request->data['Student']['department_id'] = $data['Student']['department_id'];
-			$this->request->data['Student']['college_id'] = $data['Student']['college_id'];
-			$this->request->data['Student']['admissionyear'] = $data['Student']['admissionyear'];
-
-		}
-
-		if (empty($this->request->data)) {
-
-			$this->request->data = $this->Student->find('first', array(
-				'conditions' => array('Student.id' => $id),
-				'contain' => array(
-					'Contact',
-					'AcceptedStudent',
-					'EslceResult',
-					'EheeceResult',
-					'Attachment',
-					'HigherEducationBackground',
-					'HighSchoolEducationBackground',
-					'User'
-				)
-			));
-
-			debug($this->request->data);
-		}
-
-		$regions = $this->Student->Region->find('list');
-		$countries = $this->Student->Country->find('list');
-		$cities = $this->Student->City->find('list');
-		$colleges = $this->Student->College->find('list');
-		$departments = $this->Student->Department->find('list');
-
-		//$contacts = $this->Student->Contact->find('list');
-		//$users = $this->Student->User->find('list');
-		$programs = $this->Student->Program->find('list');
-		$programTypes = $this->Student->ProgramType->find('list');
-		$this->set(compact('contacts', 'colleges', 'cities', 'departments', 'programs', 'programTypes', 'regions', 'countries')); */
+        // Setup dropdown lists, regions, and conditionally-loaded lists here
+        // Will handle this in next step
+        $this->set(compact('student'));
     }
+
+
 
     // function which will allow the registrar to admit all students then update
 
-    public function admit_all()
+
+    public function admitAll()
     {
+        $acceptedStudentsTable = TableRegistry::getTableLocator()->get('AcceptedStudents');
+        $studentsTable = $this->Students;
 
-        //debug($this->request->data);
-        $this->__init_search();
+        $data = $this->getRequest()->getData();
+        $lastSuccessMessage = '';
 
-        $last_sucess_message = '';
+        if (!empty($data) && !empty($data['admit'])) {
+            $searchSession = $data['Search'];
+            $this->getRequest()->getSession()->write('search_data', $searchSession);
 
-        if (!empty($this->request->data) && !empty($this->request->data['admit'])) {
-            $data['Search'] = $this->request->data['Search'];
-            debug($data['Search']);
+            $approveList = $data['AcceptedStudent']['approve'] ?? [];
+            $selectedIds = array_keys(array_filter($approveList));
 
-            //debug($this->request->data['AcceptedStudent']);
+            if (empty($selectedIds)) {
+                $this->Flash->error(__('Please select at least one student to admit.'));
+                return;
+            }
 
-            $atleast_select_one = array_sum($this->request->data['AcceptedStudent']['approve']);
+            $admitEntities = [];
 
-            if ($atleast_select_one > 0) {
-                unset($this->request->data['Student']['SelectAll']);
-                $admittedStudentsLists = array();
-                $selectedAdmittedCount = 0;
+            foreach ($selectedIds as $id) {
+                $accepted = $acceptedStudentsTable->get($id, ['contain' => []]);
 
-                foreach ($this->request->data['AcceptedStudent']['approve'] as $id => $selected) {
-                    if ($selected == 1) {
-                        $selected_students[] = $id;
-                        $basicData = $this->Student->AcceptedStudent->find(
-                            'first',
-                            array('conditions' => array('AcceptedStudent.id' => $id))
-                        );
-                        $checkForAcceptedDuplication = $this->Student->find(
-                            'first',
-                            array(
-                                'conditions' => array(
-                                    'OR' => array(
-                                        'Student.accepted_student_id' => $basicData['AcceptedStudent']['id'],
-                                        'Student.studentnumber' => $basicData['AcceptedStudent']['studentnumber']
-                                    )
-                                )
-                            )
-                        );
+                // Check for duplication
+                $exists = $studentsTable->exists([
+                    'OR' => [
+                        'accepted_student_id' => $accepted->id,
+                        'studentnumber' => $accepted->studentnumber
+                    ]
+                ]);
 
-                        if (!empty($basicData) && empty($checkForAcceptedDuplication)) {
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['first_name'] = $basicData['AcceptedStudent']['first_name'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['middle_name'] = $basicData['AcceptedStudent']['middle_name'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['last_name'] = $basicData['AcceptedStudent']['last_name'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['last_name'] = $basicData['AcceptedStudent']['last_name'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['user_id'] = $basicData['AcceptedStudent']['user_id'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['accepted_student_id'] = $basicData['AcceptedStudent']['id'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['gender'] = $basicData['AcceptedStudent']['sex'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['studentnumber'] = $basicData['AcceptedStudent']['studentnumber'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['country_id'] = ClassRegistry::init(
-                                'Region'
-                            )->field(
-                                'Region.country_id',
-                                array('Region.id' => $basicData['AcceptedStudent']['region_id'])
-                            );
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['region_id'] = $basicData['AcceptedStudent']['region_id'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['program_id'] = $basicData['AcceptedStudent']['program_id'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['college_id'] = $basicData['AcceptedStudent']['college_id'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['original_college_id'] = $basicData['AcceptedStudent']['college_id'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['department_id'] = $basicData['AcceptedStudent']['department_id'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['program_type_id'] = $basicData['AcceptedStudent']['program_type_id'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['curriculum_id'] = $basicData['AcceptedStudent']['curriculum_id'];
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['high_school'] = $basicData['AcceptedStudent']['high_school'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['moeadmissionnumber'] = $basicData['AcceptedStudent']['moeadmissionnumber'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['benefit_group'] = $basicData['AcceptedStudent']['benefit_group'];
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['academicyear'] = $basicData['AcceptedStudent']['academicyear'];
-
-
-                            $admittedStudentsLists['Student'][$selectedAdmittedCount]['admissionyear'] = $basicData['AcceptedStudent']['created'];
-                        }
-
-                        $selectedAdmittedCount++;
-                    }
+                if (!$exists) {
+                    $student = $studentsTable->newEntity([
+                        'first_name' => $accepted->first_name,
+                        'middle_name' => $accepted->middle_name,
+                        'last_name' => $accepted->last_name,
+                        'user_id' => $accepted->user_id,
+                        'accepted_student_id' => $accepted->id,
+                        'gender' => $accepted->sex,
+                        'studentnumber' => $accepted->studentnumber,
+                        'country_id' => TableRegistry::getTableLocator()
+                            ->get('Regions')->get($accepted->region_id)->country_id,
+                        'region_id' => $accepted->region_id,
+                        'program_id' => $accepted->program_id,
+                        'college_id' => $accepted->college_id,
+                        'original_college_id' => $accepted->college_id,
+                        'department_id' => $accepted->department_id,
+                        'program_type_id' => $accepted->program_type_id,
+                        'curriculum_id' => $accepted->curriculum_id,
+                        'high_school' => $accepted->high_school,
+                        'moeadmissionnumber' => $accepted->moeadmissionnumber,
+                        'benefit_group' => $accepted->benefit_group,
+                        'academicyear' => $accepted->academicyear,
+                        'admissionyear' => $accepted->created
+                    ]);
+                    $admitEntities[] = $student;
                 }
+            }
 
-                //debug($admittedStudentsLists['Student']);
-
-                if ($this->Student->saveAll($admittedStudentsLists['Student'], array('validate' => 'first'))) {
-                    $last_sucess_message = 'All selected ' . (count(
-                            $admittedStudentsLists['Student']
-                        )) . ' student(s) are admitted Successfully.';
-                    $this->Flash->success($last_sucess_message);
-
-                    $this->request->data = array();
-                    $this->request->data['Search'] = $data['Search'];
-                    $this->request->data['getacceptedstudent'] = true;
-
-                    $this->__init_clear_session_filters();
-                    $this->Session->write('search_data', $this->request->data);
-                    $this->Session->write('search_data_index', $this->request->data);
-
-                    if (isset($this->request->data['Student']['SelectAll'])) {
-                        unset($this->request->data['Student']['SelectAll']);
-                    }
-
-                    $this->redirect(array('action' => 'admit_all'));
-                } else {
-                    $this->Flash->error('Could not admit the selected student(s). Please, try again.');
-                }
+            if ($studentsTable->saveMany($admitEntities)) {
+                $this->Flash->success(__('All selected students have been admitted successfully.'));
+                return $this->redirect(['action' => 'admitAll']);
             } else {
-                $this->Flash->error('Please select atleast one student to admit.');
+                $this->Flash->error(__('Could not admit the selected students. Please, try again.'));
             }
         }
 
-        if (!empty($this->request->data) && isset($this->request->data['getacceptedstudent'])) {
-            $this->__init_clear_session_filters();
-            $this->__init_search();
+        // Setup dropdown filters and related info (colleges, departments, programs...)
+        $this->loadComponent('Paginator');
+        $programs = $studentsTable->Programs->find('list')->where(['Programs.active' => 1]);
+        $programTypes = $studentsTable->ProgramTypes->find('list')->where(['ProgramTypes.active' => 1]);
 
-            if (!empty($this->request->data['Search']['academicyear'])) {
-                $conditions = null;
-                $ssacdemicyear = $this->request->data['AcceptedStudent']['academicyear'] = $this->request->data['Search']['academicyear'];
-                $pprogram_id = $this->request->data['AcceptedStudent']['program_id'] = $this->request->data['Search']['program_id'];
-                $pprogram_type_id = $this->request->data['AcceptedStudent']['program_type_id'] = $this->request->data['Search']['program_type_id'];
-                $name = $this->request->data['AcceptedStudent']['name'] = $this->request->data['Search']['name'];
-                $college_ids = array();
-                $department_ids = array();
-
-                if (!empty($this->college_ids)) {
-                    $college_ids = $this->college_ids;
-                } elseif (!empty($this->department_ids)) {
-                    $department_ids = $this->department_ids;
-                }
-                // retrive list of students based on registrar clerk assigned responsibility
-
-                if (!empty($college_ids)) {
-                    if (!empty($this->request->data['Search']['college_id'])) {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE " => '' . $ssacdemicyear . '%',
-                            "AcceptedStudent.first_name LIKE " => '%' . $name . '%',
-                            "AcceptedStudent.college_id" => $this->request->data['Search']['college_id'],
-                            "AcceptedStudent.program_id" => $pprogram_id,
-                            "AcceptedStudent.program_type_id" => $pprogram_type_id,
-                            "AcceptedStudent.studentnumber is not null",
-                            "Student.id is null",
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students where accepted_student_id is not null )",
-                        );
-                    } else {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE " => '' . $ssacdemicyear . '%',
-                            "AcceptedStudent.first_name LIKE " => '%' . $name . '%',
-                            "AcceptedStudent.college_id" => $college_ids,
-                            "AcceptedStudent.program_id" => $pprogram_id,
-                            "AcceptedStudent.program_type_id" => $pprogram_type_id,
-                            "AcceptedStudent.studentnumber is not null",
-                            "Student.id is null",
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students where accepted_student_id is not null )"
-                        );
-                    }
-                } elseif (!empty($department_ids)) {
-                    if (!empty($this->request->data['Search']['department_id'])) {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE " => '' . $ssacdemicyear . '%',
-                            //"AcceptedStudent.first_name LIKE" => "%". $name."%",
-                            "AcceptedStudent.studentnumber IS NOT NULL",
-                            "AcceptedStudent.department_id" => $this->request->data['Search']['department_id'],
-                            "AcceptedStudent.program_id" => $pprogram_id,
-                            "AcceptedStudent.program_type_id" => $pprogram_type_id,
-                            "AcceptedStudent.studentnumber is not null",
-                            "Student.id is null",
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students where accepted_student_id is not null)",
-                        );
-                    } else {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE " => '' . $ssacdemicyear . '%',
-                            "AcceptedStudent.first_name LIKE " => '%' . $name . '%',
-                            "AcceptedStudent.department_id" => $department_ids,
-                            "AcceptedStudent.program_id" => $pprogram_id,
-                            "AcceptedStudent.program_type_id" => $pprogram_type_id,
-                            "AcceptedStudent.studentnumber is not null",
-                            "Student.id is null",
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students where accepted_student_id is not null)",
-                        );
-                    }
-                }
-
-
-                if (!empty($conditions)) {
-                    if (isset($this->request->data['Search']['limit']) && !empty($this->request->data['Search']['limit'])) {
-                        $limit = $this->request->data['Search']['limit'];
-                    } else {
-                        $this->request->data['Search']['limit'] = $limit = 1000;
-                    }
-
-                    $this->Paginator->settings = array(
-                        'conditions' => $conditions,
-                        'contain' => array(
-                            'Student' => array('id'),
-                            'Department' => array('id', 'name'),
-                            'College' => array('id', 'name'),
-                        ),
-                        'fields' => array(
-                            'AcceptedStudent.id',
-                            'AcceptedStudent.full_name',
-                            'AcceptedStudent.sex',
-                            'AcceptedStudent.studentnumber',
-                            'AcceptedStudent.program_id',
-                            'AcceptedStudent.college_id',
-                            'AcceptedStudent.department_id',
-                            'AcceptedStudent.EHEECE_total_results',
-                            'AcceptedStudent.academicyear'
-                        ),
-                        'limit' => $limit,
-                        'maxLimit' => $limit,
-                        //'recursive' => -1
-                    );
-
-                    debug($this->Paginator->settings);
-                    $acceptedStudents = $this->Paginator->paginate('AcceptedStudent');
-                    //debug($acceptedStudents);
-                    debug(count($acceptedStudents));
-
-                    !empty($acceptedStudents) ? debug($acceptedStudents[0]) : '';
-
-                    $this->set('acceptedStudents', $acceptedStudents);
-
-                    if (!empty($acceptedStudents)) {
-                        $this->__init_clear_session_filters();
-                        $this->request->data['getacceptedstudent'] = true;
-                        $this->__init_search();
-                    } else {
-                        if (!empty($last_sucess_message) || isset($this->request->data['admit'])) {
-                            $this->Flash->success(
-                                $last_sucess_message . ' All students with the given search criteria have been admitted and more new accepted student is found that needs admission for now. Check admitted students list for more or change search createria for admit other non admitted students.'
-                            );
-                        } else {
-                            $this->Flash->success(
-                                'Either all students have been admitted or no new accepted student is found that needs admission for now whith the given search criteria. Check admitted students list for more.'
-                            );
-                            $this->__init_clear_session_filters();
-                            $this->request->data['getacceptedstudent'] = true;
-                            $this->request->data['Search'] = $this->request->data['Search'];
-                            $this->Session->write('search_data_index', $this->request->data['Search']);
-                            $this->redirect(array('action' => 'index'));
-                        }
-                    }
-
-                    //debug($this->request->data);
-                    $admitsearch = true;
-                    $this->set('admitsearch', true);
-                    // $this->request->data['getacceptedstudent'] = true;
-                } else {
-                    $this->Flash->error('You dont have privilage to admit students in the given criteria.');
-                }
-            } else {
-                //$this->Flash->error('Please select academic year');
-            }
-        }
-
-        // display the right department and college based on the privilage of registrar users
-        if ($this->role_id == ROLE_REGISTRAR || ROLE_REGISTRAR == $this->Session->read(
-                'Auth.User'
-            )['Role']['parent_id']) {
-            $college_ids = array();
-            $department_ids = array();
-            if (!empty($this->college_ids)) {
-                $college_ids = $this->college_ids;
-                $this->set(
-                    'colleges',
-                    $this->Student->College->find(
-                        'list',
-                        array('conditions' => array('College.id' => $college_ids, 'College.active' => 1))
-                    )
-                );
-                $this->set(
-                    'departments',
-                    $this->Student->Department->find(
-                        'list',
-                        array('conditions' => array('Department.college_id' => $college_ids, 'Department.active' => 1))
-                    )
-                );
-                $this->set('college_level', true);
-            } elseif (!empty($this->department_ids)) {
-                $department_ids = $this->department_ids;
-                $this->set(
-                    'departments',
-                    $this->Student->Department->find(
-                        'list',
-                        array('conditions' => array('Department.id' => $department_ids, 'Department.active' => 1))
-                    )
-                );
-                $this->set(
-                    'colleges',
-                    $this->Student->College->find(
-                        'list',
-                        array('conditions' => array('College.id' => $college_ids, 'College.active' => 1))
-                    )
-                );
-                $this->set('department_level', true);
-            }
-            $this->set(compact('colleges'));
-        } else {
-            $colleges = $this->Student->College->find('list', array('conditions' => array('College.active' => 1)));
-            $departments = $this->Student->Department->find(
-                'list',
-                array('conditions' => array('Department.active' => 1))
-            );
-            $this->set(compact('colleges', 'departments'));
-        }
-
-        // $regions = $this->Student->Region->find('list');
-        // $countries = $this->Student->Country->find('list');
-        // $cities = $this->Student->City->find('list');
-        $programs = $this->Student->Program->find(
-            'list',
-            array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-        );
-        $programTypes = $this->Student->ProgramType->find(
-            'list',
-            array('conditions' => array('ProgramType.id' => $this->program_type_id))
-        );
-
-        $this->__init_search();
-
-        $this->set(compact('programs', 'programTypes'/* , 'regions', 'countries', 'cities' */));
+        $this->set(compact('programs', 'programTypes'));
     }
+
 
     public function admit($id = null)
     {
-
-        //check the student has already got student number, else redirect
-        if ($id) {
-            $check_elegibility_to_edit = 0;
-            if (!empty($this->college_ids)) {
-                $check_elegibility_to_edit = $this->Student->AcceptedStudent->find(
-                    'count',
-                    array(
-                        'conditions' => array(
-                            'AcceptedStudent.college_id' => $this->college_ids,
-                            'AcceptedStudent.program_type_id' => $this->program_type_id,
-                            'AcceptedStudent.program_id' => $this->program_id,
-                            'AcceptedStudent.id' => $id
-                        )
-                    )
-                );
-            } else {
-                if (!empty($this->department_ids)) {
-                    $check_elegibility_to_edit = $this->Student->AcceptedStudent->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'AcceptedStudent.department_id' => $this->department_ids,
-                                'AcceptedStudent.program_type_id' => $this->program_type_id,
-                                'AcceptedStudent.program_id' => $this->program_id,
-                                'AcceptedStudent.id' => $id
-                            )
-                        )
-                    );
-                }
-            }
-
-            if ($check_elegibility_to_edit == 0) {
-                $this->Session->setFlash(
-                    __(
-                        '<span></span> You are not elgibile to admit the student. This happens when you are trying to admit students which you are not assigned.'
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('action' => 'index'));
-            }
-
-            $studentnumber = $this->Student->AcceptedStudent->find(
-                'first',
-                array(
-                    'conditions' => array('AcceptedStudent.id' => $id),
-                    'fields' => array('AcceptedStudent.studentnumber'),
-                    'recursive' => -1
-                )
-            );
-
-            if (empty($studentnumber['AcceptedStudent']['studentnumber'])) {
-                $this->Session->setFlash(
-                    __(
-                        '<span></span> You can not admit students before generating student number, please generate student number.'
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('controller' => 'accepted_students', 'action' => 'generate'));
-            }
-            $isAdmitted = $this->Student->isAdmitted($id);
-            if ($isAdmitted) {
-                $this->Session->setFlash(
-                    __('<span></span> You have already admitted the students.'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('controller' => 'students', 'action' => 'admit'));
-            }
-        } else {
-            // Function to load/save search criteria.
-
-            if ($this->Session->read('search_data')) {
-                $this->request->data['getacceptedstudent'] = true;
-            }
-        }
-
-
-        if (!empty($this->request->data) && isset($this->request->data['admit'])) {
-            $this->set($this->request->data);
-            // if($this->Student->validates()){
-
-            $isAdmitted = $this->Student->isAdmitted($id);
-            if (!$isAdmitted) {
-                $this->request->data['User']['role_id'] = ROLE_STUDENT;
-                $this->request->data['User']['username'] = $this->request->data['Student']['studentnumber'];
-                $this->request->data['User']['first_name'] = $this->request->data['Student']['first_name'];
-                $this->request->data['User']['last_name'] = $this->request->data['Student']['last_name'];
-                $this->request->data['User']['middle_name'] = $this->request->data['Student']['middle_name'];
-                $this->request->data['User']['email'] = $this->request->data['Student']['email'];
-                // Higher education information won't be present in many cases, do not
-                // store it if nothing is entered.
-
-                if (isset($this->request->data['HigherEducationBackground'])) {
-                    $save_higher_education = false;
-                    foreach ($this->request->data['HigherEducationBackground'] as $k => $v) {
-                        if (
-                            !empty($v['name']) || !empty($v['diploma_awarded']) ||
-                            !empty($v['date_graduated']) || !empty($v['name'])
-                            || !empty($v['cgpa_at_graduation'])
-                        ) {
-                            $save_high_education = true;
-                        }
-                    }
-                    if (!$save_higher_education) {
-                        unset($this->request->data['HigherEducationBackground']);
-                    }
-                }
-                // High school information won't be present, do not
-                // store it if nothing is entered.
-                if (
-                    $this->request->data['Student']['program_id'] != PROGRAM_UNDEGRADUATE
-                    || $this->request->data['Student']['program_type_id'] != PROGRAM_TYPE_REGULAR
-                ) {
-                    if (isset($this->request->data['HighSchoolEducationBackground'])) {
-                        $save_highschool_education = false;
-                        foreach ($this->request->data['HighSchoolEducationBackground'] as $k => $v) {
-                            if (
-                                !empty($v['name']) || !empty($v['region']) ||
-                                !empty($v['town']) || !empty($v['zone'])
-                                || !empty($v['school_level'])
-                            ) {
-                                $save_highschool_education = true;
-                            }
-                        }
-                        if (!$save_highschool_education) {
-                            unset($this->request->data['HighSchoolEducationBackground']);
-                        }
-                    }
-                }
-
-                $this->request->data = $this->Student->unset_empty($this->request->data);
-
-                if ($this->Student->saveAll($this->request->data, array('validate' => 'first'))) {
-                    $this->Session->setFlash(
-                        __('<span></span>The student has been saved'),
-                        'default',
-                        array('class' => 'success-box success-message')
-                    );
-
-                    $this->redirect(array('action' => 'admit'));
-                } else {
-                    $this->Session->setFlash(
-                        __('<span></span>The student could not be saved. Please, try again.'),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                    $this->set('id', $this->request->data['Student']['accepted_student_id']);
-                }
-            } else {
-                $this->Session->setFlash(
-                    __('<span></span>The student has already admitted '),
-                    'default',
-                    array('class' => 'warning-box warning-message')
-                );
-                $this->redirect(array('edit', $id));
-            }
-            $this->set('admitsearch', true);
-        }
-
-        if (!empty($this->request->data) && isset($this->request->data['getacceptedstudent'])) {
-            $this->__init_search();
-            if (!empty($this->request->data['AcceptedStudent']['academicyear'])) {
-                $conditions = null;
-                $ssacdemicyear = $this->request->data['AcceptedStudent']['academicyear'];
-                $college_ids = array();
-                $department_ids = array();
-                if (!empty($this->college_ids)) {
-                    $college_ids = $this->college_ids;
-                } elseif (!empty($this->department_ids)) {
-                    $department_ids = $this->department_ids;
-                }
-                // retrive list of students based on registrar clerk assigned responsibility
-                if (!empty($college_ids)) {
-                    if (!empty($this->request->data['AcceptedStudent']['college_id'])) {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE" => "$ssacdemicyear%",
-                            "AcceptedStudent.college_id" => $this->request->data['AcceptedStudent']['college_id'],
-
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students where
-		                     accepted_student_id is not null)",
-                        );
-                    } else {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE" => "$ssacdemicyear%",
-                            "AcceptedStudent.college_id" => $college_ids,
-
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students
-		                    where accepted_student_id is not null)"
-                        );
-                    }
-                } elseif (!empty($department_ids)) {
-                    if (!empty($this->request->data['AcceptedStudent']['department_id'])) {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE" => "$ssacdemicyear%",
-                            "AcceptedStudent.department_id" => $this->request->data['AcceptedStudent']['department_id'],
-
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students
-		                     where accepted_student_id is not null)",
-                        );
-                    } else {
-                        $conditions = array(
-                            "AcceptedStudent.academicyear LIKE" => "$ssacdemicyear%",
-                            "AcceptedStudent.department_id" => $department_ids,
-                            "AcceptedStudent.id NOT IN (select accepted_student_id from students
-		                     where accepted_student_id is not null)",
-                        );
-                    }
-                }
-                if (!empty($this->request->data['AcceptedStudent']['program_id'])) {
-                    $conditions['AcceptedStudent.program_id'] = $this->request->data['AcceptedStudent']['program_id'];
-                } else {
-                    $conditions['AcceptedStudent.program_id'] = $this->program_id;
-                }
-                if (!empty($this->request->data['AcceptedStudent']['program_type_id'])) {
-                    $conditions['AcceptedStudent.program_type_id'] = $this->request->data['AcceptedStudent']['program_type_id'];
-                } else {
-                    $conditions['AcceptedStudent.program_type_id'] = $this->program_type_id;
-                }
-                debug($conditions);
-                if (!empty($conditions)) {
-                    $this->paginate = array(
-                        'limit' => 50000,
-                        'contain' => array(
-                            'Student',
-                            'College',
-                            'Department',
-                            'Program',
-                            'ProgramType',
-                            'Region',
-                            'User'
-                        )
-                    );
-                    $this->paginate['conditions'] = $conditions;
-                    $this->Paginator->settings = $this->paginate;
-                    $acceptedStudents = $this->Paginator->paginate('AcceptedStudent');
-                    debug($acceptedStudents);
-                    $this->set('acceptedStudents', $acceptedStudents);
-                    if (!empty($acceptedStudents)) {
-                        $this->set('admitsearch', true);
-                    } else {
-                        $this->Session->setFlash(
-                            __('<span></span>No data is found with your search criteria'),
-                            'default',
-                            array('class' => 'info-box info-message')
-                        );
-                    }
-                    $this->request->data['getacceptedstudent'] = true;
-                    $admitsearch = true;
-                } else {
-                    $this->Session->setFlash(
-                        __('<span></span>You dont have privilage to admit students in the given criteria.'),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                }
-
-                $curriculums = ClassRegistry::init('Curriculum')->find('list', array(
-                    'fields' => array('Curriculum.id', 'Curriculum.curriculum_detail'),
-                    'conditions' => array(
-                        'Curriculum.department_id' => $this->request->data['Student']['department_id'],
-                        'Curriculum.program_id' => $this->request->data['Student']['program_id'],
-                        //'Curriculum.program_type_id' => $this->request->data['Student']['program_type_id'],
-                        'Curriculum.registrar_approved' => 1,
-                    )
-                ));
-                $this->set(compact('curriculums'));
-            } else {
-                $this->Flash->error(__('Please select academic  year'));
-            }
-        }
+        $session = $this->getRequest()->getSession();
+        $acceptedStudentsTable = TableRegistry::getTableLocator()->get('AcceptedStudents');
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
 
         if ($id) {
-            $is_student_id_exist = $this->Student->AcceptedStudent->find(
-                'count',
-                array('conditions' => array('AcceptedStudent.id' => $id))
-            );
-            if ($is_student_id_exist) {
-                $this->set(compact('id'));
-                $this->set('admitsearch', true);
-                $data = $this->Student->AcceptedStudent->find(
-                    'first',
-                    array('conditions' => array('AcceptedStudent.id' => $id))
-                );
-
-                $data_import = array();
-
-                if (!empty($data)) {
-                    unset($data['Preference']);
-                    unset($data['Student']);
-                    $data_import = $data;
-
-                    $data_import['Student']['accepted_student_id'] = $data['AcceptedStudent']['id'];
-                    $data_import['Student']['first_name'] = $data['AcceptedStudent']['first_name'];
-                    $data_import['Student']['middle_name'] = $data['AcceptedStudent']['middle_name'];
-                    $data_import['Student']['last_name'] = $data['AcceptedStudent']['last_name'];
-                    $data_import['Student']['studentnumber'] = $data['AcceptedStudent']['studentnumber'];
-                    $data_import['Student']['region_id'] = $data['AcceptedStudent']['region_id'];
-
-                    if (!empty($data['AcceptedStudent']['zone_id'])) {
-                        $data_import['Student']['zone_id'] = $data['AcceptedStudent']['zone_id'];
-                    }
-
-                    if (!empty($data['AcceptedStudent']['woreda_id'])) {
-                        $data_import['Student']['woreda_id'] = $data['AcceptedStudent']['woreda_id'];
-                    }
-
-                    if (!empty($data['AcceptedStudent']['original_college_id'])) {
-                        $data_import['Student']['original_college_id'] = $data['AcceptedStudent']['original_college_id'];
-                    } else {
-                        $data_import['Student']['original_college_id'] = $data_import['AcceptedStudent']['college_id'];
-                    }
-
-                    $data_import['Student']['college_id'] = $data_import['AcceptedStudent']['college_id'];
-                    $data_import['Student']['department_id'] = $data['AcceptedStudent']['department_id'];
-                    $data_import['Student']['program_id'] = $data['AcceptedStudent']['program_id'];
-                    $data_import['Student']['program_type_id'] = $data['AcceptedStudent']['program_type_id'];
-                    $data_import['Student']['gender'] = $data['AcceptedStudent']['sex'];
-                    $data_import['Student']['curriculum_id'] = $data['AcceptedStudent']['curriculum_id'];
-                    $data_import['User']['id'] = $data['User']['id'];
-                    $data_import['User']['role_id'] = $data['User']['role_id'];
-
-                    unset($data['AcceptedStudent']);
-                }
-
-                $this->request->data = $data_import;
-            }
-        }
-
-        // display the right department and college based on the privilage of registrar users
-        if ($this->role_id == ROLE_REGISTRAR) {
-            $college_ids = array();
-            $department_ids = array();
-
+            // Check authorization
+            $conditions = ['AcceptedStudents.id' => $id];
             if (!empty($this->college_ids)) {
-                $college_ids = $this->college_ids;
-                $this->set(
-                    'colleges',
-                    $this->Student->College->find(
-                        'list',
-                        array('conditions' => array('College.id' => $college_ids, 'College.active' => 1))
-                    )
-                );
-                $this->set(
-                    'departments',
-                    $this->Student->Department->find(
-                        'list',
-                        array('conditions' => array('Department.college_id' => $college_ids, 'Department.active' => 1))
-                    )
-                );
-                $this->set('college_level', true);
+                $conditions['AcceptedStudents.college_id IN'] = $this->college_ids;
             } elseif (!empty($this->department_ids)) {
-                $department_ids = $this->department_ids;
-                $this->set(
-                    'departments',
-                    $this->Student->Department->find(
-                        'list',
-                        array('conditions' => array('Department.id' => $department_ids, 'Department.active' => 1))
-                    )
-                );
-                $this->set(
-                    'colleges',
-                    $this->Student->College->find(
-                        'list',
-                        array('conditions' => array('College.id' => $college_ids, 'College.active' => 1))
-                    )
-                );
-                $this->set('department_level', true);
+                $conditions['AcceptedStudents.department_id IN'] = $this->department_ids;
             }
 
-            $colleges = $this->Student->College->find('list', array('conditions' => array('College.active' => 1)));
-            $this->set(compact('colleges'));
-        } else {
-            $colleges = $this->Student->College->find('list', array('conditions' => array('College.active' => 1)));
-            $departments = $this->Student->Department->find(
-                'list',
-                array('conditions' => array('Department.active' => 1))
-            );
-            $this->set(compact('colleges', 'departments'));
+            $eligibilityCount = $acceptedStudentsTable->find()->where($conditions)->count();
+
+            if ($eligibilityCount == 0) {
+                $this->Flash->error(__('You are not eligible to admit the student.'));
+                return $this->redirect(['action' => 'index']);
+            }
+
+            $studentRecord = $acceptedStudentsTable->find()
+                ->select(['studentnumber'])
+                ->where(['AcceptedStudents.id' => $id])
+                ->first();
+
+            if (empty($studentRecord->studentnumber)) {
+                $this->Flash->error(__('Please generate a student number before admission.'));
+                return $this->redirect(['controller' => 'AcceptedStudents', 'action' => 'generate']);
+            }
+
+            if ($studentsTable->exists(['accepted_student_id' => $id])) {
+                $this->Flash->warning(__('This student has already been admitted.'));
+                return $this->redirect(['controller' => 'Students', 'action' => 'admit']);
+            }
         }
 
-        $regions = $this->Student->Region->find('list', array('conditions' => array('Region.active' => 1)));
-        $countries = $this->Student->Country->find('list');
-        $cities = $this->Student->City->find('list', array('conditions' => array('City.active' => 1)));
+        if ($this->request->is('post') && $this->request->getData('admit')) {
+            $data = $this->request->getData();
+            $data = $studentsTable->unsetEmpty($data); // If you implemented this helper
 
-        $zones = $this->Student->Zone->find('list', array('conditions' => array('Zone.active' => 1)));
-        $woredas = $this->Student->Woreda->find('list', array('conditions' => array('Woreda.active' => 1)));
+            $data['User']['role_id'] = ROLE_STUDENT;
+            $data['User']['username'] = $data['Student']['studentnumber'];
 
-        $this->set(
-            compact(
-                'programs',
-                'programTypes',
-                'regions',
-                'countries',
-                'cities',
-                'zones',
-                'woredas'
-            )
-        );
+            // Cleanup if optional models are not filled
+            if (empty($data['HigherEducationBackground'][0]['name'])) {
+                unset($data['HigherEducationBackground']);
+            }
+
+            if ($studentsTable->saveAll($data, ['validate' => 'first'])) {
+                $this->Flash->success(__('Student has been admitted successfully.'));
+                return $this->redirect(['action' => 'admit']);
+            }
+
+            $this->Flash->error(__('Failed to admit student. Please try again.'));
+        }
+
+        if ($this->request->is(['post', 'put']) && $this->request->getData('getacceptedstudent')) {
+            // Load eligible students (pagination)
+            $query = $acceptedStudentsTable->find()
+                ->where([
+                    'AcceptedStudents.id NOT IN' => $studentsTable->find()
+                        ->select(['accepted_student_id'])
+                        ->where(['accepted_student_id IS NOT' => null])
+                ])
+                ->contain(['Program', 'ProgramType', 'College', 'Department']);
+
+            $this->paginate = [
+                'limit' => 50,
+                'order' => ['AcceptedStudents.created' => 'DESC']
+            ];
+            $this->set('acceptedStudents', $this->paginate($query));
+        }
+
+        // Populate colleges and departments dropdowns
+        $colleges = $this->Students->Colleges->find('list', ['conditions' => ['Colleges.active' => 1]]);
+        $departments = $this->Students->Departments->find('list', ['conditions' => ['Departments.active' => 1]]);
+
+        // Load dropdown data
+        $regions = $this->Students->Regions->find('list', ['conditions' => ['Regions.active' => 1]]);
+        $zones = $this->Students->Zones->find('list');
+        $woredas = $this->Students->Woredas->find('list');
+        $countries = $this->Students->Countries->find('list');
+        $cities = $this->Students->Cities->find('list');
+
+        $this->set(compact(
+            'id',
+            'regions',
+            'zones',
+            'woredas',
+            'countries',
+            'cities',
+            'colleges',
+            'departments'
+        ));
     }
 
-    public function get_countries($region_id = null)
+
+    public function getCountries($region_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $countries = [];
 
-        $this->layout = 'ajax';
+        $this->loadModel('Regions');
+        $this->loadModel('Countries');
 
+        // Determine the region or country ID source
         if (!empty($region_id)) {
-            $country_ids = $this->Student->Region->find(
-                'list',
-                array(
-                    'conditions' => array('Region.id' => $region_id),
-                    'fields' => array('Region.country_id', 'Region.country_id')
-                )
-            );
-            $countries = $this->Student->Country->find(
-                'list',
-                array('conditions' => array('Country.id' => $country_ids))
-            );
+            $countryIds = $this->Regions->find('list', [
+                'conditions' => ['Regions.id' => $region_id],
+                'keyField' => 'country_id',
+                'valueField' => 'country_id'
+            ])->toArray();
+        } elseif (!empty($this->request->getData('Student.region_id'))) {
+            $countryIds = $this->Regions->find('list', [
+                'conditions' => ['Regions.id' => $this->request->getData('Student.region_id')],
+                'keyField' => 'country_id',
+                'valueField' => 'country_id'
+            ])->toArray();
+        } elseif (!empty($this->request->getData('Student.country_id'))) {
+            $countryIds = [$this->request->getData('Student.country_id')];
         } else {
-            if (isset($this->request->data['Student']['region_id']) && !empty($this->request->data['Student']['region_id'])) {
-                $country_ids = $this->Student->Region->find(
-                    'list',
-                    array(
-                        'conditions' => array('Region.id' => $this->request->data['Student']['region_id']),
-                        'fields' => array('Region.country_id', 'Region.country_id')
-                    )
-                );
-                $countries = $this->Student->Country->find(
-                    'list',
-                    array('conditions' => array('Country.id' => $country_ids))
-                );
-            } else {
-                if (isset($this->request->data['Student']['country_id']) && !empty($this->request->data['Student']['country_id'])) {
-                    $countries = $this->Student->Country->find(
-                        'list',
-                        array('conditions' => array('Country.id' => $this->request->data['Student']['country_id']))
-                    );
-                } else {
-                    $countries = $this->Student->Country->find('list');
-                }
-            }
+            $countryIds = null;
         }
 
-        debug($countries);
+        if (!empty($countryIds)) {
+            $countries = $this->Countries->find('list', [
+                'conditions' => ['Countries.id IN' => $countryIds],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
+        } else {
+            $countries = $this->Countries->find('list', [
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
+        }
 
         $this->set(compact('countries'));
+        $this->set('_serialize', ['countries']); // Optional: for JSON responses
     }
-
-    public function get_regions($country_id = null)
+    public function getRegions($country_id = null)
     {
-
-        $this->layout = 'ajax';
+        $this->viewBuilder()->setLayout('ajax');
+        $this->loadModel('Regions');
 
         if ($country_id) {
-            $regions = $this->Student->Region->find(
-                'list',
-                array('conditions' => array('Region.country_id' => $country_id))
-            );
+            $regions = $this->Regions->find('list', [
+                'conditions' => ['Regions.country_id' => $country_id],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
         } else {
-            $regions = $this->Student->Region->find(
-                'list',
-                array('conditions' => array('Region.country_id' => $this->request->data['Student']['country_id']))
-            );
+            $studentCountryId = $this->request->getData('Student.country_id');
+            $regions = $this->Regions->find('list', [
+                'conditions' => ['Regions.country_id' => $studentCountryId],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
         }
 
         $this->set(compact('regions'));
+        $this->set('_serialize', ['regions']); // Optional for JSON API response
     }
 
-    public function get_zones($region_id = null)
+
+    public function getZones($regionId = null)
     {
+        $this->request->allowMethod(['get', 'ajax']);
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $regionId = $regionId ?? $this->request->getData('region_id');
 
-        if ($region_id) {
-            $zones = $this->Student->Zone->find('list', array('conditions' => array('Zone.region_id' => $region_id)));
-        } else {
-            $zones = $this->Student->Zone->find(
-                'list',
-                array('conditions' => array('Zone.region_id' => $this->request->data['Student']['region_id']))
-            );
-        }
+        $zones = $this->Students->Zones->find('list', [
+            'conditions' => ['Zones.region_id' => $regionId],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
 
         $this->set(compact('zones'));
+        $this->set('_serialize', ['zones']);
     }
 
-    public function get_woredas($zone_id = null)
+
+    public function getWoredas($zoneId = null)
     {
+        $this->request->allowMethod(['get', 'ajax']);
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
-
-        if ($zone_id) {
-            $woredas = $this->Student->Woreda->find('list', array('conditions' => array('Woreda.zone_id' => $zone_id)));
-        } else {
-            $woredas = $this->Student->Woreda->find(
-                'list',
-                array('conditions' => array('Woreda.zone_id' => $this->request->data['Student']['zone_id']))
-            );
+        // If not passed via URL, try to get from POST data
+        if (!$zoneId) {
+            $zoneId = $this->request->getData('Student.zone_id');
         }
+
+        $woredas = $this->Students->Woredas->find('list', [
+            'conditions' => ['Woredas.zone_id' => $zoneId],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
 
         $this->set(compact('woredas'));
     }
 
-    public function get_cities($region_id = null)
+
+    public function getCities($regionId = null)
     {
+        $this->request->allowMethod(['get', 'ajax']);
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
-
-        if ($region_id) {
-            $cities = $this->Student->City->find('list', array('conditions' => array('City.region_id' => $region_id)));
-        } else {
-            $cities = $this->Student->City->find(
-                'list',
-                array('conditions' => array('City.region_id' => $this->request->data['Student']['region_id']))
-            );
+        if (!$regionId) {
+            $regionId = $this->request->getData('Student.region_id');
         }
+
+        $cities = $this->Students->Cities->find('list', [
+            'conditions' => ['Cities.region_id' => $regionId],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
 
         $this->set(compact('cities'));
     }
 
-    public function ajax_get_department()
+
+    public function ajaxGetDepartment()
     {
+        $this->request->allowMethod(['post', 'ajax']);
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $collegeId = $this->request->getData('Staff.0.college_id');
 
-        $this->set(
-            'departments',
-            $this->Student->Department->find(
-                'list',
-                array('conditions' => array('Department.college_id' => $this->request->data['Staff'][0]['college_id']))
-            )
-        );
-        // init departments
-        /*$college_id = $this->request->data['id'];
+        $departments = $this->Students->Departments->find('list', [
+            'conditions' => ['Departments.college_id' => $collegeId],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
 
-
-	        $departments = array();
-	        $this->layout = null;
-
-
-
-
-	        if($college_id > 0) {
-		            // get departments
-		            $departments = $this->Department->find('list',array('conditions'=>array('Department.college_id'=>$college_id)));
-
-	        }
-
-	        // set
-	        $this->set(compact('departments'));
-        */
+        $this->set(compact('departments'));
     }
-    /*
-    function issue_password() {
-        //issue students password
 
-
-	    if(!empty($this->request->data) &&
-	    isset($this->request->data['issuepasswordtostudent'])){
-	            $this->set($this->request->data);
-	            if($this->Student->User->validates()){
-	                //debug($this->request->data);
-	                if (!empty($this->request->data['User']['password'])) {
-	                $this->request->data['User']['password'] =
-				    $this->Auth->password($this->request->data['User']['password']);
-				    $this->request->data['User']['role_id']=ROLE_STUDENT;
-	                if($this->Student->User->save($this->request->data['User'])){
-	                     $this->request->data=null;
-
-	                    $this->Session->setFlash('<span></span>The student password has been updated. ','default',
-		           array('class'=>'success-box success-message'));
-
-
-	                } else {
-	                   $this->Session->setFlash('<span></span>The student password could not be updated. ','default',
-		           array('class'=>'error-box error-message'));
-	                }
-
-	               } else {
-
-	                  $this->Session->setFlash('<span></span>The issued password coudnt be empty. Please generate password first before issue. ','default',
-		           array('class'=>'error-box error-message'));
-	               }
-	            }
-	    }
-       if(!empty($this->request->data)&&isset($this->request->data['issuestudentidsearch'])){
-
-               if(!empty($this->request->data['Student']['studentnumber'])){
-		               $students=$this->Student->find('first',array('conditions'=>array('Student.studentnumber LIKE '=>
-			         trim($this->request->data['Student']['studentnumber']).'%')));
-
-		             if ($this->role_id == ROLE_DEPARTMENT) {
-
-			             if (!empty($students)) {
-
-			                  $students=$this->Student->find('first',
-			                 array('conditions'=>array('Student.studentnumber LIKE'=>
-			                 trim($this->request->data['Student']['studentnumber']).'%',
-			                 'Student.department_id'=>$this->department_id)));
-
-			                if (!empty($students)) {
-			                     if (!empty($students['Student']['department_id'])) {
-
-
-			                     } else if ($students['Student']['college_id'] != $this->college_id) {
-			                         $this->Session->setFlash('<span></span>
-			                      You are not elegible to issue password.','default',
-		                        array('class'=>'info-box info-message'));
-			                     }
-
-			                }
-			             }
-
-
-		             } else if ($this->role_id == ROLE_COLLEGE) {
-
-
-			             if (!empty($students)) {
-
-			                 $students=$this->Student->find('first',
-			                 array('conditions'=>array('Student.studentnumber LIKE'=>
-			                 trim($this->request->data['Student']['studentnumber']).'%',
-			                 'Student.college_id'=>$this->college_id,
-			                 'OR'=>array('Student.department_id is null',
-			                 'Student.department_id'=>array(0,'')))));
-
-			                if (!empty($students)) {
-			                     if (!empty($students['Student']['department_id'])) {
-
-			                     $this->Session->setFlash('<span></span>
-			                      You can not issued password. Department is responsbile to manage those students who joined department. ','default',
-		                        array('class'=>'info-box info-message'));
-			                     } else if ($students['Student']['college_id'] != $this->college_id) {
-			                         $this->Session->setFlash('<span></span>
-			                      You are not elegible to issue password.','default',
-		                        array('class'=>'info-box info-message'));
-			                     }
-
-			                }
-			             }
-		             }
-
-			        //debug($students);
-			        if(empty($students)){
-			          $this->Session->setFlash('<span></span>Please enter a valid student number','default',
-		           array('class'=>'error-box error-message'));
-			        } else {
-			               $this->set('students',$students);
-			               $this->set('hide_search',true);
-			               $this->set('student_number',$this->request->data['Student']['studentnumber']);
-			        }
-
-		       } else {
-		           $this->Session->setFlash('<span></span>Please enter student number','default',
-		           array('class'=>'error-box error-message'));
-		       }
-
-       }
-
-		$this->set('studentks', $this->paginate());
-
-    }
-    */
-
-
-    // this function has a known issue, please dont use it use department_issue_password or college_issue_password instead
-
-    public function issue_password()
-    {
-
-        //debug($this->request->data);
-        if (!empty($this->request->data) && isset($this->request->data['issuepasswordtostudent'])) {
-            // check password length
-            /* $this->loadModel('Securitysetting');
-
-			$securitysetting = $this->Securitysetting->find('first');
-
-			if (strlen($this->request->data['User']['passwd']) >= $securitysetting['Securitysetting']['minimum_password_length'] && strlen($this->request->data['User']['passwd']) <= $securitysetting['Securitysetting']['maximum_password_length']) {
-
-				// if (!empty($this->request->data['User']['password'])) {
-
-				debug($this->request->data);
-
-				$this->request->data['User']['role_id'] = ROLE_STUDENT;
-				$this->request->data['User']['password'] = $this->Auth->password($this->request->data['User']['passwd']);
-
-				unset($this->request->data['User']['passwd']);
-
-				$username = $this->Student->User->find('first', array('conditions' => array('User.username' => $this->request->data['User']['username']), 'recursive' => -1));
-
-				if (!empty($username)) {
-					$this->request->data['User']['id'] = $username['User']['id'];
-				}
-
-				$this->request->data['User']['force_password_change'] = 1;
-
-				if ($this->Student->User->save($this->request->data['User'])) {
-
-					// if the issued is the first time, update  user_id field in student table
-					if (empty($this->request->data['User']['id'])) {
-
-						$this->request->data['Student']['user_id'] = $this->Student->User->id;
-						$this->Student->id = $this->request->data['Student']['id'];
-
-						$this->Student->saveField('user_id', $this->request->data['Student']['user_id']);
-					}
-
-					$student = $this->Student->find('first', array('conditions' => array('Student.id' => $this->request->data['Student']['id']), 'recursive' => -1, 'fields' => array('id', 'user_id')));
-
-					if (!empty($student)) {
-
-						if (!empty($this->request->data['User']['id'])) {
-							$student['Student']['user_id'] = $this->request->data['User']['id'];
-						} else {
-							$student['Student']['user_id'] = $this->Student->User->id;
-						}
-
-						$this->Student->id = $student['Student']['id'];
-						$this->Student->saveField('user_id', $student['Student']['user_id']);
-
-						$this->Student->AcceptedStudent->id = $student['Student']['accepted_student_id'];
-						$this->Student->AcceptedStudent->saveField('user_id', $student['Student']['user_id']);
-
-						$this->Flash->success('The student password has been updated.');
-					} else {
-						$this->Flash->success('The student password has been updated.');
-					}
-
-					$this->request->data = null;
-				} else {
-					$this->Flash->error('The student password could not be updated. ');
-				}
-			} else {
-				$this->Flash->error(__('Password policy: Your password should be greather than or equal to ' . $securitysetting['Securitysetting']['minimum_password_length'] . ' and less than or equal to ' . $securitysetting['Securitysetting']['maximum_password_length'] . ''));
-			} */
-        }
-
-        if (!empty($this->request->data) && isset($this->request->data['issuestudentidsearch'])) {
-            if (!empty($this->request->data['Student']['studentnumber'])) {
-                $students = array();
-
-                if ($this->role_id == ROLE_DEPARTMENT) {
-                    $students = $this->Student->find('first', array(
-                        'conditions' => array(
-                            'Student.studentnumber  LIKE ' => trim(
-                                    $this->request->data['Student']['studentnumber']
-                                ) . '%',
-                            'Student.department_id' => $this->department_id
-                        ),
-                        'contain' => array(
-                            'User',
-                            'AcceptedStudent',
-                            'Program',
-                            'College',
-                            'Department',
-                            'ProgramType'
-                        )
-                    ));
-
-                    if (!empty($students)) {
-                        $this->set('students', $students);
-                        $this->set('hide_search', true);
-                        $this->set('student_number', $this->request->data['Student']['studentnumber']);
-                    } else {
-                        $this->Flash->warning(
-                            'You are not elegible to issue/reset password.The student is not belongs to your  department.'
-                        );
-                    }
-                } else {
-                    if ($this->role_id == ROLE_COLLEGE) {
-                        $students = $this->Student->find('first', array(
-                            'conditions' => array(
-                                'Student.studentnumber LIKE ' => trim(
-                                        $this->request->data['Student']['studentnumber']
-                                    ) . '%'
-                            ),
-                            'contain' => array(
-                                'User',
-                                'AcceptedStudent',
-                                'Program',
-                                'College',
-                                'Department',
-                                'ProgramType'
-                            )
-                        ));
-
-                        if (!empty($students)) {
-                            $students = $this->Student->find('first', array(
-                                'conditions' => array(
-                                    'Student.studentnumber LIKE' => trim(
-                                            $this->request->data['Student']['studentnumber']
-                                        ) . '%',
-                                    'Student.college_id' => $this->college_id,
-                                    'Student.department_id is null',
-                                )
-                            ));
-
-                            if (empty($students)) {
-                                $this->Flash->warning(
-                                    'You are not elegible to issue/reset password. The student has already assigned to department. Department is responsible for  password  issue or reset.'
-                                );
-                            } else {
-                                $this->set('students', $students);
-                                $this->set('hide_search', true);
-                                $this->set('student_number', $this->request->data['Student']['studentnumber']);
-                            }
-                        } else {
-                            if (empty($students)) {
-                                $this->Flash->error('Please enter a valid student number');
-                            }
-                        }
-                    }
-                }
-            } else {
-                $this->Flash->error('Please enter student number');
-            }
-        }
-        //$this->set('studentks', $this->paginate());
-
-    }
 
 
     public function profile($student_id = null)
@@ -3001,11 +959,6 @@ class StudentsController extends AppController
                         if (!empty($this->request->data['Student']['phone_mobile']) && !empty($this->request->data['Student']['email'])) {
                             $this->request->data = $this->Student->unset_empty($this->request->data);
 
-                            //debug($this->request->data);
-
-                            /* if (isset($this->request->data['Contact']) && (empty($this->request->data['Contact'][0]['first_name']) || empty($this->request->data['Contact'][0]['middle_name']) || empty($this->request->data['Contact'][0]['last_name']) || empty($this->request->data['Contact'][0]['phone_mobile']))) {
-							unset($this->request->data['Contact']);
-						} */
 
                             if (empty($this->request->data['Student']['city_id'])) {
                                 unset($this->request->data['Student']['city_id']);
@@ -3440,7 +1393,7 @@ class StudentsController extends AppController
         }
     }
 
-    public function move_batch_student_to_department()
+    public function moveBatchStudentToDepartment()
     {
 
         if (!empty($this->request->data) && !empty($this->request->data['moveSelectedSection'])) {
@@ -3807,7 +1760,7 @@ class StudentsController extends AppController
         $this->set(compact('colleges', 'departments', 'programs', 'programTypes', 'acyear_list'));
     }
 
-    public function ajax_update()
+    public function ajaxUpdate()
     {
 
         //Step 1. Update the value in the database
@@ -3847,7 +1800,7 @@ class StudentsController extends AppController
         $this->layout = 'ajax';
     }
 
-    public function get_course_registered_and_add($student_id = "")
+    public function getCourseRegisteredAndAdd($student_id = "")
     {
 
         $this->layout = "ajax";
@@ -3860,7 +1813,7 @@ class StudentsController extends AppController
         $this->set(compact('published_courses'));
     }
 
-    public function get_possible_sup_registered_and_add($student_id = "")
+    public function getPossibleSupRegisteredAndAdd($student_id = "")
     {
 
         $this->layout = "ajax";
@@ -3876,7 +1829,7 @@ class StudentsController extends AppController
 
     /// Web services to access students from warehouse system
 
-    public function student_lists($student_id = null)
+    public function studentLists($student_id = null)
     {
 
         $this->Student->bindModel(
@@ -3928,7 +1881,7 @@ class StudentsController extends AppController
         $this->set(compact('students', 'sections', 'colleges', 'departments'));
     }
 
-    public function manage_student_medical_card_number()
+    public function manageStudentMedicalCardNumber()
     {
 
         if (isset($this->request->data['search'])) {
@@ -3977,32 +1930,37 @@ class StudentsController extends AppController
         }
     }
 
-    public function student_academic_profile($student_id = null)
+    public function studentAcademicProfile($student_id = null)
     {
 
-        $academicYR = $this->AcademicYear->current_academicyear();
+        $academicYR = $this->AcademicYear->currentAcademicYear();
         $isTheStudentDismissed = 0;
         $isTheStudentReadmitted = 0;
         $moodleUserDetails = array();
 
         if ($this->role_id == ROLE_STUDENT) {
-            $student_section_exam_status = ClassRegistry::init('Student')->get_student_section(
-                $this->student_id,
-                null,
-                null
-            );
+
+            $StudentsTable = TableRegistry::getTableLocator()->get('Students');
+            $student_section_exam_status = $StudentsTable->getStudentSection($this->student_id,
+                null, null);
+
 
             $otps = array();
 
             if (SHOW_OTP_TAB_ON_STUDENT_ACADEMIC_PROFILE_FOR_STUDENTS == 1) {
-                $otps = $this->Student->Otp->find('all', array(
-                    'conditions' => array(
-                        'Otp.student_id' => $this->student_id,
-                        'Otp.active' => 1
-                    ),
-                    'contain' => array(),
-                    'order' => array('Otp.modified' => 'DESC', 'Otp.created' => 'DESC')
-                ));
+
+                $OtpsTable = TableRegistry::getTableLocator()->get('Otps');
+
+                $otps = $OtpsTable->find()
+                    ->where([
+                        'student_id' => $this->student_id,
+                        'active' => 1
+                    ])
+                    ->order([
+                        'modified' => 'DESC',
+                        'created' => 'DESC'
+                    ])
+                    ->all();
 
                 if (!empty($otps)) {
                     $moodleIntegratedUser = false;
@@ -4014,15 +1972,18 @@ class StudentsController extends AppController
                     }
 
                     if ($moodleIntegratedUser) {
-                        $moodleUserDetails = ClassRegistry::init('MoodleUser')->find('first', array(
-                            'conditions' => array(
-                                'MoodleUser.table_id' => $this->student_id,
-                                'MoodleUser.role_id' => ROLE_STUDENT
-                            ),
-                            'contain' => array(),
-                            'order' => array('MoodleUser.created' => 'DESC')
-                        ));
-                        debug($moodleUserDetails);
+
+
+                        $MoodleUsers = TableRegistry::getTableLocator()->get('MoodleUsers');
+
+                        $moodleUserDetails = $MoodleUsers->find()
+                            ->where([
+                                'table_id' => $this->student_id,
+                                'role_id' => ROLE_STUDENT
+                            ])
+                            ->order(['created' => 'DESC'])
+                            ->first();
+
                     }
                 }
             }
@@ -4034,94 +1995,85 @@ class StudentsController extends AppController
                 }
             }
 
-            if (isset($student_section_exam_status['StudentExamStatus']) && !empty($student_section_exam_status['StudentExamStatus']) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
+            if (
+                isset($student_section_exam_status['StudentExamStatus']) &&
+                !empty($student_section_exam_status['StudentExamStatus']) &&
+                $student_section_exam_status['StudentExamStatus']['academic_status_id']
+                == DISMISSED_ACADEMIC_STATUS_ID
+            ) {
                 $isTheStudentDismissed = 1;
 
-                $possibleReadmissionYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
+                $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+                $possibleReadmissionYears = $studentExamStatusTable->getAcademicYearRange(
                     $student_section_exam_status['StudentExamStatus']['academic_year'],
-                    $this->AcademicYear->current_academicyear()
+                    $this->AcademicYear->currentAcademicYear()
                 );
 
-                $readmitted = ClassRegistry::init('Readmission')->find('first', array(
-                    'conditions' => array(
-                        'Readmission.student_id' => $this->student_id,
-                        'Readmission.registrar_approval' => 1,
-                        'Readmission.academic_commision_approval' => 1,
-                        'Readmission.academic_year' => $possibleReadmissionYears,
-                        /* 'OR' => array(
-							'Readmission.academic_year' => $student_section_exam_status['StudentExamStatus']['academic_year'],
-							'Readmission.semester' => $student_section_exam_status['StudentExamStatus']['semester'],
-							'Readmission.registrar_approval_date' > $student_section_exam_status['StudentExamStatus']['modified'],
-							'Readmission.modified' > $student_section_exam_status['StudentExamStatus']['modified'],
-						) */
-                    ),
-                    'order' => array(
-                        'Readmission.academic_year' => 'DESC',
-                        'Readmission.semester' => 'DESC',
-                        'Readmission.modified' => 'DESC'
-                    ),
-                    'recursive' => -1,
-                ));
+                $readmissionTable = TableRegistry::getTableLocator()->get('Readmissions');
+                $readmitted = $readmissionTable->find()
+                    ->where([
+                        'student_id' => $this->student_id,
+                        'registrar_approval' => 1,
+                        'academic_commision_approval' => 1,
+                        'academic_year IN' => $possibleReadmissionYears
+                    ])
+                    ->order([
+                        'academic_year' => 'DESC',
+                        'semester' => 'DESC',
+                        'modified' => 'DESC'
+                    ])
+                    ->first();
 
-                if (count($readmitted)) {
-                    $lastReadmittedAcademicYear = $readmitted['Readmission']['academic_year'];
-                    $lastReadmittedSemester = $readmitted['Readmission']['semester'];
-                    $lastReadmittedDate = $readmitted['Readmission']['registrar_approval_date'];
-
-                    debug($lastReadmittedAcademicYear);
-
+                if (!empty($readmitted)) {
+                    $lastReadmittedAcademicYear = $readmitted->academic_year;
+                    $lastReadmittedSemester = $readmitted->semester;
+                    $lastReadmittedDate = $readmitted->registrar_approval_date;
                     $isTheStudentReadmitted = 1;
-                    $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
+
+                    $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange(
                         $lastReadmittedAcademicYear,
                         $academicYR
                     );
+
                     $this->set(compact('possibleAcademicYears'));
                 }
-
-                debug($isTheStudentReadmitted);
             }
+            // Set dismissal and readmission flags
+            $this->set('isTheStudentDismissed', $isTheStudentDismissed ?? 0);
+            $this->set('isTheStudentReadmitted', $isTheStudentReadmitted ?? 0);
+            // Get academic profile and sections
+            $student_academic_profile = $this->Students->getStudentRegisteredAddDropCurriculumResult($this->student_id, $academicYR);
+            $sectionTable = TableRegistry::getTableLocator()->get('Sections');
+            $studentAttendedSections = $sectionTable->getStudentSectionHistory($this->student_id);
 
-            $this->set('isTheStudentDismissed', $isTheStudentDismissed);
-            $this->set('isTheStudentReadmitted', $isTheStudentReadmitted);
+            $this->set(compact(
+                'student_academic_profile',
+                'studentAttendedSections',
+                'student_section_exam_status',
+                'otps',
+                'moodleUserDetails',
+                'academicYR'
+            ));
+            // Profile completion check
+            $authUser = $this->getRequest()->getSession()->read('Auth.User');
+            $controller = $this->getRequest()->getParam('controller');
+            $action = $this->getRequest()->getParam('action');
 
-            $student_academic_profile = $this->Student->getStudentRegisteredAddDropCurriculumResult(
-                $this->student_id,
-                $academicYR
-            );
-            $studentAttendedSections = ClassRegistry::init('Section')->getStudentSectionHistory($this->student_id);
-            $this->set(
-                compact(
-                    'student_academic_profile',
-                    'studentAttendedSections',
-                    'student_section_exam_status',
-                    'otps',
-                    'moodleUserDetails'
-                )
-            );
-            $this->set('academicYR', $academicYR);
-
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && !empty(
-                $this->Session->read(
-                    'Auth.User'
-                )['id']
-                )
-                //&& strcasecmp($this->request->params['controller'], 'students') != 0
-                && strcasecmp($this->request->params['action'], 'profile') != 0
-                && (ClassRegistry::init('StudentStatusPattern')->isEligibleForExitExam(
-                        $this->student_id
-                    ) || FORCE_ALL_STUDENTS_TO_FILL_BASIC_PROFILE == 1)
-                //&& !$user['User']['force_password_change'] && !$password_duration_expired
-                && strcasecmp($this->request->params['controller'], 'users') != 0
-                && strcasecmp($this->request->params['action'], 'changePwd') != 0) {
-                if (!ClassRegistry::init('StudentStatusPattern')->completedFillingProfileInfomation(
-                    $this->student_id
-                )) {
+            if (
+                $authUser['role_id'] == ROLE_STUDENT &&
+                !empty($authUser['id']) &&
+                strcasecmp($action, 'profile') !== 0 &&
+                (TableRegistry::getTableLocator()->get('StudentStatusPatterns')->isEligibleForExitExam($this->student_id)
+                    || FORCE_ALL_STUDENTS_TO_FILL_BASIC_PROFILE == 1) &&
+                strcasecmp($controller, 'Users') !== 0 &&
+                strcasecmp($action, 'changePwd') !== 0
+            ) {
+                $statusPatternTable = TableRegistry::getTableLocator()->get('StudentStatusPatterns');
+                if (!$statusPatternTable->completedFillingProfileInfomation($this->student_id)) {
                     $this->Flash->warning(
-                        'Dear ' . $this->Session->read(
-                            'Auth.User'
-                        )['first_name'] . ', you are required to complete your basic profile before proceeding. If you encounter an error or unable to update your profile by your own or need further assistance, please report to the registrar record officer who is assigned to your department.'
+                        'Dear ' . $authUser['first_name'] . ', you are required to complete your basic profile before proceeding. If you encounter an error or need help, please contact the registrar officer assigned to your department.'
                     );
-                    return $this->redirect(array('controller' => 'students', 'action' => 'profile'));
+                    return $this->redirect(['controller' => 'Students', 'action' => 'profile']);
                 }
             }
         } else {
@@ -4241,7 +2193,7 @@ class StudentsController extends AppController
 
                     $possibleReadmissionYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
                         $student_section_exam_status['StudentExamStatus']['academic_year'],
-                        $this->AcademicYear->current_academicyear()
+                        $this->AcademicYear->currentAcademicYear()
                     );
 
                     $readmitted = ClassRegistry::init('Readmission')->find('first', array(
@@ -4250,12 +2202,7 @@ class StudentsController extends AppController
                             'Readmission.registrar_approval' => 1,
                             'Readmission.academic_commision_approval' => 1,
                             'Readmission.academic_year' => $possibleReadmissionYears,
-                            /* 'OR' => array(
-								'Readmission.academic_year' => $student_section_exam_status['StudentExamStatus']['academic_year'],
-								'Readmission.semester' => $student_section_exam_status['StudentExamStatus']['semester'],
-								'Readmission.registrar_approval_date' > $student_section_exam_status['StudentExamStatus']['modified'],
-								'Readmission.modified' > $student_section_exam_status['StudentExamStatus']['modified'],
-							) */
+
                         ),
                         'order' => array(
                             'Readmission.academic_year' => 'DESC',
@@ -4313,8 +2260,12 @@ class StudentsController extends AppController
                 $this->set('academicYR', $academicYR);
             }
         }
+        echo '<pre>';
+        print_r($this->request->getData());
+        echo '</pre>';
 
-        if (!empty($this->request->data) && isset($this->request->data['continue'])) {
+        if ($this->request->is('post')  && $this->request->getData('continue')) {
+
             //debug($this->request->data);
             if (!empty($this->request->data['Student']['studentID'])) {
                 $student_id_valid = $this->Student->find(
@@ -4322,7 +2273,7 @@ class StudentsController extends AppController
                     array(
                         'conditions' => array(
                             'Student.studentnumber' => trim(
-                                $this->request->data['Student']['studentID']
+                                $this->request->getData('Student.studentID')
                             )
                         ),
                         'recursive' => -1
@@ -4475,12 +2426,7 @@ class StudentsController extends AppController
                                     'Readmission.registrar_approval' => 1,
                                     'Readmission.academic_commision_approval' => 1,
                                     'Readmission.academic_year' => $possibleReadmissionYears,
-                                    /* 'OR' => array(
-									'Readmission.academic_year' => $student_section_exam_status['StudentExamStatus']['academic_year'],
-									'Readmission.semester' => $student_section_exam_status['StudentExamStatus']['semester'],
-									'Readmission.registrar_approval_date' > $student_section_exam_status['StudentExamStatus']['modified'],
-									'Readmission.modified' > $student_section_exam_status['StudentExamStatus']['modified'],
-								) */
+
                                 ),
                                 'order' => array(
                                     'Readmission.academic_year' => 'DESC',
@@ -4553,156 +2499,123 @@ class StudentsController extends AppController
         }
     }
 
-    public function get_modal_box($student_id = null)
+    public function getModalBox($student_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $authUser = $this->Authentication->getIdentity();
+        if (!$authUser) {
+            throw new NotFoundException(__('Unauthorized'));
+        }
 
-        if ($this->Auth->user('id')) {
-            if ($this->role_id == ROLE_STUDENT) {
-                $check_id_is_valid = $this->Student->find(
-                    'count',
-                    array('conditions' => array('Student.id' => $this->student_id))
-                );
-                $student_id = $this->student_id;
-            } else {
-                if ($this->role_id != ROLE_STUDENT) {
-                    $check_id_is_valid = $this->Student->find(
-                        'count',
-                        array('conditions' => array('Student.id' => $student_id))
-                    );
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $check_id_is_valid = 0;
+
+        if ($authUser->role_id == ROLE_STUDENT) {
+            $student_id = $authUser->table_id ?? null;
+            $check_id_is_valid = $studentsTable->find()->where(['id' => $student_id])->count();
+        } else {
+            $check_id_is_valid = $studentsTable->find()->where(['id' => $student_id])->count();
+        }
+
+        $otps = [];
+        $moodleUserDetails = [];
+
+        if ($check_id_is_valid > 0) {
+            $academicYR = $this->AcademicYear->currentAcademicYear();
+            $isTheStudentDismissed = 0;
+            $isTheStudentReadmitted = 0;
+
+            if (SHOW_OTP_TAB_ON_STUDENT_ACADEMIC_PROFILE_FOR_STUDENTS == 1) {
+                $otpsTable = TableRegistry::getTableLocator()->get('Otps');
+                $otps = $otpsTable->find()
+                    ->where(['student_id' => $student_id, 'active' => 1])
+                    ->order(['modified' => 'DESC', 'created' => 'DESC'])
+                    ->toArray();
+
+                $moodleIntegratedUser = false;
+                foreach ($otps as $otp) {
+                    if ($otp->service === 'Elearning' && empty($otp->portal)) {
+                        $moodleIntegratedUser = true;
+                    }
+                }
+
+                if ($moodleIntegratedUser) {
+                    $moodleUserTable = TableRegistry::getTableLocator()->get('MoodleUsers');
+                    $moodleUserDetails = $moodleUserTable->find()
+                        ->where(['table_id' => $student_id, 'role_id' => ROLE_STUDENT])
+                        ->order(['created' => 'DESC'])
+                        ->first();
                 }
             }
 
-            $otps = array();
-            $moodleUserDetails = array();
+            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+            $sectionTable = TableRegistry::getTableLocator()->get('Sections');
 
-            if ($check_id_is_valid > 0) {
-                $academicYR = $this->AcademicYear->current_academicyear();
-                $isTheStudentDismissed = 0;
-                $isTheStudentReadmitted = 0;
+            $student_section_exam_status = $studentsTable->getStudentSection($student_id);
 
-                if (SHOW_OTP_TAB_ON_STUDENT_ACADEMIC_PROFILE_FOR_STUDENTS == 1) {
-                    $otps = $this->Student->Otp->find('all', array(
-                        'conditions' => array(
-                            'Otp.student_id' => $student_id,
-                            'Otp.active' => 1
-                        ),
-                        'contain' => array(),
-                        'order' => array('Otp.modified' => 'DESC', 'Otp.created' => 'DESC')
-                    ));
-
-                    if (!empty($otps)) {
-                        $moodleIntegratedUser = false;
-
-                        foreach ($otps as $key => $otp) {
-                            if ($otp['Otp']['service'] == 'Elearning' && empty($otp['Otp']['portal'])) {
-                                $moodleIntegratedUser = true;
-                            }
-                        }
-
-                        if ($moodleIntegratedUser) {
-                            $moodleUserDetails = ClassRegistry::init('MoodleUser')->find('first', array(
-                                'conditions' => array(
-                                    'MoodleUser.table_id' => $student_id,
-                                    'MoodleUser.role_id' => ROLE_STUDENT
-                                ),
-                                'contain' => array(),
-                                'order' => array('MoodleUser.created' => 'DESC')
-                            ));
-                        }
-                    }
-                }
-
-                /* $student_academic_profile = $this->Student->getStudentRegisteredAddDropCurriculumResult($student_id, $this->AcademicYear->current_academicyear());
-				if ($this->role_id != ROLE_STUDENT) {
-					$studentAttendedSections = ClassRegistry::init('Section')->getStudentSectionHistory($student_id);
-					$this->set(compact('studentAttendedSections'));
-				} */
-
-                $student_section_exam_status = ClassRegistry::init('Student')->get_student_section(
-                    $student_id,
-                    null,
-                    null
-                );
-
-                if (isset($student_section_exam_status['Section'])) {
-                    if (!$student_section_exam_status['Section']['archive'] && !$student_section_exam_status['Section']['StudentsSection']['archive']) {
-                        $academicYR = $student_section_exam_status['Section']['academicyear'];
-                    }
-                }
-
-                if (isset($student_section_exam_status['StudentExamStatus']) && !empty($student_section_exam_status['StudentExamStatus']) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
-                    $isTheStudentDismissed = 1;
-
-                    $possibleReadmissionYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                        $student_section_exam_status['StudentExamStatus']['academic_year'],
-                        $this->AcademicYear->current_academicyear()
-                    );
-
-                    $readmitted = ClassRegistry::init('Readmission')->find('first', array(
-                        'conditions' => array(
-                            'Readmission.student_id' => $student_id,
-                            'Readmission.registrar_approval' => 1,
-                            'Readmission.academic_commision_approval' => 1,
-                            'Readmission.academic_year' => $possibleReadmissionYears,
-                            /* 'OR' => array(
-								'Readmission.academic_year' => $student_section_exam_status['StudentExamStatus']['academic_year'],
-								'Readmission.semester' => $student_section_exam_status['StudentExamStatus']['semester'],
-								'Readmission.registrar_approval_date' > $student_section_exam_status['StudentExamStatus']['modified'],
-								'Readmission.modified' > $student_section_exam_status['StudentExamStatus']['modified'],
-							) */
-                        ),
-                        'order' => array(
-                            'Readmission.academic_year' => 'DESC',
-                            'Readmission.semester' => 'DESC',
-                            'Readmission.modified' => 'DESC'
-                        ),
-                        'recursive' => -1,
-                    ));
-
-                    if (count($readmitted)) {
-                        $lastReadmittedAcademicYear = $readmitted['Readmission']['academic_year'];
-                        $lastReadmittedSemester = $readmitted['Readmission']['semester'];
-                        $lastReadmittedDate = $readmitted['Readmission']['registrar_approval_date'];
-
-                        debug($lastReadmittedAcademicYear);
-
-                        $isTheStudentReadmitted = 1;
-                        $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                            $lastReadmittedAcademicYear,
-                            $academicYR
-                        );
-                        $this->set(compact('possibleAcademicYears'));
-                    }
-
-                    debug($isTheStudentReadmitted);
-                }
-
-                $student_academic_profile = $this->Student->getStudentRegisteredAddDropCurriculumResult(
-                    $student_id,
-                    $academicYR
-                );
-
-                $studentAttendedSections = ClassRegistry::init('Section')->getStudentSectionHistory($student_id);
-
-                $this->set(
-                    compact(
-                        'studentAttendedSections',
-                        'student_academic_profile',
-                        'student_section_exam_status',
-                        'otps',
-                        'moodleUserDetails'
-                    )
-                );
-                $this->set('isTheStudentDismissed', $isTheStudentDismissed);
-                $this->set('isTheStudentReadmitted', $isTheStudentReadmitted);
-                $this->set('academicYR', $academicYR);
+            if (!empty($student_section_exam_status['Section'])
+                && !$student_section_exam_status['Section']['archive']
+                && !$student_section_exam_status['Section']['StudentsSection']['archive']) {
+                $academicYR = $student_section_exam_status['Section']['academicyear'];
             }
+
+            if (!empty($student_section_exam_status['StudentExamStatus']) &&
+                $student_section_exam_status['StudentExamStatus']['academic_status_id'] == DISMISSED_ACADEMIC_STATUS_ID) {
+                $isTheStudentDismissed = 1;
+
+                $possibleReadmissionYears = $studentExamStatusTable->getAcademicYearRange(
+                    $student_section_exam_status['StudentExamStatus']['academic_year'],
+                    $this->AcademicYear->currentAcademicYear()
+                );
+
+                $readmissionTable = TableRegistry::getTableLocator()->get('Readmissions');
+                $readmitted = $readmissionTable->find()
+                    ->where([
+                        'student_id' => $student_id,
+                        'registrar_approval' => 1,
+                        'academic_commision_approval' => 1,
+                        'academic_year IN' => $possibleReadmissionYears
+                    ])
+                    ->order(['academic_year' => 'DESC', 'semester' => 'DESC', 'modified' => 'DESC'])
+                    ->first();
+
+                if ($readmitted) {
+                    $lastReadmittedAcademicYear = $readmitted->academic_year;
+                    $lastReadmittedSemester = $readmitted->semester;
+                    $lastReadmittedDate = $readmitted->registrar_approval_date;
+
+                    $isTheStudentReadmitted = 1;
+
+                    $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange(
+                        $lastReadmittedAcademicYear,
+                        $academicYR
+                    );
+                    $this->set(compact('possibleAcademicYears'));
+                }
+            }
+
+            $student_academic_profile = $studentsTable->getStudentRegisteredAddDropCurriculumResult(
+                $student_id,
+                $academicYR
+            );
+
+            $studentAttendedSections = $sectionTable->getStudentSectionHistory($student_id);
+
+            $this->set(compact(
+                'studentAttendedSections',
+                'student_academic_profile',
+                'student_section_exam_status',
+                'otps',
+                'moodleUserDetails',
+                'academicYR',
+                'isTheStudentDismissed',
+                'isTheStudentReadmitted'
+            ));
         }
     }
 
-    public function profile_not_build_list()
+    public function profileNotBuildList()
     {
 
         $limit = 100;
@@ -5229,20 +3142,9 @@ class StudentsController extends AppController
         $this->set(compact('colleges', 'departments', /* 'students', */ 'turn_off_search', 'limit', 'name'));
     }
 
-    /* function profile_not_build_list()
-	{
-		$student_lists = array();
 
-		if ($this->department_ids){
-			$student_lists = $this->Student->getProfileNotBuildList(DAYS_BACK_PROFILE, $this->department_ids, null);
-		} else if ($this->college_ids){
-			$student_lists = $this->Student->getProfileNotBuildList(DAYS_BACK_PROFILE, null, $this->college_ids);
-		}
 
-		$this->set(compact('student_lists'));
-	} */
-
-    public function name_change($id = null)
+    public function nameChange($id = null)
     {
 
         if (!empty($this->request->data['Student']) && isset($this->request->data['searchStudentName'])) {
@@ -5378,13 +3280,13 @@ class StudentsController extends AppController
         }
     }
 
-    public function department_issue_password($section_id = null)
+    public function departmentIssuePassword($section_id = null)
     {
 
         $this->__issue_password($section_id, 0);
     }
 
-    public function freshman_issue_password($section_id = null)
+    public function freshmanIssuePassword($section_id = null)
     {
 
         $this->__issue_password($section_id, 1);
@@ -5721,7 +3623,7 @@ class StudentsController extends AppController
         return $password;
     }
 
-    public function auto_yearlevel_update()
+    public function autoYearlevelUpdate()
     {
 
         $studentssections = $this->Student->find('all', array(
@@ -5789,7 +3691,7 @@ class StudentsController extends AppController
         }
     }
 
-    public function name_list()
+    public function nameList()
     {
 
         $this->paginate = array('contain' => array('Department', 'Curriculum', 'ProgramType', 'Program', 'College'));
@@ -5938,7 +3840,7 @@ class StudentsController extends AppController
         }
     }
 
-    public function correct_name($id)
+    public function correctName($id)
     {
 
         if (!$id) {
@@ -6094,21 +3996,12 @@ class StudentsController extends AppController
         }
     }
 
-    public function scan_profile_picture()
+    public function scanProfilePicture()
     {
 
         debug($this->request->data);
         if (isset($this->request->data['Synchronize']) && !empty($this->request->data['Synchronize'])) {
-            /* $allImages = glob(WWW_ROOT . "media/transfer/img/*.jpg");
-			debug($allImages);
-			foreach ($allImages as $image) {
-				debug($image);
-				$imageFileName = explode(WWW_ROOT . 'media/transfer/img/', $image);
 
-				$studentnumberWithImage = str_replace('-', '/', $imageFileName[1]);
-				$studentnumber = explode('.jpg', $studentnumberWithImage);
-				debug($studentnumber);
-			} */
 
             $path = WWW_ROOT . "media/transfer/img/";
             $allImages = $this->__getNewestFN($path);
@@ -6182,19 +4075,7 @@ class StudentsController extends AppController
         usort($files, array($this, "_filemtime_compare"));
 
         return $files;
-        /* $p = opendir($path);
 
-		while (false !== ($file = readdir($p))) {
-			$parts = pathinfo($file);
-			debug($parts);
-			if (strstr($file, ".inf") && $parts['extension'] == 'jpg') {
-				$list[] = date("YmdHis ", filemtime($path . $file)) . $path . $file;
-			}
-		}
-		// sort array descending
-		rsort($list);
-		// return newest file name
-		return $list[0]; */
     }
 
     private function _filemtime_compare($a, $b)
@@ -6203,7 +4084,7 @@ class StudentsController extends AppController
         return filemtime($a) - filemtime($b);
     }
 
-    public function mass_import_profile_picture()
+    public function massImportProfilePicture()
     {
 
         if (!empty($this->request->data)) {
@@ -6388,7 +4269,7 @@ class StudentsController extends AppController
         $this->set(compact('profilePictureUploaded', 'totalStudentCount'));
     }
 
-    public function mass_import_student_national_id()
+    public function massImportStudentNationalId()
     {
 
         if (!empty($this->request->data)) {
@@ -6607,31 +4488,7 @@ class StudentsController extends AppController
         //debug($ac_years_to_look);
 
         $ac_years_to_look_imploded = "'" . implode("', '", $ac_years_to_look) . "'";
-        //debug($ac_years_to_look_imploded);
 
-        /* $nonGraduatedStudentCount = $this->Student->CourseRegistration->find('count', array(
-			'conditions' => array(
-				'CourseRegistration.academic_year' => $ac_years_to_look,
-			),
-			'contain' => array(
-				'Student' => array(
-					'conditions' => array(
-						'graduated' => 0,
-						'Student.academicyear' => $admissions_years_to_look,
-						'Student.program_id !=' => PROGRAM_REMEDIAL,
-						'OR' => array(
-							'Student.student_national_id IS NOT NULL',
-							'Student.student_national_id != 0',
-							'Student.student_national_id != ""'
-						)
-					)
-				)
-			),
-			'group' => array('CourseRegistration.student_id'),
-			'recursive' => -1
-		));
-
-		debug($nonGraduatedStudentCount); */
 
         $nonGraduatedStudentCount = $this->Student->StudentExamStatus->find('count', array(
             'conditions' => array(
@@ -6658,17 +4515,6 @@ class StudentsController extends AppController
 
         debug($nonGraduatedStudentCount);
 
-        //$totalStudentCount = $this->Student->find('count', array('conditions' => array('Student.graduated = 0', 'Student.academicyear' => $admissions_years_to_look), 'recursive' => -1));
-
-        /* $totalStudentCount = $this->Student->find('count', array(
-			'conditions' => array(
-				'Student.graduated = 0',
-				'Student.program_id !=' => PROGRAM_REMEDIAL,
-				'Student.academicyear' => $admissions_years_to_look,
-				'Student.id IN (select student_id from course_registrations where academic_year IN (' .$ac_years_to_look_imploded . ') GROUP BY student_id ) '
-			),
-			'recursive' => -1
-		)); */
 
         $totalStudentCount = $this->Student->CourseRegistration->find('count', array(
             'conditions' => array(
@@ -6692,7 +4538,7 @@ class StudentsController extends AppController
         $this->set(compact('nonGraduatedStudentCount', 'totalStudentCount'));
     }
 
-    public function mass_import_one_time_passwords()
+    public function massImportOneTimePasswords()
     {
 
         if (!empty($this->request->data)) {
@@ -7076,7 +4922,7 @@ class StudentsController extends AppController
     }
 
 
-    public function activate_deactivate_profile($parameters)
+    public function activateDeactivateProfile($parameters)
     {
 
         if (!empty($parameters)) {
@@ -7108,7 +4954,7 @@ class StudentsController extends AppController
         }
     }
 
-    public function id_card_print()
+    public function idcardPrint()
     {
 
         if (!empty($this->request->data) && !empty($this->request->data['getacceptedstudent'])) {
@@ -7241,7 +5087,7 @@ class StudentsController extends AppController
         $this->set(compact('departments'));
     }
 
-    public function card_printing_report()
+    public function cardPrintingReport()
     {
 
         if (
@@ -7350,12 +5196,7 @@ class StudentsController extends AppController
                 'IDNotIssuedStudentList' => 'ID Card Not Issued Student List',
                 //'profileNotCompleted' => 'Profile Not Completed Student List',
             ),
-            /*
-    	  	'List'=>array(
-                  'IDNotIssuedStudentList' => 'ID Card Not Issued Student List',
-                  'profileNotCompleted' => 'Profile Not Completed Student List',
-    	  	),
-    	  	*/
+
 
         );
         $programs = $this->Student->Program->find('list');
@@ -7503,7 +5344,7 @@ class StudentsController extends AppController
         return $label;
     }
 
-    public function print_record()
+    public function printRecord()
     {
 
         if ($this->Session->check('students')) {
@@ -7540,7 +5381,7 @@ class StudentsController extends AppController
         }
     }
 
-    public function ajax_check_ecardnumber()
+    public function ajaxCheckEcardnumber()
     {
 
         $this->layout = 'ajax';
@@ -7560,147 +5401,7 @@ class StudentsController extends AppController
         $this->set(compact('value'));
     }
 
-    /*
-	public function push_students_cafe_entry() {
-
-    	 if (!empty($this->request->data) && !empty($this->request->data['getStudent']))
-    	 {
-
-             $options=array();
-             $limit=100;
-             if(!empty($this->request->data['Search']['academicyear'])){
-             	 $options['conditions']['Student.admissionyear']=$this->AcademicYear->get_academicYearBegainingDate($this->request->data['Search']['academicyear']);
-             }
-             if(!empty($this->request->data['Search']['currentAcademicYear'])
-             	&& !empty($this->request->data['Search']['currentAcademicYear'])){
-
-             	$cafe=$this->request->data['Search']['cafe'];
-
-             	$options['conditions'][] = 'Student.id in (select student_id from course_registrations where academic_year="'.$this->request->data['Search']['currentAcademicYear'].'" and semester="'.$this->request->data['Search']['semester'].'" and cafeteria_consumer='.$cafe.') and Student.ecardnumber is not null';
-
-             }
-             if(!empty($this->request->data['Search']['department_id'])){
-             	$college_id = explode('~', $this->request->data['Search']['department_id']);
-				if(count($college_id) > 1) {
-					$options['conditions']['Student.college_id']=$college_id[1];
-				} else {
-	              $options['conditions']['Student.department_id']=$college_id;
-				}
-             }
-
-             if(!empty($this->request->data['Search']['name'])){
-             	 $options['conditions']['Student.first_name LIKE ']=$this->request->data['Search']['name'].'%';
-             }
-
-             if(!empty($this->request->data['Search']['program_type_id'])){
-             	 $options['conditions']['Student.program_type_id']=$this->request->data['Search']['program_type_id'];
-             }
-             if(!empty($this->request->data['Search']['program_id'])){
-             	 $options['conditions']['Student.program_id']=$this->request->data['Search']['program_id'];
-             }
-             if(!empty($this->request->data['Search']['limit'])){
-             	 $limit=$this->request->data['Search']['limit'];
-             }
-
-
-             if(!empty($options)){
-             	  	 $this->paginate = array('limit'=>$limit,
-			  'maxLimit'=>$limit);
-					 $this->paginate['conditions']=$options['conditions'];
-					 $this->Paginator->settings=$this->paginate;
-
-			      $students=$this->Paginator->paginate('Student');
-			      if(empty($students)){
-			      	  $this->Session->setFlash('<span></span>'.__('No result found.'), 'default',array('class'=>'error-box error-message'));
-			      }
-                  $this->set(compact('students'));
-             }
-         }
-
-        if (!empty($this->request->data) && !empty($this->request->data['pushStudentsToCafeGate'])) {
-          	   $studentsList=array();
-          	   $db = ConnectionManager::getDataSource("mssql");
-          	   foreach ($this->request->data['Student']['approve'] as $key => $value) {
-          			if($value==1){
-          				$studentsList=1;
-          				$studentInfo=$this->Student->find('first',array('conditions'=>array('Student.id'=>$key),'contain'=>array('College')));
-          				$mealHallAssigned=$this->Student->MealHallAssignment->find('first',array('conditions'=>array('MealHallAssignment.student_id'=>$key,'MealHallAssignment.academic_year'=>$this->request->data['Search']['currentAcademicYear']),'recursive'=>-1));
-
-          			    $studentQuery="SELECT TOP(1) SLN_Employee FROM dbo.MSTR_Employee AS S WHERE Employee_Code='".$studentInfo['Student']['studentnumber']."'";
-		                //[Access_Level4]
-		  				$studentResult = $db->query($studentQuery);
-		  				if(!empty($studentResult[0][0]['SLN_Employee'])){
-		  					    // does the student exist ?
-
-          			    		$cardSQL="SELECT TOP(1) SLN_Employee FROM ACS_Cards_Info AS S WHERE SLN_Employee='".$studentResult[0][0]['SLN_Employee']."'";
-
-          			    		$cardResult = $db->query($cardSQL);
-          			    		if($this->request->data['Search']['allow']==1){
-          			    			  $accessLevel4Cafe=isset($mealHallAssigned['MealHallAssignment']['meal_hall_id']) ? $mealHallAssigned['MealHallAssignment']['meal_hall_id']:0 ;
-
-          			    		} else {
-          			    			$accessLevel4Cafe=0;
-          			    		}
-
-
-          			    		if(!empty($cardResult[0][0]['SLN_Employee'])){
-          			    			$cafeAccessSQL="UPDATE ACS_Cards_Info
-SET Access_Level4 = ".$accessLevel4Cafe." WHERE SLN_Employee=".$cardResult[0][0]['SLN_Employee']."";
-
-          			    		} else{
-          			    				// do inseration to ess db
-		  						$slnEmployee=$studentResult[0][0]['SLN_Employee'];
-		  						$cardNumber=$studentInfo['Student']['ecardnumber'];
-		  						$facilityID=$studentInfo['College']['campus_id'];
-		  						$accessLevel1CommonGate=13;
-		  						$accessLevel2AllStudentGate=9;
-		  						$accessLevel3AllLibGate=5;
-
-		  						$accessLevel5=0;
-		  						$accessLevel6=0;
-		  						$accessLevel7=0;
-		  						$accessLevel8=0;
-
-		  					   $cafeAccessSQL="INSERT INTO ACS_Cards_Info(SLN_Employee,Card_Number,Facility_ID,Access_Level1,Access_Level2,Access_Level3,Access_Level4,Access_Level5,Access_Level6,Access_Level7,Access_Level8) VALUES ('$slnEmployee','$cardNumber','$facilityID','$accessLevel1CommonGate','$accessLevel2AllStudentGate','$accessLevel3AllLibGate','$accessLevel4Cafe','$accessLevel5','$accessLevel6','$accessLevel7','$accessLevel8')";
-          			    	}
-          			    	$cafeQuery = $db->query($cafeAccessSQL);
-          			    	debug($cafeQuery);
-
-		  				}
-          			}
-          		}
-
-				if(empty($studentsList)) {
-					$this->Session->setFlash('<span></span>'.__('Please select the students you would like to allow/deny cafe gate.'), 'default', array('class'=>'info-box info-message'));
-				}
-				else {
-					$this->Session->setFlash('<span></span>'.__('The selected students has been allowed/denied cafe gate and update has been propagated to devices.'), 'default', array('class'=>'success-box success-message'));
-				}
-
-          }
-
-
-         if($this->role_id==ROLE_SYSADMIN){
-		 	$department_ids=ClassRegistry::init('Department')->find('list',array('fields'=>
-		 		array('Department.id','Department.id')));
-
-            $departments = ClassRegistry::init('Department')->allDepartmentsByCollege2(1,
-			$department_ids, $this->college_ids);
-		 } else if (!empty($this->department_ids) ||
-	!empty($this->college_ids)) {
-		     $departments = ClassRegistry::init('Department')->allDepartmentsByCollege2(1,
-			$this->department_ids, $this->college_ids);
-		 } else if(!empty($this->department_id)) {
-		     $departments = ClassRegistry::init('Department')->allDepartmentsByCollege2(1,
-			$this->department_id, $this->college_id);
-		 }  else {
-            $departments=array();
-		 }
-		 $this->set(compact('departments'));
-    }
-    */
-
-    public function push_students_cafe_entry()
+    public function pushStudentsCafeEntry()
     {
 
         $this->_mssql();
@@ -7933,7 +5634,7 @@ SET Access_Level4 = " . $accessLevel4Cafe . " WHERE SLN_Employee=" . $cardResult
     }
 
 
-    public function delete_student_from_graduate_list_for_correction($student_id)
+    public function deleteStudentFromGraduateListForCorrection($student_id)
     {
 
         if ($student_id) {
@@ -7970,7 +5671,7 @@ SET Access_Level4 = " . $accessLevel4Cafe . " WHERE SLN_Employee=" . $cardResult
         }
     }
 
-    public function update_koha_db()
+    public function updateKohaDb()
     {
 
         if (!empty($this->request->data) && !empty($this->request->data['updateKohaDB'])) {
@@ -8056,7 +5757,7 @@ SET Access_Level4 = " . $accessLevel4Cafe . " WHERE SLN_Employee=" . $cardResult
         );
     }
 
-    public function update_lms_db()
+    public function updateLmsDb()
     {
 
         if (!empty($this->request->data) && !empty($this->request->data['deleteLMSDB'])) {

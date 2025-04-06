@@ -58,6 +58,7 @@ class AppController extends Controller
         $this->loadComponent('Auth', [
 
             'authorize' => ['Acl.Actions'],
+            'actionPath' => 'controllers/', // ✅ This line is key
             //'authorize' => [], // Disable ACL
             'authenticate' => [
                 'Form' => [
@@ -92,15 +93,59 @@ class AppController extends Controller
         ]);
         // Ensure user session is loaded
         $this->set('authUser', $this->Auth->user());
-
+        $this->loadComponent('Attachment');
         $this->loadComponent('RequestHandler');
         $this->loadComponent('Flash');
         $this->loadComponent('MenuOptimized');
+
     }
 
     protected function _findIp()
     {
-        return $this->request->clientIp();
+        // Check for X-Real-IP (commonly set by Nginx reverse proxy)
+        $realIp = getenv("X-Real-IP");
+        if (!empty($realIp) && filter_var($realIp, FILTER_VALIDATE_IP)) {
+            return $realIp;
+        }
+
+        // Check for X-Forwarded-For (commonly used by Nginx reverse proxy or load balancers)
+        $xForwardedFor = getenv("X-Forwarded-For");
+        if (!empty($xForwardedFor)) {
+            $ipList = explode(',', $xForwardedFor);
+            foreach ($ipList as $ip) {
+                $ip = trim($ip);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip; // Return first valid IP
+                }
+            }
+        }
+
+        // Check for HTTP_X_FORWARDED_FOR (used by Apache or certain proxies)
+        $httpXForwardedFor = getenv("HTTP_X_FORWARDED_FOR");
+        if (!empty($httpXForwardedFor)) {
+            $ipList = explode(',', $httpXForwardedFor);
+            foreach ($ipList as $ip) {
+                $ip = trim($ip);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip; // Return first valid IP
+                }
+            }
+        }
+
+        // Check for HTTP_CLIENT_IP (legacy proxy configurations)
+        $httpClientIp = getenv("HTTP_CLIENT_IP");
+        if (!empty($httpClientIp) && filter_var($httpClientIp, FILTER_VALIDATE_IP)) {
+            return $httpClientIp;
+        }
+
+        // Fallback to REMOTE_ADDR (server-detected client IP)
+        $remoteAddr = getenv("REMOTE_ADDR");
+        if (!empty($remoteAddr) && filter_var($remoteAddr, FILTER_VALIDATE_IP)) {
+            return $remoteAddr;
+        }
+
+        // Return null if no valid IP is found
+        return null;
     }
 
     public function beforeFilter(Event $event)
@@ -122,21 +167,20 @@ class AppController extends Controller
             return; // Skip ACL check, allow the action
         }
 
-
-
         $session = $this->request->getSession();
         if ($session->check('Auth.User')) {
             $auth = $session->read('Auth.User');
             if (!empty($auth)) {
                 $userTable = TableRegistry::getTableLocator()->get('Users');
-                $permissionLists = $userTable->getAllPermissions($auth['id']);
 
                 $this->set('username', $auth['username']);
                 $this->set('last_login', $auth['last_login']);
                 $this->set('user_id', $auth['id']);
 
+                $this->set('role_id', $auth['role_id']);
 
-                if ($auth['id'] && !$session->read('permissionLists') || true) {
+
+                if ($auth['id'] && !$session->read('permissionLists') ) {
 
                     $permissionLists = $userTable->getAllPermissions($auth['id']);
 
@@ -212,8 +256,6 @@ class AppController extends Controller
                     $this->set('program_type_id', $this->program_type_id);
                 }
 
-
-
                 $this->department_ids = $userDetail['ApplicableAssignments']['department_ids'] ?? [];
                 $this->college_ids = $userDetail['ApplicableAssignments']['college_ids'] ?? [];
                 $this->program_ids = $userDetail['ApplicableAssignments']['program_ids'] ?? [];
@@ -235,36 +277,45 @@ class AppController extends Controller
                 }
             }
         }
+
         /*
         $user = $this->Auth->user();
 
         if (!empty($user) && isset($user['id'])) {
 
-            // Store all allowed actions from child controllers
-            if (!isset($this->allowedActions)) {
-                $this->allowedActions = [];
+            // === Role mode configuration ===
+            $roleBasedRoles = [2, 3];    // roles to check via Role ARO (e.g., Admin, Manager)
+
+            // Build ACO path
+            $plugin = $this->request->getParam('plugin');
+            $prefix = $this->request->getParam('prefix');
+            $controller = $this->request->getParam('controller');
+            $action = $this->request->getParam('action');
+
+            $acoPath = 'controllers/';
+            if ($plugin) {
+                $acoPath .= $plugin . '/';
             }
-
-            // Retrieve actions that are explicitly allowed in the child controller
-            $this->allowedActions = array_merge($this->allowedActions, $this->Auth->allowedActions);
-
-            // ✅ Skip ACL Check for Publicly Allowed Actions (from any controller)
-            if (in_array($this->request->getParam('action'), $this->allowedActions)) {
-                return; // Skip ACL check, allow the action
+            if ($prefix) {
+                $acoPath .= Inflector::camelize($prefix) . '/';
             }
+            $acoPath .= $controller . '/' . $action;
 
-            $acoPath = "controllers/" . Inflector::camelize($this->name) .
-                "/{$this->request->getParam('action')}";
-
-            $permissionCheck = $this->Acl->check(['Roles' => ['id' => $user['role_id']]], $acoPath);
-            // If no access for role, check by user
-            if (!$permissionCheck) {
+            // === Permission Check Mode ===
+            $roleId = $user['role_id'];
+            if (in_array($roleId, $roleBasedRoles)) {
+                // Check against role permissions
+                $aro = ['model' => 'Roles', 'foreign_key' => $roleId];
+            }  else {
+                // Optional: Default fallback (e.g. deny or use role check)
+                $aro = ['model' => 'Users', 'foreign_key' => $user['id']];
+            }
+            if (!$this->Acl->check($aro, $acoPath)) {
                 $this->Flash->error(__('You are not authorized to access this page.'));
-                //  return $this->redirect(['controller' => 'Users', 'action' => 'login']);
                 return $this->redirect('/');
             }
-
         }
         */
+
     }
 }

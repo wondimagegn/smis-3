@@ -194,84 +194,84 @@ use Cake\Utility\Inflector;
                         <tbody ng-init="getAll()">
                         <tr ng-if="isNotZeroOrUndefined(exam_grade_change_requests)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_department_grade_change">
+                                <a ng-href="/examGradeChanges/manage_department_grade_change">
                                     You have {{ exam_grade_change_requests }} grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(exam_grade_changes_for_college_approval)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_college_grade_change">
+                                <a ng-href="/examGradeChanges/manage_college_grade_change">
                                     You have {{ exam_grade_changes_for_college_approval }} grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(makeup_exam_grades)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_department_grade_change">
+                                <a ng-href="/examGradeChanges/manage_department_grade_change">
                                     You have {{ makeup_exam_grades }} makeup exam approval requests.
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(rejected_makeup_exams)">
                             <td class="rejected">
-                                <a ng-href="/exam_grade_changes/manage_department_grade_change">
+                                <a ng-href="/examGradeChanges/manage_department_grade_change">
                                     You have {{ rejected_makeup_exams }} rejected makeup exam grades.
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(rejected_supplementary_exams)">
                             <td class="rejected">
-                                <a ng-href="/exam_grade_changes/manage_department_grade_change">
+                                <a ng-href="/examGradeChanges/manage_department_grade_change">
                                     You have rejected supplementary exam grades.
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(fm_exam_grade_change_requests)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_freshman_grade_change">
+                                <a ng-href="/examGradeChanges/manage_freshman_grade_change">
                                     You have {{ fm_exam_grade_change_requests }} freshman grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(fm_makeup_exam_grades)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_freshman_grade_change">
+                                <a ng-href="/examGradeChanges/manage_freshman_grade_change">
                                     You have {{ fm_makeup_exam_grades }} freshman makeup grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(fm_rejected_makeup_exams)">
                             <td class="rejected">
-                                <a ng-href="/exam_grade_changes/manage_freshman_grade_change">
+                                <a ng-href="/examGradeChanges/manage_freshman_grade_change">
                                     You have rejected freshman makeup grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(fm_rejected_supplementary_exams)">
                             <td class="rejected">
-                                <a ng-href="/exam_grade_changes/manage_freshman_grade_change">
+                                <a ng-href="/examGradeChanges/manage_freshman_grade_change">
                                     You have rejected supplementary grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(reg_exam_grade_change_requests)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_registrar_grade_change">
+                                <a ng-href="/examGradeChanges/manage_registrar_grade_change">
                                     You have {{ reg_exam_grade_change_requests }} grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(reg_makeup_exam_grades)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_registrar_grade_change">
+                                <a ng-href="/examGradeChanges/manage_registrar_grade_change">
                                     You have {{ reg_makeup_exam_grades }} makeup grade change requests
                                 </a>
                             </td>
                         </tr>
                         <tr ng-if="isNotZeroOrUndefined(reg_supplementary_exam_grades)">
                             <td>
-                                <a ng-href="/exam_grade_changes/manage_registrar_grade_change">
+                                <a ng-href="/examGradeChanges/manage_registrar_grade_change">
                                     You have {{ reg_supplementary_exam_grades }} supplementary grade change requests
                                 </a>
                             </td>
@@ -282,6 +282,150 @@ use Cake\Utility\Inflector;
             </div>
         </div>
     <?php endif; ?>
+
+    <?php
+    if ($role_id == ROLE_COLLEGE || $role_id == ROLE_DEPARTMENT || $role_id == ROLE_REGISTRAR) { ?>
+        <div class="large-4 columns">
+            <div class="box" id="gradeBox">
+                <div class="box-header bg-transparent">
+                    <div class="pull-right box-tools">
+                        <span class="box-btn" data-widget="collapse"><i class="icon-minus"></i></span>
+                        <!-- <span class="box-btn" data-widget="remove"><i class="icon-cross"></i></span> -->
+                    </div>
+                    <h3 class="box-title"><i class="fontello-check"></i><span>Grade Approval/Confirmation</span></h3>
+                </div>
+                <loading-ajax> </loading-ajax>
+
+                <div class="box-body" style="display: block; margin-top: -15px;" id="GradeConfiramationApproval" ng-controller="gradeApprovalConfirmation">
+                    <table cellpadding="0" cellspacing="0" class="table">
+                        <tr ng-repeat="grade in courses_for_dpt_approvals | startFrom:currentPage*pageSize | limitTo:pageSize">
+                            <td>
+                                <a ng-href="/examGrades/approve_non_freshman_grade_submission/{{grade.PublishedCourse.id}}">
+                                    Instructor: {{grade.CourseInstructorAssignment[0].Staff.Title.title}}. {{grade.CourseInstructorAssignment[0].Staff.full_name}} <br />
+                                    Course: {{grade.Course.course_title}} ({{ grade.Course.course_code }}) <br />
+                                    Department: {{grade.Department.name}} {{grade.College.name}} <br />
+                                    Section: {{grade.Section.name}} <br />
+                                    <!-- Year Level: {{grade.YearLevel.name }} <br /> -->
+                                    Year Level: {{(grade.YearLevel.name ? grade.YearLevel.name : 'Pre/Freshman') }} <br />
+                                    Program: {{grade.Program.name }} <br />
+                                    ProgramType: {{grade.ProgramType.name }} <br />
+                                    Academic Year: {{grade.PublishedCourse.academic_year}} <br />
+                                    Semester: {{grade.PublishedCourse.semester}} <br />
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <?php
+                    if ($role_id == ROLE_DEPARTMENT ) {?>
+                        <table ng-show="courses_for_dpt_approvals.length == 0 " cellpadding="0" cellspacing="0" class="table">
+                            <tr>
+                                <td>
+                                    <a href="/examGrades/approve_non_freshman_grade_submission"> Check grade submissions prior to <?= $acy_ranges_by_coma_quoted_for_display?></a>
+                                </td>
+                            </tr>
+                        </table>
+                        <?php
+                    } ?>
+
+                    <?php
+                    if ($role_id == ROLE_REGISTRAR ) {?>
+                        <table ng-show="courses_for_registrar_approval.length == 0" cellpadding="0" cellspacing="0" class="table">
+                            <tr>
+                                <td>
+                                    <a href="/examGrades/confirmGradeSubmission"> Check grade submissions prior to <?= $acyRangesByComaQuotedForDisplay?></a>
+                                </td>
+                            </tr>
+                        </table>
+                        <?php
+                    } ?>
+
+                    <div class="pagination-centered" ng-show="courses_for_dpt_approvals.length > 0">
+                        <br>
+                        <ul class="pagination">
+                            <li class="arrow">
+                                <button type="button" class="tiny radius button bg-blue" ng-disabled="currentPage == 0" ng-click="currentPage=currentPage-1"> &lt; PREV</button>
+                            </li>
+                            <li>
+                                <span>{{currentPage+1}} of {{ numberOfPages()}}</span>
+                            </li>
+                            <li class="arrow">
+                                <button class="tiny radius button bg-blue" ng-disabled="currentPage >= courses_for_dpt_approvals.length/pageSize-1" ng-click="currentPage=currentPage+1">NEXT &gt;</button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <table ng-show="courses_for_registrar_approval.length > 0" cellpadding="0" cellspacing="0" class="table">
+                        <tr ng-repeat="grade in courses_for_registrar_approval | startFrom:currentPage*pageSize | limitTo:pageSize">
+                            <td>
+                                <a ng-href="/examGrades/confirm_grade_submission/{{grade.PublishedCourse.id}}">
+                                    Instructor: {{grade.CourseInstructorAssignment[0].Staff.Title.title}}. {{grade.CourseInstructorAssignment[0].Staff.full_name}} <br />
+                                    Course: {{grade.Course.course_title}} ({{ grade.Course.course_code }}) <br />
+                                    Department: {{grade.Department.name}} {{grade.College.name}} <br />
+                                    Section: {{grade.Section.name}} <br />
+                                    <!-- Year Level: {{grade.YearLevel.name }} <br /> -->
+                                    Year Level: {{(grade.YearLevel.name ? grade.YearLevel.name : 'Pre/Freshman') }} <br />
+                                    Academic Year: {{grade.PublishedCourse.academic_year}} <br />
+                                    Semester: {{grade.PublishedCourse.semester}} <br />
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="pagination-centered" ng-show="courses_for_registrar_approval.length > 0">
+                        <br>
+                        <ul class="pagination">
+                            <li class="arrow">
+                                <button type="button" class="tiny radius button bg-blue" ng-disabled="currentPage == 0" ng-click="currentPage=currentPage-1"> &lt; PREV</button>
+                            </li>
+                            <li>
+                                <span>{{currentPage+1}} of {{ numberOfPages()}}</span>
+                            </li>
+                            <li class="arrow">
+                                <button class="tiny radius button bg-blue" ng-disabled="currentPage >= courses_for_registrar_approval.length/pageSize - 1 " ng-click="currentPage=currentPage+1">NEXT &gt;</button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <table ng-show="courses_for_freshman_approvals.length > 0" cellpadding="0" cellspacing="0" class="table">
+                        <tr ng-repeat="grade in courses_for_freshman_approvals | startFrom:currentPage*pageSize | limitTo:pageSize  ">
+                            <td>
+                                <a ng-href="/examGrades/approve_freshman_grade_submission/{{grade.PublishedCourse.id}}">
+                                    Instructor: {{grade.CourseInstructorAssignment[0].Staff.Title.title}} {{grade.CourseInstructorAssignment[0].Staff.full_name}} <br />
+                                    Course: {{grade.Course.course_title}}. ({{ grade.Course.course_code }}) <br />
+                                    Department: {{grade.Department.name}} {{grade.College.name}} <br />
+                                    Section: {{grade.Section.name}} <br />
+                                    <!-- Year Level: Pre/1st <br /> -->
+                                    Year Level: {{(grade.YearLevel.name ? grade.YearLevel.name : 'Pre/Freshman') }} <br />
+                                    Program: {{grade.Program.name }} <br />
+                                    ProgramType: {{grade.ProgramType.name }} <br />
+                                    Academic Year: {{grade.PublishedCourse.academic_year}} <br />
+                                    Semester: {{grade.PublishedCourse.semester}} <br />
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="pagination-centered" ng-show="courses_for_freshman_approvals.length > 0 ">
+                        <br>
+                        <ul class="pagination">
+                            <li class="arrow">
+                                <button type="button" class="tiny radius button bg-blue" ng-disabled="currentPage == 0" ng-click="currentPage=currentPage-1"> &lt;  PREV</button>
+                            </li>
+                            <li>
+                                <span>{{currentPage+1}} of {{ numberOfPages()}}</span>
+                            </li>
+                            <li class="arrow">
+                                <button class="tiny radius button bg-blue" ng-disabled="currentPage >=courses_for_freshman_approvals.length/pageSize - 1 " ng-click="currentPage=currentPage+1">NEXT &gt;</button>
+                            </li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <?php
+    } ?>
 
     <?php if ($role_id == ROLE_DEPARTMENT) : ?>
         <div class="large-4 columns">
@@ -305,7 +449,7 @@ use Cake\Utility\Inflector;
                         <tbody>
                         <tr ng-repeat="course in dispatched_course_list | startFrom:currentPage*pageSize | limitTo:pageSize">
                             <td>
-                                <a ng-href="/course_instructor_assignments/assign_course_instructor/{{ course.PublishedCourse.id }}">
+                                <a ng-href="/courseInstructorAssignments/assign_course_instructor/{{ course.PublishedCourse.id }}">
                                     <strong>Dispatched to: </strong> {{ course.GivenByDepartment.name }} <br>
                                     <strong>From: </strong> {{ course.Department.name }} {{ course.College.name }} <br>
                                     <strong>Course: </strong> {{ course.Course.course_title }} ({{ course.Course.course_code }}) <br>
@@ -368,7 +512,7 @@ use Cake\Utility\Inflector;
                         <tr>
                             <?php if ($role_id == ROLE_REGISTRAR) : ?>
                                 <td ng-show="add_request">
-                                    <a ng-show="add_request > 0" ng-href="/course_adds/approve_adds">
+                                    <a ng-show="add_request > 0" ng-href="/courseAdds/approve_adds">
                                         You have {{ add_request }} Course Add requests which are approved by department and waiting your confirmation.
                                     </a>
                                 </td>
@@ -377,7 +521,7 @@ use Cake\Utility\Inflector;
                                 </td>
                             <?php else : ?>
                                 <td ng-show="add_request_dpt">
-                                    <a ng-show="add_request_dpt > 0" ng-href="/course_adds/approve_adds">
+                                    <a ng-show="add_request_dpt > 0" ng-href="/courseAdds/approve_adds">
                                         You have {{ add_request_dpt }} Course Add requests from your students waiting your approval.
                                     </a>
                                 </td>
@@ -389,7 +533,7 @@ use Cake\Utility\Inflector;
                         <tr>
                             <?php if ($role_id == ROLE_REGISTRAR) : ?>
                                 <td ng-show="drop_request">
-                                    <a ng-href="/course_drops/approve_drops">
+                                    <a ng-href="/courseDrops/approve_drops">
                                         You have {{ drop_request }} course drop request approved by department and waiting your confirmation.
                                     </a>
                                 </td>
@@ -398,7 +542,7 @@ use Cake\Utility\Inflector;
                                 </td>
                             <?php else : ?>
                                 <td ng-show="drop_request_dpt">
-                                    <a ng-show="drop_request_dpt > 0" ng-href="/course_drops/approve_drops">
+                                    <a ng-show="drop_request_dpt > 0" ng-href="/courseDrops/approve_drops">
                                         You have {{ drop_request_dpt }} course drop request from your students waiting for approval.
                                     </a>
                                 </td>
@@ -410,7 +554,7 @@ use Cake\Utility\Inflector;
                         <?php if ($role_id == ROLE_REGISTRAR) : ?>
                             <tr>
                                 <td ng-show="forced_drops">
-                                    <a ng-href="/course_drops/forced_drop">You have students that need forced drop. </a>
+                                    <a ng-href="/courseDrops/forced_drop">You have students that need forced drop. </a>
                                 </td>
                                 <td ng-if="forced_drops == 0">
                                     You don't have any student that need forced drop for now.
@@ -605,6 +749,8 @@ use Cake\Utility\Inflector;
         </div>
     </div>
 </div>
+
+
 
 <?php if ($role_id == ROLE_STUDENT || $role_id == ROLE_INSTRUCTOR) : ?>
     <div class="row">

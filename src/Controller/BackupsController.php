@@ -11,7 +11,7 @@ class BackupsController extends AppController
     public $name = 'Backups';
 
     public $menuOptions = array(
-        'exclude' => array('delete_one_month_old_backup'),
+        'exclude' => array('deleteOneMonthOldBackup'),
         'alias' => array(
             'index' => 'Download Backup',
         )
@@ -24,7 +24,7 @@ class BackupsController extends AppController
     {
 
         parent::beforeFilter($event);
-        $this->Auth->Allow('delete_one_month_old_backup');
+        $this->Auth->Allow('deleteOneMonthOldBackup');
     }
 
     public function __init_search()
@@ -39,7 +39,7 @@ class BackupsController extends AppController
         }
     }
 
-    public function take_backup($cron = false)
+    public function takeBackup($cron = false)
     {
 
         //read the command from smis.php
@@ -174,7 +174,7 @@ class BackupsController extends AppController
         }
     }
 
-    public function delete_one_month_old_backup($cron = false)
+    public function deleteOneMonthOldBackup($cron = false)
     {
 
         $backupList = array();

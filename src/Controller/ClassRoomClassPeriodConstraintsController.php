@@ -517,7 +517,7 @@ class ClassRoomClassPeriodConstraintsController extends AppController
         }
     }
 
-    public function get_class_rooms($class_room_block_id = null)
+    public function getClassRooms($class_room_block_id = null)
     {
 
         if (!empty($class_room_block_id)) {
@@ -539,7 +539,7 @@ class ClassRoomClassPeriodConstraintsController extends AppController
         }
     }
 
-    public function get_periods($data = null)
+    public function getPeriods($data = null)
     {
 
         $explode_data = explode('~', $data);
@@ -553,7 +553,7 @@ class ClassRoomClassPeriodConstraintsController extends AppController
         }
     }
 
-    public function get_already_recorded_data($data = null)
+    public function getAlreadyRecordedData($data = null)
     {
 
         if ($this->Session->read('class_room_id')) {

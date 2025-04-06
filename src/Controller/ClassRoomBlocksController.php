@@ -15,16 +15,16 @@ class ClassRoomBlocksController extends AppController
         'parent' => 'schedule',
         'exclude' => array(
             'deleteClassRoom',
-            'class_rooms_checkboxs',
-            'delete_assign_program_program_type',
-            'get_modal',
-            'get_class_room_blocks',
-            'get_class_room_block_exam_rooms'
+            'classRoomsCheckboxs',
+            'deleteAssignProgramProgramType',
+            'getModal',
+            'getClassRoomBlocks',
+            'getClassRoomBlockExamRooms'
         ),
         'alias' => array(
             'index' => 'List Class Room Blocks with Rooms',
             'add' => 'Add Class Room Block/Rooms ',
-            'assign_program_program_type' => 'Assign/Edit Class Rooms Program Type'
+            'assignProgramProgramType' => 'Assign/Edit Class Rooms Program Type'
         )
     );
     public $paginate = array();
@@ -35,11 +35,11 @@ class ClassRoomBlocksController extends AppController
         parent::beforeFilter($event);
         //$this->Auth->allow(array('*'));
         $this->Auth->allow(
-            'class_rooms_checkboxs',
-            'delete_assign_program_program_type',
-            'get_modal',
-            'get_class_room_blocks',
-            'get_class_room_block_exam_rooms'
+            'classRoomsCheckboxs',
+            'deleteAssignProgramProgramType',
+            'getModal',
+            'getClassRoomBlocks',
+            'getClassRoomBlockExamRooms'
         );
     }
 
@@ -106,7 +106,7 @@ class ClassRoomBlocksController extends AppController
         $this->set('classRoomBlocks', $this->Paginator->paginate('ClassRoomBlock'));
     }
 
-    public function get_modal($id = null)
+    public function getModal($id = null)
     {
 
         $this->layout = 'ajax';
@@ -314,7 +314,7 @@ class ClassRoomBlocksController extends AppController
         }
     }
 
-    public function assign_program_program_type()
+    public function assignProgramProgramType()
     {
 
         if (!empty($this->request->data)) {
@@ -403,7 +403,7 @@ class ClassRoomBlocksController extends AppController
         $this->set(compact('programs', 'programTypes', 'classRooms'));
     }
 
-    public function class_rooms_checkboxs($data = null)
+    public function classRoomsCheckboxs($data = null)
     {
 
         if ($this->Session->read('program_id')) {
@@ -427,7 +427,7 @@ class ClassRoomBlocksController extends AppController
         }
     }
 
-    public function delete_assign_program_program_type($id = null)
+    public function deleteAssignProgramProgramType($id = null)
     {
 
         if (!$id) {
@@ -542,7 +542,7 @@ class ClassRoomBlocksController extends AppController
         return $merged_return_get_class_rooms_data_array;
     }
 
-    public function get_class_room_blocks($campus_id = null)
+    public function getClassRoomBlocks($campus_id = null)
     {
 
         if (!empty($campus_id)) {
@@ -570,7 +570,7 @@ class ClassRoomBlocksController extends AppController
         }
     }
 
-    public function get_class_room_block_exam_rooms($class_room_block_id = null)
+    public function getClassRoomBlockExamRooms($class_room_block_id = null)
     {
 
         $this->layout = 'ajax';

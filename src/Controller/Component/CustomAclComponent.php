@@ -50,11 +50,20 @@ class CustomAclComponent extends AclComponent
             return false;
         }
 
+        // ✅ Ensure 'controllers/' prefix
+        if (stripos($aco, 'controllers/') !== 0) {
+            $aco = 'controllers/' . $aco;
+        }
+
         $session = $this->getController()->getRequest()->getSession();
         $permissionLists = $session->read('permissionLists');
 
         if (!empty($permissionLists) && in_array($aco, $permissionLists)) {
             return true;
+        } else {
+            echo '<pre>';
+          // print_r($aco);
+            echo '</pre>';
         }
 
         // If not found in session, fallback to core ACL check

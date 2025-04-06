@@ -46,13 +46,18 @@ Router::scope('/', function (RouteBuilder $routes) {
     );
 
 
+    $routes->connect('/dashboard/getApprovalRejectGrade',
+        ['controller' => 'Dashboard', 'action' => 'getApprovalRejectGrade']
+    );
+
+
     $routes->connect('/dashboard/disptachedAssignedCourseList',
         ['controller' => 'Dashboard', 'action' => 'disptachedAssignedCourseList']
     );
 
 
-    $routes->connect('/dashboard/addDropRequestController',
-        ['controller' => 'Dashboard', 'action' => 'addDropRequestController']
+    $routes->connect('/dashboard/addDropRequestList',
+        ['controller' => 'Dashboard', 'action' => 'addDropRequestList']
     );
 
     $routes->connect('/dashboard/clearanceWithdrawSubRequest',

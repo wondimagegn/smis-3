@@ -16,12 +16,13 @@ class AttachmentsTable extends Table
     public function initialize(array $config)
     {
         parent::initialize($config);
-
         $this->setTable('attachments');
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
-
         $this->addBehavior('Timestamp');
+        $this->belongsTo('Students', [
+            'foreignKey' => 'foreign_key'
+        ]);
     }
 
     /**
@@ -83,7 +84,6 @@ class AttachmentsTable extends Table
     {
         $table = $this->tablePrefix . $this->table;
         $result = $this->query("TRUNCATE $table");
-        //$this->setDataSource('default');
         return $result;
     }
 }

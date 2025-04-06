@@ -250,823 +250,303 @@ class ExamGradeChangesTable extends Table
     }
 
     //Department grade change approval
-    function getListOfGradeChangeForDepartmentApproval($col_dpt_id = null, $department = 1, $departmentIDs = array())
+    public function getListOfGradeChangeForDepartmentApproval($col_dpt_id = null, $department = 1,
+        $departmentIDs = [],$serviceType=null)
     {
-
         $currentAcademicYear = AcademicYear::currentAcademicYear();
-        $years_to_look_list = AcademicYear::academicYearInArray(
-            ((explode('/', $currentAcademicYear)[0]) - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL),
-            (explode('/', $currentAcademicYear)[0])
-        );
-
-
-        //debug($years_to_look_list);
+        $yearFrom = (int)explode('/', $currentAcademicYear)[0] - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL;
+        $yearTo = (int)explode('/', $currentAcademicYear)[0];
+        $years_to_look_list = AcademicYear::academicYearInArray($yearFrom, $yearTo);
 
         if (empty($col_dpt_id) && empty($departmentIDs)) {
-            return array();
+            return [];
         }
 
         if (!empty($departmentIDs)) {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $departmentIDs,
-            );
+            $conditions = [
+                'PublishedCourses.academic_year IN' => $years_to_look_list,
+                'PublishedCourses.given_by_department_id IN' => $departmentIDs,
+            ];
         } elseif (empty($department)) {
-            $department_idss = ClassRegistry::init('Department')->find(
-                'list',
-                array(
-                    'conditions' => array('Department.college_id' => $col_dpt_id, 'Department.active' => 1),
-                    'fields' => array('Department.id', 'Department.id')
-                )
-            );
+            $departmentIDs = TableRegistry::getTableLocator()->get('Departments')->find('list', [
+                'keyField' => 'id',
+                'valueField' => 'id',
+                'conditions' => ['college_id' => $col_dpt_id, 'active' => 1]
+            ])->toArray();
 
-            debug($department_idss);
-
-            if (empty($department_idss)) {
-                return array();
+            if (empty($departmentIDs)) {
+                return [];
             }
 
-            $departmentIDs = $department_idss;
-
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $department_idss,
-            );
+            $conditions = [
+                'PublishedCourses.academic_year IN' => $years_to_look_list,
+                'PublishedCourses.given_by_department_id IN' => $departmentIDs,
+            ];
         } else {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $col_dpt_id,
-            );
+            $conditions = [
+                'PublishedCourses.academic_year IN' => $years_to_look_list,
+                'PublishedCourses.given_by_department_id' => $col_dpt_id,
+            ];
         }
 
-        debug($conditions);
+        $query = $this->find()
+            ->enableHydration(false)
+            ->where([
+                'ExamGradeChanges.makeup_exam_result IS' => null,
+                'ExamGradeChanges.department_approval IS' => null,
+                'ExamGradeChanges.manual_ng_conversion' => 0,
+                'ExamGradeChanges.auto_ng_conversion' => 0
+            ])
+            ->contain([
+                'MakeupExams' => [
+                    'PublishedCourses' => [
+                        'conditions' => $conditions,
+                        'Courses',
+                        'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                        'CourseInstructorAssignments' => [
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                            'Staffs' => ['Titles', 'Positions']
+                        ]
+                    ],
+                    'Students' => ['conditions' => ['Students.graduated' => 0]]
+                ],
+                'ExamGrades' => [
+                    'sort' => ['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC'],
+                    'CourseRegistrations' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ],
+                    'CourseAdds' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ]
+                ]
+            ])
+            ->order(['ExamGradeChanges.id' => 'DESC', 'ExamGradeChanges.created' => 'DESC'])
+            ->toArray();
 
-        $department_action_required_list = $this->find('all', array(
-            'conditions' => array(
-                'ExamGradeChange.makeup_exam_result IS null',
-                'ExamGradeChange.department_approval IS null',
-                'ExamGradeChange.manual_ng_conversion = 0',
-                'ExamGradeChange.auto_ng_conversion = 0'
-            ),
-            'contain' => array(
-                'MakeupExam' => array(
-                    'PublishedCourse' => array(
-                        'Course',
-                        'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff' => array('Title', 'Position')
-                        ),
-                        'conditions' => $conditions
-                    ),
-                    'Student' => array(
-                        'conditions' => array(
-                            'Student.graduated' => 0
-                        ),
-                    )
-                ),
-                'ExamGrade' => array(
-                    'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                    'CourseRegistration' => array(
-                        'PublishedCourse' => array(
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                    'CourseAdd' => array(
-                        'PublishedCourse' => array(
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                )
-            ),
-            'order' => array('ExamGradeChange.id' => 'DESC', 'ExamGradeChange.created' => 'DESC')
-        ));
+        $summarizer = new GradeChangeSummarizerService();
+        if($serviceType=='Stat'){
+            return $summarizer->summarizeGradeChangeStat($query);
 
-        $exam_grade_changes_summery = array();
-
-        if (!empty($department_action_required_list)) {
-            //debug($department_action_required_list);
-            foreach ($department_action_required_list as $key => $grade_change_detail) {
-                //Grade change for student course registration
-                isset($grade_change_detail['MakeupExam']['Student']['id']) ? debug(
-                    $grade_change_detail['MakeupExam']['Student']['graduated']
-                ) : '';
-                if (isset($grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']) && isset($grade_change_detail['ExamGrade']['CourseRegistration']['Student']['id']) && $grade_change_detail['ExamGrade']['CourseRegistration']['Student']['graduated'] == 0 && is_numeric(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'] == $col_dpt_id || (!empty($departmentIDs) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] == $col_dpt_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))))) {
-                    $program = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['Program']['name'];
-                    debug($program);
-                    $program_type = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                    if (!isset($exam_grade_changes_summery[$program][$program_type])) {
-                        $exam_grade_changes_summery[$program][$program_type] = array();
-                    }
-
-                    $index = count($exam_grade_changes_summery[$program][$program_type]);
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseRegistration']['Student'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationLatestGrade(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    );
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Staff'] = (isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']) ? $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'] : array());
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationGradeHistory(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    );
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                        'all',
-                        array(
-                            'conditions' => array('ExamGrade.course_registration_id' => $grade_change_detail['ExamGrade']['CourseRegistration']['id']),
-                            'recursive' => -1,
-                            'order' => array('ExamGrade.created DESC')
-                        )
-                    );
-
-                    if (!empty($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'])) {
-                        foreach ($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                            $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                            );
-                            $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                            );
-                        }
-                    }
-                } elseif (isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']) && isset($grade_change_detail['ExamGrade']['CourseAdd']['Student']['id']) && $grade_change_detail['ExamGrade']['CourseAdd']['Student']['graduated'] == 0 && is_numeric(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'] == $col_dpt_id || (!empty($departmentIDs) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id'] == $col_dpt_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))))) {
-                    //Grade change for student course add
-                    $program = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['Program']['name'];
-                    $program_type = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                    if (!isset($exam_grade_changes_summery[$program][$program_type])) {
-                        $exam_grade_changes_summery[$program][$program_type] = array();
-                    }
-
-                    $index = count($exam_grade_changes_summery[$program][$program_type]);
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseAdd']['Student'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseAdd->getCourseRegistrationLatestGrade(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    );
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Staff'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section'];
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseAdd->getCourseAddGradeHistory(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    );
-                    $exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                        'all',
-                        array(
-                            'conditions' => array('ExamGrade.course_add_id 	' => $grade_change_detail['ExamGrade']['CourseAdd']['id']),
-                            'recursive' => -1,
-                            'order' => array('ExamGrade.created DESC')
-                        )
-                    );
-
-                    if (!empty($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'])) {
-                        foreach ($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                            $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                            );
-                            $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                            );
-                        }
-                    }
-                }
-            }
         }
-
-        //debug($exam_grade_changes_summery);
-        return $exam_grade_changes_summery;
+        return $summarizer->summarizeGrade($query, [
+            'type' => 'department'
+        ]);
     }
 
-    function getListOfMakeupGradeChangeForDepartmentApproval(
+    public function getListOfMakeupGradeChangeForDepartmentApproval(
         $col_dep_id = null,
         $registrar_rejected = 0,
         $department = 1,
-        $departmentIDs = array()
+        $departmentIDs = [],
+        $serviceType = null
     ) {
-
         $currentAcademicYear = AcademicYear::currentAcademicYear();
-        $years_to_look_list = AcademicYear::academicYearInArray(
+        $yearsToLookList = AcademicYear::academicYearInArray(
             ((explode('/', $currentAcademicYear)[0]) - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL),
-            (explode('/', $currentAcademicYear)[0])
+            explode('/', $currentAcademicYear)[0]
         );
-
 
         if (empty($col_dep_id) && empty($departmentIDs)) {
-            return array();
+            return [];
         }
 
-        if (!empty($departmentIDs)) {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $departmentIDs,
-            );
-        } elseif (empty($department)) {
-            $department_idss = ClassRegistry::init('Department')->find(
-                'list',
-                array(
-                    'conditions' => array('Department.college_id' => $col_dep_id, 'Department.active' => 1),
-                    'fields' => array('Department.id', 'Department.id')
-                )
-            );
+        $departmentIDs = (array)$departmentIDs;
 
-            debug($department_idss);
-
-            if (empty($department_idss)) {
-                return array();
-            }
-
-            $departmentIDs = $department_idss;
-
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $department_idss,
-            );
-        } else {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $col_dep_id,
-            );
+        if (empty($departmentIDs) && $department == 0) {
+            $departmentIDs = TableRegistry::getTableLocator()->get('Departments')
+                ->find('list', [
+                    'conditions' => ['Departments.college_id' => $col_dep_id, 'Departments.active' => 1],
+                    'valueField' => 'id'
+                ])->toArray();
         }
 
-        debug($conditions);
+        $conditions = [
+            'PublishedCourses.academic_year IN' => $yearsToLookList,
+            'PublishedCourses.given_by_department_id IN' => $departmentIDs ?: [$col_dep_id],
+        ];
+
+        $baseConditions = [
+            'ExamGradeChanges.makeup_exam_result IS NOT' => null
+        ];
 
         if (!$registrar_rejected) {
-            $department_action_required_list = $this->find('all', array(
-                'conditions' => array(
-                    'ExamGradeChange.makeup_exam_result IS NOT null',
-                    'ExamGradeChange.department_approval IS null',
-                ),
-                'contain' => array(
-                    'MakeupExam' => array(
-                        'PublishedCourse' => array(
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                    'ExamGrade' => array(
-                        'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                        'CourseRegistration' => array(
-                            'PublishedCourse' => array(
-                                'Course',
-                                'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                                'CourseInstructorAssignment' => array(
-                                    'conditions' => array(
-                                        'CourseInstructorAssignment.isprimary' => 1
-                                    ),
-                                    'Staff' => array('Title', 'Position')
-                                ),
-                                'conditions' => $conditions
-                            ),
-                            'Student' => array(
-                                'conditions' => array(
-                                    'Student.graduated' => 0
-                                ),
-                            )
-                        ),
-                        'CourseAdd' => array(
-                            'PublishedCourse' => array(
-                                'Course',
-                                'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                                'CourseInstructorAssignment' => array(
-                                    'conditions' => array(
-                                        'CourseInstructorAssignment.isprimary' => 1
-                                    ),
-                                    'Staff' => array('Title', 'Position')
-                                ),
-                                'conditions' => $conditions
-                            ),
-                            'Student' => array(
-                                'conditions' => array(
-                                    'Student.graduated' => 0
-                                ),
-                            )
-                        ),
-                    )
-                ),
-                'order' => array('ExamGradeChange.id' => 'DESC', 'ExamGradeChange.created' => 'DESC')
-            ));
+            $baseConditions += [
+                'ExamGradeChanges.department_approval IS' => null
+            ];
         } else {
-            $department_action_required_list = $this->find('all', array(
-                'conditions' => array(
-                    'ExamGradeChange.makeup_exam_result IS NOT null',
-                    'ExamGradeChange.initiated_by_department = 0',
-                    'ExamGradeChange.department_approval = 1',
-                    'ExamGradeChange.registrar_approval = -1'
-                ),
-                'contain' => array(
-                    'MakeupExam' => array(
-                        'PublishedCourse' => array(
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                    'ExamGrade' => array(
-                        'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                        'CourseRegistration' => array(
-                            'PublishedCourse' => array(
-                                'Course',
-                                'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                                'CourseInstructorAssignment' => array(
-                                    'conditions' => array(
-                                        'CourseInstructorAssignment.isprimary' => 1
-                                    ),
-                                    'Staff' => array('Title', 'Position')
-                                ),
-                                'conditions' => $conditions
-                            ),
-                            'Student' => array(
-                                'conditions' => array(
-                                    'Student.graduated' => 0
-                                ),
-                            )
-                        ),
-                        'CourseAdd' => array(
-                            'PublishedCourse' => array(
-                                'Course',
-                                'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                                'CourseInstructorAssignment' => array(
-                                    'conditions' => array(
-                                        'CourseInstructorAssignment.isprimary' => 1
-                                    ),
-                                    'Staff' => array('Title', 'Position')
-                                ),
-                                'conditions' => $conditions
-                            ),
-                            'Student' => array(
-                                'conditions' => array(
-                                    'Student.graduated' => 0
-                                ),
-                            )
-                        ),
-                    )
-                ),
-                'order' => array('ExamGradeChange.id' => 'DESC', 'ExamGradeChange.created' => 'DESC')
-            ));
+            $baseConditions += [
+                'ExamGradeChanges.initiated_by_department' => 0,
+                'ExamGradeChanges.department_approval' => 1,
+                'ExamGradeChanges.registrar_approval' => -1
+            ];
         }
 
-        $exam_grade_changes_summery = array();
-        $processed_makeup_grade_changes = array();
+        $query = $this->find()
+            ->enableHydration(false)
+            ->where($baseConditions)
+            ->contain([
+                'MakeupExams' => [
+                    'PublishedCourses' => [
+                        'conditions' => $conditions,
+                        'Courses',
+                        'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                        'CourseInstructorAssignments' => [
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                            'Staffs' => ['Titles', 'Positions']
+                        ]
+                    ],
+                    'Students' => ['conditions' => ['Students.graduated' => 0]]
+                ],
+                'ExamGrades' => [
+                    'sort' => ['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC'],
+                    'CourseRegistrations' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ],
+                    'CourseAdds' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ]
+                ]
+            ])
+            ->order(['ExamGradeChanges.id' => 'DESC', 'ExamGradeChanges.created' => 'DESC'])
+            ->toArray();
 
-        if (!empty($department_action_required_list)) {
-            foreach ($department_action_required_list as $key => $grade_change_detail) {
-                isset($grade_change_detail['MakeupExam']['Student']['id']) ? debug(
-                    $grade_change_detail['MakeupExam']['Student']['graduated']
-                ) : '';
-
-                if (isset($grade_change_detail['MakeupExam']['Student']['id']) && $grade_change_detail['MakeupExam']['Student']['graduated'] == 0) {
-                    //debug($grade_change_detail['MakeupExam']['Student']['graduated']);
-
-                    $grade_change_detail2 = $this->find('first', array(
-                        'conditions' => array('ExamGradeChange.exam_grade_id' => $grade_change_detail['ExamGradeChange']['exam_grade_id']),
-                        'order' => array('ExamGradeChange.created' => 'DESC'),
-                        'recursive' => -1
-                    ));
-
-                    if ($registrar_rejected == 1) {
-                        if ($grade_change_detail2['ExamGradeChange']['registrar_approval'] != -1 || in_array(
-                                $grade_change_detail2['ExamGradeChange']['exam_grade_id'],
-                                $processed_makeup_grade_changes
-                            )) {
-                            continue;
-                        } else {
-                            $processed_makeup_grade_changes[] = $grade_change_detail2['ExamGradeChange']['exam_grade_id'];
-                        }
-                    }
-
-                    //Grade change for student course registration
-                    if (isset($grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']) && $grade_change_detail['ExamGrade']['CourseRegistration']['Student']['graduated'] == 0 && is_numeric(
-                            $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                        ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'] == $col_dep_id || (!empty($departmentIDs) && in_array(
-                                            $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                            $departmentIDs
-                                        )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] == $col_dep_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && in_array(
-                                            $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                            $departmentIDs
-                                        )))))) {
-                        $program = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['Program']['name'];
-                        $program_type = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                        if (!isset($exam_grade_changes_summery[$program][$program_type])) {
-                            $exam_grade_changes_summery[$program][$program_type] = array();
-                        }
-
-                        $index = count($exam_grade_changes_summery[$program][$program_type]);
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Staff'] = $grade_change_detail['MakeupExam']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamCourse'] = $grade_change_detail['MakeupExam']['PublishedCourse']['Course'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamSection'] = $grade_change_detail['MakeupExam']['PublishedCourse']['Section'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['MakeupExam'] = $grade_change_detail['MakeupExam'];
-
-                        unset($exam_grade_changes_summery[$program][$program_type][$index]['MakeupExam']['PublishedCourse']);
-
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseRegistration']['Student'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Course'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationLatestGrade(
-                            $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                        );
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationGradeHistory(
-                            $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                        );
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                            'all',
-                            array(
-                                'conditions' => array('ExamGrade.course_registration_id 	' => $grade_change_detail['ExamGrade']['CourseRegistration']['id']),
-                                'recursive' => -1,
-                                'order' => array('ExamGrade.created DESC')
-                            )
-                        );
-
-                        if (!empty($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'])) {
-                            foreach ($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                                $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                    'User'
-                                )->field(
-                                    'full_name',
-                                    array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                                );
-                                $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                    'User'
-                                )->field(
-                                    'full_name',
-                                    array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                                );
-                            }
-                        }
-                    } elseif (isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']) && $grade_change_detail['ExamGrade']['CourseAdd']['Student']['graduated'] == 0 && is_numeric(
-                            $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                        ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'] == $col_dep_id || (!empty($departmentIDs) && in_array(
-                                            $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                            $departmentIDs
-                                        )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id'] == $col_dep_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && in_array(
-                                            $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                            $departmentIDs
-                                        )))))) {
-                        $program = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['Program']['name'];
-                        $program_type = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                        if (!isset($exam_grade_changes_summery[$program][$program_type])) {
-                            $exam_grade_changes_summery[$program][$program_type] = array();
-                        }
-
-                        $index = count($exam_grade_changes_summery[$program][$program_type]);
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Staff'] = $grade_change_detail['MakeupExam']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamCourse'] = $grade_change_detail['MakeupExam']['PublishedCourse']['Course'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamSection'] = $grade_change_detail['MakeupExam']['PublishedCourse']['Section'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['MakeupExam'] = $grade_change_detail['MakeupExam'];
-
-                        unset($exam_grade_changes_summery[$program][$program_type][$index]['MakeupExam']['PublishedCourse']);
-
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseAdd']['Student'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Course'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseAdd->getCourseRegistrationLatestGrade(
-                            $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                        );
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section'];
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseAdd->getCourseAddGradeHistory(
-                            $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                        );
-                        $exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                            'all',
-                            array(
-                                'conditions' => array('ExamGrade.course_add_id 	' => $grade_change_detail['ExamGrade']['CourseAdd']['id']),
-                                'recursive' => -1,
-                                'order' => array('ExamGrade.created DESC')
-                            )
-                        );
-
-                        if (!empty($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'])) {
-                            foreach ($exam_grade_changes_summery[$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                                $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                    'User'
-                                )->field(
-                                    'full_name',
-                                    array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                                );
-                                $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                    'User'
-                                )->field(
-                                    'full_name',
-                                    array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                                );
-                            }
-                        }
-                    }
-                }
-            }
+        $summarizer = new \App\Service\GradeChangeSummarizerService();
+        if($serviceType=='Stat'){
+            return $summarizer->summarizeGradeChangeStat($query);
         }
-        return $exam_grade_changes_summery;
+        return $summarizer->summarize($query, [
+            'type' => 'makeup',
+            'program_id' => [],
+            'program_type_id' => [],
+            'college_ids' => [],
+            'department_ids' => $departmentIDs,
+            'filterByRegistrarRejected' => (bool)$registrar_rejected
+        ]);
     }
 
-    function getMakeupGradesAskedByDepartmentRejectedByRegistrar(
+
+    public function getMakeupGradesAskedByDepartmentRejectedByRegistrar(
         $col_dep_id = null,
         $department = 1,
-        $departmentIDs = array()
+        $departmentIDs = [],
+        $serviceType = null
     ) {
-
-
-
         $currentAcademicYear = AcademicYear::currentAcademicYear();
         $years_to_look_list = AcademicYear::academicYearInArray(
             ((explode('/', $currentAcademicYear)[0]) - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL),
-            (explode('/', $currentAcademicYear)[0])
+            explode('/', $currentAcademicYear)[0]
         );
 
-        //debug($years_to_look_list);
+        if (empty($col_dep_id) && empty($departmentIDs)) {
+            return [];
+        }
+
+        $conditions = [
+            'PublishedCourses.academic_year IN' => $years_to_look_list,
+        ];
 
         if (!empty($departmentIDs)) {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-                'PublishedCourse.given_by_department_id' => $departmentIDs,
-            );
+            $conditions['PublishedCourses.given_by_department_id IN'] = $departmentIDs;
         } else {
-            $conditions = array(
-                'PublishedCourse.academic_year' => $years_to_look_list,
-            );
+            $conditions['PublishedCourses.given_by_department_id'] = $col_dep_id;
         }
 
-        debug($conditions);
+        $query = $this->find()
+            ->enableHydration(false)
+            ->where([
+                'ExamGradeChanges.makeup_exam_result IS NOT' => null,
+                'ExamGradeChanges.initiated_by_department' => 1,
+                'ExamGradeChanges.department_approval' => 1,
+                'ExamGradeChanges.registrar_approval' => -1
+            ])
+            ->contain([
+                'ExamGrades' => [
+                    'sort' => ['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC'],
+                    'CourseRegistrations' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Departments' => ['Colleges'],
+                            'Colleges',
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ],
+                    'CourseAdds' => [
+                        'PublishedCourses' => [
+                            'conditions' => $conditions,
+                            'Departments' => ['Colleges'],
+                            'Colleges',
+                            'Courses',
+                            'Sections' => ['Programs', 'ProgramTypes', 'YearLevels'],
+                            'CourseInstructorAssignments' => [
+                                'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                                'Staffs' => ['Titles', 'Positions']
+                            ]
+                        ],
+                        'Students' => ['conditions' => ['Students.graduated' => 0]]
+                    ]
+                ]
+            ])
+            ->order([
+                'ExamGradeChanges.id' => 'DESC',
+                'ExamGradeChanges.created' => 'DESC'
+            ])
+            ->toArray();
 
-        $department_action_required_list = $this->find('all', array(
-            'conditions' => array(
-                'ExamGradeChange.makeup_exam_result IS NOT null',
-                'ExamGradeChange.initiated_by_department = 1',
-                'ExamGradeChange.department_approval = 1',
-                'ExamGradeChange.registrar_approval = -1'
-            ),
-            'contain' => array(
-                'ExamGrade' => array(
-                    'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                    'CourseRegistration' => array(
-                        'PublishedCourse' => array(
-                            'Department' => array('College'),
-                            'College',
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                    'CourseAdd' => array(
-                        'PublishedCourse' => array(
-                            'Department' => array('College'),
-                            'College',
-                            'Course',
-                            'Section' => array('Program', 'ProgramType', 'YearLevel'),
-                            'CourseInstructorAssignment' => array(
-                                'conditions' => array(
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                ),
-                                'Staff' => array('Title', 'Position')
-                            ),
-                            'conditions' => $conditions
-                        ),
-                        'Student' => array(
-                            'conditions' => array(
-                                'Student.graduated' => 0
-                            ),
-                        )
-                    ),
-                )
-            ),
-            'order' => array('ExamGradeChange.id' => 'DESC', 'ExamGradeChange.created' => 'DESC')
-        ));
+        $summarizer = new GradeChangeSummarizerService();
+        if($serviceType=='Stat'){
+            return $summarizer->summarizeGradeChangeStat($query);
 
-        $exam_grade_changes_summery = array();
-        $processed_makeup_grade_changes = array();
-
-        if (!empty($department_action_required_list)) {
-            foreach ($department_action_required_list as $key => $grade_change_detail) {
-                $grade_change_detail2 = $this->find('first', array(
-                    'conditions' => array('ExamGradeChange.exam_grade_id' => $grade_change_detail['ExamGradeChange']['exam_grade_id']),
-                    'order' => array('ExamGradeChange.created' => 'DESC'),
-                    'recursive' => -1
-                ));
-
-                if ($grade_change_detail2['ExamGradeChange']['registrar_approval'] != -1 || in_array(
-                        $grade_change_detail2['ExamGradeChange']['exam_grade_id'],
-                        $processed_makeup_grade_changes
-                    )) {
-                    continue;
-                } else {
-                    $processed_makeup_grade_changes[] = $grade_change_detail2['ExamGradeChange']['exam_grade_id'];
-                }
-
-                //Grade change for student course registration
-                if (isset($grade_change_detail['ExamGrade']['CourseRegistration']['id']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']['id']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']['Student']['id']) && $grade_change_detail['ExamGrade']['CourseRegistration']['Student']['graduated'] == 0 && is_numeric(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'] == $col_dep_id || (!empty($departmentIDs) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] == $col_dep_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id']) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))))) {
-                    $college = (!empty($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Department']['College']['name']) ? $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Department']['College']['name'] : $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['College']['name']);
-                    $departement = (!empty($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Department']['name']) ? $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Department']['name'] : ($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial Program' : 'Freshman Program'));
-
-                    $program = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['Program']['name'];
-                    $program_type = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                    if (!isset($exam_grade_changes_summery[$college][$departement][$program][$program_type])) {
-                        $exam_grade_changes_summery[$college][$departement][$program][$program_type] = array();
-                    }
-
-                    $index = count($exam_grade_changes_summery[$college][$departement][$program][$program_type]);
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Staff'] = (isset($grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']) ? $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'] : array());
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Section'];
-
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseRegistration']['Student'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationLatestGrade(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    );
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseRegistration->getCourseRegistrationGradeHistory(
-                        $grade_change_detail['ExamGrade']['CourseRegistration']['id']
-                    );
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                        'all',
-                        array(
-                            'conditions' => array('ExamGrade.course_registration_id' => $grade_change_detail['ExamGrade']['CourseRegistration']['id']),
-                            'recursive' => -1,
-                            'order' => array('ExamGrade.created DESC')
-                        )
-                    );
-
-                    if (!empty($exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'])) {
-                        foreach ($exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                            $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                            );
-                            $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                            );
-                        }
-                    }
-                } elseif (isset($grade_change_detail['ExamGrade']['CourseAdd']['id']) && !empty($grade_change_detail['ExamGrade']['CourseAdd']['id']) && isset($grade_change_detail['ExamGrade']['CourseAdd']['Student']['id']) && $grade_change_detail['ExamGrade']['CourseAdd']['Student']['graduated'] == 0 && is_numeric(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    ) && (($department == 1 && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && ($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'] == $col_dep_id || (!empty($departmentIDs) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))) || ($department == 0 && ((isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id']) && $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id'] == $col_dep_id) || (!empty($departmentIDs) && isset($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id']) && in_array(
-                                        $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                        $departmentIDs
-                                    )))))) {
-                    $college = (!empty($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Department']['College']['name']) ? $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Department']['College']['name'] : $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['College']['name']);
-                    $departement = (!empty($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Department']['name']) ? $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Department']['name'] : ($grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial Program' : 'Freshman Program'));
-
-                    $program = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['Program']['name'];
-                    $program_type = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section']['ProgramType']['name'];
-
-                    if (!isset($exam_grade_changes_summery[$college][$departement][$program][$program_type])) {
-                        $exam_grade_changes_summery[$college][$departement][$program][$program_type] = array();
-                    }
-
-                    $index = count($exam_grade_changes_summery[$college][$departement][$program][$program_type]);
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Staff'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Section'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Section'];
-
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Student'] = $grade_change_detail['ExamGrade']['CourseAdd']['Student'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['Course'] = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Course'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['latest_grade'] = $this->ExamGrade->CourseAdd->getCourseAddLatestGradeDetail(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    );
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGradeChange'] = $grade_change_detail['ExamGradeChange'];
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGradeHistory'] = $this->ExamGrade->CourseAdd->getCourseAddGradeHistory(
-                        $grade_change_detail['ExamGrade']['CourseAdd']['id']
-                    );
-                    $exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'] = $this->ExamGrade->find(
-                        'all',
-                        array(
-                            'conditions' => array('ExamGrade.course_registration_id' => $grade_change_detail['ExamGrade']['CourseAdd']['id']),
-                            'recursive' => -1,
-                            'order' => array('ExamGrade.created DESC')
-                        )
-                    );
-
-                    if (!empty($exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'])) {
-                        foreach ($exam_grade_changes_summery[$college][$departement][$program][$program_type][$index]['ExamGrade'] as $eg_key => &$exam_grade_detail) {
-                            $exam_grade_detail['ExamGrade']['department_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['department_approved_by'])
-                            );
-                            $exam_grade_detail['ExamGrade']['registrar_approved_by_name'] = ClassRegistry::init(
-                                'User'
-                            )->field(
-                                'full_name',
-                                array('User.id' => $exam_grade_detail['ExamGrade']['registrar_approved_by'])
-                            );
-                        }
-                    }
-                }
-            }
         }
-        return $exam_grade_changes_summery;
+        return $summarizer->summarize($query, [
+            'type' => 'makeup',
+            'department_ids' => $departmentIDs,
+            'college_ids' => [$col_dep_id],
+            'department_mode' => $department
+        ]);
     }
+
 
     //COLLEGE
 /*
@@ -1312,7 +792,8 @@ class ExamGradeChangesTable extends Table
         return $exam_grade_changes_summery;
     }
 */
-    public function getListOfGradeChangeForCollegeApproval($collegeId = null)
+    public function getListOfGradeChangeForCollegeApproval($collegeId = null,
+        $serviceType=null)
     {
         if (empty($collegeId)) {
             return [];
@@ -1404,10 +885,11 @@ class ExamGradeChangesTable extends Table
             ->toArray();
 
         $summarizer = new \App\Service\GradeChangeSummarizerService();
-        return $summarizer->summarize($query, [
-            'type' => 'college',
-            'college_id' => $collegeId,
-            'department_ids' => $departmentIds
+        if($serviceType=='Stat'){
+            return $summarizer->summarizeGradeChangeStat($query);
+        }
+        return $summarizer->summarizeGrade($query, [
+            'type' => 'College'
         ]);
     }
 

@@ -4,7 +4,13 @@ namespace App\Model\Table;
 
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
+use Cake\Datasource\ConnectionManager;
+use Cake\Database\Expression\QueryExpression;
+use Cake\Utility\Hash;
+
+
 
 class ExamGradesTable extends Table
 {
@@ -4220,512 +4226,141 @@ class ExamGradesTable extends Table
         return $courses_for_approval;
     }
 
-    function getRegistrarNonApprovedCoursesList(
-        $department_ids = null,
-        $college_ids = null,
-        $program_id = null,
-        $program_type_ids = null
+    //
+    public function getRegistrarNonApprovedCoursesList(
+        $departmentIds = null,
+        $collegeIds = null,
+        $academicYear = '',
+        $semester = '',
+        $programId = null,
+        $programTypeId = null,
+        array $acyRanges = []
     ) {
+        $connection = ConnectionManager::get('default');
 
-        //check to which department is assigned.
-        $yearsInPast = Configure::read('ExamGrade.Approval.yearsInPast');
-        $registrationAddMakeupIDs = array();
-        $published_courses = array();
-        $results = array();
-        $resultsRegistration = array();
-        $resultsMakeup = array();
-        $resultsAdds = array();
-        $queryPs = " id is not null ";
-        $queryPss = " published_courses.id is not null ";
+        $buildWhere = function () use ($academicYear, $semester, $acyRanges, $departmentIds, $collegeIds, $programId, $programTypeId) {
+            $conditions = ["published_courses.id IS NOT NULL"];
 
-        if (!empty($program_id)) {
-            $prg_ids = implode(', ', $program_id);
-            $queryPs .= " and program_id in ($prg_ids) ";
-            $queryPss .= " and published_courses.program_id in ($prg_ids)";
-        }
+            if (!empty($acyRanges)) {
+                $quoted = implode("','", $acyRanges);
+                $conditions[] = "published_courses.academic_year IN ('$quoted')";
+            }
 
-        if (!empty($program_type_id)) {
-            $prg_type_ids = implode(', ', $program_type_id);
-            $queryPs .= " and program_type_id IN ($prg_type_ids)";
-            $queryPss .= " and published_courses.program_type_id in ($prg_type_ids) ";
-        }
+            if (!empty($academicYear)) {
+                $conditions[] = "published_courses.academic_year LIKE '$academicYear'";
+            }
 
-        if (!empty($department_ids)) {
-            $dept_ids = implode(', ', $department_ids);
-            $queryPs .= " and department_id in ($dept_ids)";
-            $queryPss .= " and published_courses.department_id in ($dept_ids) ";
-        }
+            if (!empty($semester)) {
+                $conditions[] = "published_courses.semester LIKE '$semester'";
+            }
 
-        if (!empty($college_ids) && empty($department_ids)) {
-            $college_ids = implode(', ', $college_ids);
-            $queryPs .= " and college_id in ($college_ids) and department_id is null ";
-            $queryPss .= " and published_courses.college_id in ($college_ids) and department_id is null ";
-        }
+            if (!empty($programId)) {
+                $ids = implode(',', (array)$programId);
+                $conditions[] = "published_courses.program_id IN ($ids)";
+            }
 
-        debug($queryPs);
-        debug($queryPss);
+            if (!empty($programTypeId)) {
+                $ids = implode(',', (array)$programTypeId);
+                $conditions[] = "published_courses.program_type_id IN ($ids)";
+            }
 
-        if (!empty($queryPs) && !empty($queryPss)) {
-            $resultsRegistrationNR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR))
-			AND exam_grades.registrar_approval IS NULL AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.course_registration_id NOT IN (
-				SELECT exam_grades.course_registration_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.course_registration_id IS NOT NULL
-				GROUP BY exam_grades.course_registration_id ORDER BY exam_grades.id DESC
-			)"
-            );
+            if (!empty($departmentIds)) {
+                $ids = implode(',', (array)$departmentIds);
+                $conditions[] = "published_courses.department_id IN ($ids)";
+            } elseif (!empty($collegeIds)) {
+                $ids = implode(',', (array)$collegeIds);
+                $conditions[] = "published_courses.college_id IN ($ids)";
+                $conditions[] = "published_courses.department_id IS NULL";
+            }
 
-            $resultsRegistrationR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR))
-			AND exam_grades.registrar_approval is null AND exam_grades.department_reply = 1 AND $queryPss
-			AND exam_grades.course_registration_id NOT IN (
-				SELECT exam_grades.course_registration_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.course_registration_id IS NOT NULL
-				GROUP BY exam_grades.course_registration_id ORDER BY exam_grades.id DESC
-			)"
-            );
+            return implode(' AND ', $conditions);
+        };
 
-            $resultsRegistration = array_merge($resultsRegistrationNR, $resultsRegistrationR);
+        $whereSQL = $buildWhere();
 
-            $resultsAddsNR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR))
-			AND exam_grades.registrar_approval IS NULL AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.course_add_id NOT IN (
-				SELECT exam_grades.course_add_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.course_add_id IS NOT NULL
-				GROUP BY exam_grades.course_add_id ORDER BY exam_grades.id DESC
-			)"
-            );
+        $fetchGrades = function ($joinTable, $joinField) use ($connection, $whereSQL) {
+            return $connection->execute("
+            SELECT exam_grades.* FROM exam_grades
+            INNER JOIN $joinTable ON exam_grades.$joinField = $joinTable.id
+            INNER JOIN students ON $joinTable.student_id = students.id
+            INNER JOIN published_courses ON $joinTable.published_course_id = published_courses.id
+            WHERE students.graduated = 0
+              AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval IN (1, -1)))
+              AND exam_grades.registrar_approval IS NULL
+              AND $whereSQL
+            GROUP BY exam_grades.$joinField
+            ORDER BY exam_grades.id DESC
+        ")->fetchAll('assoc');
+        };
 
-            $resultsAddsR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR))
-			AND exam_grades.registrar_approval is null AND exam_grades.department_reply = 1 AND $queryPss
-			AND exam_grades.course_add_id NOT IN (
-				SELECT exam_grades.course_add_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.course_add_id IS NOT NULL
-				GROUP BY exam_grades.course_add_id ORDER BY exam_grades.id DESC
-			)"
-            );
+        $resultsRegistration = $fetchGrades('course_registrations', 'course_registration_id');
+        $resultsAdds = $fetchGrades('course_adds', 'course_add_id');
+        $resultsMakeup = $fetchGrades('makeup_exams', 'makeup_exam_id');
 
-            $resultsAdds = array_merge($resultsAddsNR, $resultsAddsR);
+        $results = array_merge($resultsRegistration, $resultsAdds, $resultsMakeup);
 
-            $resultsMakeupNR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR)) AND exam_grades.registrar_approval IS NULL
-			AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.makeup_exam_id NOT IN (
-				SELECT exam_grades.makeup_exam_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.makeup_exam_id IS NOT NULL
-				GROUP BY exam_grades.makeup_exam_id ORDER BY exam_grades.id DESC
-			)"
-            );
-
-            $resultsMakeupR = $this->query(
-                "SELECT DISTINCT exam_grades. * FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR)) AND exam_grades.registrar_approval is null
-			AND exam_grades.department_reply = 1  AND $queryPss
-			AND exam_grades.makeup_exam_id NOT IN (
-				SELECT exam_grades.makeup_exam_id FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1 AND exam_grades.department_approval = 1 AND exam_grades.makeup_exam_id IS NOT NULL
-				GROUP BY exam_grades.makeup_exam_id  ORDER BY exam_grades.id DESC
-			)"
-            );
-
-            $resultsMakeup = array_merge($resultsMakeupNR, $resultsMakeupR);
-
-            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
-        }
-
-
-        if (!empty($results)) {
-            foreach ($results as $k => $value) {
-                if (!empty($value['exam_grades']['course_registration_id'])) {
-                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
-                } elseif (!empty($value['exam_grades']['course_add_id'])) {
-                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
-                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
-                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
-                }
+        // Extract published_course_ids
+        $registrationAddMakeupIDs = ['register' => [], 'add' => [], 'makeup' => []];
+        foreach ($results as $row) {
+            if (!empty($row['course_registration_id'])) {
+                $registrationAddMakeupIDs['register'][] = $row['course_registration_id'];
+            } elseif (!empty($row['course_add_id'])) {
+                $registrationAddMakeupIDs['add'][] = $row['course_add_id'];
+            } elseif (!empty($row['makeup_exam_id'])) {
+                $registrationAddMakeupIDs['makeup'][] = $row['makeup_exam_id'];
             }
         }
 
-        // debug($registrationAddMakeupIDs);
-        $publication_ids = array();
-        if (!empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'fields' => array('CourseRegistration.published_course_id'),
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register'])
-            ));
+        $CourseRegistration = TableRegistry::getTableLocator()->get('CourseRegistrations');
+        $CourseAdd = TableRegistry::getTableLocator()->get('CourseAdds');
+        $MakeupExam = TableRegistry::getTableLocator()->get('MakeupExams');
+        $PublishedCourse = TableRegistry::getTableLocator()->get('PublishedCourses');
 
-            $publication_ids = $publication_ids + $publication_ids_register;
+        $publicationIds = [];
+
+        if (!empty($registrationAddMakeupIDs['register'])) {
+            $publicationIds += $CourseRegistration->find('list')
+                ->select(['published_course_id'])
+                ->where(['id IN' => $registrationAddMakeupIDs['register']])
+                ->toArray();
         }
 
-
         if (!empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'fields' => array('CourseAdd.published_course_id'),
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add'])
-            ));
-
-            $publication_ids += $publication_ids_add;
+            $publicationIds += $CourseAdd->find('list')
+                ->select(['published_course_id'])
+                ->where(['id IN' => $registrationAddMakeupIDs['add']])
+                ->toArray();
         }
 
         if (!empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'fields' => array('MakeupExam.published_course_id'),
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup'])
-            ));
-
-            $publication_ids += $publication_ids_makeup;
+            $publicationIds += $MakeupExam->find('list')
+                ->select(['published_course_id'])
+                ->where(['id IN' => $registrationAddMakeupIDs['makeup']])
+                ->toArray();
         }
 
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
-        }
+        $distinctIds = array_unique(array_values($publicationIds));
+        if (empty($distinctIds)) return [];
 
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            if (!empty($college_ids) && empty($department_ids)) {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        'PublishedCourse.college_id' => $college_ids,
-                        'PublishedCourse.program_type_id' => $program_type_ids,
-                        'PublishedCourse.program_id' => $program_id,
-                        'PublishedCourse.department_id is null'
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    ),
-                    'order' => array('PublishedCourse.academic_year DESC', 'PublishedCourse.semester DESC')
-                ));
-            } elseif (!empty($department_ids)) {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        'PublishedCourse.program_type_id' => $program_type_ids,
-                        'PublishedCourse.program_id' => $program_id,
-                        'PublishedCourse.department_id' => $department_ids
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    ),
-                    'order' => array('PublishedCourse.academic_year DESC', 'PublishedCourse.semester DESC')
-                ));
-            }
-        }
-
-        return $published_courses;
-    }
-
-    function getRegistrarNonApprovedCoursesList2(
-        $department_ids = null,
-        $college_ids = null,
-        $acadamic_year = '',
-        $semester = '',
-        $program_id = null,
-        $program_type_id = null,
-        $acy_ranges = array()
-    ) {
-
-        //check to which department is assigned.
-        $registrationAddMakeupIDs = array();
-
-        $queryPs = " id is not null ";
-        $queryPss = " published_courses.id is not null ";
-
-        if (isset($acy_ranges) && !empty($acy_ranges)) {
-            $acy_ranges_by_coma_quoted = "'" . implode("', '", $acy_ranges) . "'";
-            $queryPs .= ' and published_courses.academic_year IN (' . $acy_ranges_by_coma_quoted . ') ';
-            $queryPss .= ' and published_courses.academic_year IN (' . $acy_ranges_by_coma_quoted . ') ';
-        }
-
-        if (!empty($acadamic_year)) {
-            $queryPs .= " and published_courses.academic_year LIKE '" . $acadamic_year . "' ";
-            $queryPss .= " and published_courses.academic_year LIKE '" . $acadamic_year . "' ";
-        }
-
-        if (!empty($semester)) {
-            $queryPs .= " and published_courses.semester LIKE '" . $semester . "' ";
-            $queryPss .= " and published_courses.semester LIKE '" . $semester . "' ";
-        }
-
-        if (!empty($program_id)) {
-            $prg_ids = implode(', ', $program_id);
-            $queryPs .= " and program_id in ($prg_ids) ";
-            $queryPss .= " and published_courses.program_id in ($prg_ids)";
-        }
-
-        if (!empty($program_type_id)) {
-            $prg_type_ids = implode(', ', $program_type_id);
-            $queryPs .= " and program_type_id IN ($prg_type_ids)";
-            $queryPss .= " and published_courses.program_type_id in ($prg_type_ids) ";
-        }
-
-        if (!empty($department_ids)) {
-            $dept_ids = implode(', ', $department_ids);
-            $queryPs .= " and department_id in ($dept_ids)";
-            $queryPss .= " and published_courses.department_id in ($dept_ids) ";
-        }
-
-        if (!empty($college_ids) && empty($department_ids)) {
-            $college_ids = implode(', ', $college_ids);
-            $queryPs .= " and college_id in ($college_ids) and department_id is null ";
-            $queryPss .= " and published_courses.college_id in ($college_ids) and published_courses.department_id is null ";
-        }
-
-        debug($queryPs);
-        debug($queryPss);
-
-        if (!empty($queryPs) && !empty($queryPss)) {
-            $resultsRegistration = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN students students ON course_registrations.student_id = students.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			WHERE students.graduated = 0 AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = -1)) AND exam_grades.registrar_approval IS NULL AND $queryPss GROUP BY exam_grades.course_registration_id ORDER BY exam_grades.id DESC"
-            );
-
-            if (!empty($resultsRegistration)) {
-                foreach ($resultsRegistration as $key => $value) {
-                    //debug($value);
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.course_registration_id' => $value['exam_grades']['course_registration_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsRegistration[$key]);
-                    }
+        return $PublishedCourse->find()
+            ->contain([
+                'Programs',
+                'ProgramTypes',
+                'Sections',
+                'Departments',
+                'GivenByDepartments',
+                'Colleges',
+                'YearLevels',
+                'Courses' => ['Curriculums'],
+                'CourseInstructorAssignments' => function ($q) {
+                    return $q->where(['CourseInstructorAssignments.isprimary' => 1])
+                        ->contain(['Staffs' => ['Titles', 'Positions', 'Users']]);
                 }
-            }
-
-            //debug($resultsRegistration);
-
-
-            $resultsAdds = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN students students ON course_adds.student_id = students.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE students.graduated = 0 AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1)) AND exam_grades.registrar_approval IS NULL AND $queryPss GROUP BY exam_grades.course_add_id ORDER BY exam_grades.id DESC"
-            );
-
-            if (!empty($resultsAdds)) {
-                foreach ($resultsAdds as $key => $value) {
-                    //debug($value);
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.course_add_id' => $value['exam_grades']['course_add_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsAdds[$key]);
-                    }
-                }
-            }
-
-            //debug($resultsAdds);
-
-            $resultsMakeup = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN students students ON makeup_exams.student_id = students.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE students.graduated = 0 AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1)) AND exam_grades.registrar_approval IS NULL AND $queryPss GROUP BY exam_grades.makeup_exam_id ORDER BY exam_grades.id DESC"
-            );
-
-            if (!empty($resultsMakeup)) {
-                foreach ($resultsMakeup as $key => $value) {
-                    //debug($value);
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.makeup_exam_id' => $value['exam_grades']['makeup_exam_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsMakeup[$key]);
-                    }
-                }
-            }
-
-            //debug($resultsMakeup);
-
-            $results = array_merge($resultsRegistration, $resultsAdds, $resultsMakeup);
-        }
-
-
-        if (isset($results) && !empty($results)) {
-            foreach ($results as $k => $value) {
-                if (!empty($value['exam_grades']['course_registration_id'])) {
-                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
-                } elseif (!empty($value['exam_grades']['course_add_id'])) {
-                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
-                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
-                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
-                }
-            }
-        }
-
-        $publication_ids = array();
-
-        if (isset($registrationAddMakeupIDs['register']) && !empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'fields' => array('CourseRegistration.published_course_id'),
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register'])
-            ));
-
-            $publication_ids = $publication_ids + $publication_ids_register;
-        }
-
-
-        if (isset($registrationAddMakeupIDs['add']) && !empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'fields' => array('CourseAdd.published_course_id'),
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add'])
-            ));
-            $publication_ids += $publication_ids_add;
-        }
-
-        if (isset($registrationAddMakeupIDs['makeup']) && !empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'fields' => array('MakeupExam.published_course_id'),
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup'])
-            ));
-
-            $publication_ids += $publication_ids_makeup;
-        }
-
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
-        }
-
-        $published_courses = array();
-
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            if (!empty($college_ids) && empty($department_ids)) {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name', 'type'),
-                        'GivenByDepartment' => array('id', 'name', 'type'),
-                        'College' => array('id', 'name', 'type'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                                'User' => array('id', 'username', 'email', 'active', 'email_verified'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                        )
-                    ),
-                    'order' => array('PublishedCourse.academic_year DESC', 'PublishedCourse.semester DESC')
-                ));
-            } elseif (!empty($department_ids)) {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name', 'type'),
-                        'GivenByDepartment' => array('id', 'name', 'type'),
-                        'College' => array('id', 'name', 'type'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                                'User' => array('id', 'username', 'email', 'active', 'email_verified'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                        )
-                    ),
-                    'order' => array('PublishedCourse.academic_year DESC', 'PublishedCourse.semester DESC')
-                ));
-            }
-        }
-
-        return $published_courses;
+            ])
+            ->where(['PublishedCourses.id IN' => $distinctIds])
+            ->order(['PublishedCourses.academic_year' => 'DESC', 'PublishedCourses.semester' => 'DESC'])
+            ->enableHydration(false)
+            ->toArray();
     }
 
     //It returns list of courses from each department and freshman program that the registrar is supposed to confirm the grade submission
@@ -4977,565 +4612,149 @@ class ExamGradesTable extends Table
         return $published_courses;
     }
 
-    function getRejectedOrNonApprovedPublishedCourseList(
-        $department_college_id,
-        $department = 1,
-        $acadamic_year = '',
-        $semester = '',
-        $program_ids = array(),
-        $program_type_ids = array()/* , $year_level_ids = array() */,
-        $acy_ranges = array()
-    ) {
+    // src/Model/Table/ExamGradesTable.php
 
-        $registrationAddMakeupIDs = array();
-        $results = array();
-
-        //check to which department /college course is assigned.
-        if (!empty($department_college_id) && $department == 1) {
-            $queryPss = " published_courses.id is not null and (published_courses.year_level_id is not null or published_courses.year_level_id != 0 or published_courses.year_level_id != '') ";
-            $queryPss .= " and published_courses.given_by_department_id = $department_college_id ";
-        } else {
-            $queryPss = " published_courses.id is not null and (published_courses.year_level_id is null or published_courses.year_level_id = 0 or published_courses.year_level_id = '') ";
-            $queryPss .= " and published_courses.program_id = 1 and published_courses.program_type_id = 1 and department_id is null and published_courses.given_by_department_id = $department_college_id ";
-        }
-
-        if (isset($acy_ranges) && !empty($acy_ranges)) {
-            $acy_ranges_by_coma_quoted = "'" . implode("', '", $acy_ranges) . "'";
-            $queryPss .= ' and published_courses.academic_year IN (' . $acy_ranges_by_coma_quoted . ') ';
-        }
-
-        if (!empty($acadamic_year)) {
-            $queryPss .= " and published_courses.academic_year LIKE '" . $acadamic_year . "' ";
-        }
-
-        if (!empty($semester)) {
-            $queryPss .= " and published_courses.semester LIKE '" . $semester . "' ";
-        }
-
-        if (!empty($program_ids)) {
-            $queryPss .= " and published_courses.program_id IN ('" . implode(', ', $program_ids) . "') ";
-        }
-
-        if (!empty($program_type_ids)) {
-            $queryPss .= " and published_courses.program_type_id IN ('" . implode(', ', $program_type_ids) . "') ";
-        }
-
-        /* if (!empty($year_level_ids)) {
-            $queryPss .= " and published_courses.year_level_id IN ('" . implode(', ', $year_level_ids). "') ";
-        } */
-
-        debug($queryPss);
-
-        //$minimum_date_of_published_courses = $this->query("SELECT published_courses.created FROM published_courses WHERE $queryPss ORDER BY published_courses.created ASC LIMIT 1");
-        //debug($minimum_date_of_published_courses[0]['published_courses']['created']);
-        //$first_published_for_dept = $minimum_date_of_published_courses[0]['published_courses']['created'];
-
-        /* $resultsRegistrationcheck = $this->query("SELECT exam_grades.* FROM exam_grades
-        INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-        INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-        WHERE exam_grades.department_approval IS NOT NULL AND $queryPss ");
-        debug($resultsRegistrationcheck); */
-
-        if (!empty($queryPss)) {
-            $resultsRegistrationNR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			WHERE exam_grades.department_approval IS NULL AND $queryPss
-			AND exam_grades.course_registration_id NOT IN (
-				SELECT exam_grades.course_registration_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.course_registration_id IS NOT NULL
-				GROUP BY exam_grades.course_registration_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsRegistrationR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			WHERE exam_grades.registrar_approval = -1 AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.course_registration_id NOT IN (
-				SELECT exam_grades.course_registration_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.course_registration_id IS NOT NULL
-				GROUP BY exam_grades.course_registration_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsRegistration = array_merge($resultsRegistrationNR, $resultsRegistrationR);
-            debug($resultsRegistration);
-
-            $resultsAddsNR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE  exam_grades.department_approval IS NULL AND $queryPss
-			AND exam_grades.course_add_id NOT IN (
-				SELECT exam_grades.course_add_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.course_add_id IS NOT NULL
-				GROUP BY exam_grades.course_add_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsAddsR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE exam_grades.registrar_approval = -1 AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.course_add_id NOT IN (
-				SELECT exam_grades.course_add_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.course_add_id IS NOT NULL
-				GROUP BY exam_grades.course_add_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsAdds = array_merge($resultsAddsNR, $resultsAddsR);
-
-            debug($resultsAdds);
-
-            $resultsMakeupNR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE exam_grades.department_approval IS NULL AND $queryPss
-			AND exam_grades.makeup_exam_id NOT IN (
-				SELECT exam_grades.makeup_exam_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.makeup_exam_id IS NOT NULL
-				GROUP BY exam_grades.makeup_exam_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsMakeupR = $this->query(
-                "SELECT DISTINCT exam_grades.* FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE exam_grades.registrar_approval = -1 AND exam_grades.department_approval = 1 AND $queryPss
-			AND exam_grades.makeup_exam_id NOT IN (
-				SELECT exam_grades.makeup_exam_id
-				FROM exam_grades
-				WHERE exam_grades.registrar_approval = 1
-				AND exam_grades.department_approval = 1
-				AND exam_grades.makeup_exam_id IS NOT NULL
-				GROUP BY exam_grades.makeup_exam_id
-				ORDER BY exam_grades.id DESC
-			) "
-            );
-
-            $resultsMakeup = array_merge($resultsMakeupNR, $resultsMakeupR);
-
-            debug($resultsMakeup);
-
-            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
-        }
-
-        if (!empty($results)) {
-            foreach ($results as $k => $value) {
-                if (!empty($value['exam_grades']['course_registration_id'])) {
-                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
-                } elseif (!empty($value['exam_grades']['course_add_id'])) {
-                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
-                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
-                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
-                }
-            }
-            //debug($registrationAddMakeupIDs);
-        }
-
-        $publication_ids = array();
-
-        if (!empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register']),
-                'fields' => array('CourseRegistration.published_course_id')
-            ));
-            $publication_ids = $publication_ids + $publication_ids_register;
-        }
-
-        if (!empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add']),
-                'fields' => array('CourseAdd.published_course_id'),
-            ));
-            $publication_ids += $publication_ids_add;
-        }
-
-        if (!empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup']),
-                'fields' => array('MakeupExam.published_course_id'),
-            ));
-            $publication_ids += $publication_ids_makeup;
-        }
-
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
-        }
-
-        $published_courses = array();
-
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            if ($department == 1) {
-                //debug($distinct_publication_ids);
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        'PublishedCourse.given_by_department_id' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                        )
-                    )
-                ));
-                // debug($published_courses);
-            } else {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        'PublishedCourse.college_id' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                        )
-                    )
-                ));
-            }
-        }
-
-        return $published_courses;
-    }
-
-
-    function getRejectedOrNonApprovedPublishedCourseList2(
+    public function getRejectedOrNonApprovedPublishedCourseList(
         $department_id,
         $acadamic_year = '',
         $semester = '',
-        $year_level = array(),
-        $program_ids = array(),
-        $program_type_ids = array(),
-        $acy_ranges = array(),
+        $year_level = [],
+        $program_ids = [],
+        $program_type_ids = [],
+        $acy_ranges = [],
         $role_id = ROLE_DEPARTMENT,
         $freshman = 0
     ) {
-
-        $registrationAddMakeupIDs = array();
-        $results = array();
-
+        $conn = $this->getConnection();
+        $publication_ids = [];
+        $results = [];
         $given_by = 'given_by_department_id';
 
-        if (!empty($department_id) && $role_id == ROLE_DEPARTMENT) {
-            if (is_array($department_id)) {
-                $depts_by_coma_quoted = "'" . implode("', '", $department_id) . "'";
-            } else {
-                $depts_by_coma_quoted = '' . $department_id . '';
-            }
-            $queryPss = " published_courses.id is not null ";
-            $queryPss .= " and published_courses.given_by_department_id IN ($depts_by_coma_quoted)";
-        } elseif (!empty($department_id) && $role_id == ROLE_COLLEGE) {
-            if (is_array($department_id)) {
-                $depts_by_coma_quoted = "'" . implode("', '", $department_id) . "'";
-            } else {
-                $depts_by_coma_quoted = '' . $department_id . '';
-            }
-            $queryPss = " published_courses.id is not null ";
-            $queryPss .= " and published_courses.college_id IN ($depts_by_coma_quoted)";
+        if (empty($department_id)) return [];
+
+        if ($role_id === ROLE_DEPARTMENT) {
+            $queryPss = "published_courses.given_by_department_id IN (" . implode(',', (array)$department_id) . ")";
+        } elseif ($role_id === ROLE_COLLEGE) {
+            $queryPss = "published_courses.college_id IN (" . implode(',', (array)$department_id) . ")";
             $given_by = 'college_id';
         } else {
-            return array();
+            return [];
         }
 
-        if (isset($acy_ranges) && !empty($acy_ranges)) {
-            $acy_ranges_by_coma_quoted = "'" . implode("', '", $acy_ranges) . "'";
-            $queryPss .= ' and published_courses.academic_year IN (' . $acy_ranges_by_coma_quoted . ') ';
+        if (!empty($acy_ranges)) {
+            $quoted = implode("','", $acy_ranges);
+            $queryPss .= " AND published_courses.academic_year IN ('$quoted')";
         }
 
         if (!empty($acadamic_year)) {
-            $queryPss .= " and published_courses.academic_year LIKE '" . $acadamic_year . "' ";
+            $queryPss .= " AND published_courses.academic_year = '$acadamic_year'";
         }
 
         if (!empty($semester)) {
-            $queryPss .= " and published_courses.semester LIKE '" . $semester . "' ";
+            $queryPss .= " AND published_courses.semester = '$semester'";
         }
 
-        if (!$freshman) {
-            if (!empty($year_level)) {
-                if (!empty($department_id) && $role_id == ROLE_DEPARTMENT) {
-                    $published_dept_ids = ClassRegistry::init('PublishedCourse')->find(
-                        'list',
-                        array(
-                            'group' => array('PublishedCourse.department_id'),
-                            'fields' => array('PublishedCourse.department_id', 'PublishedCourse.department_id'),
-                            'conditions' => array(
-                                'PublishedCourse.given_by_department_id' => $department_id,
-                                'PublishedCourse.academic_year' => (isset($acy_ranges) && !empty($acy_ranges) ? $acy_ranges : $acadamic_year)
-                            )
-                        )
-                    );
-                }
+        // Year level filtering
+        if (!$freshman && !empty($year_level)) {
+            $yearLevelTbl = TableRegistry::getTableLocator()->get('YearLevels');
+            $year_level_ids = $yearLevelTbl->find('list')
+                ->where(['YearLevels.name IN' => $year_level])
+                ->toArray();
 
-                //debug($published_dept_ids);
-
-                $year_level_ids = ClassRegistry::init('YearLevel')->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'YearLevel.department_id' => $published_dept_ids,
-                            'YearLevel.name' => $year_level
-                        )
-                    )
-                );
-
-                if (!empty($year_level_ids)) {
-                    $year_level_ids = array_keys($year_level_ids);
-                }
-
-                //debug($year_level_ids);
-
-                $year_levels_coma_quoted = "'" . implode("', '", $year_level_ids) . "'";
-                $queryPss .= " and (published_courses.year_level_id IN ($year_levels_coma_quoted) OR ((published_courses.year_level_id IS NULL OR published_courses.year_level_id = '' OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL )) ";
-                //$queryPss .= " and (published_courses.year_level_id IN ('" . implode(', ', $year_level_id) . "')) ";
+            if (!empty($year_level_ids)) {
+                $ids = implode(',', array_keys($year_level_ids));
+                $queryPss .= " AND (published_courses.year_level_id IN ($ids) OR ((published_courses.year_level_id IS NULL OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL))";
             }
-        } else {
-            $queryPss .= " and (published_courses.year_level_id IS NULL OR published_courses.year_level_id = '' OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL )) ";
         }
 
         if (!empty($program_ids)) {
-            if (is_array($program_ids)) {
-                $program_ids_coma_quoted = "'" . implode("', '", $program_ids) . "'";
-            } else {
-                $program_ids_coma_quoted = '' . $program_ids . '';
-            }
-            $queryPss .= " and published_courses.program_id IN ($program_ids_coma_quoted) ";
+            $queryPss .= " AND published_courses.program_id IN (" . implode(',', (array)$program_ids) . ")";
         }
 
         if (!empty($program_type_ids)) {
-            if (is_array($program_type_ids)) {
-                $program_type_ids_coma_quoted = "'" . implode("', '", $program_type_ids) . "'";
-            } else {
-                $program_type_ids_coma_quoted = '' . $program_type_ids . '';
-            }
-            $queryPss .= " and published_courses.program_type_id IN ($program_type_ids_coma_quoted) ";
+            $queryPss .= " AND published_courses.program_type_id IN (" . implode(',', (array)$program_type_ids) . ")";
         }
 
-        debug($queryPss);
+        // Shared WHERE condition
+        $whereClause = "students.graduated = 0 AND (
+        (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+        OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+        OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+    ) AND $queryPss";
 
-        if (!empty($queryPss)) {
-            $resultsRegistration = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN course_registrations course_registrations ON exam_grades.course_registration_id = course_registrations.id
-			INNER JOIN published_courses published_courses ON course_registrations.published_course_id = published_courses.id
-			INNER JOIN students students ON course_registrations.student_id = students.id
-			WHERE students.graduated = 0 AND ((exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL) OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1) OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)) AND $queryPss GROUP BY exam_grades.course_registration_id ORDER BY exam_grades.id DESC"
-            );
+        // Fetch from CourseRegistration
+        $sql1 = "SELECT exam_grades.* FROM exam_grades
+        INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
+        INNER JOIN students ON course_registrations.student_id = students.id
+        INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
+        WHERE $whereClause
+        GROUP BY exam_grades.course_registration_id
+        ORDER BY exam_grades.id DESC";
 
-            if (!empty($resultsRegistration)) {
-                foreach ($resultsRegistration as $key => $value) {
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.course_registration_id' => $value['exam_grades']['course_registration_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsRegistration[$key]);
-                    }
-                }
-            }
+        $resultsRegistration = $conn->execute($sql1)->fetchAll('assoc');
 
-            //debug($resultsRegistration);
+        // Fetch from CourseAdd
+        $sql2 = "SELECT exam_grades.* FROM exam_grades
+        INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
+        INNER JOIN students ON course_adds.student_id = students.id
+        INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
+        WHERE $whereClause
+        GROUP BY exam_grades.course_add_id
+        ORDER BY exam_grades.id DESC";
 
-            $resultsAdds = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN course_adds course_adds ON exam_grades.course_add_id = course_adds.id
-			INNER JOIN students students ON course_adds.student_id = students.id
-			INNER JOIN published_courses published_courses ON course_adds.published_course_id = published_courses.id
-			WHERE students.graduated = 0 AND ((exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL) OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1) OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)) AND $queryPss GROUP BY exam_grades.course_add_id ORDER BY exam_grades.id DESC"
-            );
+        $resultsAdds = $conn->execute($sql2)->fetchAll('assoc');
 
-            if (!empty($resultsAdds)) {
-                foreach ($resultsAdds as $key => $value) {
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.course_add_id' => $value['exam_grades']['course_add_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsAdds[$key]);
-                    }
-                }
-            }
+        // Fetch from MakeupExam
+        $sql3 = "SELECT exam_grades.* FROM exam_grades
+        INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
+        INNER JOIN students ON makeup_exams.student_id = students.id
+        INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
+        WHERE $whereClause
+        GROUP BY exam_grades.makeup_exam_id
+        ORDER BY exam_grades.id DESC";
 
-            //debug($resultsAdds);
+        $resultsMakeup = $conn->execute($sql3)->fetchAll('assoc');
 
-            $resultsMakeup = $this->query(
-                "SELECT exam_grades.* FROM exam_grades
-			INNER JOIN makeup_exams makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-			INNER JOIN students students ON makeup_exams.student_id = students.id
-			INNER JOIN published_courses published_courses ON makeup_exams.published_course_id = published_courses.id
-			WHERE students.graduated = 0 AND ((exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL) OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1) OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)) AND $queryPss GROUP BY exam_grades.makeup_exam_id ORDER BY exam_grades.id DESC"
-            );
+        // Filter: keep only unapproved ones
+        $results = array_merge($resultsRegistration, $resultsAdds, $resultsMakeup);
 
-            if (!empty($resultsMakeup)) {
-                foreach ($resultsMakeup as $key => $value) {
-                    if ($this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ExamGrade.makeup_exam_id' => $value['exam_grades']['makeup_exam_id'],
-                                'ExamGrade.registrar_approval' => 1
-                            )
-                        )
-                    )) {
-                        unset($resultsMakeup[$key]);
-                    }
-                }
-            }
-
-            //debug($resultsMakeup);
-
-            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
-        }
-
-        if (isset($results) && !empty($results)) {
-            foreach ($results as $k => $value) {
-                if (!empty($value['exam_grades']['course_registration_id'])) {
-                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
-                } elseif (!empty($value['exam_grades']['course_add_id'])) {
-                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
-                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
-                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
-                }
+        foreach ($results as $row) {
+            if (!empty($row['course_registration_id'])) {
+                $publication_ids[] = $this->CourseRegistrations->get($row['course_registration_id'])->published_course_id;
+            } elseif (!empty($row['course_add_id'])) {
+                $publication_ids[] = $this->CourseAdds->get($row['course_add_id'])->published_course_id;
+            } elseif (!empty($row['makeup_exam_id'])) {
+                $publication_ids[] = $this->MakeupExams->get($row['makeup_exam_id'])->published_course_id;
             }
         }
 
-        $publication_ids = array();
+        $publication_ids = array_unique($publication_ids);
 
-        if (isset($registrationAddMakeupIDs['register']) && !empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register']),
-                'fields' => array('CourseRegistration.published_course_id')
-            ));
+        if (empty($publication_ids)) return [];
 
-            $publication_ids = $publication_ids + $publication_ids_register;
-        }
+        $PublishedCoursesTbl = TableRegistry::getTableLocator()->get('PublishedCourses');
+        $courses = $PublishedCoursesTbl->find()
+            ->enableHydration(false)
+            ->where(['PublishedCourses.id IN' => $publication_ids])
+            ->contain([
+                'Program', 'ProgramType', 'Section', 'Department',
+                'GivenByDepartment', 'College', 'YearLevel',
+                'CourseInstructorAssignments' => function ($q) {
+                    return $q->where(['CourseInstructorAssignments.isprimary' => 1])
+                        ->contain([
+                            'Staff' => ['Positions', 'Titles', 'Users']
+                        ]);
+                },
+                'Course' => ['Curriculum']
+            ])
+            ->toArray();
 
-        if (isset($registrationAddMakeupIDs['add']) && !empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add']),
-                'fields' => array('CourseAdd.published_course_id'),
-            ));
-
-            $publication_ids += $publication_ids_add;
-        }
-
-        if (isset($registrationAddMakeupIDs['makeup']) && !empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup']),
-                'fields' => array('MakeupExam.published_course_id'),
-            ));
-
-            $publication_ids += $publication_ids_makeup;
-        }
-
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
-        }
-
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            debug($distinct_publication_ids);
-            $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                'conditions' => array(
-                    'PublishedCourse.id' => $distinct_publication_ids,
-                    'PublishedCourse.' . $given_by . '' => $department_id
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name'),
-                    'Section' => array('id', 'name'),
-                    'Department' => array('id', 'name', 'type'),
-                    'GivenByDepartment' => array('id', 'name', 'type'),
-                    'College' => array('id', 'name', 'type'),
-                    'YearLevel' => array('id', 'name'),
-                    'CourseInstructorAssignment' => array(
-                        'fields' => array('id', 'published_course_id', 'staff_id'),
-                        'Staff' => array(
-                            'fields' => array('id', 'full_name', 'user_id'),
-                            'Position' => array('id', 'position'),
-                            'Title' => array('id', 'title'),
-                            'User' => array('id', 'username', 'email', 'active', 'email_verified'),
-                        ),
-                        'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                    ),
-                    'Course' => array(
-                        'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                        'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                    )
-                )
-            ));
-            // debug($published_courses);
-        }
-
-        if (isset($published_courses) && !empty($published_courses)) {
-            return $published_courses;
-        }
-
-        return array();
+        return $courses;
     }
+
+
+
+
 
 
     function getAddSemester($student_id = null, $current_academic_year = null)

@@ -30,11 +30,10 @@ class SecuritysettingsController extends AppController
 
     public function beforeFilter(Event $event)
     {
-
         parent::beforeFilter($event);
     }
 
-    public function permission_management()
+    public function permissionManagement()
     {
 
         $this->redirect(array(

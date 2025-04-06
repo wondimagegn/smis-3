@@ -648,7 +648,7 @@ class ClassPeriodCourseConstraintsController extends AppController
         }
     }
 
-    public function get_year_level($department_id = null)
+    public function getYearLevel($department_id = null)
     {
 
         if (!empty($department_id)) {
@@ -662,7 +662,7 @@ class ClassPeriodCourseConstraintsController extends AppController
         }
     }
 
-    public function get_periods($week_id = null)
+    public function getPeriods($week_id = null)
     {
 
         $selected_program = $this->Session->read('selected_program');
@@ -703,7 +703,7 @@ class ClassPeriodCourseConstraintsController extends AppController
         }
     }
 
-    public function get_course_types($publishedCourse_id = null)
+    public function getCourseTypes($publishedCourse_id = null)
     {
 
         debug($publishedCourse_id);

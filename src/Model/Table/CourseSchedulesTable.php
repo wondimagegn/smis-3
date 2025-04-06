@@ -5,6 +5,7 @@ namespace App\Model\Table;
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
 
 class CourseSchedulesTable extends Table
@@ -153,56 +154,68 @@ class CourseSchedulesTable extends Table
         return $sorted_publishedCourses;
     }
 
-    public function get_published_course_details($publishedCourse_id = null)
+    public function getPublishedCourseDetails($publishedCourse_id = null): array
     {
-
-        if (!empty($publishedCourse_id)) {
-            $publishedCourses = $this->PublishedCourse->find('first', array(
-                'conditions' => array('PublishedCourse.id' => $publishedCourse_id),
-                'fields' => array(
-                    'PublishedCourse.id',
-                    'PublishedCourse.lecture_number_of_session',
-                    'PublishedCourse.lab_number_of_session',
-                    'PublishedCourse.tutorial_number_of_session'
-                ),
-                'contain' => array(
-                    'Section' => array('fields' => array('Section.id', 'Section.name')),
-                    'SectionSplitForPublishedCourse',
-                    'Course' => array(
-                        'fields' => array(
-                            'Course.id',
-                            'Course.course_title',
-                            'Course.course_code',
-                            'Course.credit',
-                            'Course.lecture_hours',
-                            'Course.tutorial_hours',
-                            'Course.laboratory_hours'
-                        )
-                    ),
-                    'SectionSplitForPublishedCourse' => array('CourseSplitSection'),
-                    'CourseInstructorAssignment' => array(
-                        'fields' => array(
-                            'CourseInstructorAssignment.id',
-                            'CourseInstructorAssignment.staff_id',
-                            'CourseInstructorAssignment.type',
-                            'CourseInstructorAssignment.isprimary'
-                        ),
-                        'Staff' => array(
-                            'fields' => array('Staff.full_name'),
-                            'conditions' => array('Staff.active' => 1),
-                            'Title' => array('fields' => array('title')),
-                            'Position' => array('fields' => array('position'))
-                        )
-                    ),
-                    'ClassPeriodCourseConstraint',
-                    'ClassRoomCourseConstraint'
-                )
-            ));
-
-            return $publishedCourses;
+        if (empty($publishedCourse_id)) {
+            return [];
         }
-    }
 
+        $query = $this->PublishedCourses
+            ->find()
+            ->enableHydration(false)
+            ->select([
+                'PublishedCourses.id',
+                'PublishedCourses.lecture_number_of_session',
+                'PublishedCourses.lab_number_of_session',
+                'PublishedCourses.tutorial_number_of_session'
+            ])
+            ->where(['PublishedCourses.id' => $publishedCourse_id])
+            ->contain([
+                'Sections' => function ($q) {
+                    return $q->select(['Sections.id', 'Sections.name']);
+                },
+                'SectionSplitForPublishedCourses.CourseSplitSections',
+                'Courses' => function ($q) {
+                    return $q->select([
+                        'Courses.id',
+                        'Courses.course_title',
+                        'Courses.course_code',
+                        'Courses.credit',
+                        'Courses.lecture_hours',
+                        'Courses.tutorial_hours',
+                        'Courses.laboratory_hours'
+                    ]);
+                },
+                'CourseInstructorAssignments' => function ($q) {
+                    return $q->select([
+                        'CourseInstructorAssignments.id',
+                        'CourseInstructorAssignments.staff_id',
+                        'CourseInstructorAssignments.type',
+                        'CourseInstructorAssignments.isprimary'
+                    ])
+                        ->contain([
+                            'Staffs' => function ($q) {
+                                return $q->select(['Staffs.full_name'])
+                                    ->where(['Staffs.active' => 1])
+                                    ->contain([
+                                        'Titles' => function ($q) {
+                                            return $q->select(['Titles.title']);
+                                        },
+                                        'Positions' => function ($q) {
+                                            return $q->select(['Positions.position']);
+                                        }
+                                    ]);
+                            }
+                        ]);
+                },
+                'ClassPeriodCourseConstraints',
+                'ClassRoomCourseConstraints'
+            ]);
+
+        $result = $query->first();
+
+        return $result ?: [];
+    }
     /*
     *calculate the number of period per session, the highest comes at top.
     */
@@ -937,151 +950,127 @@ class CourseSchedulesTable extends Table
     }
 
     //get course schedule of ongoing courses for a  given instructor
-    public function getCourseSchedulesForInstructor($user_id = null, $role_id = null)
+    use Cake\ORM\TableRegistry;
+
+    public function getCourseSchedulesForInstructor($userId = null, $roleId = null)
     {
+        if ($roleId === ROLE_STUDENT) {
+            return [];
+        }
 
-        if ($role_id == ROLE_STUDENT) {
-        } else {
-            $staff = ClassRegistry::init('Staff')->find(
-                'first',
-                array(
-                    'conditions' =>
-                        array('Staff.user_id' => $user_id),
-                    'recursive' => -1
-                )
-            );
-            $latest_course_assignment = ClassRegistry::init('CourseInstructorAssignment')->find(
-                'first',
-                array(
-                    'conditions' =>
-                        array(
-                            'CourseInstructorAssignment.staff_id' => $staff['Staff']['id']
-                        ),
-                    'order' => array('CourseInstructorAssignment.created DESC'),
-                    'recursive' => -1
-                )
-            );
-            $course_assignments = ClassRegistry::init('CourseInstructorAssignment')->find(
-                'all',
-                array(
-                    'conditions' =>
-                        array(
-                            'CourseInstructorAssignment.staff_id' => $staff['Staff']['id'],
-                            'CourseInstructorAssignment.academic_year' => $latest_course_assignment['CourseInstructorAssignment']['academic_year'],
-                            'CourseInstructorAssignment.semester' => $latest_course_assignment['CourseInstructorAssignment']['semester']
-                        ),
-                    'contain' =>
-                        array(
-                            'PublishedCourse' =>
-                                array(
-                                    'Department',
-                                    'College',
-                                    'Section',
-                                    'Course',
-                                    'CourseRegistration' =>
-                                        array(
-                                            'ExamGrade' =>
-                                                array(
-                                                    'order' => array('ExamGrade.created DESC')
-                                                )
-                                        ),
-                                    'CourseAdd' =>
-                                        array(
-                                            'ExamGrade' =>
-                                                array(
-                                                    'order' => array('ExamGrade.created DESC')
-                                                )
-                                        )
-                                )
-                        )
-                )
-            );
-            //debug($course_assignments);
-            $ongoing_courses = array();
-            foreach ($course_assignments as $key => $course_assignment) {
-                $grade_submitted = true;
-                if ($course_assignment['PublishedCourse']['drop'] == 0) {
-                    if (!isset($course_assignment['PublishedCourse']['CourseRegistration'])) {
-                        //debug($course_assignment);
-                    }
-                    foreach ($course_assignment['PublishedCourse']['CourseRegistration'] as $key2 => $course_registration) {
-                        //Excluding students who dropped the course
-                        $course_droped = ClassRegistry::init('CourseRegistration')->isCourseDroped(
-                            $course_registration['id']
-                        );
-                        if (!$course_droped && (empty($course_registration['ExamGrade']) || $course_registration['ExamGrade'][0]['department_approval'] == -1)) {
-                            $grade_submitted = false;
+        $Staffs = TableRegistry::getTableLocator()->get('Staffs');
+        $staff = $Staffs->find()
+            ->enableHydration(false)
+            ->where(['Staffs.user_id' => $userId])
+            ->first();
 
-                            if ($course_assignment['PublishedCourse']['id'] == 6) {
-                                //debug($course_registration);
-                            }
-                            break;
-                        }
-                    }
-                    if ($grade_submitted == true) {
-                        foreach ($course_assignment['PublishedCourse']['CourseAdd'] as $key2 => $course_add) {
-                            //Course drop consideration left
-                            if (empty($course_add['ExamGrade']) || $course_add['ExamGrade'][0]['department_approval'] == -1) {
-                                $grade_submitted = false;
+        if (!$staff) {
+            return [];
+        }
 
-                                if ($course_assignment['PublishedCourse']['id'] == 6) {
-                                    //debug($course_add);
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    if ($grade_submitted == false) {
-                        $index = count($ongoing_courses);
-                        $ongoing_courses[$index]['Section']['id'] = $course_assignment['PublishedCourse']['Section']['id'];
-                        $ongoing_courses[$index]['PublishedCourse']['id'] = $course_assignment['PublishedCourse']['id'];
-                        $ongoing_courses[$index]['CourseInstructorAssignment']['type'] = $course_assignment['CourseInstructorAssignment']['type'];
+        $Assignments = TableRegistry::getTableLocator()->get('CourseInstructorAssignments');
+        $latest = $Assignments->find()
+            ->enableHydration(false)
+            ->where(['CourseInstructorAssignments.staff_id' => $staff['id']])
+            ->order(['CourseInstructorAssignments.created' => 'DESC'])
+            ->first();
+
+        if (!$latest) {
+            return [];
+        }
+
+        $assignments = $Assignments->find()
+            ->enableHydration(false)
+            ->contain([
+                'PublishedCourses' => [
+                    'Departments',
+                    'Colleges',
+                    'Sections',
+                    'Courses',
+                    'CourseRegistrations.ExamGrades' => ['sort' => ['ExamGrades.created' => 'DESC']],
+                    'CourseAdds.ExamGrades' => ['sort' => ['ExamGrades.created' => 'DESC']]
+                ]
+            ])
+            ->where([
+                'CourseInstructorAssignments.staff_id' => $staff['id'],
+                'CourseInstructorAssignments.academic_year' => $latest['academic_year'],
+                'CourseInstructorAssignments.semester' => $latest['semester']
+            ])
+            ->toArray();
+
+        $ongoing = [];
+
+        foreach ($assignments as $assignment) {
+            $published = $assignment['published_course'];
+            $registrations = $published['course_registrations'] ?? [];
+            $adds = $published['course_adds'] ?? [];
+
+            $gradeSubmitted = true;
+
+            foreach ($registrations as $cr) {
+                if (!empty($cr['exam_grades'][0]['department_approval']) && $cr['exam_grades'][0]['department_approval'] === -1) {
+                    $gradeSubmitted = false;
+                    break;
+                }
+            }
+
+            if ($gradeSubmitted) {
+                foreach ($adds as $ca) {
+                    if (!empty($ca['exam_grades'][0]['department_approval']) && $ca['exam_grades'][0]['department_approval'] === -1) {
+                        $gradeSubmitted = false;
+                        break;
                     }
                 }
             }
-            //debug($ongoing_courses);
-            $instructor_course_schedules = array();
-            foreach ($ongoing_courses as $ock => $ocv) {
-                $course_type_array = array();
-                $course_type_array = explode('+', $ocv['CourseInstructorAssignment']['type']);
-                $instructor_course_schedules[$ock] = $this->find('all', array(
-                    'conditions' => array(
-                        'CourseSchedule.published_course_id' => $ocv['PublishedCourse']['id'],
-                        'CourseSchedule.section_id' => $ocv['Section']['id'],
-                        'CourseSchedule.academic_year' => $latest_course_assignment['CourseInstructorAssignment']['academic_year'],
-                        'CourseSchedule.semester' => $latest_course_assignment['CourseInstructorAssignment']['semester'],
-                        'CourseSchedule.type' => $course_type_array
-                    ),
-                    'contain' => array(
-                        'ClassRoom' => array(
-                            'fields' => array('ClassRoom.room_code'),
-                            "ClassRoomBlock" => array(
-                                'fields' => array("ClassRoomBlock.id"),
-                                "Campus" => array('fields' => array("Campus.name"))
-                            )
-                        ),
-                        'PublishedCourse' => array(
-                            'fields' => array('PublishedCourse.id'),
-                            'Course' => array('fields' => array('Course.course_title', 'Course.course_code')),
-                            'Department' => array('fields' => array('Department.name')),
-                            'College' => array('fields' => array('College.name'))
-                        ),
-                        'Section' => array('fields' => array('Section.name')),
-                        'CourseSplitSection',
-                        'ClassPeriod' => array(
-                            'fields' => array(
-                                'ClassPeriod.id',
-                                'ClassPeriod.week_day',
-                                'ClassPeriod.period_setting_id'
-                            ),
-                            'PeriodSetting' => array('fields' => array('PeriodSetting.hour'))
-                        )
-                    )
-                ));
-            }
 
-            return $instructor_course_schedules;
+            if (!$gradeSubmitted && $published['drop'] == 0) {
+                $ongoing[] = [
+                    'section_id' => $published['section']['id'],
+                    'published_course_id' => $published['id'],
+                    'course_type' => $assignment['type']
+                ];
+            }
         }
+
+        $CourseSchedules = TableRegistry::getTableLocator()->get('CourseSchedules');
+        $schedules = [];
+
+        foreach ($ongoing as $oc) {
+            $typeList = explode('+', $oc['course_type']);
+            $schedules[] = $CourseSchedules->find()
+                ->enableHydration(false)
+                ->contain([
+                    'ClassRooms' => [
+                        'fields' => ['room_code'],
+                        'ClassRoomBlocks' => [
+                            'fields' => ['id'],
+                            'Campuses' => ['fields' => ['name']]
+                        ]
+                    ],
+                    'PublishedCourses' => [
+                        'fields' => ['id'],
+                        'Courses' => ['fields' => ['course_title', 'course_code']],
+                        'Departments' => ['fields' => ['name']],
+                        'Colleges' => ['fields' => ['name']]
+                    ],
+                    'Sections' => ['fields' => ['name']],
+                    'CourseSplitSections',
+                    'ClassPeriods' => [
+                        'fields' => ['id', 'week_day', 'period_setting_id'],
+                        'PeriodSettings' => ['fields' => ['hour']]
+                    ]
+                ])
+                ->where([
+                    'CourseSchedules.published_course_id' => $oc['published_course_id'],
+                    'CourseSchedules.section_id' => $oc['section_id'],
+                    'CourseSchedules.academic_year' => $latest['academic_year'],
+                    'CourseSchedules.semester' => $latest['semester'],
+                    'CourseSchedules.type IN' => $typeList
+                ])
+                ->toArray();
+        }
+
+        return $schedules;
     }
 
     //get course schedule of current academic year and semester for a given student
@@ -1523,7 +1512,7 @@ class CourseSchedulesTable extends Table
             }
         }
 
-        $publishedCourse_details = $this->get_published_course_details($course_schedules['PublishedCourse']['id']);
+        $publishedCourse_details = $this->getPublishedCourseDetails($course_schedules['PublishedCourse']['id']);
         if (strcasecmp($course_schedules['CourseSchedule']['type'], 'Lecture') === 0) {
             $number_of_period_per_session = $this->get_number_period_per_session(
                 $publishedCourse_details['Course']['lecture_hours'],
@@ -1787,7 +1776,7 @@ class CourseSchedulesTable extends Table
             }
         }
 
-        $publishedCourse_details = $this->get_published_course_details($publish_courses['PublishedCourse']['id']);
+        $publishedCourse_details = $this->getPublishedCourseDetails($publish_courses['PublishedCourse']['id']);
 
         $number_of_period_per_session = $this->get_number_period_per_session(
             $publishedCourse_details['Course']['lecture_hours'],

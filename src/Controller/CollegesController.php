@@ -11,15 +11,15 @@ class CollegesController extends AppController
         'parent' => 'campuses',
         'exclude' => array(
             'index',
-            'delegate_scale',
-            'registrar_delegate_scale',
-            'get_college_combo',
-            'get_active_college_combo',
+            'delegateScale',
+            'registrarDelegateScale',
+            'getCollegeCombo',
+            'getActiveCollegeCombo',
             'search'
         ),
         'alias' => array(
             'add' => 'Add College',
-            'delegate_scale' => 'Delegate Scale',
+            'delegateScale' => 'Delegate Scale',
         )
     );
 
@@ -38,7 +38,7 @@ class CollegesController extends AppController
 
         parent::beforeFilter($event);
         $this->Auth->Allow(
-            'get_college_combo',
+            'getCollegeCombo',
             'get_active_college_combo',
             'search'
         );
@@ -72,9 +72,7 @@ class CollegesController extends AppController
     public function index()
     {
 
-        //$this->College->recursive = 0;
-        /* $this->Paginator->settings =  array('contain' => array('Campus'), 'recursive'=> -1);
-        $this->set('colleges', $this->paginate()); */
+
 
         $conditions = array();
 
@@ -282,7 +280,7 @@ class CollegesController extends AppController
         $this->set(compact('campuses'));
     }
 
-    public function delegate_scale()
+    public function delegateScale()
     {
 
         if (!empty($this->request->data)) {
@@ -314,7 +312,7 @@ class CollegesController extends AppController
         $this->set(compact('campuses'));
     }
 
-    public function registrar_delegate_scale()
+    public function registrarDelegateScale()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['update'])) {
@@ -372,7 +370,7 @@ class CollegesController extends AppController
         return $this->redirect(array('action' => 'index'));
     }
 
-    public function get_college_combo($campus_id = null, $all = 0)
+    public function getCollegeCombo($campus_id = null, $all = 0)
     {
 
         $this->layout = 'ajax';
@@ -400,7 +398,7 @@ class CollegesController extends AppController
         $this->set(compact('colleges'));
     }
 
-    public function get_active_college_combo($campus_id = null, $all = 0)
+    public function getActiveCollegeCombo($campus_id = null, $all = 0)
     {
 
         $this->layout = 'ajax';

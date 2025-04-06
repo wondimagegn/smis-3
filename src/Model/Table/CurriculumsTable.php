@@ -60,6 +60,12 @@ class CurriculumsTable extends Table
         $this->hasMany('Students', [
             'foreignKey' => 'curriculum_id',
         ]);
+        $this->hasMany('Attachments', [
+            'foreignKey' => 'foreign_key',
+            'conditions' => ['Attachments.model' => 'Curriculum'],
+            'dependent' => true,
+            'cascadeCallbacks' => true
+        ]);
     }
 
     /**

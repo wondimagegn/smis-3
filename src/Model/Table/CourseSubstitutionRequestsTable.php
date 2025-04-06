@@ -107,22 +107,21 @@ class CourseSubstitutionRequestsTable extends Table
     }
 
     //count course substitution request not approved
-    function count_substitution_request($department_ids = null)
+    public function countSubstitutionRequest($departmentIds = null): int
     {
-        $options = array();
+        $daysBack = FrozenDate::now()->subDays(DAYS_BACK_COURSE_SUBSTITUTION);
 
-        $options['conditions'] = array(
-            'Student.department_id' => $department_ids,
-            'Student.graduated' => 0,
-            'CourseSubstitutionRequest.department_approve is null',
-            'CourseSubstitutionRequest.request_date >= ' => date(
-                "Y-m-d",
-                strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
-            ),
-        );
+        $courseSubstitutions = TableRegistry::getTableLocator()->get('CourseSubstitutionRequests');
 
-        $substitutionCount = $this->find('count', $options);
+        $query = $courseSubstitutions->find()
+            ->contain(['Students'])
+            ->where([
+                'Students.department_id IN' => (array)$departmentIds,
+                'Students.graduated' => 0,
+                'CourseSubstitutionRequests.department_approve IS' => null,
+                'CourseSubstitutionRequests.request_date >=' => $daysBack
+            ]);
 
-        return  $substitutionCount;
+        return $query->count();
     }
 }

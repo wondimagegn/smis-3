@@ -8,7 +8,11 @@
         <div class="row">
             <div class="large-12 columns" style="margin-top: -35px;">
                 <hr>
-                <?php echo $this->Form->create('Student');
+                <?php //echo $this->Form->create('Student');
+
+                echo $this->Form->create($student);
+
+
                 if ($role_id != ROLE_STUDENT && !isset($student_academic_profile)) { ?>
                     <fieldset style="padding-bottom: 5px;">
                         <legend>&nbsp;&nbsp; Student Number / ID &nbsp;&nbsp;</legend>

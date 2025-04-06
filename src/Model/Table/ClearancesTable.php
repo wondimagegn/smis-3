@@ -2,9 +2,11 @@
 
 namespace App\Model\Table;
 
+use Cake\I18n\FrozenDate;
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
 
 class ClearancesTable extends Table
@@ -558,54 +560,6 @@ class ClearancesTable extends Table
     }
 
 
-    //count clearance request not approved
-    function count_clearnce_request($department_ids = null, $college_ids = null, $days_back = '', $current_academic_year_start_date = '')
-    {
-        $options = array();
-
-        if (isset($days_back) && !empty($days_back)) {
-            $request_date = date('Y-m-d ', strtotime("-" . $days_back . " day "));
-        } else {
-            $request_date = date('Y-m-d ', strtotime("-" . DAYS_BACK_CLEARANCE . " day "));
-        }
-
-
-        $options['recursive'] = -1;
-        $options['contain'] = array('Student');
-
-        if (!empty($department_ids)) {
-            $options['conditions'] = array(
-                'Student.department_id' => $department_ids,
-                'Clearance.confirmed is null',
-                'OR' => array(
-                    'Clearance.request_date >= ' => (!empty($current_academic_year_start_date) ? $current_academic_year_start_date : $request_date),
-                    'Clearance.last_class_attended_date >= ' => (!empty($current_academic_year_start_date) ? $current_academic_year_start_date : $request_date),
-                )
-            );
-        }
-
-        if (!empty($college_ids)) {
-            $options['conditions'] = array(
-                'Student.department_id is null ',
-                'Student.college_id ' => $college_ids,
-                'Clearance.confirmed is null',
-                'OR' => array(
-                    'Clearance.request_date >= ' => (!empty($current_academic_year_start_date) ? $current_academic_year_start_date : $request_date),
-                    'Clearance.last_class_attended_date >= ' => (!empty($current_academic_year_start_date) ? $current_academic_year_start_date : $request_date),
-                )
-            );
-        }
-
-        if (isset($options['conditions']) && !empty($options['conditions'])) {
-            $clearanceCount = $this->find('count', $options);
-        } else {
-            $clearanceCount = 0;
-        }
-
-        //debug($clearanceCount );
-        return  $clearanceCount;
-    }
-
     function clearedAfterRegistration($student_id = null)
     {
         $last_registration_date = $this->Student->CourseRegistration->find('first', array(
@@ -772,5 +726,49 @@ class ClearancesTable extends Table
         } else {
             return false;
         }
+    }
+
+    public function countClearanceRequest(
+        $departmentIds = null,
+        $collegeIds = null,
+        $daysBack = '',
+        $academicYearStartDate = ''
+    ) {
+        $requestDate = !empty($daysBack)
+            ? date('Y-m-d', strtotime("-{$daysBack} days"))
+            : date('Y-m-d', strtotime("-" . DAYS_BACK_CLEARANCE . " days"));
+
+        $Clearances = $this->find()
+            ->contain(['Students'])
+            ->where(function ($exp, $q) use ($departmentIds, $collegeIds, $academicYearStartDate, $requestDate) {
+                $startDate = !empty($academicYearStartDate) ? $academicYearStartDate : $requestDate;
+
+                if (!empty($departmentIds)) {
+                    return $exp->and_([
+                        'Students.department_id IN' => (array)$departmentIds,
+                        'Clearances.confirmed IS' => null,
+                        $exp->or_([
+                            'Clearances.request_date >=' => $startDate,
+                            'Clearances.last_class_attended_date >=' => $startDate
+                        ])
+                    ]);
+                }
+
+                if (!empty($collegeIds)) {
+                    return $exp->and_([
+                        'Students.department_id IS' => null,
+                        'Students.college_id IN' => (array)$collegeIds,
+                        'Clearances.confirmed IS' => null,
+                        $exp->or_([
+                            'Clearances.request_date >=' => $startDate,
+                            'Clearances.last_class_attended_date >=' => $startDate
+                        ])
+                    ]);
+                }
+
+                return []; // fallback empty filter
+            });
+
+        return $Clearances->count();
     }
 }

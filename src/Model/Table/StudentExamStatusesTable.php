@@ -6872,34 +6872,39 @@ Section.academicyear=' . $recentRegistration['Section']['academicyear'] . '',
     }
 
 
-    function displayStudentRank($student_id, $academicYear)
+
+    public function displayStudentRank($studentId, $academicYear)
     {
+        $StudentRanks = TableRegistry::getTableLocator()->get('StudentRanks');
 
-        $rank = array();
-        $rank = $this->Student->StudentRank->find(
-            'all',
-            array(
-                'conditions' => array(
-                    'StudentRank.student_id' => $student_id,
-                    'StudentRank.academicyear' => $academicYear
-                ),
-                'order' => array('StudentRank.academicyear DESC')
-            )
-        );
+        // First attempt to get for a specific academic year
+        $rankQuery = $StudentRanks->find()
+            ->where([
+                'StudentRanks.student_id' => $studentId,
+                'StudentRanks.academicyear' => $academicYear
+            ])
+            ->order(['StudentRanks.academicyear' => 'DESC']);
 
-        if (empty($rank)) {
-            $rank = $this->Student->StudentRank->find('all', array(
-                'conditions' => array('StudentRank.student_id' => $student_id),
-                'order' => array('StudentRank.academicyear DESC')
-            ));
+        $ranks = $rankQuery->toArray();
+
+        // If not found for academicYear, try all years
+        if (empty($ranks)) {
+            $ranks = $StudentRanks->find()
+                ->where(['StudentRanks.student_id' => $studentId])
+                ->order(['StudentRanks.academicyear' => 'DESC'])
+                ->toArray();
         }
-        $rankFormatted = array();
-        foreach ($rank as $k => $v) {
-            $rankFormatted[$v['StudentRank']['academicyear'] . '-' . $v['StudentRank']['semester']][$v['StudentRank']['category']] = $v;
+
+        $rankFormatted = [];
+
+        foreach ($ranks as $rank) {
+            $key = $rank->academicyear . '-' . $rank->semester;
+            $rankFormatted[$key][$rank->category] = $rank->toArray();
         }
 
         return $rankFormatted;
     }
+
 
     function rankName($i)
     {

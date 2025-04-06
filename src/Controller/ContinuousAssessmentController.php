@@ -11,10 +11,10 @@ class ContinuousAssessmentController extends AppController {
 
 		 public $menuOptions = array(
 		 	'parent' => 'evalution',
-		 	'exclude'=>array('view_continouse_assessement_setup'),
+		 	'exclude'=>array('viewContinouseAssessementSetup'),
 			 'alias' => array(
                     'index' => 'View All Continuous',
-                    'view_continouse_assessement_detail'=>'View Continuous Assessment Report',
+                    'viewContinouseAssessementDetail'=>'View Continuous Assessment Report',
             )
 
 		 );
@@ -148,7 +148,7 @@ class ContinuousAssessmentController extends AppController {
 
       	}
 
-    public function view_continouse_assessement_detail() {
+    public function viewContinouseAssessementDetail() {
 
 			if(isset($this->request->data['getReport'])) {
 				$instructor_lists=ClassRegistry::init('ExamType')->getExamTypeReport(
@@ -216,7 +216,7 @@ class ContinuousAssessmentController extends AppController {
 
 		}
 
-		public function view_continouse_assessement_setup($pid) {
+		public function viewContinouseAssessementSetup($pid) {
 			$continouseExamSetup=ClassRegistry::init('ExamType')->getExamType($pid);
 			$total_registered=ClassRegistry::init('CourseRegistration')->find('count',
 array('conditions'=>array('CourseRegistration.published_course_id'=>$pid)));

@@ -162,23 +162,21 @@ class ExamGradeChangesController extends AppController
     }
 
     //College Freshman
-    public function manage_freshman_grade_change()
+    public function manageFreshmanGradeChange()
     {
 
-        $this->__manage_grade_change(0);
+        $this->__manageGradeChange(0);
         $this->render('manage_department_grade_change');
     }
 
     //DEPARTMENT
-    public function manage_department_grade_change()
+    public function manageDepartmentGradeChange()
     {
 
-        //Role based checking is removed
-        //if($this->role_id == 6) {
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
                 'Auth.User'
             )['role_id'] == ROLE_COLLEGE) {
-            $this->__manage_grade_change(1);
+            $this->__manageGradeChange(1);
             $this->render('manage_department_grade_change');
         } else {
             $this->Flash->error(
@@ -189,13 +187,11 @@ class ExamGradeChangesController extends AppController
     }
 
     //DEPARTMENT and COLLEGE freshman grade change (common)
-    private function __manage_grade_change($department = 1)
+    private function __manageGradeChange($department = 1)
     {
 
         $departmentIDs = array();
 
-        //Role based checking is removed
-        //if($this->role_id == 6 || $this->role_id == 5) {
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
                 'Auth.User'
             )['role_id'] == ROLE_COLLEGE) {
@@ -550,11 +546,9 @@ class ExamGradeChangesController extends AppController
     }
 
     //COLLEGE
-    public function manage_college_grade_change()
+    public function manageCollegeGradeChange()
     {
 
-        //Role based checking is removed
-        //if($this->role_id == 5 || $this->role_id == 6) {
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
             $exam_grade_changes = $this->ExamGradeChange->getListOfGradeChangeForCollegeApproval($this->college_id);
 
@@ -783,7 +777,7 @@ class ExamGradeChangesController extends AppController
         }
     }
 
-    public function cancel_auto_grade_change()
+    public function cancelAutoGradeChange()
     {
 
         if (isset($this->request->data) && !empty($this->request->data['cancelAutoGrade'])) {
@@ -845,14 +839,10 @@ class ExamGradeChangesController extends AppController
     }
 
     //REGISTRAR
-    public function manage_registrar_grade_change()
+    public function manageRegistrarGradeChange()
     {
 
-        //Role based checking is removed
-        //if($this->role_id == 4) {
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-            //debug($this->department_ids);
-            //debug($this->college_ids);
             $exam_grade_changes = $this->ExamGradeChange->getListOfGradeChangeForRegistrarApproval(
                 $this->department_ids,
                 $this->college_ids,
@@ -1158,11 +1148,11 @@ class ExamGradeChangesController extends AppController
         }
     }
 
-    public function freshman_makeup_exam_result()
+    public function freshmanMakeupExamResult()
     {
 
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-            $this->__makeup_exam_result(0);
+            $this->__makeupExamResult(0);
             $this->render('makeup_exam_result');
         } else {
             $this->Flash->error(
@@ -1172,15 +1162,14 @@ class ExamGradeChangesController extends AppController
         }
     }
 
-    public function department_makeup_exam_result()
+    public function departmentMakeupExamResult()
     {
 
-        //Role based checking is skipped
-        //if($this->role_id == 6) {
+
         if ($this->Session->read(
                 'Auth.User'
             )['role_id'] == ROLE_DEPARTMENT /* || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE */) {
-            $this->__makeup_exam_result(1);
+            $this->__makeupExamResult(1);
             $this->render('makeup_exam_result');
         } else {
             $this->Flash->error(
@@ -1191,13 +1180,11 @@ class ExamGradeChangesController extends AppController
     }
 
     //TODO: Reject grade change when there is other submitted grade which is on process (DONE)
-    private function __makeup_exam_result($departement = 1)
+    private function __makeupExamResult($departement = 1)
     {
 
         $grade_history = array();
         $register_or_add = array();
-        //Role based checking is skipped
-        //if($this->role_id == 6 || $this->role_id == 5) {
         if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
                 'Auth.User'
             )['role_id'] == ROLE_COLLEGE) {

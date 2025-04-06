@@ -149,19 +149,29 @@ class DormitoryAssignmentsTable extends Table
     }
 
 
-    public function getStudentAssignedDormitory($student_id = null, $request_date = null)
+    public function getStudentAssignedDormitory($studentId = null, $requestDate = null)
     {
-        $student = $this->find('first', array(
-            'conditions' => array(
-                'DormitoryAssignment.leave_date is null ',
+        if (!$studentId) {
+            return [];
+        }
 
-                'DormitoryAssignment.student_id' => $student_id
-            ),
-            'order' => array('DormitoryAssignment.created' => 'DESC'),
-            'contain' => array('Dormitory' => array('DormitoryBlock' => array('Campus')))
-        ));
+        $DormitoryAssignments = TableRegistry::getTableLocator()->get('DormitoryAssignments');
 
-        return $student;
+        $student = $DormitoryAssignments->find()
+            ->enableHydration(false) // Return as associative array
+            ->contain([
+                'Dormitories' => [
+                    'DormitoryBlocks' => ['Campuses']
+                ]
+            ])
+            ->where([
+                'DormitoryAssignments.student_id' => $studentId,
+                'DormitoryAssignments.leave_date IS' => null
+            ])
+            ->order(['DormitoryAssignments.created' => 'DESC'])
+            ->first();
+
+        return $student ?: [];
     }
 
 

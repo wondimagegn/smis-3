@@ -180,47 +180,48 @@ class AcademicYearComponent extends Component
     public function acYearMinuSeparated($beginYear = '', $endYear = '')
     {
 
-        // If no range is given, determine based on default values
+        $result = [];
+
         if (empty($beginYear) && empty($endYear)) {
             for ($i = 86; $i <= 99; $i++) {
-                $this->acyear_minu_separted["19{$i}-" . sprintf('%02d', $i + 1)] = "19{$i}/" . sprintf('%02d', $i + 1);
+                $result["19{$i}-" . sprintf('%02d', $i + 1)] = "19{$i}/" . sprintf('%02d', $i + 1);
             }
 
             $thisYear = date('Y');
             $thisMonth = date('m');
 
-            if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+            if (in_array($thisMonth, range(1, 8))) {
                 $thisYear--;
             }
 
-            $front2digitThisYear = substr($thisYear, 0, 2);
-            $shortThisYear = substr($thisYear, 2, 2) + 1;
+            $front2digit = substr($thisYear, 0, 2);
+            $shortYear = substr($thisYear, 2, 2) + 1;
 
-            for ($i = 0; $i <= $shortThisYear; $i++) {
-                $yearString = sprintf('%02d', $i);
-                $this->acyear_minu_separted["{$front2digitThisYear}{$yearString}-" . sprintf('%02d', $i + 1)]
-                    = "{$front2digitThisYear}{$yearString}/" . sprintf('%02d', $i + 1);
+            for ($i = 0; $i <= $shortYear; $i++) {
+                $iStr = sprintf('%02d', $i);
+                $result["{$front2digit}{$iStr}-" . sprintf('%02d', $i + 1)] = "{$front2digit}{$iStr}/" . sprintf('%02d', $i + 1);
             }
+
         } else {
             $thisYear = $endYear;
             $thisMonth = date('m');
 
-            if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
+            if (in_array($thisMonth, range(1, 8))) {
                 $thisYear--;
             }
 
-            $front2digitThisYear = substr($thisYear, 0, 2);
-            $shortThisYear = substr($thisYear, 2, 2);
+            $front2digit = substr($thisYear, 0, 2);
+            $shortYear = substr($thisYear, 2, 2);
 
-            for ($i = substr($beginYear, 2, 2); $i <= $shortThisYear; $i++) {
-                $yearString = sprintf('%02d', $i);
-                $this->acyear_minu_separted["{$front2digitThisYear}{$yearString}-" . sprintf('%02d', $i + 1)]
-                    = "{$front2digitThisYear}{$yearString}/" . sprintf('%02d', $i + 1);
+            for ($i = substr($beginYear, 2, 2); $i <= $shortYear; $i++) {
+                $iStr = sprintf('%02d', $i);
+                $result["{$front2digit}{$iStr}-" . sprintf('%02d', $i + 1)] = "{$front2digit}{$iStr}/" . sprintf('%02d', $i + 1);
             }
         }
 
-        arsort($this->acyear_minu_separted);
-        return $this->acyear_minu_separted;
+        arsort($result);
+        $this->acyear_minu_separated = $result;
+        return $result;
     }
 
 

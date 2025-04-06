@@ -16,10 +16,10 @@ class AttendancesController extends AppController
         'parent' => 'grades',
         'exclude' => array('index', 'edit', 'delete', 'view'),
         'alias' => array(
-            'take_attendance' => 'Take Attendance',
-            'instructor_view_attendance' => 'View Attendance',
-            'department_view_attendance' => 'View Instructor\'s Attendance',
-            'freshman_view_attendance' => 'View Freshman Attendance'
+            'takeAttendance' => 'Take Attendance',
+            'instructorViewAttendance' => 'View Attendance',
+            'departmentViewAttendance' => 'View Instructor\'s Attendance',
+            'freshmanViewAttendance' => 'View Freshman Attendance'
         )
     );
 
@@ -45,7 +45,7 @@ class AttendancesController extends AppController
         $this->set(compact('acyear_array_data', 'defaultacademicyear'));
     }
 
-    public function take_attendance($published_course_id = null, $selected_attendance_date = null)
+    public function takeAttendance($published_course_id = null, $selected_attendance_date = null)
     {
 
         $selected_acadamic_year = $this->AcademicYear->current_academicyear();
@@ -277,19 +277,19 @@ class AttendancesController extends AppController
         }
     }
 
-    public function instructor_view_attendance($published_course_id = null)
+    public function instructorViewAttendance($published_course_id = null)
     {
 
         $this->__view($published_course_id, 0, 0);
     }
 
-    public function freshman_view_attendance($published_course_id = null)
+    public function freshmanViewAttendance($published_course_id = null)
     {
 
         $this->__department_and_freshman_view_attendance($published_course_id, 1, 1);
     }
 
-    public function department_view_attendance($published_course_id = null)
+    public function departmentViewAttendance($published_course_id = null)
     {
 
         $this->__department_and_freshman_view_attendance($published_course_id, 1, 0);

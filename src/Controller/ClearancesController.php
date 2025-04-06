@@ -14,7 +14,7 @@ class ClearancesController extends AppController
         'exclude' => array('index'),
         'alias' => array(
             'index' => 'View Clearance/Withdraw',
-            'approve_clearance' => 'Approve Clearance',
+            'approveClearance' => 'Approve Clearance',
             'add' => 'Apply for Clearance/Withdraw',
         )
     );
@@ -329,8 +329,8 @@ class ClearancesController extends AppController
             }
 
             if ($this->role_id != ROLE_STUDENT) {
-                $clearance_start_date = $this->AcademicYear->get_academicYearBegainingDate(
-                    $this->AcademicYear->current_academicyear()
+                $clearance_start_date = $this->AcademicYear->getAcademicYearBegainingDate(
+                    $this->AcademicYear->currentAcademicYear()
                 );
                 $options['conditions'] = array(
                     'OR' => array(
@@ -638,7 +638,7 @@ class ClearancesController extends AppController
         return $this->redirect(array('action' => 'index'));
     }
 
-    public function approve_clearance()
+    public function approveClearance()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['saveIt'])) {
@@ -909,7 +909,7 @@ class ClearancesController extends AppController
         $this->set(compact('programs', 'departments', 'colleges', 'programTypes', 'clearances', 'filterByDate'));
     }
 
-    public function withdraw_management()
+    public function withdrawManagement()
     {
 
         /* get the list of approved clearnce and allow the registrar to feed proper withdrawl

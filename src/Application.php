@@ -36,7 +36,8 @@ class Application extends BaseApplication
      */
     public function bootstrap()
     {
-
+        $this->addPlugin('Acl', ['autoload' => true]);
+        $this->addPlugin('Acls', ['autoload' => true, 'routes' => true]);
 
         // Call parent to load bootstrap from files.
         parent::bootstrap();
@@ -54,8 +55,9 @@ class Application extends BaseApplication
         }
 
         // Load more plugins here
-        $this->addPlugin('Acl');
-        $this->addPlugin('Acls');
+
+        $this->addPlugin('Josegonzalez/Upload');
+
     }
 
     /**

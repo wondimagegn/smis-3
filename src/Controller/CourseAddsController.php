@@ -14,15 +14,15 @@ class CourseAddsController extends AppController
         'alias' => array(
             'index' => 'List Course Adds',
             'add' => 'Request Course Add for Student',
-            'approve_adds' => 'Approve Course Add Requests',
-            'student_add_courses' => 'Add Courses',
-            'mass_add' => 'Approve Mass Add Requests',
-            'cancel_mass_add' => 'Cancel Approved Mass Adds',
-            'cancel_course_add' => 'Cancel Course Add of Student',
+            'approveAdds' => 'Approve Course Add Requests',
+            'studentAddCourses' => 'Add Courses',
+            'massAdd' => 'Approve Mass Add Requests',
+            'cancelMassAdd' => 'Cancel Approved Mass Adds',
+            'cancelCourseAdd' => 'Cancel Course Add of Student',
         ),
         'exclude' => array(
-            'get_published_add_courses',
-            'approve_auto_rejected_course_add',
+            'getPublishedAddCourses',
+            'approveAutoRejectedCourseAdd',
             'search'
         )
     );
@@ -95,7 +95,7 @@ class CourseAddsController extends AppController
 
         parent::beforeFilter($event);
         $this->Auth->allow(
-            'get_published_add_courses',
+            'getPublishedAddCourses',
             //'invalid',
             'search'
         //'approve_auto_rejected_course_add'
@@ -1115,63 +1115,6 @@ class CourseAddsController extends AppController
                 }
 
                 if (!empty($student_section_exam_status['Section'])) {
-                    /* if (!empty($student_section_exam_status['StudentBasicInfo']['department_id'])) {
-
-						$ownDepartmentPublishedForAdd = $this->CourseAdd->PublishedCourse->find('all', array(
-							'conditions' => array(
-								'PublishedCourse.semester' => $semester,
-								'PublishedCourse.department_id' => $student_section_exam_status['StudentBasicInfo']['department_id'],
-								'PublishedCourse.section_id' => $student_section_exam_status['Section']['id'],
-								'PublishedCourse.academic_year LIKE ' => $current_academic_year . '%',
-								'PublishedCourse.add' => 1
-							),
-							'contain' => array('Course')
-						));
-
-					} else if (empty($student_section_exam_status['StudentBasicInfo']['department_id'])) {
-
-						$ownDepartmentPublishedForAdd = $this->CourseAdd->PublishedCourse->find('all', array(
-							'conditions' => array(
-								'PublishedCourse.semester' => $semester,
-								'PublishedCourse.department_id is null ',
-								'PublishedCourse.college_id' => $student_section_exam_status['College']['id'],
-								'PublishedCourse.section_id' => $student_section_exam_status['Section']['id'],
-								'PublishedCourse.academic_year LIKE ' => $current_academic_year . '%',
-								'PublishedCourse.add' => 1
-							),
-							'contain' => array('Course')
-						));
-					}
-
-					$pub_own_as_add_courses = array();
-					$count = 0;
-
-
-					if (isset($ownDepartmentPublishedForAdd) && !empty($ownDepartmentPublishedForAdd)) {
-
-						foreach ($ownDepartmentPublishedForAdd as $ownIndex => $ownValue) {
-
-							$already_added = $this->CourseAdd->find('count', array(
-								'conditions' => array(
-									'CourseAdd.student_id' => $id,
-									'CourseAdd.published_course_id' => $ownValue['PublishedCourse']['id']
-								)
-							));
-
-							if ($already_added > 0) {
-								$pub_own_as_add_courses[$count] = $ownValue;
-								$pub_own_as_add_courses[$count]['already_added'] = 1;
-							} else {
-								$pub_own_as_add_courses[$count] = $ownValue;
-								$pub_own_as_add_courses[$count]['already_added'] = 0;
-							}
-						}
-					}
-
-					$ownDepartmentPublishedForAdd = $pub_own_as_add_courses;
-
-					$this->set(compact('ownDepartmentPublishedForAdd')); */
-
                     $collegess = $this->CourseAdd->PublishedCourse->College->find('list', array(
                         'conditions' => array(
                             'OR' => array(
@@ -1692,12 +1635,12 @@ class CourseAddsController extends AppController
         $this->set(compact('yearLevels', 'departments', 'colleges', 'collegess', 'hide_search'));
     }
 
-    public function approve_adds()
+    public function approveAdds()
     {
 
         $flag = false;
 
-        $current_acy = $this->AcademicYear->current_academicyear();
+        $current_acy = $this->AcademicYear->currentAcademicYear();
 
         if (is_numeric(ACY_BACK_COURSE_ADD_DROP_APPROVAL) && ACY_BACK_COURSE_ADD_DROP_APPROVAL) {
             $ac_yearsAddDrop = $this->AcademicYear->academicYearInArray(
@@ -1727,8 +1670,6 @@ class CourseAddsController extends AppController
             $rejectedRequests = 0;
             $processedRequests = 0;
 
-
-            debug($this->request->data['CourseAdd']);
 
 
             foreach ($this->request->data['CourseAdd'] as $k => &$v) {
@@ -2347,23 +2288,6 @@ class CourseAddsController extends AppController
         $this->set(compact('departments', 'programTypes', 'programs'));
     }
 
-    /* function delete($id = null)
-	{
-		if (!$id) {
-			$this->Flash->error(__('Invalid id for course add'));
-			return $this->redirect(array('action' => 'index'));
-		} */
-
-    // Needs validation for exam grades or assesments, if we are going to use it besides cancel course add, Neway
-
-    /* if ($this->CourseAdd->delete($id)) {
-			$this->Flash->success(__('Course add deleted'));
-			return $this->redirect(array('action' => 'index'));
-		} */
-
-    /* $this->Flash->error(__('Course add was not deleted'));
-		return $this->redirect(array('action' => 'index'));
-	} */
 
     public function delete($id = null)
     {
@@ -2537,12 +2461,12 @@ class CourseAddsController extends AppController
         $this->redirect(Router::url($this->referer(), true));
     }
 
-    public function student_add_courses()
+    public function studentAddCourses()
     {
 
-        $current_academic_year = $this->AcademicYear->current_academicyear();
+        $current_academic_year = $this->AcademicYear->currentAcademicYear();
 
-        $student_section_exam_status = $this->CourseAdd->Student->get_student_section(
+        $student_section_exam_status = $this->CourseAdd->Student->getStudentSection(
             $this->student_id,
             $current_academic_year
         );
@@ -2564,11 +2488,6 @@ class CourseAddsController extends AppController
 
         $current_section_id = (!empty($student_section_exam_status['Section']['id']) ? $student_section_exam_status['Section']['id'] : '');
 
-        debug($latest_academic_year);
-        debug($studentDetails);
-        debug($latestAcSemester);
-        debug($student_section_exam_status);
-        debug($current_section_id);
 
         if (empty($student_section_exam_status)) {
             $this->Flash->warning(
@@ -3017,7 +2936,7 @@ class CourseAddsController extends AppController
         $this->set(compact('colleges', 'departments'));
     }
 
-    public function get_published_add_courses($section_id = null, $student_id = null, $academicYearSemester = null)
+    public function getPublishedAddCourses($section_id = null, $student_id = null, $academicYearSemester = null)
     {
 
         $this->layout = 'ajax';
@@ -3230,7 +3149,7 @@ class CourseAddsController extends AppController
         return $pub_own_as_add_courses;
     }
 
-    public function cancel_mass_add()
+    public function cancelMassAdd()
     {
 
         // Function to load/save search criteria.
@@ -3522,7 +3441,7 @@ class CourseAddsController extends AppController
         $this->set(compact('departments', 'yearLevels', 'programs', 'programTypes'));
     }
 
-    public function mass_add()
+    public function massAdd()
     {
 
         // Function to load/save search criteria.
@@ -3991,7 +3910,7 @@ class CourseAddsController extends AppController
         $this->set(compact('departments', 'yearLevels', 'programs', 'programTypes'));
     }
 
-    public function cancel_course_add()
+    public function cancelCourseAdd()
     {
 
         if ($this->role_id == ROLE_REGISTRAR || ROLE_REGISTRAR == $this->Session->read(
@@ -4116,10 +4035,6 @@ class CourseAddsController extends AppController
             }
 
 
-            debug($courseAddAndGrade);
-            debug($student_ids_to_regenarate_status);
-            debug($exam_grade_change_ids_to_delete);
-
             if (!empty($courseAddAndGrade)) {
                 $courseAddandRegistrationExamGradeIds = array();
 
@@ -4204,11 +4119,7 @@ class CourseAddsController extends AppController
                 if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids)) {
                     $college_ids = $this->college_ids;
                 }
-            } /* else if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-				$college_ids[] = $this->college_id;
-			} else if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-				$department_ids[] = $this->department_id;
-			} */
+            }
 
 
             $password = $this->CourseAdd->Student->User->field(
@@ -4422,7 +4333,7 @@ class CourseAddsController extends AppController
         return $program_types_to_look;
     }
 
-    public function approve_auto_rejected_course_add($id = null)
+    public function approveAutoRejectedCourseAdd($id = null)
     {
 
         $this->CourseAdd->id = $id;
@@ -4437,19 +4348,7 @@ class CourseAddsController extends AppController
                         'Course' => array(
                             'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
                         ),
-                        /* 'GivenByDepartment' => array(
-							'College' => array('id', 'name', 'type', 'stream'),
-						),
-						'Department' => array(
-							'College' => array('id', 'name', 'type','stream'),
-							'fields' => array('id', 'name', 'type'),
-						),
-						'College' => array('id', 'name', 'type','stream'),
-						'Section' => array(
-							'fields' => array('id', 'name', 'academicyear', 'curriculum_id', 'program_id', 'program_type_id', 'archive'),
-							'YearLevel' => array('id', 'name'),
-							'Curriculum' => array('id', 'name', 'year_introduced' ,'type_credit', 'active'),
-						), */
+
                     ),
                     'Student' => array(
                         'fields' => array(

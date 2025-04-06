@@ -10,7 +10,7 @@ class CostSharesController extends AppController
 
     public $name = 'CostShares';
     public $menuOptions = array(
-        'exclude' => array('search', 'get_cost_share_summery'),
+        'exclude' => array('search', 'getCostShareSummery'),
         'alias' => array(
             'index' => 'View Cost Shares',
             'add' => 'Maintain Cost Shares'
@@ -516,7 +516,7 @@ class CostSharesController extends AppController
         return $this->redirect(array('action' => 'index'));
     }
 
-    public function get_cost_share_summery($student_id = null)
+    public function getCostShareSummery($student_id = null)
     {
 
         $this->layout = 'ajax';
@@ -535,7 +535,7 @@ class CostSharesController extends AppController
     }
 
 
-    public function mass_cost_sharing_import()
+    public function massCostSharingImport()
     {
 
         $acyear_list = $this->AcademicYear->academicYearInArray(date('Y') - 4, date('Y') - 1);
@@ -844,7 +844,7 @@ class CostSharesController extends AppController
         }
     }
 
-    public function cost_sharing_report()
+    public function costSharingReport()
     {
 
         if (isset($this->request->data['getReport']) ||

@@ -15,22 +15,22 @@ class CourseInstructorAssignmentsController extends AppController
         'parent' => 'curriculums',
         'exclude' => array(
             'add',
-            'get_department',
-            'assign_instructor_update',
-            'reset_department',
-            'assign_instructor',
-            'get_assigned_fx_for_instructor',
-            'get_assigned_courses_of_instructor_by_section_for_combo',
-            'get_assigned_grade_entry_for_instructor',
+            'getDepartment',
+            'assignInstructorUpdate',
+            'resetDepartment',
+            'assignInstructor',
+            'getAssignedFxForInstructor',
+            'getAssignedCoursesOfInstructorBySectionForCombo',
+            'getAssignedGradeEntryForInstructor',
             'assign',
-            'get_instructor_combo',
+            'getInstructorCombo',
             'search'
         ),
         'alias' => array(
             'index' => 'View Instructors Assignment',
             //'assign' => 'Assign Instructors',
-            'change_course_department' => 'Dispatch to other Department',
-            'assign_course_instructor' => 'Assign Instructor to Courses'
+            'changeCourseDepartment' => 'Dispatch to other Department',
+            'assignCourseInstructor' => 'Assign Instructor to Courses'
         )
     );
 
@@ -42,15 +42,15 @@ class CourseInstructorAssignmentsController extends AppController
 
         parent::beforeFilter($event);
         $this->Auth->allow(
-            'get_assigned_courses_of_instructor_by_section_for_combo',
-            'get_department',
-            'get_assigned_fx_for_instructor',
-            'assign_instructor',
-            'assign_instructor_update',
-            'get_course_instructor_detail',
-            'get_assigned_grade_entry_for_instructor',
-            'reset_department',
-            'get_instructor_combo',
+            'getAssignedCoursesOfInstructorBySectionForCombo',
+            'getDepartment',
+            'getAssignedFxForInstructor',
+            'assignInstructor',
+            'assignInstructorUpdate',
+            'getCourseInstructorDetail',
+            'getAssignedGradeEntryForInstructor',
+            'resetDepartment',
+            'getInstructorCombo',
             'search'
         );
     }
@@ -1265,7 +1265,7 @@ class CourseInstructorAssignmentsController extends AppController
         }
     }
 
-    public function get_department($college_id = null)
+    public function getDepartment($college_id = null)
     {
 
         $this->layout = 'ajax';
@@ -1277,7 +1277,7 @@ class CourseInstructorAssignmentsController extends AppController
         $this->set(compact('departments'));
     }
 
-    public function assign_instructor($data = null)
+    public function assignInstructor($data = null)
     {
 
         $this->layout = 'ajax';
@@ -1484,7 +1484,7 @@ class CourseInstructorAssignmentsController extends AppController
         }
     }
 
-    public function assign_instructor_update()
+    public function assignInstructorUpdate()
     {
 
         //debug($this->request->data);
@@ -1692,7 +1692,7 @@ class CourseInstructorAssignmentsController extends AppController
         }
     }
 
-    public function get_assigned_courses_of_instructor_by_section_for_combo(
+    public function getAssignedCoursesOfInstructorBySectionForCombo(
         $acadamic_year1 = null,
         $acadamic_year2 = null,
         $semester = null,
@@ -1720,7 +1720,7 @@ class CourseInstructorAssignmentsController extends AppController
         $this->set(compact('publishedCourses'));
     }
 
-    public function get_assigned_fx_for_instructor(
+    public function getAssignedFxForInstructor(
         $acadamic_year1 = null,
         $acadamic_year2 = null,
         $semester = null,
@@ -1746,7 +1746,7 @@ class CourseInstructorAssignmentsController extends AppController
         $this->set(compact('publishedCourses'));
     }
 
-    public function get_assigned_grade_entry_for_instructor(
+    public function getAssignedGradeEntryForInstructor(
         $acadamic_year1 = null,
         $acadamic_year2 = null,
         $semester = null,
@@ -1775,7 +1775,7 @@ class CourseInstructorAssignmentsController extends AppController
         $this->set(compact('publishedCourses'));
     }
 
-    public function reset_department($college_id = null)
+    public function resetDepartment($college_id = null)
     {
 
         $this->layout = 'ajax';
@@ -1787,7 +1787,7 @@ class CourseInstructorAssignmentsController extends AppController
         $this->set(compact('departments'));
     }
 
-    public function view_instructor_course_load()
+    public function viewInstructorCourseLoad()
     {
 
         /*
@@ -1796,9 +1796,9 @@ class CourseInstructorAssignmentsController extends AppController
             Filtering criteria will be by Academic Year, Semester,  Department, and Instructor.  Out of this instructor will be mandatory and the other will be optional (--- All ---). (High)
         */
 
-        $current_acy_and_semester = $this->AcademicYear->current_acy_and_semester();
+        $current_acy_and_semester = $this->AcademicYear->currentAcyAndSemester();
 
-        $current_acy_and_semester = $this->AcademicYear->current_acy_and_semester();
+        $current_acy_and_semester = $this->AcademicYear->currentAcyAndSemester();
 
         $curr_acy = '"' . $current_acy_and_semester['academic_year'] . '"';
         $curr_sem = '"' . $current_acy_and_semester['semester'] . '"';
@@ -2072,7 +2072,7 @@ class CourseInstructorAssignmentsController extends AppController
         );
     }
 
-    public function assign_course_instructor($for_assign_instructor = null)
+    public function assignCourseInstructor($for_assign_instructor = null)
     {
 
         if (!empty($for_assign_instructor)) {
@@ -2522,7 +2522,7 @@ class CourseInstructorAssignmentsController extends AppController
         );
     }
 
-    public function change_course_department()
+    public function changeCourseDepartment()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['changeDispatch'])) {
@@ -2834,12 +2834,12 @@ class CourseInstructorAssignmentsController extends AppController
         }
     }
 
-    public function get_instructor_combo($department_id = null)
+    public function getInstructorCombo($department_id = null)
     {
 
         $this->layout = 'ajax';
 
-        $current_acy_and_semester = $this->AcademicYear->current_acy_and_semester();
+        $current_acy_and_semester = $this->AcademicYear->currentAcyAndSemester();
 
         $curr_acy = '"' . $current_acy_and_semester['academic_year'] . '"';
         $curr_sem = '"' . $current_acy_and_semester['semester'] . '"';

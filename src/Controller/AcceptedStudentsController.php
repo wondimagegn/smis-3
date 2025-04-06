@@ -16,33 +16,33 @@ class AcceptedStudentsController extends AppController
         'parent' => 'placement',
         'exclude' => array(
             'search',
-            'print_autoplaced_pdf',
-            'export_autoplaced_xls',
+            'printAutoplacedPdf',
+            'exportAutoplacedXls',
             'download',
-            'print_students_number_pdf',
-            'export_students_number_xls',
-            'download_csv',
+            'printStudentsNumberPdf',
+            'exportStudentsNumberXls',
+            'downloadSsv',
             'download',
-            'count_result'
+            'countResult'
         ),
         'alias' => array(
             'index' => 'List Accepted Students',
             'add' => 'Add Accepted Student',
             'generate' => 'Generate Student ID Number',
-            'import_newly_students' => 'Import Accepted Students',
-            'direct_placement' => 'Direct Department Placement',
-            'auto_placement' => 'Auto Department Placement',
-            'cancel_auto_placement' => 'Cancel Auto Placement',
-            'auto_placement_approve_college' => 'Approve Auto Placement/View',
-            'export_print_students_number' => 'Export Student IDs',
-            'approve_auto_placement' => 'Approve Auto Placed Students',
-            'print_student_identification' => 'Print Student IDs',
-            'deattach_curriculum' => 'Detach Curriculum',
-            'place_to_campus' => 'Place Students to Campus',
-            'view_campus_assignment' => 'View Campus Assignment',
-            'place_student_to_college_for_section' => 'Place Students to College For Section',
-            'transfer_campus' => 'Transfer Student Campus',
-            'move_readmitted_to_freshman' => 'Move Readmitted to Freshman'
+            'importNewlyStudents' => 'Import Accepted Students',
+            'directPlacement' => 'Direct Department Placement',
+            'autoPlacement' => 'Auto Department Placement',
+            'cancelAutoPlacement' => 'Cancel Auto Placement',
+            'autoPlacementApproveCollege' => 'Approve Auto Placement/View',
+            'exportPrintStudentsNumber' => 'Export Student IDs',
+            'approveAutoPlacement' => 'Approve Auto Placed Students',
+            'printStudentIdentification' => 'Print Student IDs',
+            'deattachCurriculum' => 'Detach Curriculum',
+            'placeToCampus' => 'Place Students to Campus',
+            'viewCampusAssignment' => 'View Campus Assignment',
+            'placeStudentToCollegeForSection' => 'Place Students to College For Section',
+            'transferCampus' => 'Transfer Student Campus',
+            'moveReadmittedToFreshman' => 'Move Readmitted to Freshman'
         )
     );
 
@@ -1700,7 +1700,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function move_readmitted_to_freshman()
+    public function moveReadmittedToFreshman()
     {
 
         if ($this->role_id == ROLE_REGISTRAR || ROLE_REGISTRAR == $this->Session->read(
@@ -1971,7 +1971,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function place_to_campus($id = null)
+    public function placeToCampus($id = null)
     {
 
         //********* TO Filter students per academic year, College, Program, program_type and display
@@ -2233,7 +2233,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function place_student_to_college_for_section($id = null)
+    public function placeStudentToCollegeForSection($id = null)
     {
 
         //********* TO Filter students per academic year, College, Program, program_type and display
@@ -2446,7 +2446,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function view_campus_assignment()
+    public function viewCampusAssignment()
     {
 
         //$this->AcceptedStudent->recursive = 0;
@@ -2591,7 +2591,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function transfer_campus()
+    public function transferCampus()
     {
 
         // transfer campus
@@ -2856,7 +2856,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function export_print_students_number()
+    public function exportPrintStudentsNumber()
     {
 
         //$this->AcceptedStudent->recursive = 0;
@@ -3094,7 +3094,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function download_csv()
+    public function downloadCsv()
     {
 
         $acceptedStudents = $this->Session->read('acceptedStudents');
@@ -3142,7 +3142,7 @@ class AcceptedStudentsController extends AppController
         Configure::write('debug', '0');
     }
 
-    public function print_students_number_pdf()
+    public function printStudentsNumberPdf()
     {
 
         $acceptedStudents = $this->Session->read('acceptedStudents');
@@ -3169,7 +3169,7 @@ class AcceptedStudentsController extends AppController
         $this->render();
     }
 
-    public function export_students_number_xls()
+    public function exportStudentsNumberXls()
     {
 
         $acceptedStudents = $this->Session->read('acceptedStudents');
@@ -3193,7 +3193,7 @@ class AcceptedStudentsController extends AppController
         );
     }
 
-    public function direct_placement()
+    public function directPlacement()
     {
 
         if (!empty($this->request->data)) {
@@ -3457,7 +3457,7 @@ class AcceptedStudentsController extends AppController
     }
 
     //Place students automatically
-    public function auto_placement()
+    public function autoPlacement()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['runautoplacement'])) {
@@ -3729,7 +3729,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function cancel_auto_placement()
+    public function cancelAutoPlacement()
     {
 
         //$this->paginate = array('limit'=>500000);
@@ -3898,7 +3898,7 @@ class AcceptedStudentsController extends AppController
         }
     }
 
-    public function auto_fill_preference($academicyear = '2009/10')
+    public function autoFillPreference($academicyear = '2009/10')
     {
 
         $accepted_students = $this->AcceptedStudent->find('all', array(
@@ -3962,63 +3962,10 @@ class AcceptedStudentsController extends AppController
         }
 
         return $this->redirect(array('controller' => 'preferences', 'action' => 'index'));
-        /*
-		$data = $this->AcceptedStudent->find('all', array(
-			'conditions' => array(
-				'AcceptedStudent.college_id' => $this->college_id,
-				'AcceptedStudent.academicyear LIKE' => $academicyear
-			)
-		));
 
-		$detail_of_participating_department = ClassRegistry::init('ParticipatingDepartment')->find('all', array(
-			'conditions' => array(
-				'ParticipatingDepartment.college_id' => $this->college_id,
-				'ParticipatingDepartment.academic_year' => $academicyear
-			)
-		));
-
-		$number_of_participating_department = count($detail_of_participating_department);
-		debug($detail_of_participating_department);
-		debug($data);
-
-		exit();
-		$preference = array();
-
-		if (!empty($detail_of_participating_department)) {
-
-			$preference_random = array('numberOfVariables' => $count($detail_of_participating_department));
-			$preference_order = array();
-
-			// Loop through our range of variables and set a random number for each one.
-			foreach (range(1, $preference_random['numberOfVariables']) as $variable) {
-				$preference_order[] = rand(1, count($detail_of_participating_department));
-				//check uniquiness of each array
-			}
-
-			if (!empty($data)) {
-				foreach ($data as $key => $value) {
-					foreach ($detail_of_participating_department as $k => $v) {
-						//accepted_student_id	academicyear	college_id	department_id	preferences_order
-						$randompreferenceorder = rand(1, $number_of_participating_department);
-						$preference_order = 1;
-
-						if ($key > 0) {
-							$preference_order = $preference['Preference'][$key - 1]['preferences_order'] != $randompreferenceorder ? $randompreferenceorder : rand(1, $number_of_participating_department);
-						}
-
-						$preference['Preference'][$key]['accepted_student_id'] = $value['AcceptedStudent']['id'];
-						$preference['Preference'][$key]['academicyear'] = $academicyear;
-						$preference['Preference'][$key]['department_id'] = $v['ParticipatingDepartment']['department_id'];
-						$preference['Preference'][$key]['college_id'] = $v['ParticipatingDepartment']['college_id'];
-						$preference['Preference'][$key]['preferences_order'] = $preference_order;
-					}
-				}
-			}
-		}
-		*/
     }
 
-    public function import_newly_students()
+    public function importNewlyStudents()
     {
 
         $regions = $this->AcceptedStudent->Region->find('list');
@@ -4854,74 +4801,12 @@ class AcceptedStudentsController extends AppController
     }
 
     // function to view pdf
-    public function print_autoplaced_pdf()
+    public function printAutoplacedPdf()
     {
 
         $autoplacedstudents = $this->Session->read('autoplacedstudents');
         $selected_academic_year = $this->Session->read('selected_academic_year');
 
-        /* $placedstudent = $this->AcceptedStudent->find('all', array(
-			'conditions' => array(
-				'AcceptedStudent.college_id' =>
-				$this->college_id, 'AcceptedStudent.academicyear LIKE ' => $selected_academic_year . '%',
-				'AcceptedStudent.placementtype' => AUTO_PLACEMENT
-			),
-			'order' => array(
-				'AcceptedStudent.department_id asc',
-				'AcceptedStudent.EHEECE_total_results desc',
-				'AcceptedStudent.freshman_result desc'
-			)
-		));
-
-		$departments = ClassRegistry::init('ParticipatingDepartment')->find("all", array(
-			'fields' => 'ParticipatingDepartment.department_id',
-			"conditions" => array(
-				'ParticipatingDepartment.academic_year LIKE' => $selected_academic_year . '%',
-				'ParticipatingDepartment.college_id' => $this->college_id
-			)
-		));
-
-		if (empty($placedstudent)) {
-			$this->Flash->info('No auto placement report for  the selected academic year.');
-			$this->redirect(array('action' => 'auto_placement_approve_college'));
-		}
-
-		$dep_id = array();
-
-		if (!empty($departments)) {
-			foreach ($departments as $k => $v) {
-				$dep_id[] = $v['ParticipatingDepartment']['department_id'];
-			}
-		}
-
-		$dep_name = $this->AcceptedStudent->Department->find('list', array('conditions' => array('Department.id' => $dep_id)));
-		$newly_placed_student = array();
-
-		if (!empty($dep_name)) {
-			foreach ($dep_name as $dk => $dv) {
-
-				if (!empty($placedstudent)) {
-					foreach ($placedstudent as $k => $v) {
-						if ($dk == $v['Department']['id']) {
-							$newly_placed_student[$dv][$k] = $v;
-						}
-					}
-				}
-
-				$newly_placed_student['auto_summery'][$dv]['C'] = $this->AcceptedStudent->find('count', array(
-					'conditions' => array(
-						'AcceptedStudent.academicyear LIKE ' => $selected_academic_year . '%',
-						'AcceptedStudent.department_id' => $dk,
-						'AcceptedStudent.college_id' => $this->college_id,
-						'AcceptedStudent.placement_based' => 'C'
-					)
-				));
-
-				$newly_placed_student['auto_summery'][$dv]['Q'] = 0;
-			}
-		}
-
-		$autoplacedstudents = $newly_placed_student;  */
 
         $college_name = $this->college_name;
         //debug($college_name);
@@ -4932,7 +4817,7 @@ class AcceptedStudentsController extends AppController
     }
 
     // function to export
-    public function export_autoplaced_xls()
+    public function exportAutoplacedXls()
     {
 
         $autoplacedstudents = $this->Session->read('autoplacedstudents');
@@ -4943,7 +4828,7 @@ class AcceptedStudentsController extends AppController
 
     // funcation to produce report of autoplacement
 
-    public function auto_report()
+    public function autoReport()
     {
 
         $this->__view_placement_report();
@@ -5133,123 +5018,10 @@ class AcceptedStudentsController extends AppController
     }
 
 
-    /*
-
-	function issue_password()
-	{
-
-		if (!empty($this->request->data) && isset($this->request->data['issuepasswordtostudent'])) {
-
-			// check password length
-			$this->loadModel('Securitysetting');
-			$securitysetting = $this->Securitysetting->find('first');
-
-			if (strlen($this->request->data['User']['passwd']) >= $securitysetting['Securitysetting']['minimum_password_length'] && strlen($this->request->data['User']['passwd']) <= $securitysetting['Securitysetting']['maximum_password_length']) {
-
-				$this->request->data['User']['role_id'] = ROLE_STUDENT;
-				$this->request->data['User']['password'] = $this->Auth->password($this->request->data['User']['passwd']);
-				unset($this->request->data['User']['passwd']);
-
-				$username = $this->AcceptedStudent->User->find('first', array('conditions' => array('User.username' => $this->request->data['User']['username']), 'recursive' => -1));
-
-				if (!empty($username)) {
-					$this->request->data['User']['id'] = $username['User']['id'];
-				}
-
-				$this->request->data['User']['force_password_change'] = 1;
-
-				if ($this->AcceptedStudent->User->save($this->request->data['User'])) {
-					// if the issued is the first time update accepted student field
-					if (empty($this->request->data['User']['id'])) {
-						$this->request->data['AcceptedStudent']['user_id'] = $this->AcceptedStudent->User->id;
-						$this->AcceptedStudent->id = $this->request->data['AcceptedStudent']['id'];
-						$this->AcceptedStudent->saveField('user_id', $this->request->data['AcceptedStudent']['user_id']);
-					}
-
-					$student = $this->AcceptedStudent->Student->find('first', array('conditions' => array('Student.accepted_student_id' => $this->request->data['AcceptedStudent']['id']), 'recursive' => -1, 'fields' => array('id', 'user_id')));
-
-					if (!empty($student)) {
-						if (!empty($this->request->data['User']['id'])) {
-							$student['Student']['user_id'] = $this->request->data['User']['id'];
-						} else {
-							$student['Student']['user_id'] = $this->AcceptedStudent->User->id;
-						}
-
-						$this->AcceptedStudent->Student->id = $student['Student']['id'];
-						$this->AcceptedStudent->Student->saveField('user_id', $student['Student']['user_id']);
-						//$this->Flash->success('The student password has been updated.');
-					}
-
-					$this->Flash->success('The student password has been updated.');
-					$this->request->data = null;
-
-				} else {
-					$this->Flash->error('The student password could not be updated. Please try again.');
-				}
-			} else {
-				$this->Flash->error('Password policy: Your password should be greather than or equal to ' . $securitysetting['Securitysetting']['minimum_password_length'] . ' and less than or equal to ' . $securitysetting['Securitysetting']['maximum_password_length'] . '');
-			}
-		}
-
-		if (!empty($this->request->data) && isset($this->request->data['issuestudentidsearch'])) {
-
-			if (!empty($this->request->data['AcceptedStudent']['studentnumber'])) {
-
-				$students = array();
-
-				if ($this->role_id == ROLE_DEPARTMENT) {
-
-					$students = $this->AcceptedStudent->find('first', array(
-						'conditions' => array(
-							'AcceptedStudent.studentnumber LIKE ' => trim($this->request->data['AcceptedStudent']['studentnumber']),
-							'AcceptedStudent.department_id' => $this->department_id
-						)
-					));
-
-					if (!empty($students)) {
-						$this->set('students', $students);
-						$this->set('hide_search', true);
-						$this->set('student_number', $this->request->data['AcceptedStudent']['studentnumber']);
-					} else {
-						$this->Flash->error('You are not elegible to issue/reset password or The student is not belongs to your department. Please check if you make a typo error or check for space and try again.');
-					}
-
-				} else if ($this->role_id == ROLE_COLLEGE) {
-
-					$studentsss = $this->AcceptedStudent->find('first', array('conditions' => array('AcceptedStudent.studentnumber LIKE ' => trim($this->request->data['AcceptedStudent']['studentnumber']) . '%')));
-
-					if (!empty($studentsss)) {
-
-						$students = $this->AcceptedStudent->find('first', array(
-							'conditions' => array(
-								'AcceptedStudent.studentnumber LIKE' => trim($this->request->data['AcceptedStudent']['studentnumber']),
-								'AcceptedStudent.college_id' => $this->college_id,
-								'AcceptedStudent.department_id is null',
-							))
-						);
-
-						if (empty($students)) {
-							$this->Flash->info('You are not elegible to issue/reset password. The student has already assigned to department. Department is responsible for  password  issue or reset.');
-						} else {
-							$this->set('students', $students);
-							$this->set('hide_search', true);
-							$this->set('student_number', $this->request->data['AcceptedStudent']['studentnumber']);
-						}
-
-					} else {
-						$this->Flash->error('Please enter a valid Student ID Number. Check for typo errors and spaces.');
-					}
-				}
-			} else {
-				$this->Flash->error('Please provide student number');
-			}
-		}
-	}
-
-	*/
 
 
-    public function deattach_curriculum()
+
+    public function deattachCurriculum()
     {
 
         // deattach curriculum
@@ -5445,7 +5217,7 @@ class AcceptedStudentsController extends AppController
         $this->set(compact('programs', 'programTypes', 'acyear_list', 'limit'));
     }
 
-    public function attach_curriculum()
+    public function attachCurriculum()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['attach'])) {
@@ -5650,7 +5422,7 @@ class AcceptedStudentsController extends AppController
         $this->set(compact('curriculums', 'programs', 'programTypes', 'acyear_list', 'limit'));
     }
 
-    public function approve_auto_placement()
+    public function approveAutoPlacement()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['approve'])) {
@@ -5832,7 +5604,7 @@ class AcceptedStudentsController extends AppController
         $this->set(compact('curriculums'));
     }
 
-    public function auto_placement_approve_college()
+    public function autoPlacementApproveCollege()
     {
 
         if (!empty($this->request->data) && isset($this->request->data['approve'])) {
@@ -5991,7 +5763,7 @@ class AcceptedStudentsController extends AppController
     }
 
     // count_result($result=null,$result_type=null)
-    public function count_result()
+    public function countResult()
     {
 
         $this->layout = 'ajax';
@@ -6027,7 +5799,7 @@ class AcceptedStudentsController extends AppController
         $this->set('result_count', $result_count);
     }
 
-    public function print_student_identification()
+    public function printStudentIdentification()
     {
 
         $this->layout = 'pdf';

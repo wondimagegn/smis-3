@@ -285,21 +285,7 @@ class ClassRoomCourseConstraintsController extends AppController
                         array('class' => 'info-box info-message')
                     );
                 } else {
-                    /*$classRoomBlocks = $this->ClassRoomCourseConstraint->ClassRoom->ClassRoomBlock->find('list',array('conditions'));
 
-                    $classRoomBlocks_ids = $this->ClassRoomCourseConstraint->ClassRoom->ClassRoomBlock->find('list',array('conditions'=>array('ClassRoomBlock.college_id'=>$this->college_id),'fields'=>array('ClassRoomBlock.id')));
-
-                    $classRooms = $this->ClassRoomCourseConstraint->ClassRoom->find('all', array('conditions'=>array('ClassRoom.class_room_block_id'=>$classRoomBlocks_ids, 'ClassRoom.available_for_lecture'=>1), 'fields'=>array('ClassRoom.id','ClassRoom.room_code', 'ClassRoom.class_room_block_id'),'contain'=>array('ProgramProgramTypeClassRoom'=>array('Program'=>array('fields'=>array('Program.name')),'ProgramType'=>array('fields'=>array('ProgramType.name'))), 'ClassRoomBlock'=>array('fields'=>array('ClassRoomBlock.id','ClassRoomBlock.block_code'), 'Campus'=>array('fields'=>array('Campus.name'))))));
-                    //formatted class rooms by class room blocks and campus
-                    $formated_classRooms = array();
-                    foreach($classRooms as $crk=>$crv){
-                        $formated_classRooms[$crv['ClassRoomBlock']['Campus']['name'].'-Block:'.$crv['ClassRoomBlock']['block_code']][$crv['ClassRoom']['id']] = $crv['ClassRoom'];
-                        if(!empty($crv['ProgramProgramTypeClassRoom'])){
-                            foreach($crv['ProgramProgramTypeClassRoom'] as $ppk=>$ppv){
-                                $formated_classRooms[$crv['ClassRoomBlock']['Campus']['name'].'-Block:'.$crv['ClassRoomBlock']['block_code']][$crv['ClassRoom']['id']][$ppv['Program']['name']][]=$ppv['ProgramType']['name'];
-                            }
-                        }
-                    }*/
                     $undergraduate_program_name = $this->ClassRoomCourseConstraint->PublishedCourse->Program->field(
                         'Program.name',
                         array('Program.id' => 1)
@@ -705,7 +691,7 @@ class ClassRoomCourseConstraintsController extends AppController
         }
     }
 
-    public function get_class_rooms($class_room_block_id = null)
+    public function getClassRooms($class_room_block_id = null)
     {
 
         if (!empty($class_room_block_id)) {
@@ -727,7 +713,7 @@ class ClassRoomCourseConstraintsController extends AppController
         }
     }
 
-    public function get_year_level($department_id = null)
+    public function getYearLevel($department_id = null)
     {
 
         if (!empty($department_id)) {
@@ -741,7 +727,7 @@ class ClassRoomCourseConstraintsController extends AppController
         }
     }
 
-    public function get_course_types($publishedCourse_id = null)
+    public function getCourseTypes($publishedCourse_id = null)
     {
 
         debug($publishedCourse_id);

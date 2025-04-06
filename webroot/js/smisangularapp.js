@@ -57,10 +57,7 @@ dashboardApp.controller('gradeApprovalConfirmation', ['$scope', '$http', '$filte
         $scope.getApprovalRejectGrade = function () {
             $http({
                 method: "GET",
-                url: "/dashboard/getApprovalRejectGrade",
-                async: true,
-                cache: false,
-                headers: { 'Accept': 'application/json', 'Pragma': 'no-cache' },
+                url: "/dashboard/getApprovalRejectGrade"
             }).then(
                 function mySucces(response) {
                     if (angular.isUndefined(response.data) || response.data == null) {

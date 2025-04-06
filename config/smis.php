@@ -954,7 +954,7 @@ Configure::write('Graduation.graduation_work', $graduation_work);
 
 // Configure::write('ACL.disabled', false);
 // Configure::write('Developer', false);
-Configure::write('Developer', false);
+Configure::write('Developer', true);
 Configure::write('NumberProcessAllowedToRunProfile', 3);
 
 #Wonde Web service url for accessing wimis from smis

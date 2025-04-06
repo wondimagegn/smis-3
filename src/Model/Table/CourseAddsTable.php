@@ -6,6 +6,9 @@ use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
+use Cake\ORM\TableRegistry;
+
+
 class CourseAddsTable extends Table
 {
     /**
@@ -681,107 +684,82 @@ class CourseAddsTable extends Table
 
 
     //count_add_request // registrar=1, department = 2
-    function count_add_request($department_ids = null, $registrar = 1, $college_ids = null, $program_id = null, $program_type_id = null, $acy_ranges = null)
-    {
-        $options = array();
+    public function countAddRequest(
+        $departmentIds = null,
+        $registrar = 1,
+        $collegeIds = null,
+        $programId = null,
+        $programTypeId = null,
+        $acyRanges = null
+    ) {
+        $CourseAdds = TableRegistry::getTableLocator()->get('CourseAdds');
 
-        if (!empty($department_ids) || !empty($college_ids)) {
-            if ($registrar == 1) {
-                /* if (!empty($department_ids) && is_array($department_ids)) {
-                    $activeDepartmentIDs = $this->PublishedCourse->Department->find('list', array('conditions' => array('Department.id' => $department_ids, 'Department.active' => 1)));
-                    if (!empty($activeDepartmentIDs)) {
-                        $department_ids  = array_keys($activeDepartmentIDs);
-                    }
-                }
+        $query = $CourseAdds->find()->contain([
+            'Students' => function ($q) {
+                return $q->contain(['StudentsSections' => function ($q2) {
+                    return $q2->where(['StudentsSections.archive' => 0]);
+                }])->select([
+                    'id',
 
-                if (!empty($college_ids) && is_array($college_ids)) {
-                    $activeCollegeIDs = $this->PublishedCourse->College->find('list', array('conditions' => array('College.id' => $college_ids, 'College.active' => 1 )));
-                    if (!empty($activeCollegeIDs)) {
-                        $college_ids = array_keys($activeCollegeIDs);
-                    }
-                } */
-
-                if (isset($program_id) && !empty($program_id)) {
-                    $options['conditions']['Student.program_id'] = $program_id;
-                }
-
-                if (isset($program_type_id) && !empty($program_type_id)) {
-                    $options['conditions']['Student.program_type_id'] = $program_type_id;
-                }
-
-                if (!empty($department_ids)) {
-                    $options['conditions']['Student.department_id'] = $department_ids;
-                    $options['conditions'][] = 'CourseAdd.department_approval = 1';
-                    $options['conditions'][] = 'CourseAdd.registrar_confirmation is null';
-                } elseif (!empty($college_ids)) {
-                    $options['conditions'] = array(
-                        'Student.department_id is null ',
-                        'Student.college_id ' => $college_ids,
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation is null',
-                        'Student.graduated = 0',
-                    );
-                }
-                //debug($options);
-            } elseif ($registrar == 2) {
-                $options['conditions'] = array(
-                    'Student.department_id' => $department_ids,
-                    'CourseAdd.department_approval is null',
-                    'CourseAdd.department_approval is null',
-                    'Student.graduated = 0',
-                );
-            } elseif ($registrar == 3) {
-                if (!empty($college_ids)) {
-                    $options['conditions'] = array(
-                        'Student.department_id is null',
-                        'Student.college_id' => $college_ids,
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation is null',
-                        'Student.graduated = 0',
-                    );
-                }
+                    'gender',
+                    'studentnumber',
+                    'program_id',
+                    'program_type_id',
+                    'department_id',
+                    'college_id',
+                    'graduated'
+                ]);
             }
+        ])->group(['CourseAdds.student_id']);
+
+        if (!empty($programId)) {
+            $query->where(['Students.program_id IN' => (array)$programId]);
         }
 
-        $courseAddCount = 0;
-
-        if (!empty($options['conditions'])) {
-            if (isset($acy_ranges) && !empty($acy_ranges)) {
-                $acy_ranges_by_comma_quoted = "'" . implode("', '", $acy_ranges) . "'";
-                $options['conditions'][] = 'CourseAdd.academic_year IN (' . $acy_ranges_by_comma_quoted . ')';
-                $options['conditions'][] = 'CourseAdd.auto_rejected <> 1';
-            }
-
-            $this->Student->bindModel(array('hasMany' => array('StudentsSection')));
-            $options['group'] = array('CourseAdd.student_id');
-
-            $options['contain'] = array(
-                'Student' => array(
-                    'StudentsSection' => array(
-                        'conditions' => array('StudentsSection.archive = 0'),
-                    ),
-                    'fields' => array(
-                        'id',
-                        'full_name',
-                        'gender',
-                        'studentnumber',
-                        'program_id',
-                        'program_type_id',
-                        'department_id',
-                        'college_id',
-                        'graduated'
-                    )
-                )
-            );
-
-            $options['recursive'] = -1;
-
-            debug($options);
-
-            $courseAddCount = $this->find('count', $options);
+        if (!empty($programTypeId)) {
+            $query->where(['Students.program_type_id IN' => (array)$programTypeId]);
         }
 
-        return  $courseAddCount;
+        if ($registrar == 1) {
+            if (!empty($departmentIds)) {
+                $query->where([
+                    'Students.department_id IN' => (array)$departmentIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation IS' => null
+                ]);
+            } elseif (!empty($collegeIds)) {
+                $query->where([
+                    'Students.department_id IS' => null,
+                    'Students.college_id IN' => (array)$collegeIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation IS' => null,
+                    'Students.graduated' => 0
+                ]);
+            }
+        } elseif ($registrar == 2) {
+            $query->where([
+                'Students.department_id IN' => (array)$departmentIds,
+                'CourseAdds.department_approval IS' => null,
+                'Students.graduated' => 0
+            ]);
+        } elseif ($registrar == 3 && !empty($collegeIds)) {
+            $query->where([
+                'Students.department_id IS' => null,
+                'Students.college_id IN' => (array)$collegeIds,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation IS' => null,
+                'Students.graduated' => 0
+            ]);
+        }
+
+        if (!empty($acyRanges)) {
+            $query->where([
+                'CourseAdds.academic_year IN' => (array)$acyRanges,
+                'CourseAdds.auto_rejected !=' => 1
+            ]);
+        }
+
+        return $query->count();
     }
 
     function reformatApprovalRequest($courseAdds = null, $department_id = null, $current_academic_year = null, $college_id = null)

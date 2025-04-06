@@ -1726,4 +1726,56 @@ class AcademicCalendarsTable extends Table
 
         return $deadlineConverted;
     }
+
+    use Cake\ORM\TableRegistry;
+
+    public function getAcademicCalender($currentAcademicYear)
+    {
+        $calendar = [];
+
+        $academicCalendarsTable = TableRegistry::getTableLocator()->get('AcademicCalendars');
+        $collegesTable = TableRegistry::getTableLocator()->get('Colleges');
+        $departmentsTable = TableRegistry::getTableLocator()->get('Departments');
+
+        $currentAcademicCalendars = $academicCalendarsTable->find()
+            ->where(['AcademicCalendars.academic_year' => $currentAcademicYear])
+            ->contain(['Programs', 'ProgramTypes'])
+            ->enableHydration(false)
+            ->toArray();
+
+        foreach ($currentAcademicCalendars as $calendarEntry) {
+            $departmentIds = unserialize($calendarEntry['department_id']);
+            $yearLevelIds = unserialize($calendarEntry['year_level_id']);
+
+            foreach ((array)$departmentIds as $deptId) {
+                if (strpos($deptId, 'pre_') !== false) {
+                    $collegeId = str_replace('pre_', '', $deptId);
+                    $collegeName = $collegesTable->find()
+                        ->where(['id' => $collegeId])
+                        ->enableHydration(false)
+                        ->first()['name'] ?? 'Unknown';
+
+                    $calendar[$deptId] = [
+                        'departmentname' => "Pre($collegeName)",
+                        'yearlevel' => '1st',
+                        'calendarDetail' => $calendarEntry
+                    ];
+                } else {
+                    $departmentName = $departmentsTable->find()
+                        ->where(['id' => $deptId])
+                        ->enableHydration(false)
+                        ->first()['name'] ?? 'Unknown';
+
+                    $calendar[$deptId] = [
+                        'departmentname' => $departmentName,
+                        'yearlevel' => $yearLevelIds,
+                        'calendarDetail' => $calendarEntry
+                    ];
+                }
+            }
+        }
+
+        return $calendar;
+    }
+
 }

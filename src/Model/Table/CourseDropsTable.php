@@ -5,8 +5,10 @@ namespace App\Model\Table;
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
-use Cake\Validation\Validator;
 
+use Cake\ORM\TableRegistry;
+
+use Cake\Validation\Validator;
 class CourseDropsTable extends Table
 {
     /**
@@ -478,113 +480,116 @@ class CourseDropsTable extends Table
         return $course_drop_reformat;
     }
 
-    function list_of_students_need_force_drop($department_ids = null, $college_ids = null, $program_ids = null, $program_type_ids = null, $academic_year = null, $semester = null, $freshmaninclude = 0)
-    {
+    public function listOfStudentsNeedForceDrop(
+        $departmentIds = null,
+        $collegeIds = null,
+        $programIds = null,
+        $programTypeIds = null,
+        $academicYear = null,
+        $semester = null,
+        $freshmanInclude = 0
+    ): array {
+        $typeOfRegistrations = [11, 12, 13];
+        $listOfRegisteredIds = [];
 
-        //$type_of_registrations = array(31, 32, 33);
-        $type_of_registrations = array(11, 12, 13);
+        $CourseRegistrations = TableRegistry::getTableLocator()->get('CourseRegistrations');
 
-        $list_of_registred_ids = array();
-        $coursesDrop = array();
-        $options = array();
+        $query = $CourseRegistrations->find()
+            ->where(['CourseRegistrations.type IN' => $typeOfRegistrations])
+            ->group(['CourseRegistrations.student_id']);
 
-        $options['conditions']['CourseRegistration.type'] = $type_of_registrations;
-        $options['group'] = array('CourseRegistration.student_id'/* , 'CourseRegistration.section_id' */);
-
-        if (!empty($academic_year)) {
-            $options['conditions']['CourseRegistration.academic_year'] = $academic_year;
+        if (!empty($academicYear)) {
+            $query->where(['CourseRegistrations.academic_year' => $academicYear]);
         }
 
         if (!empty($semester)) {
-            $options['conditions']['CourseRegistration.semester'] = $semester;
+            $query->where(['CourseRegistrations.semester' => $semester]);
         }
 
-        if (!empty($freshmaninclude) && !empty($college_ids)) {
-            //$options['conditions'][] = 'CourseRegistration.year_level_id IS NULL OR CourseRegistration.year_level_id = 0 OR CourseRegistration.year_level_id = ""';
-            $options['conditions']['OR'] = array('CourseRegistration.year_level_id = ""', 'CourseRegistration.year_level_id IS NULL', 'CourseRegistration.year_level_id = 0');
+        if (!empty($freshmanInclude) && !empty($collegeIds)) {
+            $query->where([
+                'OR' => [
+                    'CourseRegistrations.year_level_id IS' => null,
+                    'CourseRegistrations.year_level_id' => '',
+                    'CourseRegistrations.year_level_id' => 0
+                ]
+            ]);
         }
 
-        if (!empty($department_ids)) {
-            $options['contain'] = array(
-                'Student'  => array(
-                    'conditions' => array(
-                        'Student.department_id' => $department_ids,
-                        'Student.program_id' => $program_ids,
-                        'Student.program_type_id' => $program_type_ids,
-                        'Student.graduated' => 0,
-                    ),
-                    'fields' => array('id', 'department_id')
+        if (!empty($departmentIds)) {
+            $query->contain(['Students' => function ($q) use ($departmentIds, $programIds, $programTypeIds) {
+                return $q->where([
+                    'Students.department_id IN' => (array)$departmentIds,
+                    'Students.program_id IN' => (array)$programIds,
+                    'Students.program_type_id IN' => (array)$programTypeIds,
+                    'Students.graduated' => 0
+                ])->select(['id', 'department_id']);
+            }]);
+        } elseif (!empty($collegeIds)) {
+            $query->contain(['Students' => function ($q) use ($collegeIds, $programIds, $programTypeIds) {
+                return $q->where([
+                    'Students.department_id IS' => null,
+                    'Students.college_id IN' => (array)$collegeIds,
+                    'Students.program_id IN' => (array)$programIds,
+                    'Students.program_type_id IN' => (array)$programTypeIds,
+                    'Students.graduated' => 0
+                ])->select(['id', 'college_id', 'department_id']);
+            }]);
+        }
+
+        $results = $query->toArray();
+
+        foreach ($results as $registration) {
+            $student = $registration->student;
+
+            if (
+                isset($student->department_id) &&
+                !empty($student->department_id) &&
+                !empty($registration->student_id) &&
+                (
+                    (is_array($departmentIds) && in_array($student->department_id, $departmentIds)) ||
+                    (!is_array($departmentIds) && $student->department_id == $departmentIds)
                 )
-            );
-        } elseif (!empty($college_ids)) {
-            $options['contain'] = array(
-                'Student'  => array(
-                    'conditions' => array(
-                        'Student.department_id IS NULL',
-                        'Student.college_id' => $college_ids,
-                        'Student.program_id' => $program_ids,
-                        'Student.program_type_id' => $program_type_ids,
-                        'Student.graduated' => 0,
-                    ),
-                    'fields' => array('id', 'college_id', 'department_id')
+            ) {
+                $listOfRegisteredIds[] = $registration->id;
+            } elseif (
+                isset($student->college_id) &&
+                !empty($student->college_id) &&
+                !empty($registration->student_id) &&
+                (
+                    (is_array($collegeIds) && in_array($student->college_id, $collegeIds)) ||
+                    (!is_array($collegeIds) && $student->college_id == $collegeIds)
                 )
-            );
-        }
-
-        //debug($options);
-
-        $listOfStudentCourseRegistrations = $this->CourseRegistration->find('all', $options);
-
-        debug(count($listOfStudentCourseRegistrations));
-
-        if (!empty($listOfStudentCourseRegistrations)) {
-            foreach ($listOfStudentCourseRegistrations as $index => $registred_id) {
-                //incase regisration without student id
-                //$list_of_registred_ids[] = $registred_id['CourseRegistration']['id'];
-                if (isset($registred_id['Student']['department_id']) && !empty($registred_id['Student']['department_id']) && !empty($registred_id['CourseRegistration']['student_id'])) {
-                    if ((is_array($department_ids) && in_array($registred_id['Student']['department_id'], $department_ids)) || (!is_array($department_ids) && $registred_id['Student']['department_id'] == $department_ids)) {
-                        $list_of_registred_ids[] = $registred_id['CourseRegistration']['id'];
-                    }
-                } elseif (isset($registred_id['Student']['college_id']) && !empty($registred_id['Student']['college_id']) && !empty($registred_id['CourseRegistration']['student_id'])) {
-                    if ((is_array($college_ids) && in_array($registred_id['Student']['college_id'], $college_ids)) || (!is_array($college_ids) && $registred_id['Student']['college_id'] == $college_ids)) {
-                        $list_of_registred_ids[] = $registred_id['CourseRegistration']['id'];
-                    }
-                }
+            ) {
+                $listOfRegisteredIds[] = $registration->id;
             }
         }
 
-        $coursesDrop['list'] = array();
-        $coursesDrop['count'] = 0;
+        $coursesDrop = ['list' => [], 'count' => 0];
 
-        if (!empty($list_of_registred_ids)) {
-            $coursesDrop['list'] = $this->CourseRegistration->find('all', array(
-                'conditions' => array(
-                    'CourseRegistration.id' => $list_of_registred_ids,
-                    //'Student.id NOT IN (select student_id from graduate_lists)',
-                    //'CourseRegistration.id NOT IN (select course_registration_id from course_drops where course_registration_id is not null )',
-                    //'CourseRegistration.id NOT IN (select course_registration_id from exam_grades where course_registration_id is not null )'
-                ),
-                'contain' => array(
-                    'Student' => array(
-                        'Department' => array('id', 'name'),
-                        'College' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Program' => array('id', 'name'),
-                        'fields' => array('id', 'program_id', 'program_type_id', 'department_id', 'college_id', 'studentnumber', 'full_name', 'gender', 'graduated')
-                    ),
-                    'CourseDrop',
-                    'ExamGrade'
-                )
-            ));
+        if (!empty($listOfRegisteredIds)) {
+            $coursesDrop['list'] = $CourseRegistrations->find()
+                ->where(['CourseRegistrations.id IN' => $listOfRegisteredIds])
+                ->contain([
+                    'Students' => [
+                        'Departments' => ['fields' => ['id', 'name']],
+                        'Colleges' => ['fields' => ['id', 'name']],
+                        'ProgramTypes' => ['fields' => ['id', 'name']],
+                        'Programs' => ['fields' => ['id', 'name']],
+                        'fields' => [
+                            'id', 'program_id', 'program_type_id', 'department_id', 'college_id',
+                            'studentnumber', 'full_name', 'gender', 'graduated'
+                        ]
+                    ],
+                    'CourseDrops',
+                    'ExamGrades'
+                ])
+                ->toArray();
 
-            //debug($coursesDrop['list'][0]);
-
-            if (!empty($coursesDrop['list'])) {
-                foreach ($coursesDrop['list'] as $key => &$cdrop) {
-                    if (!empty($cdrop['ExamGrade']) || !empty($cdrop['CourseDrop'])) {
-                        unset($coursesDrop['list'][$key]);
-                        continue;
-                    }
+            // Remove students who already have drops or grades
+            foreach ($coursesDrop['list'] as $key => $cdrop) {
+                if (!empty($cdrop->exam_grades) || !empty($cdrop->course_drops)) {
+                    unset($coursesDrop['list'][$key]);
                 }
             }
 
@@ -958,67 +963,57 @@ class CourseDropsTable extends Table
     }
 
     //count_drop_request // registrar=1,department=2
-    function count_drop_request($department_ids = null, $registrar = 1, $college_ids = null)
+    public function countDropRequest($departmentIds = null, $registrar = 1, $collegeIds = null): int
     {
-        $options = array();
-        if ($registrar == 1) {
-            if (!empty($department_ids)) {
-                $options['conditions'] = array(
-                    'Student.department_id' => $department_ids,
-                    'CourseDrop.department_approval = 1',
-                    'CourseDrop.registrar_confirmation is null',
-                    'Student.graduated = 0',
-                );
+        $courseDrops = TableRegistry::getTableLocator()->get('CourseDrops');
+
+        $query = $courseDrops->find()
+            ->contain([
+                'Students' => function ($q) {
+                    return $q->contain([
+                        'StudentsSections' => function ($q2) {
+                            return $q2->where(['StudentsSections.archive' => 0]);
+                        }
+                    ])->select(['id', 'full_name', 'program_id', 'program_type_id', 'department_id', 'college_id', 'graduated']);
+                }
+            ]);
+
+        if ($registrar === 1) {
+            if (!empty($departmentIds)) {
+                $query->where([
+                    'Students.department_id IN' => (array)$departmentIds,
+                    'CourseDrops.department_approval' => 1,
+                    'CourseDrops.registrar_confirmation IS' => null,
+                    'Students.graduated' => 0
+                ]);
+            } elseif (!empty($collegeIds)) {
+                $query->where([
+                    'Students.department_id IS' => null,
+                    'Students.college_id IN' => (array)$collegeIds,
+                    'CourseDrops.department_approval' => 1,
+                    'CourseDrops.registrar_confirmation IS' => null,
+                    'Students.graduated' => 0
+                ]);
             }
-            if (!empty($college_ids)) {
-                $options['conditions'] = array(
-                    'Student.department_id is null',
-                    'Student.college_id' => $college_ids,
-                    'CourseDrop.department_approval = 1',
-                    'CourseDrop.registrar_confirmation is null',
-                    'Student.graduated = 0',
-                );
-            }
-        } elseif ($registrar == 2) {
-            $options['conditions'] = array(
-                'Student.department_id' => $department_ids,
-                'CourseDrop.department_approval is null',
-                'Student.graduated = 0',
-            );
-        } elseif ($registrar == 3) {
-            if (!empty($college_ids)) {
-                $options['conditions'] = array(
-                    'Student.department_id is null',
-                    'Student.college_id' => $college_ids,
-                    'CourseDrop.department_approval = 1',
-                    'CourseDrop.registrar_confirmation is null',
-                    'Student.graduated = 0',
-                );
+        } elseif ($registrar === 2) {
+            $query->where([
+                'Students.department_id IN' => (array)$departmentIds,
+                'CourseDrops.department_approval IS' => null,
+                'Students.graduated' => 0
+            ]);
+        } elseif ($registrar === 3) {
+            if (!empty($collegeIds)) {
+                $query->where([
+                    'Students.department_id IS' => null,
+                    'Students.college_id IN' => (array)$collegeIds,
+                    'CourseDrops.department_approval' => 1,
+                    'CourseDrops.registrar_confirmation IS' => null,
+                    'Students.graduated' => 0
+                ]);
             }
         }
 
-        $courseDropCount = 0;
-
-        if (!empty($options['conditions'])) {
-            $this->Student->bindModel(array('hasMany' => array('StudentsSection')));
-
-            $options['contain'] = array(
-                'Student' => array(
-                    'StudentsSection' => array(
-                        'conditions' => array('StudentsSection.archive = 0')
-                    ),
-                    'fields' => array('id', 'full_name', 'program_id', 'program_type_id', 'department_id', 'college_id', 'graduated')
-                )
-            );
-
-            $options['recursive'] = -1;
-
-            //debug($options);
-
-            $courseDropCount = $this->find('count', $options);
-        }
-
-        return  $courseDropCount;
+        return $query->count();
     }
 
 

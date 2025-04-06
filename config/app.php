@@ -150,7 +150,11 @@ return [
             'duration' => '+1 years',
             'url' => env('CACHE_CAKEROUTES_URL', null),
         ],
-
+        'menu_component' => [
+            'className' => FileEngine::class,
+            'duration' => '+1 month',
+            'path' => CACHE,
+        ],
     ],
 
     /*
@@ -413,4 +417,5 @@ return [
     'Session' => [
         'defaults' => 'php' // Switch from 'database' to 'php'
     ],
+
 ];

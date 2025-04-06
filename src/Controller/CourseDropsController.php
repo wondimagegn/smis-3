@@ -12,13 +12,13 @@ class CourseDropsController extends AppController
     public $name = 'CourseDrops';
     public $menuOptions = array(
         'parent' => 'registrations',
-        'exclude' => array('list_students', 'delete'),
+        'exclude' => array('listStudents', 'delete'),
         'alias' => array(
             'index' => 'List Course Drops',
             'add' => 'Drop course for a Student',
-            'forced_drop' => 'Forced Drop',
-            'drop_courses' => 'Drop Courses',
-            'mass_drop' => 'Confirm Mass Drop Requests'
+            'forcedDrop' => 'Forced Drop',
+            'dropCourses' => 'Drop Courses',
+            'massDrop' => 'Confirm Mass Drop Requests'
         )
     );
 
@@ -163,7 +163,7 @@ class CourseDropsController extends AppController
         $direction = 'desc';
         $sort = 'CourseDrop.created';
 
-        $default_ac_year = $this->AcademicYear->current_academicyear();
+        $default_ac_year = $this->AcademicYear->currentAcademicYear();
         $allowed_academic_years_for_add_drop[$default_ac_year] = $default_ac_year;
 
         if (is_numeric(ACY_BACK_COURSE_ADD_DROP_APPROVAL) && ACY_BACK_COURSE_ADD_DROP_APPROVAL) {
@@ -1102,7 +1102,7 @@ class CourseDropsController extends AppController
         $this->set(compact('yearLevels', 'departments', 'programs', 'studentnumber', 'is_forced_drop'));
     }
 
-    public function mass_drop()
+    public function massDrop()
     {
 
         //get list of students and registered courses
@@ -1466,7 +1466,7 @@ class CourseDropsController extends AppController
         $this->set(compact('departments', 'programTypes', 'programs'));
     }
 
-    public function approve_drops()
+    public function approveDrops()
     {
 
         $flag = false;
@@ -1965,7 +1965,7 @@ class CourseDropsController extends AppController
         $this->set(compact('departments', 'programTypes', 'programs'));
     }
 
-    public function list_students($course_id = null)
+    public function listStudents($course_id = null)
     {
 
         $this->layout = 'ajax';
@@ -2010,7 +2010,7 @@ class CourseDropsController extends AppController
         $this->set('studentsss', $list_of_students_registered_for_courses);
     }
 
-    public function drop_courses()
+    public function dropCourses()
     {
 
         $current_academic_year = $this->AcademicYear->current_academicyear();
@@ -2186,10 +2186,10 @@ class CourseDropsController extends AppController
         }
     }
 
-    public function forced_drop()
+    public function forcedDrop()
     {
 
-        $current_academic_year = $this->AcademicYear->current_academicyear();
+        $current_academic_year = $this->AcademicYear->currentAcademicYear();
         $semester = '';
         $studentnumber = '';
 

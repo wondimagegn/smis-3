@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Controller\AppController;
 
-
 use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
 use Cake\Core\Configure;
@@ -43,7 +42,7 @@ class AcademicRulesController extends AppController
         $this->set('academicRules', $this->paginate());
     }
 
-    public function view_other_academic_rules()
+    public function viewOtherAcademicRules()
     {
 
         ClassRegistry::init('OtherAcademicRule')->recursive = 1;
@@ -60,7 +59,7 @@ class AcademicRulesController extends AppController
         $this->set('academicRule', $this->AcademicRule->read(null, $id));
     }
 
-    public function add_other_academic_rules()
+    public function addOtherAcademicRules()
     {
 
         if (!empty($this->request->data)) {
@@ -163,7 +162,7 @@ class AcademicRulesController extends AppController
         );
     }
 
-    public function edit_other_academic_rules($id = null)
+    public function editOtherAcademicRules($id = null)
     {
 
         if (!$id && empty($this->request->data)) {
@@ -387,7 +386,7 @@ class AcademicRulesController extends AppController
         return $this->redirect(array('action' => 'index'));
     }
 
-    public function delete_other_ar($id = null)
+    public function deleteOtherAr($id = null)
     {
 
         if (!$id) {

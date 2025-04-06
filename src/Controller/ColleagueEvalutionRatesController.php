@@ -13,9 +13,9 @@ class ColleagueEvalutionRatesController extends AppController
         'parent' => 'evalution',
         'exclude' => array('index'),
         'alias' => array(
-            'colleague_evaluate_instructor' => 'Evaluate Your Colleagues',
-            'head_evaluate_instructor' => 'Evaluate Instructor as Head',
-            'instructor_evaluation_report' => 'Instructor Evaluation Reports',
+            'colleagueEvaluateInstructor' => 'Evaluate Your Colleagues',
+            'headEvaluateInstructor' => 'Evaluate Instructor as Head',
+            'instructorEvaluationReport' => 'Instructor Evaluation Reports',
         )
     );
 
@@ -55,14 +55,14 @@ class ColleagueEvalutionRatesController extends AppController
 
         parent::beforeRender($event);
         //$acyear_array_data = $this->AcademicYear->academicYearInArray(date('Y') - 2, date('Y'));
-        $current_academicyear = $this->AcademicYear->current_academicyear();
+        $current_academicyear = $this->AcademicYear->currentAcademicYear();
         $acyear_array_data = $this->AcademicYear->academicYearInArray(
             ((explode('/', $current_academicyear)[0]) - ACY_BACK_FOR_STAFF_EVALUATION_LIST_PRINT_AND_ARCHIEVE),
             (explode('/', $current_academicyear)[0])
         );
 
         // $academic_year_selected = $defaultacademicyear = $this->AcademicYear->current_academicyear();
-        $acYearAndSemester = $this->AcademicYear->current_acy_and_semester();
+        $acYearAndSemester = $this->AcademicYear->currentAcyAndSemester();
         $defaultacademicyear = $current_academicyear = $acYearAndSemester['academic_year'];
         $current_semester = $acYearAndSemester['semester'];
 
@@ -92,7 +92,7 @@ class ColleagueEvalutionRatesController extends AppController
         }
     }
 
-    public function colleague_evaluate_instructor($staff_id = null)
+    public function colleagueEvaluateInstructor($staff_id = null)
     {
 
         $this->layout = 'default_nobackrefresh';
@@ -233,7 +233,7 @@ class ColleagueEvalutionRatesController extends AppController
         $this->render('colleague_evaluate_instructor');
     }
 
-    public function head_evaluate_instructor($staff_id = null)
+    public function headEvaluateInstructor($staff_id = null)
     {
 
         $this->__init_search();
@@ -241,7 +241,7 @@ class ColleagueEvalutionRatesController extends AppController
         $this->__head_evaluate_instructor($staff_id);
     }
 
-    public function instructor_evaluation_report($staff_id = null)
+    public function instructorEvaluationReport($staff_id = null)
     {
 
         $this->__init_search();
@@ -354,25 +354,7 @@ class ColleagueEvalutionRatesController extends AppController
             }
         }
 
-        /* if (isset($this->request->data['getInstructorList'])) {
-            $colleagueLists = $this->ColleagueEvalutionRate->getNotEvaluatedColleaguesListForHead($this->request->data, $this->Auth->user('id'));
-        } else {
 
-            $acYearAndSemester = $this->AcademicYear->current_acy_and_semester();
-
-            if (!isset($this->request->data['Search']['semester']) && !isset($this->request->data['Search']['acadamic_year'])) {
-                $this->request->data['Search']['acadamic_year'] = $acYearAndSemester['academic_year'];
-                if ($acYearAndSemester['semester'] == 'II') {
-                    $this->request->data['Search']['semester'] = 'I';
-                } else if ($acYearAndSemester['semester'] == 'III') {
-                    $this->request->data['Search']['semester'] = 'II';
-                } else {
-                    $this->request->data['Search']['semester'] = $acYearAndSemester['semester'];
-                }
-            }
-
-            $colleagueLists = $this->ColleagueEvalutionRate->getNotEvaluatedColleaguesListForHead($this->request->data, $this->Auth->user('id'));
-        } */
 
         if (isset($this->request->data['submitEvaluationResult'])) {
             $count = 0;

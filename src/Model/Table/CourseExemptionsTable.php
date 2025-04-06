@@ -6,6 +6,7 @@ use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\I18n\FrozenDate;
 
 class CourseExemptionsTable extends Table
 {
@@ -168,60 +169,44 @@ class CourseExemptionsTable extends Table
     }
 
     //count course substitution request not approved
-    function count_exemption_request($role_id = null, $department_ids = null, $college_ids = null)
+    public function countExemptionRequest($roleId = null, $departmentIds = null, $collegeIds = null): int
     {
-        $options = array();
+        $courseExemptions = TableRegistry::getTableLocator()->get('CourseExemptions');
+        $daysBack = FrozenDate::now()->subDays(DAYS_BACK_COURSE_SUBSTITUTION);
 
-        if ($role_id == ROLE_DEPARTMENT) {
-            $options['conditions'] = array(
-                'Student.department_id' => $department_ids,
-                'Student.graduated' => 0,
-                'CourseExemption.department_accept_reject is null',
-                'CourseExemption.request_date >= ' => date(
-                    "Y-m-d",
-                    strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
-                ),
-            );
-        } elseif ($role_id == ROLE_REGISTRAR) {
-            if (!empty($department_ids)) {
-                $options['conditions'] = array(
-                    'Student.department_id is not null',
-                    'Student.department_id ' => $department_ids,
-                    'Student.graduated' => 0,
-                    'CourseExemption.department_accept_reject is not null',
-                    'CourseExemption.registrar_confirm_deny is null',
-                    'CourseExemption.request_date >= ' => date(
-                        "Y-m-d",
-                        strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
-                    ),
-                );
-            } elseif (!empty($college_ids)) {
-                $options['conditions'] = array(
-                    'Student.department_id is null',
-                    'Student.college_id' => $college_ids,
-                    'Student.graduated' => 0,
-                    'CourseExemption.department_accept_reject is not null',
-                    'CourseExemption.registrar_confirm_deny is null',
-                    'CourseExemption.request_date >= ' => date(
-                        "Y-m-d",
-                        strtotime("-" . DAYS_BACK_COURSE_SUBSTITUTION . " day")
-                    ),
-                );
+        $query = $courseExemptions->find()
+            ->contain(['Students'])
+            ->where(['CourseExemptions.request_date >=' => $daysBack]);
+
+        if ($roleId == ROLE_DEPARTMENT) {
+            $query->where([
+                'Students.department_id IN' => (array)$departmentIds,
+                'Students.graduated' => 0,
+                'CourseExemptions.department_accept_reject IS' => null
+            ]);
+        } elseif ($roleId == ROLE_REGISTRAR) {
+            $query->where([
+                'Students.graduated' => 0,
+                'CourseExemptions.department_accept_reject IS NOT' => null,
+                'CourseExemptions.registrar_confirm_deny IS' => null
+            ]);
+
+            if (!empty($departmentIds)) {
+                $query->where([
+                    'Students.department_id IN' => (array)$departmentIds
+                ]);
+            } elseif (!empty($collegeIds)) {
+                $query->where([
+                    'Students.department_id IS' => null,
+                    'Students.college_id IN' => (array)$collegeIds
+                ]);
             }
+        } else {
+            return 0;
         }
 
-        $exemptionCount = 0;
-
-        if (!empty($options)) {
-            debug($this->find('all', $options));
-            $exemptionCount = $this->find('count', $options);
-        }
-
-        debug($exemptionCount);
-
-        return  $exemptionCount;
+        return $query->count();
     }
-
     function studentExemptedCourseList($student_id)
     {
         $exemptedCourseLists = $this->find('all', array(

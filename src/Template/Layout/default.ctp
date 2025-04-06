@@ -1,7 +1,5 @@
 <?php
-
 use Cake\Core\Configure;
-
 ?>
 <!DOCTYPE html>
 <html class="no-js" lang="en">
@@ -11,45 +9,20 @@ use Cake\Core\Configure;
     <title><?= h(Configure::read('ApplicationShortName') . ' ' . Configure::read('ApplicationVersionShort')) . (!empty($this->fetch('title_details')) ? ' | ' . h($this->fetch('title_details')) : ''); ?></title>
 
     <?= $this->Html->css(['foundation', 'dashboard', 'style', 'dripicon', 'typicons', 'font-awesome', 'theme', 'pace-theme-flash', 'slicknav', 'common1', 'responsive-tables']); ?>
-    <?= $this->Html->script(['jquery', 'vendor/modernizr', 'jquery-customselect-1.9.1.min']); ?>
+    <?= $this->Html->script(['jquery', 'vendor/modernizr', 'jquery-customselect-1.9.1.min','amharictyping','admit_student']); ?>
     <?= $this->Html->css('jquery-customselect-1.9.1'); ?>
 
-    <script>
-
-
-        document.addEventListener('DOMContentLoaded', function() {
-            var isLoggedIn = <?= json_encode($this->request->getSession()->read('User.is_logged_in')); ?>;
-
-            if (isLoggedIn) {
-                setInterval(function() {
-                    fetch('<?= $this->Url->build(["controller" => "Users", "action" => "checkSession"]); ?>', {
-                        method: 'GET',
-                        headers: {'X-Requested-With': 'XMLHttpRequest'} // Ensures AJAX request
-                    })
-                        .then(response => response.text()) // Read response as text first
-                        .then(text => {
-                            try {
-                                const data = JSON.parse(text); // Convert text to JSON
-                                if (!data.is_logged_in) {
-                                    window.location.reload();
-                                }
-                            } catch (error) {
-                                console.error("Invalid JSON response:", text); // Debugging
-                            }
-                        })
-                        .catch(error => console.error("Fetch error:", error));
-                }, 10000);
-            }
-        });
-
-    </script>
 </head>
 
 <body>
-<?= $this->Flash->render(); ?>
-<?= $this->fetch('content'); ?>
+<!-- Preloader -->
+<div id="preloader">
+    <div id="status">&nbsp;</div>
+</div>
+<!-- End of Preloader -->
 
-<?= $this->Html->script(['waypoints.min', 'preloader-script', 'foundation.min', 'foundation/foundation.abide', 'slimscroll/jquery.slimscroll', 'slicknav/jquery.slicknav', 'sliding-menu', 'scriptbreaker-multiple-accordion-1', 'number/jquery.counterup.min', 'circle-progress/jquery.circliful', 'number-progress-bar/jquery.velocity.min', 'number-progress-bar/number-pb', 'app', 'loader/loader', 'loader/demo']); ?>
+
+<?= $this->Html->script(['waypoints.min', 'preloader-script', 'foundation.min', 'foundation/foundation.abide', 'slimscroll/jquery.slimscroll', 'slicknav/jquery.slicknav', 'sliding-menu', 'scriptbreaker-multiple-accordion-1', 'number/jquery.counterup.min', 'circle-progress/jquery.circliful', 'number-progress-bar/jquery.velocity.min', 'number-progress-bar/number-pb', 'app', 'loader/loader']); ?>
 
 <script>
     $(document).ready(function() {
@@ -61,11 +34,6 @@ use Cake\Core\Configure;
         });
     });
 </script>
-<!-- Preloader -->
-<div id="preloader">
-    <div id="status">&nbsp;</div>
-</div>
-<!-- End of Preloader -->
 
 <div id="myModal" class="reveal-modal" data-reveal></div>
 
@@ -127,16 +95,21 @@ use Cake\Core\Configure;
                 <div class="row">
                     <div class="large-12 columns">
                         <div class="box">
-                            <?php if ($this->Flash->render('auth')): ?>
+
+                            <?php $flash = $this->Flash->render(); ?>
+                            <?php if (!empty($flash)): ?>
                                 <div style="margin-top: 40px;">
-                                    <?= $this->Flash->render('auth'); ?>
+                                    <?= $flash ?>
                                 </div>
                             <?php endif; ?>
-                            <?php if ($this->Flash->render()): ?>
+
+                            <?php $authFlash = $this->Flash->render('auth'); ?>
+                            <?php if (!empty($authFlash)): ?>
                                 <div style="margin-top: 40px;">
-                                    <?= $this->Flash->render(); ?>
+                                    <?= $authFlash ?>
                                 </div>
                             <?php endif; ?>
+
                         </div>
                     </div>
                 </div>

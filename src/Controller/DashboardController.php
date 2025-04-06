@@ -5,6 +5,7 @@ namespace App\Controller;
 use Cake\Core\Configure;
 use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
+
 use Exception;
 
 class DashboardController extends AppController
@@ -30,8 +31,11 @@ class DashboardController extends AppController
         parent::beforeFilter($event);
 
         $this->Auth->allow([
-            'getMessageAjax', // Ensure this action is allowed
+
             'index',
+
+            'getModal',
+            'getMessageAjax', // Ensure this action is allowed
             'getRankAjax',
             'getApprovalCourseListAjax',
             'getApprovalRejectGradeChange',
@@ -90,15 +94,71 @@ class DashboardController extends AppController
     }
 
 
+    public function index()
+    {
+        $this->viewBuilder()->setLayout('dashboard');
+
+        // Load AcademicYear Model
+        $currentAcy = $this->AcademicYear->currentAcademicyear();
+        if (
+            is_numeric(Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD'))
+            && Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD')
+        ) {
+            $acYearsArray = $this->AcademicYear->academicYearInArray(
+                ((explode('/', $currentAcy)[0]) - Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD')),
+                (explode('/', $currentAcy)[0])
+            );
+        } else {
+            $acYearsArray[$currentAcy] = $currentAcy;
+        }
+
+        $acyRangesByComaQuotedForDisplay = implode(", ", $acYearsArray);
+        $this->set(compact('acyRangesByComaQuotedForDisplay'));
+
+        $comingAcademicCalendarsDeadlines = [];
+        $this->set(compact('comingAcademicCalendarsDeadlines'));
+
+        // Session handling using CakePHP 3.7
+        $session = $this->request->getSession();
+        $authUser = $session->read('Auth.User');
+
+        // Student Profile Completion Check
+        if (
+            isset($authUser['role_id']) && $authUser['role_id'] == Configure::read('Roles.STUDENT') &&
+            !empty($authUser['id']) &&
+            strcasecmp($this->request->getParam('action'), 'profile') !== 0 &&
+            (
+                TableRegistry::getTableLocator()->get('StudentStatusPatterns')->isEligibleForExitExam(
+                    $this->student_id
+                ) ||
+                Configure::read('FORCE_ALL_STUDENTS_TO_FILL_BASIC_PROFILE') == 1
+            ) &&
+            strcasecmp($this->request->getParam('controller'), 'users') !== 0 &&
+            strcasecmp($this->request->getParam('action'), 'changePwd') !== 0
+        ) {
+            if (
+                !TableRegistry::getTableLocator()->get('StudentStatusPatterns')->
+                completedFillingProfileInformation($this->student_id)
+            ) {
+                $this->Flash->warning(
+                    __(
+                        'Dear {0}, you are required to complete your basic profile before proceeding. If you encounter an error or need assistance, please report to the registrar record officer assigned to your department.',
+                        $authUser['first_name']
+                    )
+                );
+                return $this->redirect(['controller' => 'Students', 'action' => 'profile']);
+            }
+        }
+    }
+
+
     public function getModal($published_course_id = null)
     {
-        $this->request->allowMethod(['post', 'ajax']); // Allow only AJAX and POST requests
+        $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
-
-
         if (!empty($published_course_id)) {
             //get publishedcourse details
-            $publishedCourse_details = TableRegistry::getTableLocator()->get('CourseSchedule')->get_published_course_details($published_course_id);
+            $publishedCourse_details = TableRegistry::getTableLocator()->get('CourseSchedules')->getPublishedCourseDetails($published_course_id);
             $formatted_published_course_detail = array();
 
             if (!empty($publishedCourse_details)) {
@@ -179,73 +239,16 @@ class DashboardController extends AppController
         ]);
     }
 
-    public function index()
-    {
-        $this->viewBuilder()->setLayout('dashboard');
-
-        // Load AcademicYear Model
-        $currentAcy = $this->AcademicYear->currentAcademicyear();
-        if (
-            is_numeric(Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD'))
-            && Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD')
-        ) {
-            $acYearsArray = $this->AcademicYear->academicYearInArray(
-                ((explode('/', $currentAcy)[0]) - Configure::read('BackEntry.ACY_BACK_GRADE_APPROVAL_DASHBOARD')),
-                (explode('/', $currentAcy)[0])
-            );
-        } else {
-            $acYearsArray[$currentAcy] = $currentAcy;
-        }
-
-        $acyRangesByComaQuotedForDisplay = implode(", ", $acYearsArray);
-        $this->set(compact('acyRangesByComaQuotedForDisplay'));
-
-        $comingAcademicCalendarsDeadlines = [];
-        $this->set(compact('comingAcademicCalendarsDeadlines'));
-
-        // Session handling using CakePHP 3.7
-        $session = $this->request->getSession();
-        $authUser = $session->read('Auth.User');
-
-        // Student Profile Completion Check
-        if (
-            isset($authUser['role_id']) && $authUser['role_id'] == Configure::read('Roles.STUDENT') &&
-            !empty($authUser['id']) &&
-            strcasecmp($this->request->getParam('action'), 'profile') !== 0 &&
-            (
-                TableRegistry::getTableLocator()->get('StudentStatusPatterns')->isEligibleForExitExam(
-                    $this->student_id
-                ) ||
-                Configure::read('FORCE_ALL_STUDENTS_TO_FILL_BASIC_PROFILE') == 1
-            ) &&
-            strcasecmp($this->request->getParam('controller'), 'users') !== 0 &&
-            strcasecmp($this->request->getParam('action'), 'changePwd') !== 0
-        ) {
-            if (
-                !TableRegistry::getTableLocator()->get('StudentStatusPatterns')->
-                completedFillingProfileInformation($this->student_id)
-            ) {
-                $this->Flash->warning(
-                    __(
-                        'Dear {0}, you are required to complete your basic profile before proceeding. If you encounter an error or need assistance, please report to the registrar record officer assigned to your department.',
-                        $authUser['first_name']
-                    )
-                );
-                return $this->redirect(['controller' => 'Students', 'action' => 'profile']);
-            }
-        }
-    }
-
 
     public function getProfileNotComplete()
     {
-        $this->request->allowMethod(['post', 'ajax']); // Allow only AJAX and POST requests
+        $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
         $profile_not_buildc = 0;
 
         if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/Students/profile_not_build_list') && ($this->role_id != ROLE_STUDENT)) {
             if (!empty($this->department_ids)) {
-                $profile_not_buildc = TableRegistry::getTableLocator()->get('Student')->getProfileNotBuildListCount(
+                $profile_not_buildc = TableRegistry::getTableLocator()->get('Students')->getProfileNotBuildListCount(
                     DAYS_BACK_PROFILE,
                     $this->department_ids,
                     null,
@@ -253,7 +256,7 @@ class DashboardController extends AppController
                     $this->program_type_ids
                 );
             } elseif (!empty($this->college_ids)) {
-                $profile_not_buildc = TableRegistry::getTableLocator()->get('Student')->getProfileNotBuildListCount(
+                $profile_not_buildc = TableRegistry::getTableLocator()->get('Students')->getProfileNotBuildListCount(
                     DAYS_BACK_PROFILE,
                     null,
                     $this->college_ids,
@@ -279,7 +282,7 @@ class DashboardController extends AppController
         $calendar = array();
 
         if ($this->role_id == ROLE_STUDENT) {
-            $calendarr = TableRegistry::getTableLocator()->get('AcademicCalendar')->getAcademicCalender(
+            $calendarr = TableRegistry::getTableLocator()->get('AcademicCalendars')->getAcademicCalender(
                 $this->AcademicYear->currentAcademicyear()
             );
             if (!empty($this->department_id)) {
@@ -299,7 +302,7 @@ class DashboardController extends AppController
 
     public function clearanceWithdrawSubRequest()
     {
-        $this->request->allowMethod(['post', 'ajax']); // Allow only AJAX and POST requests
+        $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
 
         $clearance_request = 0;
@@ -308,44 +311,42 @@ class DashboardController extends AppController
 
         //clearances/approve_clearance
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR /* || $this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT */) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/Clearances/approve_clearance')) {
-                $current_academic_year_start_date = $this->AcademicYear->getAcademicyearBegainingDate(
-                    $this->AcademicYear->currentAcademicyear()
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/Clearances/approveClearance')) {
+                $current_academic_year_start_date = $this->AcademicYear->getAcademicYearBeginningDate(
+                    $this->AcademicYear->currentAcademicYear()
                 );
                 if (!empty($this->college_ids)) {
-                    $clearance_request = TableRegistry::getTableLocator()->get('Clearance')->count_clearnce_request(null, $this->college_ids, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
+                    $clearance_request = TableRegistry::getTableLocator()->get('Clearances')->countClearanceRequest(null, $this->college_ids, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
                 } elseif (!empty($this->department_ids)) {
-                    $clearance_request = TableRegistry::getTableLocator()->get('Clearance')->count_clearnce_request($this->department_ids, null, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
+                    $clearance_request = TableRegistry::getTableLocator()->get('Clearances')->countClearanceRequest($this->department_ids, null, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
                 }
-                //$this->set(compact('clearance_request'));
-                //$this->set('_serialize', array('clearance_request'));
+
             }
         }
 
         //courseExemptions/list_exemption_request
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseExemptions/list_exemption_request')) {
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseExemptions/listExemptionRequest')) {
                 if (!empty($this->college_ids)) {
-                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemption')->count_exemption_request($this->role_id, null, $this->college_ids);
+                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemptions')->countExemptionRequest($this->role_id, null, $this->college_ids);
                 } elseif (!empty($this->department_ids)) {
-                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemption')->count_exemption_request($this->role_id, $this->department_ids, null);
+                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemptions')->countExemptionRequest($this->role_id, $this->department_ids, null);
                 }
             }
         }
 
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseExemptions/list_exemption_request')) {
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseExemptions/listExemptionRequest')) {
                 if (!empty($this->department_id)) {
-                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemption')->count_exemption_request($this->role_id, $this->department_id, null);
+                    $exemption_request = TableRegistry::getTableLocator()->get('CourseExemptions')->countExemptionRequest($this->role_id, $this->department_id, null);
                 }
-                //$this->set(compact('exemption_request'));
-                // $this->set('_serialize', array('exemption_request'));
+
             }
         }
         //substitution
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseSubstitutionRequests/approve_substitution')) {
-                $substitution_request = TableRegistry::getTableLocator()->get('CourseSubstitutionRequest')->count_substitution_request($this->department_id);
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseSubstitutionRequests/approveSubstitution')) {
+                $substitution_request = TableRegistry::getTableLocator()->get('CourseSubstitutionRequests')->countSubstitutionRequest($this->department_id);
             }
         }
 
@@ -361,7 +362,7 @@ class DashboardController extends AppController
     public function addDropRequestList()
     {
         //course_drops/approve_drops
-        $this->request->allowMethod(['post', 'ajax']); // Allow only AJAX and POST requests
+        $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
 
         $drop_request = 0;
@@ -370,7 +371,7 @@ class DashboardController extends AppController
         $add_request_dpt = 0;
         $add_request = 0;
 
-        $current_acy = $this->AcademicYear->currentAcademicyear();
+        $current_acy = $this->AcademicYear->currentAcademicYear();
 
         if (is_numeric(ACY_BACK_COURSE_ADD_DROP_APPROVAL) && ACY_BACK_COURSE_ADD_DROP_APPROVAL) {
             $ac_yearsAddDrop = $this->AcademicYear->academicYearInArray(((explode('/', $current_acy)[0]) - ACY_BACK_COURSE_ADD_DROP_APPROVAL), (explode('/', $current_acy)[0]));
@@ -380,33 +381,37 @@ class DashboardController extends AppController
 
         $ac_yearsAddDrop = array_keys($ac_yearsAddDrop);
 
+
         if (
             $this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT ||
             $this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE ||
-            $this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR
+            $this->request->getSession()->read('Auth.User.role_id')  == ROLE_REGISTRAR
         ) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseDrops/approve_drops')) {
+            if ($this->MenuOptimized->check($this->Auth->user(),
+                'controllers/CourseDrops/approveDrops')) {
                 if ($this->role_id == ROLE_REGISTRAR) {
                     if (!empty($this->department_ids)) {
-                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrop')->count_drop_request($this->department_ids);
+                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrops')->countDropRequest($this->department_ids);
                     } elseif (!empty($this->college_ids)) {
-                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrop')->count_drop_request(null, 1, $this->college_ids);
+                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrops')->countDropRequest(null, 1, $this->college_ids);
                     }
                 } else {
                     if ($this->role_id == ROLE_DEPARTMENT) {
-                        $drop_request_dpt = TableRegistry::getTableLocator()->get('CourseDrop')->count_drop_request($this->department_id, 2);
+                        $drop_request_dpt = TableRegistry::getTableLocator()->get('CourseDrops')->countDropRequest($this->department_id, 2);
                     } elseif ($this->role_id == ROLE_COLLEGE) {
-                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrop')->count_drop_request(null, 3, $this->college_id);
+                        $drop_request = TableRegistry::getTableLocator()->get('CourseDrops')->countDropRequest(null, 3, $this->college_id);
                     }
                 }
+
+
             }
 
             if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR) {
-                if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseDrops/forced_drop')) {
+                if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseDrops/forcedDrop')) {
                     if (!empty($this->department_ids)) {
-                        $forced_drops = TableRegistry::getTableLocator()->get('CourseDrop')->list_of_students_need_force_drop($this->department_ids, null, $this->program_ids, $this->program_type_ids, $current_acy);
+                        $forced_drops = TableRegistry::getTableLocator()->get('CourseDrops')->listOfStudentsNeedForceDrop($this->department_ids, null, $this->program_ids, $this->program_type_ids, $current_acy);
                     } elseif (!empty($this->college_ids)) {
-                        $forced_drops = TableRegistry::getTableLocator()->get('CourseDrop')->list_of_students_need_force_drop(null, $this->college_ids, $this->program_ids, $this->program_type_ids, $current_acy, null, 1);
+                        $forced_drops = TableRegistry::getTableLocator()->get('CourseDrops')->listOfStudentsNeedForceDrop(null, $this->college_ids, $this->program_ids, $this->program_type_ids, $current_acy, null, 1);
                     }
 
                     if (count($forced_drops) && $forced_drops['count'] != 0) {
@@ -420,10 +425,15 @@ class DashboardController extends AppController
             }
 
             //course_adds/approve_adds
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseAdds/approve_adds')) {
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseAdds/approveAdds')) {
+
+
+
                 if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR) {
                     if (!empty($this->department_ids)) {
-                        $add_request = TableRegistry::getTableLocator()->get('CourseAdd')->count_add_request(
+
+
+                        $add_request = TableRegistry::getTableLocator()->get('CourseAdds')->countAddRequest(
                             $this->department_ids,
                             1,
                             null,
@@ -431,14 +441,15 @@ class DashboardController extends AppController
                             $this->program_type_ids,
                             $ac_yearsAddDrop
                         );
+
                     } elseif (!empty($this->college_ids)) {
-                        $add_request = TableRegistry::getTableLocator()->get('CourseAdd')->count_add_request(null, 1, $this->college_ids, $this->program_ids, $this->program_type_ids, $ac_yearsAddDrop);
+                        $add_request = TableRegistry::getTableLocator()->get('CourseAdds')->countAddRequest(null, 1, $this->college_ids, $this->program_ids, $this->program_type_ids, $ac_yearsAddDrop);
                     }
                 } else {
                     if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
-                        $add_request_dpt = TableRegistry::getTableLocator()->get('CourseAdd')->count_add_request($this->department_id, 2, null, null, null, $ac_yearsAddDrop);
+                        $add_request_dpt = TableRegistry::getTableLocator()->get('CourseAdds')->countAddRequest($this->department_id, 2, null, null, null, $ac_yearsAddDrop);
                     } elseif ($this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE) {
-                        $add_request = TableRegistry::getTableLocator()->get('CourseAdd')->count_add_request(null, 3, $this->college_id, null, null, $ac_yearsAddDrop);
+                        $add_request = TableRegistry::getTableLocator()->get('CourseAdds')->countAddRequest(null, 3, $this->college_id, null, null, $ac_yearsAddDrop);
                     }
                 }
             }
@@ -453,7 +464,8 @@ class DashboardController extends AppController
             'add_request'=>$add_request,
             'add_request_dpt'=>$add_request_dpt,
             'forced_drops'=>$forced_drops,
-            '_serialize' => [ 'drop_request',
+            '_serialize' => [
+                'drop_request',
                 'drop_request_dpt',
                 'add_request',
                 'add_request_dpt',
@@ -497,9 +509,9 @@ class DashboardController extends AppController
         $this->viewBuilder()->setClassName('Json');
 
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_STUDENT) {
-            $rank = TableRegistry::getTableLocator()->get('StudentExamStatus')->displayStudentRank(
+            $rank = TableRegistry::getTableLocator()->get('StudentExamStatuses')->displayStudentRank(
                 $this->student_id,
-                $this->AcademicYear->currentAcademicyear()
+                $this->AcademicYear->currentAcademicYear()
             );
 
         }
@@ -517,9 +529,8 @@ class DashboardController extends AppController
         $this->viewBuilder()->setClassName('Json');
 
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_STUDENT) {
-            $dormAssignedStudent = TableRegistry::getTableLocator()->get('DormitoryAssignment')->getStudentAssignedDormitory($this->student_id);
-          //  $this->set('dormAssignedStudent', $dormAssignedStudent);
-          //  $this->set('_serialize', array('dormAssignedStudent'));
+            $dormAssignedStudent = TableRegistry::getTableLocator()->get('DormitoryAssignments')->getStudentAssignedDormitory($this->student_id);
+
         }
 
         $this->set([
@@ -534,15 +545,13 @@ class DashboardController extends AppController
         $this->viewBuilder()->setClassName('Json');
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_STUDENT) {
             $student_course_schedules = array();
-            // $student_course_schedules = ClassRegistry::init('CourseSchedule')->getCourseSchedulesForStudent($this->student_id, $this->AcademicYear->currentAcademicyear());
-
             $this->set([
                 'student_course_schedules'=>student_course_schedules,
                 '_serialize' => [ 'student_course_schedules']
             ]);
 
         } elseif ($this->request->getSession()->read('Auth.User.role_id') == ROLE_INSTRUCTOR) {
-            $instructor_course_schedules = TableRegistry::getTableLocator()->get('CourseSchedule')->getCourseSchedulesForInstructor($this->Auth->user('id'), $this->role_id);
+            $instructor_course_schedules = TableRegistry::getTableLocator()->get('CourseSchedules')->getCourseSchedulesForInstructor($this->Auth->user('id'), $this->role_id);
 
             $this->set([
                 'instructor_course_schedules'=>$instructor_course_schedules,
@@ -557,7 +566,7 @@ class DashboardController extends AppController
         $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
 
-        $current_acy = $this->AcademicYear->currentAcademicyear();
+        $current_acy = $this->AcademicYear->currentAcademicYear();
 
         if (is_numeric(ACY_BACK_GRADE_APPROVAL_DASHBOARD) && ACY_BACK_GRADE_APPROVAL_DASHBOARD) {
             $ac_years = $this->AcademicYear->academicYearInArray(((explode('/', $current_acy)[0])  - ACY_BACK_GRADE_APPROVAL_DASHBOARD), (explode('/', $current_acy)[0]));
@@ -568,10 +577,10 @@ class DashboardController extends AppController
         $ac_years = array_keys($ac_years);
 
         //If the user has department grade approval privilage
-        if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
+        if ($this->request->getSession()->read('Auth.User.role_id')
+            == ROLE_DEPARTMENT) {
             if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGrades/approve_non_freshman_grade_submission')) {
-                $courses_for_dpt_approvals = TableRegistry::getTableLocator()->get('ExamGrade')->getRejectedOrNonApprovedPublishedCourseList2($this->department_id, '', '', array(), array(), array(), $ac_years, $this->role_id);
-                //debug($courses_for_dpt_approvals);
+                $courses_for_dpt_approvals = TableRegistry::getTableLocator()->get('ExamGrades')->getRejectedOrNonApprovedPublishedCourseList($this->department_id, '', '', array(), array(), array(), $ac_years, $this->role_id);
 
                 $this->set([
                     'courses_for_dpt_approvals'=>$courses_for_dpt_approvals,
@@ -582,8 +591,8 @@ class DashboardController extends AppController
 
         //If the user has regustrar grade confirmation privilage
         if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGrades/confirm_grade_submission')) {
-                $courses_for_registrar_approval = TableRegistry::getTableLocator()->get('ExamGrade')->getRegistrarNonApprovedCoursesList2($this->department_ids, $this->college_ids, '', '', $this->program_ids, $this->program_type_ids, $ac_years);
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGrades/confirmGradeSubmission')) {
+                $courses_for_registrar_approval = TableRegistry::getTableLocator()->get('ExamGrades')->getRegistrarNonApprovedCoursesList($this->department_ids, $this->college_ids, '', '', $this->program_ids, $this->program_type_ids, $ac_years);
 
                 $this->set([
                     'courses_for_registrar_approval'=>$courses_for_registrar_approval,
@@ -623,24 +632,8 @@ class DashboardController extends AppController
         if ($this->request->getSession()->read('Auth.User.role_id')
             == ROLE_COLLEGE) {
             if ($this->MenuOptimized->check($this->Auth->user(),
-                'controllers/ExamGradeChanges/manage_college_grade_change')) {
-
-
+                'controllers/ExamGradeChanges/manageCollegeGradeChange')) {
                 $exam_grade_changes_for_college_approval = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForCollegeApproval($this->college_id);
-                $exam_grade_changes_for_college_approval_sum = 0;
-
-                if (!empty($exam_grade_changes_for_college_approval)) {
-                    foreach ($exam_grade_changes_for_college_approval as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            foreach ($value2 as $key3 => $value3) {
-                                $exam_grade_changes_for_college_approval_sum += count($value3);
-                            }
-                        }
-                    }
-                }
-
-                $exam_grade_changes_for_college_approval = $exam_grade_changes_for_college_approval_sum;
-
             }
         }
 
@@ -658,71 +651,19 @@ class DashboardController extends AppController
             }
 
 
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manage_department_grade_change')) {
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs);
-                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs);
-                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs);
-                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs);
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manageDepartmentGradeChange')) {
+                if ($this->request->getSession()->read('Auth.User')['role_id']
+                    == ROLE_DEPARTMENT) {
+                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs,"Stat");
+                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs,'Stat');
+                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs,'Stat');
+                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs,'Stat');
                 } else {
-                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs);
-                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs);
-                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs);
-                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs);
+                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs,'Stat');
+                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs,'Stat');
+                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs,'Stat');
+                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs,'Stat');
                 }
-
-                $exam_grade_change_requests_sum = 0;
-
-                if (!empty($exam_grade_change_requests)) {
-                    foreach ($exam_grade_change_requests as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $exam_grade_change_requests_sum += count($value2);
-                        }
-                    }
-                }
-
-                $exam_grade_change_requests = $exam_grade_change_requests_sum;
-
-                //debug($exam_grade_change_requests);
-
-                //$makeup_exam_grades = ClassRegistry::init('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs);
-                $makeup_exam_grades_sum = 0;
-
-                if (!empty($makeup_exam_grades)) {
-                    foreach ($makeup_exam_grades as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $makeup_exam_grades_sum += count($value2);
-                        }
-                    }
-                }
-
-                $makeup_exam_grades = $makeup_exam_grades_sum;
-
-                //$rejected_makeup_exams = ClassRegistry::init('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs);
-                $rejected_makeup_exams_sum = 0;
-
-                if (!empty($rejected_makeup_exams)) {
-                    foreach ($rejected_makeup_exams as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $rejected_makeup_exams_sum += count($value2);
-                        }
-                    }
-                }
-
-                $rejected_makeup_exams = $rejected_makeup_exams_sum;
-
-                //$rejected_supplementary_exams = ClassRegistry::init('ExamGradeChange')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs);
-                $rejected_supplementary_exams_sum = 0;
-
-                if (!empty($rejected_supplementary_exams)) {
-                    foreach ($rejected_supplementary_exams as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $rejected_supplementary_exams_sum += count($value2);
-                        }
-                    }
-                }
-
-                $rejected_supplementary_exams = $rejected_supplementary_exams_sum;
             }
         }
 
@@ -731,70 +672,18 @@ class DashboardController extends AppController
             $this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT
             || $this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE
         ) {
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manage_freshman_grade_change')) {
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manageFreshmanGradeChange')) {
                 if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
-                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs);
-                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs);
-                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs);
-                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs);
+                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs,'Stat');
+                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs,'Stat');
+                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs,'Stat');
+                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs,'Stat');
                 } else {
-                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs);
-                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs);
-                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs);
-                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs);
+                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs,'Stat');
+                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs,'Stat');
+                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs,'Stat');
+                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs,'Stat');
                 }
-
-                //$fm_exam_grade_change_requests = ClassRegistry::init('ExamGradeChange')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs);
-                $fm_exam_grade_change_requests_sum = 0;
-
-                if (!empty($fm_exam_grade_change_requests)) {
-                    foreach ($fm_exam_grade_change_requests as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $fm_exam_grade_change_requests_sum += count($value2);
-                        }
-                    }
-                }
-
-                $fm_exam_grade_change_requests = $fm_exam_grade_change_requests_sum;
-
-                //$fm_makeup_exam_grades = ClassRegistry::init('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs);
-                $fm_makeup_exam_grades_sum = 0;
-
-                if (!empty($fm_makeup_exam_grades)) {
-                    foreach ($fm_makeup_exam_grades as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $fm_makeup_exam_grades_sum += count($value2);
-                        }
-                    }
-                }
-
-                $fm_makeup_exam_grades = $fm_makeup_exam_grades_sum;
-
-                //$fm_rejected_makeup_exams = ClassRegistry::init('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs);
-                $fm_rejected_makeup_exams_sum = 0;
-
-                if (!empty($fm_rejected_makeup_exams)) {
-                    foreach ($fm_rejected_makeup_exams as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $fm_rejected_makeup_exams_sum += count($value2);
-                        }
-                    }
-                }
-
-                $fm_rejected_makeup_exams = $fm_rejected_makeup_exams_sum;
-
-                //$fm_rejected_supplementary_exams = ClassRegistry::init('ExamGradeChange')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs);
-                $fm_rejected_supplementary_exams_sum = 0;
-
-                if (!empty($fm_rejected_supplementary_exams)) {
-                    foreach ($fm_rejected_supplementary_exams as $key => $value) {
-                        foreach ($value as $key2 => $value2) {
-                            $fm_rejected_supplementary_exams_sum += count($value2);
-                        }
-                    }
-                }
-
-                $fm_rejected_supplementary_exams = $fm_rejected_supplementary_exams_sum;
             }
         }
 
@@ -803,7 +692,7 @@ class DashboardController extends AppController
         if ($this->request->getSession()->read('Auth.User.role_id')
             == ROLE_REGISTRAR) {
             if ($this->MenuOptimized->check($this->Auth->user(),
-                'controllers/ExamGradeChanges/manage_registrar_grade_change')) {
+                'controllers/ExamGradeChanges/manageRegistrarGradeChange')) {
                 $serviceType='Stat';
                 $reg_exam_grade_change_requests =
                     TableRegistry::getTableLocator()->get('ExamGradeChanges')->
@@ -830,7 +719,7 @@ class DashboardController extends AppController
         }
 
         $this->set([
-
+            'exam_grade_change_requests'=>$exam_grade_change_requests,
             'makeup_exam_grades'=>$makeup_exam_grades,
             'rejected_makeup_exams'=>$rejected_makeup_exams,
             'rejected_supplementary_exams'=>$rejected_supplementary_exams,
@@ -843,6 +732,7 @@ class DashboardController extends AppController
             'fm_rejected_makeup_exams'=>$fm_rejected_makeup_exams,
             'fm_rejected_supplementary_exams'=>$fm_rejected_supplementary_exams,
             '_serialize' => [
+                'exam_grade_change_requests',
                 'makeup_exam_grades',
                 'rejected_makeup_exams',
                 'rejected_supplementary_exams',
@@ -953,7 +843,7 @@ class DashboardController extends AppController
             $this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE
         ) {
             //If the user has instructor assignment
-            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseInstructorAssignments/assign_course_instructor')) {
+            if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/CourseInstructorAssignments/assignCourseInstructor')) {
                 $dispatched_course_not_assigned = TableRegistry::getTableLocator()->get('CourseInstructorAssignments')->getDisptachedCoursesNotAssigned($this->department_id);
                 $dispatched_course_list = TableRegistry::getTableLocator()->get('CourseInstructorAssignments')->getDisptachedCoursesForNotification($this->department_id);
 

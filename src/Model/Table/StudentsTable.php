@@ -4,7 +4,11 @@ namespace App\Model\Table;
 use Cake\ORM\Query;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
+
+use Cake\Datasource\ConnectionManager;
 
 class StudentsTable extends Table
 {
@@ -16,226 +20,276 @@ class StudentsTable extends Table
         $this->setDisplayField('full_name');
         $this->setPrimaryKey('id');
 
+        $this->belongsTo('Programs',['propertyName'=>'Program']);
+        $this->belongsTo('ProgramTypes',['propertyName'=>'ProgramType']);
+
         // hasMany Associations
         $this->hasMany('CostSharingPayments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CostSharingPayment'
         ]);
 
         $this->hasMany('StudentNameHistories', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'StudentNameHistory'
         ]);
 
         $this->hasMany('DropOuts', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'DropOut'
         ]);
 
         $this->hasMany('CourseExemptions', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CourseExemption'
         ]);
 
         $this->hasMany('GraduationWorks', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'GraduationWork'
         ]);
 
         $this->hasMany('ExitExams', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'ExitExam'
         ]);
 
         $this->hasMany('Otps', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Otp'
         ]);
 
         $this->hasMany('ApplicablePayments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'ApplicablePayment'
         ]);
 
         $this->hasMany('ExceptionMealAssignments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'ExceptionMealAssignment'
         ]);
 
         $this->hasMany('CostShares', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CostShare'
         ]);
 
         $this->hasMany('Payments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Payment'
         ]);
 
         $this->hasMany('MakeupExams', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'MakeupExam'
         ]);
 
         $this->hasMany('ResultEntryAssignments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'ResultEntryAssignment'
         ]);
 
         $this->hasMany('Contacts', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Contact'
         ]);
 
         $this->hasMany('ProgramTypeTransfers', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'ProgramTypeTransfer'
         ]);
 
         $this->hasMany('Clearances', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Clearance'
         ]);
 
         $this->hasMany('Withdrawals', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Withdrawal'
         ]);
 
         $this->hasMany('DepartmentTransfers', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'DepartmentTransfer'
         ]);
 
         $this->hasMany('Readmissions', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Readmission'
         ]);
 
         $this->hasMany('CurriculumAttachments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CurriculumAttachment'
         ]);
 
         $this->hasMany('Attendances', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Attendance'
         ]);
 
         $this->hasMany('EslceResults', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'EslceResult'
         ]);
 
         $this->hasMany('EheeceResults', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'EheeceResult'
         ]);
 
         $this->hasMany('Attachments', [
             'foreignKey' => 'foreign_key',
             'conditions' => ['Attachments.model' => 'Student'],
-            'dependent' => true
+            'dependent' => true,
+            'propertyName' => 'Attachment'
         ]);
+
 
         $this->hasMany('HigherEducationBackgrounds', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'HigherEducationBackground'
         ]);
 
         $this->hasMany('HighSchoolEducationBackgrounds', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'HighSchoolEducationBackground'
         ]);
 
         $this->hasMany('StudentExamStatuses', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'StudentExamStatus'
         ]);
 
         $this->hasMany('CourseRegistrations', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CourseRegistration'
         ]);
 
         $this->hasMany('CourseDrops', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CourseDrop'
         ]);
 
         $this->hasMany('CourseAdds', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'CourseAdd'
         ]);
 
         $this->hasMany('SenateLists', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'SenateList'
         ]);
 
         $this->hasMany('Dismissals', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Dismissal'
         ]);
 
         $this->hasMany('TakenProperties', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'TakenProperty'
         ]);
 
         $this->hasMany('DormitoryAssignments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'DormitoryAssignment'
         ]);
 
         $this->hasMany('MealHallAssignments', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'MealHallAssignment'
         ]);
 
         $this->hasMany('MealAttendances', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'MealAttendance'
         ]);
 
         $this->hasMany('Disciplines', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Discipline'
         ]);
 
         $this->hasMany('StudentRanks', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'StudentRank'
         ]);
 
         $this->hasMany('PlacementPreferences', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'PlacementPreference'
         ]);
 
         // hasOne Associations
         $this->hasOne('GraduateLists', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'GraduateList'
         ]);
 
         $this->hasOne('Alumnus', [
             'foreignKey' => 'student_id',
-            'dependent' => false
+            'dependent' => false,
+            'propertyName' => 'Alumnus'
         ]);
 
-
-        $this->belongsToMany('Sections', [
-            'joinTable' => 'students_sections'
+        $this->hasMany('StudentsSections', [
+            'foreignKey' => 'student_id',
+            'dependent' => false,
+            'propertyName' => 'StudentsSection'
         ]);
 
         $this->belongsToMany('Courses', [
-            'joinTable' => 'courses_students'
+            'joinTable' => 'courses_students',
+            'propertyName' => 'CourseStudent'
         ]);
 
         $this->belongsToMany('CourseSplitSections', [
-            'joinTable' => 'students_course_split_sections'
+            'joinTable' => 'students_course_split_sections',
+            'propertyName' => 'StudentCourseSplitSection'
         ]);
+
+
 
 
     }
@@ -1238,7 +1292,7 @@ class StudentsTable extends Table
 
 
     // Function to get students section and exam status
-    function get_student_section($student_id = null, $academic_year = null, $semester = null)
+    function getStudentSection($student_id = null, $academic_year = null, $semester = null)
     {
         $this->bindModel(array('hasMany' => array('StudentsSection' => array('conditions' => array('StudentsSection.archive' => 0)))));
 
@@ -3235,55 +3289,63 @@ class StudentsTable extends Table
         return $list;
     }
 
-    function getProfileNotBuildListCount($max_not_build_time = null, $department_ids = null, $college_ids = null, $program_ids = null, $program_type_ids = null)
-    {
 
-        $count = 0;
+    public function getProfileNotBuildListCount(
+        $maxNotBuildTime = null,
+        $departmentIds = null,
+        $collegeIds = null,
+        $programIds = null,
+        $programTypeIds = null
+    ) {
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $notBuildFor = date('Y-m-d', strtotime('-' . ($maxNotBuildTime ?? DAYS_BACK_PROFILE) . ' days'));
 
-        if (isset($max_not_build_time) && !empty($max_not_build_time)){
-            $not_build_for = date('Y-m-d ', strtotime("-" . $max_not_build_time . " day "));
-        } else {
-            $not_build_for = date('Y-m-d ', strtotime("-" . DAYS_BACK_PROFILE . " day "));
+        // Early return if only PROGRAM_REMEDIAL is present
+        if (!empty($programIds)) {
+            if (is_array($programIds) && in_array(PROGRAM_REMEDIAL, $programIds)) {
+                $programIds = array_filter($programIds, fn($pid) => $pid != PROGRAM_REMEDIAL);
+            } elseif (!is_array($programIds) && $programIds == PROGRAM_REMEDIAL) {
+                return 0;
+            }
         }
 
-        if (!empty($program_ids) && is_array($program_ids) && in_array(PROGRAM_REMEDIAL, $program_ids)) {
-            unset($program_ids[PROGRAM_REMEDIAL]);
-        } else if (!empty($program_ids) && !is_array($program_ids) && $program_ids == PROGRAM_REMEDIAL) {
-            return $count;
+        // Early return if neither department nor college filter is given
+        if (empty($departmentIds) && empty($collegeIds)) {
+            return 0;
         }
 
-        if (!empty($department_ids)) {
-            $count = $this->find('count', array(
-                'conditions' => array(
-                    'Student.program_id' => $program_ids,
-                    'Student.program_type_id' => $program_type_ids,
-                    'Student.graduated' => 0,
-                    'Student.department_id' => $department_ids,
-                    'Student.id NOT IN (SELECT student_id FROM contacts)',
-                    //'Student.id NOT IN (SELECT foreign_key FROM attachments where model="Student")',
-                    //'Student.modified <= ' => $not_build_for,
-                    'Student.created >= ' => $not_build_for
+        $query = $studentsTable->find();
+
+        $query->where([
+            'Students.program_id IN' => (array)$programIds,
+            'Students.program_type_id IN' => (array)$programTypeIds,
+            'Students.graduated' => 0,
+            'Students.created >=' => $notBuildFor,
+        ]);
+
+        // Apply department/college filters
+        if (!empty($departmentIds)) {
+            $query->andWhere(['Students.department_id IN' => (array)$departmentIds]);
+        } elseif (!empty($collegeIds)) {
+            $query->andWhere([
+                'Students.department_id IS' => null,
+                'Students.college_id IN' => (array)$collegeIds
+            ]);
+        }
+
+        // Exclude students with contact profile
+        $query->andWhere(function ($exp, $q) {
+            return $exp->notIn('Students.id',
+                $q->newExpr()->add(
+                    $q->connection()->newQuery()
+                        ->select('student_id')
+                        ->from('contacts')
                 )
-            ));
-        } else if (!empty($college_ids)){
-            $count = $this->find('count', array(
-                'conditions' => array(
-                    'Student.program_id' => $program_ids,
-                    'Student.program_type_id' => $program_type_ids,
-                    'Student.graduated' => 0,
-                    'Student.department_id IS NULL',
-                    'Student.college_id' => $college_ids,
-                    'Student.id NOT IN (SELECT student_id FROM contacts)',
-                    //'Student.id NOT IN (SELECT foreign_key FROM attachments where model="Student")',
-                    //'Student.modified <= ' => $not_build_for,
-                    'Student.created >= ' => $not_build_for
-                )
-            ));
-        }
+            );
+        });
 
-        return $count;
+        return $query->count();
     }
-
 
     function updateDepartmentTransferFromFiled()
     {
