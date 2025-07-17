@@ -16,14 +16,7 @@ class AcademicStatus extends Entity
      * @var array
      */
     protected $_accessible = [
-        'name' => true,
-        'order' => true,
-        'computable' => true,
-        'created' => true,
-        'modified' => true,
-        'academic_stands' => true,
-        'historical_student_exam_statuses' => true,
-        'other_academic_rules' => true,
-        'student_exam_statuses' => true,
+        '*' => true,
+        'id' => false,
     ];
 }

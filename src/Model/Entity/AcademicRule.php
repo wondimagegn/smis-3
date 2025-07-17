@@ -1,34 +1,53 @@
 <?php
-
 namespace App\Model\Entity;
 
 use Cake\ORM\Entity;
 
+/**
+ * AcademicRule Entity
+ */
 class AcademicRule extends Entity
 {
-    protected $_virtual = ['cmp_sgpa', 'cmp_cgpa']; // Define virtual fields
+    /**
+     * Fields that can be mass assigned using newEntity() or patchEntity().
+     *
+     * @var array
+     */
     protected $_accessible = [
-        'scmo' => true,
-        'sgpa' => true,
-        'operatorI' => true,
-        'ccmo' => true,
-        'cgpa' => true,
-        'operatorII' => true,
-        'tcw' => true,
-        'operatorIII' => true,
-        'pfw' => true,
-        'academic_stand_id' => true,
-        'created' => true,
-        'modified' => true,
-        'academic_stands' => true,
+        '*' => true,
+        'id' => false,
     ];
-    protected function _getCmpSgpa()
+
+    /**
+     * Virtual fields
+     *
+     * @var array
+     */
+    protected $_virtual = ['cmp_sgpa', 'cmp_cgpa'];
+
+    /**
+     * Getter for cmp_sgpa virtual field
+     *
+     * @return string|null
+     */
+    protected function _getCmpSgpa(): ?string
     {
-        return $this->scmo . $this->sgpa; // Concatenating fields
+        if ($this->scmo !== null && $this->sgpa !== null) {
+            return $this->scmo . $this->sgpa;
+        }
+        return null;
     }
 
-    protected function _getCmpCgpa()
+    /**
+     * Getter for cmp_cgpa virtual field
+     *
+     * @return string|null
+     */
+    protected function _getCmpCgpa(): ?string
     {
-        return $this->ccmo . $this->cgpa; // Concatenating fields
+        if ($this->ccmo !== null && $this->cgpa !== null) {
+            return $this->ccmo . $this->cgpa;
+        }
+        return null;
     }
 }

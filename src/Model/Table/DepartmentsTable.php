@@ -1,21 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\RulesChecker;
 
 class DepartmentsTable extends Table
 {
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
@@ -23,721 +15,539 @@ class DepartmentsTable extends Table
         $this->setDisplayField('name');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Colleges', [
-            'className' => 'Colleges',
-            'foreignKey' => 'college_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'College',
+            'foreignKey' => 'college_id'
         ]);
-        $this->belongsTo('MoodleCategories', [
-            'className' => 'MoodleCategories',
-            'foreignKey' => 'moodle_category_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'MoodleCategory',
-        ]);
-        $this->hasMany('AcademicCalendars', [
-            'className' => 'AcademicCalendars',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'AcademicCalendar',
-        ]);
+
         $this->hasMany('AcceptedStudents', [
-            'className' => 'AcceptedStudents',
             'foreignKey' => 'department_id',
-            'propertyName' => 'AcceptedStudent',
+            'dependent' => false
         ]);
-        $this->hasMany('Courses', [
-            'className' => 'Courses',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Course',
-        ]);
-        $this->hasMany('Curriculums', [
 
-            'className' => 'Curriculums',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Curriculum',
-        ]);
-        $this->hasMany('DepartmentStudyPrograms', [
-            'className' => 'DepartmentStudyPrograms',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'DepartmentStudyProgram',
-        ]);
         $this->hasMany('DepartmentTransfers', [
-            'className' => 'DepartmentTransfers',
             'foreignKey' => 'department_id',
-            'propertyName' => 'DepartmentTransfer',
-        ]);
-        $this->hasMany('ExtendingAcademicCalendars', [
-            'className' => 'ExtendingAcademicCalendars',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'ExtendingAcademicCalendar',
-        ]);
-        $this->hasMany('Notes', [
-            'className' => 'Notes',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Note',
-        ]);
-        $this->hasMany('Offers', [
-            'className' => 'Offers',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Offer',
-        ]);
-        $this->hasMany('OnlineApplicants', [
-            'className' => 'OnlineApplicants',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'OnlineApplicant',
+            'dependent' => false
         ]);
 
-        $this->hasMany('ParticipatingDepartments', [
-            'className' => 'ParticipatingDepartments',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'ParticipatingDepartment',
-        ]);
-        $this->hasMany('Preferences', [
-            'className' => 'Preferences',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Preference',
-        ]);
-        $this->hasMany('PublishedCourses', [
-            'class' => 'PublishedCourses',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'PublishedCourse',
-        ]);
-        $this->hasMany('Sections', [
-            'className' => 'Sections',
-            'foreignKey' => 'department_id',
-            'propertyName' => 'Section',
-        ]);
         $this->hasMany('Specializations', [
-            'className' => 'Specializations',
             'foreignKey' => 'department_id',
-            'propertyName' => 'Specialization',
+            'dependent' => false
         ]);
-        $this->hasMany('StaffAssignes', [
-            'className' => 'StaffAssignes',
+
+        $this->hasMany('Curriculums', [
             'foreignKey' => 'department_id',
-            'propertyName' => 'StaffAssignee',
+            'dependent' => false
         ]);
+
+        $this->hasMany('Courses', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('PublishedCourses', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('Offers', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('Preferences', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
         $this->hasMany('Staffs', [
-            'className' => 'Staffs',
             'foreignKey' => 'department_id',
-            'propertyName' => 'Staff',
+            'dependent' => false
         ]);
+
         $this->hasMany('Students', [
-            'className' => 'Students',
             'foreignKey' => 'department_id',
-            'propertyName' => 'Student',
+            'dependent' => false
         ]);
-        $this->hasMany('TakenProperties', [
-            'className' => 'TakenProperties',
+
+        $this->hasMany('Sections', [
             'foreignKey' => 'department_id',
-            'propertyName' => 'TakenProperty',
+            'dependent' => false
         ]);
 
         $this->hasMany('YearLevels', [
-            'className' => 'YearLevels',
             'foreignKey' => 'department_id',
-            'propertyName' => 'YearLevel',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('GradeScales', [
+            'foreignKey' => 'foreign_key',
+            'conditions' => ['GradeScales.model' => 'Department'],
+            'dependent' => true
+        ]);
+
+        $this->hasMany('AcademicCalendars', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('TakenProperties', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('DepartmentNameChanges', [
+            'foreignKey' => 'department_id',
+            'dependent' => false
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
+            ->notEmptyString('name', 'Name is required')
+            ->add('name', 'isUniqueDepartmentInCollege', [
+                'rule' => function ($value, $context) {
+                    $conditions = [
+                        'Departments.college_id' => $context['data']['college_id'],
+                        'Departments.name' => trim($value)
+                    ];
 
-        $validator
-            ->scalar('name')
-            ->maxLength('name', 200)
-            ->requirePresence('name', 'create')
-            ->notEmptyString('name');
+                    if (!empty($context['data']['id'])) {
+                        $conditions['Departments.id !='] = $context['data']['id'];
+                    }
 
-        $validator
-            ->scalar('shortname')
-            ->maxLength('shortname', 10)
-            ->allowEmptyString('shortname');
+                    $count = $this->find()
+                        ->where($conditions)
+                        ->count();
 
-        $validator
-            ->scalar('name_start_date')
-            ->allowEmptyString('name_start_date');
-
-        $validator
-            ->scalar('name_end_date')
-            ->allowEmptyString('name_end_date');
-
-        $validator
-            ->scalar('amharic_name')
-            ->maxLength('amharic_name', 200)
-            ->allowEmptyString('amharic_name');
-
-        $validator
-            ->scalar('amharic_short_name')
-            ->maxLength('amharic_short_name', 50)
-            ->allowEmptyString('amharic_short_name');
-
-        $validator
-            ->boolean('applay')
-            ->notEmptyString('applay');
-
-        $validator
-            ->boolean('active')
-            ->notEmptyString('active');
-
-        $validator
-            ->scalar('type')
-            ->maxLength('type', 50)
-            ->notEmptyString('type');
-
-        $validator
-            ->scalar('type_amharic')
-            ->maxLength('type_amharic', 100)
-            ->notEmptyString('type_amharic');
-
-        $validator
-            ->scalar('description')
-            ->allowEmptyString('description');
-
-        $validator
-            ->scalar('phone')
-            ->maxLength('phone', 30)
-            ->allowEmptyString('phone');
-
-        $validator
-            ->scalar('institution_code')
-            ->maxLength('institution_code', 100)
-            ->allowEmptyString('institution_code');
-
-        $validator
-            ->boolean('allow_year_based_curriculums')
-            ->notEmptyString('allow_year_based_curriculums');
-
-        $validator
-            ->boolean('accept_course_dispatch')
-            ->notEmptyString('accept_course_dispatch');
+                    return $count === 0;
+                },
+                'message' => 'The department name should be unique in the college. The name is already taken. Use another one.'
+            ]);
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add($rules->existsIn(['college_id'], 'Colleges'));
-        $rules->add($rules->existsIn(['moodle_category_id'], 'MoodleCategories'));
+        $rules->add($rules->existsIn('college_id', 'Colleges'), [
+            'errorField' => 'college_id',
+            'message' => 'The specified college does not exist.'
+        ]);
 
         return $rules;
     }
 
-
-    function isUniqueDepartmentInCollege()
+    public function canItBeDeleted($department_id = null): bool
     {
-        $count = 0;
-        if (!empty($this->data['Department']['id'])) {
-            $count = $this->find('count', array(
-                'conditions' => array(
-                    'Department.college_id' => $this->data['Department']['college_id'],
-                    'Department.name' => trim($this->data['Department']['name']),
-                    'Department.id <> ' => $this->data['Department']['id']
-                )
-            ));
-        } else {
-            $count = $this->find('count', array(
-                'conditions' => array(
-                    'Department.college_id' => $this->data['Department']['college_id'],
-                    'Department.name' => trim($this->data['Department']['name'])
-                )
-            ));
-        }
-        if ($count > 0) {
+        if ($this->YearLevels->find()->where(['YearLevels.department_id' => $department_id])->count() > 0) {
             return false;
         }
+
+        if ($this->Students->find()->where(['Students.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->Sections->find()->where(['Sections.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->GradeScales->find()->where(['GradeScales.model' => 'Department', 'GradeScales.foreign_key' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->PublishedCourses->find()->where(['PublishedCourses.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->Curriculums->find()->where(['Curriculums.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->AcceptedStudents->find()->where(['AcceptedStudents.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
+        if ($this->Staffs->find()->where(['Staffs.department_id' => $department_id])->count() > 0) {
+            return false;
+        }
+
         return true;
     }
 
-    function canItBeDeleted($department_id = null)
+    public function allDepartmentsByCollege($include_freshman_program = 0, $only_active = 0): array
     {
-        if ($this->YearLevel->find('count', array('conditions' => array('YearLevel.department_id' => $department_id))) > 0) {
-            return false;
-        }
+        $departments_organized = [];
 
-        if ($this->Student->find('count', array('conditions' => array('Student.department_id' => $department_id))) > 0) {
-            return false;
-        } elseif ($this->Section->find('count', array('conditions' => array('Section.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->GradeScale->find(
-                'count',
-                array(
-                    'conditions' => array(
-                        'GradeScale.model' => 'Department',
-                        'GradeScale.foreign_key' => $department_id
-                    )
-                )
-            ) > 0) {
-            return false;
-        } elseif ($this->PublishedCourse->find(
-                'count',
-                array('conditions' => array('PublishedCourse.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->Curriculum->find(
-                'count',
-                array('conditions' => array('Curriculum.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->AcceptedStudent->find(
-                'count',
-                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->AcceptedStudent->find(
-                'count',
-                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->AcceptedStudent->find(
-                'count',
-                array('conditions' => array('AcceptedStudent.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } elseif ($this->Staff->find('count', array('conditions' => array('Staff.department_id' => $department_id))
-            ) > 0) {
-            return false;
-        } else {
-            return true;
-        }
-    }
+        $active = $only_active ? 1 : [0, 1];
 
-    function allDepartmentsByCollege($include_freshman_program = 0, $only_active = 0)
-    {
-        $departments_organized = array();
+        $departments_data = $this->Colleges->find()
+            ->contain([
+                'Departments' => [
+                    'conditions' => ['Departments.active IN' => $active]
+                ]
+            ])
+            ->toArray();
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        debug($departments_data);
 
-        $departments_data = $this->College->find('all', array(
-            'contain' => array(
-                'Department' => array(
-                    'conditions' => array(
-                        'Department.active' => $active
-                    )
-                )
-            )
-        ));
-
-        //debug($departments_data);
         if (!empty($departments_data)) {
-            foreach ($departments_data as $key => $college_and_department) {
-                $departments_organized[$college_and_department['College']['name']] = array();
+            foreach ($departments_data as $college_and_department) {
+                $departments_organized[$college_and_department->name] = [];
                 if ($include_freshman_program == 1) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = $college_and_department['College']['shortname'] . ' - Pre/Freshman/Remedial';
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = $college_and_department->shortname . ' - Pre/Freshman/Remedial';
                 }
-                foreach ($college_and_department['Department'] as $key => $department) {
-                    $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
+                foreach ($college_and_department->departments as $department) {
+                    $departments_organized[$college_and_department->name][$department->id] = $department->name;
                 }
             }
         }
-        //array_unshift($sections_organized, array('' => '--- Select Section ---'));
-        //debug($departments_organized);
+
         return $departments_organized;
     }
 
-    //Filter list of departments by thier privligae (It is for registrar)
-    function allDepartmentsByCollege2($include_all_department = 0, $privilaged_department_ids = array(), $privilaged_collage_ids = array(), $only_active = '')
+    public function allDepartmentsByCollege2($include_all_department = 0, $privileged_department_ids = [], $privileged_college_ids = [], $only_active = 0): array
     {
-        $departments_organized = array();
+        $departments_organized = [];
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        $active = $only_active ? 1 : [0, 1];
 
-        if (!empty($privilaged_department_ids)) {
-            $departments_data = $this->College->find('all', array(
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array(
-                            'Department.id' => $privilaged_department_ids,
-                            'Department.active' => $active
-                        ),
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                )
-            ));
-        } elseif (!empty($privilaged_collage_ids)) {
-            $departments_data = $this->College->find('all', array(
-                'conditions' => array(
-                    'College.id' => $privilaged_collage_ids,
-                    'College.active' => $active
-                ),
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array(
-                            'Department.active' => $active
-                        ),
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                )
-            ));
+        if (!empty($privileged_department_ids)) {
+            $departments_data = $this->Colleges->find()
+                ->contain([
+                    'Departments' => [
+                        'conditions' => [
+                            'Departments.id IN' => $privileged_department_ids,
+                            'Departments.active IN' => $active
+                        ],
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
+        } elseif (!empty($privileged_college_ids)) {
+            $departments_data = $this->Colleges->find()
+                ->where(['Colleges.id IN' => $privileged_college_ids, 'Colleges.active IN' => $active])
+                ->contain([
+                    'Departments' => [
+                        'conditions' => ['Departments.active IN' => $active],
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
         } else {
-            $departments_data = $this->College->find('all', array(
-                'conditions' => array(
-                    'College.active' => $active
-                ),
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array(
-                            'Department.active' => $active
-                        ),
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                )
-            ));
-            //debug($departments_data);
+            $departments_data = $this->Colleges->find()
+                ->where(['Colleges.active IN' => $active])
+                ->contain([
+                    'Departments' => [
+                        'conditions' => ['Departments.active IN' => $active],
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
         }
 
         if (!empty($departments_data)) {
-            foreach ($departments_data as $key => $college_and_department) {
+            foreach ($departments_data as $college_and_department) {
+                $departments_organized[$college_and_department->name] = [];
                 if ($include_all_department == 1) {
-                    // Added By Neway
-                    if (!empty($privilaged_collage_ids) && !is_array($privilaged_collage_ids) && is_numeric($privilaged_collage_ids) && $college_and_department['College']['id'] == $privilaged_collage_ids) {
-                        //for College role
-                        $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } elseif (!empty($privilaged_department_ids) && !empty($privilaged_collage_ids) && is_array(
-                            $privilaged_collage_ids
-                        ) && in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
-                        $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } elseif (!empty($privilaged_collage_ids) && is_array($privilaged_collage_ids) && in_array(
-                            $college_and_department['College']['id'],
-                            $privilaged_collage_ids
-                        )) {
-                        $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } elseif (!empty($privilaged_department_ids) && empty($privilaged_collage_ids)) {
-                        //for department or registrar role without college_id passed
-                        $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                    } elseif (empty($privilaged_collage_ids) && empty($privilaged_department_ids)) {
-                        // other roles than colllege, department & registrar
-                        $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
+                    if (
+                        (!empty($privileged_college_ids) && is_numeric($privileged_college_ids) && $college_and_department->id == $privileged_college_ids) ||
+                        (!empty($privileged_department_ids) && !empty($privileged_college_ids) && is_array($privileged_college_ids) && in_array($college_and_department->id, $privileged_college_ids)) ||
+                        (empty($privileged_department_ids) && empty($privileged_college_ids)) ||
+                        (!empty($privileged_department_ids) && empty($privileged_college_ids)) ||
+                        (!empty($privileged_college_ids) && is_array($privileged_college_ids) && in_array($college_and_department->id, $privileged_college_ids))
+                    ) {
+                        $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = 'All ' . $college_and_department->shortname;
                     }
-                    // end Added By neway
-                    //$departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . '';
-                } elseif (is_array($privilaged_department_ids) && in_array(
-                        $college_and_department['College']['id'],
-                        $privilaged_collage_ids
-                    )) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'Pre/Freshman/Remedial - ' . $college_and_department['College']['shortname'];
                 }
-                foreach ($college_and_department['Department'] as $key => $department) {
-                    if (is_array($privilaged_department_ids) && !empty($privilaged_department_id)) {
-                        if (in_array($department['id'], $privilaged_department_ids)) {
-                            $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
-                        }
-                    } elseif (isset($privilaged_department_id) && $department['id'] == $privilaged_department_ids) {
-                        debug($department);
-                        $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
-                    } else {
-                        $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
+                foreach ($college_and_department->departments as $department) {
+                    if (!empty($privileged_department_ids) && in_array($department->id, $privileged_department_ids)) {
+                        $departments_organized[$college_and_department->name][$department->id] = $department->name;
+                    } elseif (empty($privileged_department_ids)) {
+                        $departments_organized[$college_and_department->name][$department->id] = $department->name;
                     }
                 }
             }
         }
-        //array_unshift($sections_organized, array('' => '--- Select Section ---'));
-        //debug($departments_organized);
+
         return $departments_organized;
     }
 
-    function onlyFreshmanInAllColleges($college_ids = null, $only_active = 0)
+    public function onlyFreshmanInAllColleges($college_ids = null, $only_active = 0): array
     {
-        $departments = array();
+        $departments = [];
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        $active = $only_active ? 1 : [0, 1];
+
+        $colleges_query = $this->Colleges->find()
+            ->where(['Colleges.active IN' => $active]);
 
         if (!empty($college_ids)) {
-            $colleges = $this->College->find('all', array(
-                'conditions' => array(
-                    'College.id' => $college_ids,
-                    'College.active' => $active
-                ),
-                'recursive' => -1
-            ));
-        } else {
-            $colleges = $this->College->find('all', array(
-                'conditions' => array(
-                    'College.active' => $active
-                ),
-                'recursive' => -1
-            ));
+            $colleges_query->where(['Colleges.id IN' => $college_ids]);
         }
+
+        $colleges = $colleges_query->toArray();
 
         if (!empty($colleges)) {
-            foreach ($colleges as $k => $v) {
-                $departments[$v['College']['name']]['c~' . $v['College']['id']] = 'Pre/Freshman/Remedial - ' . $v['College']['shortname'];
+            foreach ($colleges as $v) {
+                $departments[$v->name]['c~' . $v->id] = 'Pre/Freshman/Remedial - ' . $v->shortname;
             }
         }
 
         return $departments;
     }
 
-    //Filter list of departments by college (It is for college privliage use like grade view)
-    function allCollegeDepartments($college_id = null, $only_active = 0, $include_freshman_program = 0)
+    public function allCollegeDepartments($college_id = null, $only_active = 0, $include_freshman_program = 0): array
     {
-        $departments_organized = array();
+        $departments_organized = [];
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        $active = $only_active ? 1 : [0, 1];
 
-        if (isset($college_id) && !empty($college_id)) {
-            $departments_data = $this->College->Department->find('all', array(
-                'conditions' => array(
-                    'Department.college_id' => $college_id,
-                    'Department.active' => $active
-                ),
-                'contain' => array(
-                    'College' => array('id', 'name', 'shortname')
-                ),
-                'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC'),
-                'recursive' => -1
-            ));
-
-            //$departments_organized['c~' . $college_id] = 'Freshman Program';
+        if (!empty($college_id)) {
+            $departments_data = $this->find()
+                ->where([
+                    'Departments.college_id' => $college_id,
+                    'Departments.active IN' => $active
+                ])
+                ->contain(['Colleges' => ['fields' => ['id', 'name', 'shortname']]])
+                ->order(['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC'])
+                ->toArray();
 
             if (!empty($departments_data)) {
-                foreach ($departments_data as $key => $department) {
-                    if ($include_freshman_program || 1) {
-                        $departments_organized['c~' . $department['College']['id']] = 'Pre/Freshman/Remedial - ' . $department['College']['shortname'];
+                foreach ($departments_data as $department) {
+                    if ($include_freshman_program) {
+                        $departments_organized['c~' . $department->college->id] = 'Pre/Freshman/Remedial - ' . $department->college->shortname;
                     }
-                    $departments_organized[$department['Department']['id']] = $department['Department']['name'];
+                    $departments_organized[$department->id] = $department->name;
                 }
             }
         }
+
         return $departments_organized;
     }
 
-    //Filter list of departments by thier privligae (It is for registrar)
-    function allDepartmentsByCollege3($include_all_department = 0, $privilaged_department_ids = array(), $privilaged_collage_ids = array(), $only_active = 0)
+    public function allDepartmentsByCollege3($include_all_department = 0, $privileged_department_ids = [], $privileged_college_ids = [], $only_active = 0): array
     {
-        $departments_organized = array();
+        $departments_organized = [];
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        $active = $only_active ? 1 : [0, 1];
 
-        $departments_data = $this->College->find('all', array(
-            'conditions' => array(
-                'College.active' => $active
-            ),
-            'contain' => array(
-                'Department' => array(
-                    'conditions' => array(
-                        'Department.active' => $active
-                    ),
-                ),
-                'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-            )
-        ));
+        $departments_data = $this->Colleges->find()
+            ->where(['Colleges.active IN' => $active])
+            ->contain([
+                'Departments' => [
+                    'conditions' => ['Departments.active IN' => $active],
+                    'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                ]
+            ])
+            ->toArray();
 
         if (!empty($departments_data)) {
-            foreach ($departments_data as $key => $college_and_department) {
+            foreach ($departments_data as $college_and_department) {
+                $departments_organized[$college_and_department->name] = [];
                 if ($include_all_department == 1) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['shortname'] . ' Students';
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = 'All ' . $college_and_department->shortname . ' Students';
                 }
-                /* else if(in_array($college_and_department['College']['id'], $privilaged_collage_ids)) {
-                    $departments_organized[$college_and_department['College']['name']]['c~'.$college_and_department['College']['id']] = 'Freshman Program';
-                } */
-                foreach ($college_and_department['Department'] as $key => $department) {
-                    //  if(in_array($department['id'], $privilaged_department_ids)) {
-                    $departments_organized[$college_and_department['College']['name']][$department['id']] = $department['name'];
-                    //  }
+                foreach ($college_and_department->departments as $department) {
+                    $departments_organized[$college_and_department->name][$department->id] = $department->name;
                 }
             }
         }
-        //array_unshift($sections_organized, array('' => '--- Select Section ---'));
-        //debug($departments_organized);
+
         return $departments_organized;
     }
 
-    function allDepartmentInCollegeIncludingPre($department_ids = null, $college_ids = null, $includePre = 0, $only_active = 0)
+    public function allDepartmentInCollegeIncludingPre($department_ids = null, $college_ids = null, $includePre = 0, $only_active = 0): array
     {
-        $departments = array();
+        $departments = [];
 
-        if (empty($only_active)) {
-            $active = array(0 => 0, 1 => 1);
-        } else {
-            $active =  $only_active;
-        }
+        $active = $only_active ? 1 : [0, 1];
 
         if (!empty($department_ids)) {
-            $college_s = $this->find('all', array(
-                'conditions' => array(
-                    'Department.id' => $department_ids,
-                    'Department.active' => $active
-                ),
-                'contain' => array(
-                    'College' => array(
-                        'conditions' => array(
-                            'College.active' => $active
-                        )
-                    )
-                ),
-                'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-            ));
+            $college_s = $this->find()
+                ->where([
+                    'Departments.id IN' => $department_ids,
+                    'Departments.active IN' => $active
+                ])
+                ->contain([
+                    'Colleges' => [
+                        'conditions' => ['Colleges.active IN' => $active]
+                    ]
+                ])
+                ->order(['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC'])
+                ->toArray();
 
             if (!empty($college_s)) {
-                foreach ($college_s as $k => $v) {
+                foreach ($college_s as $v) {
                     if ($includePre) {
-                        $departments[$v['College']['name']]['c~' . $v['College']['id']] = 'Pre/Freshman/Remedial - ' . $v['College']['shortname'];
-                    } else {
-                        //$departments[$v['Department']['id']] = $v['Department']['name'];
+                        $departments[$v->college->name]['c~' . $v->college->id] = 'Pre/Freshman/Remedial - ' . $v->college->shortname;
                     }
-                    $departments[$v['College']['name']][$v['Department']['id']] = $v['Department']['name'];
+                    $departments[$v->college->name][$v->id] = $v->name;
                 }
             }
         }
 
         if (!empty($college_ids)) {
-            $college_s = $this->find('all', array(
-                'conditions' => array(
-                    'Department.college_id' => $college_ids,
-                    'Department.active' => $active
-                ),
-                'contain' => array(
-                    'College' => array(
-                        'conditions' => array(
-                            'College.active' => $active
-                        )
-                    )
-                ),
-                'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-            ));
+            $college_s = $this->find()
+                ->where([
+                    'Departments.college_id IN' => $college_ids,
+                    'Departments.active IN' => $active
+                ])
+                ->contain([
+                    'Colleges' => [
+                        'conditions' => ['Colleges.active IN' => $active]
+                    ]
+                ])
+                ->order(['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC'])
+                ->toArray();
 
             if (!empty($college_s)) {
-                foreach ($college_s as $k => $v) {
+                foreach ($college_s as $v) {
                     if ($includePre) {
-                        $departments[$v['College']['name']]['c~' . $v['College']['id']] = 'Pre/Freshman/Remedial - ' . $v['College']['shortname'];
-                    } else {
-                        //$departments[$v['Department']['id']] = $v['Department']['name'];
+                        $departments[$v->college->name]['c~' . $v->college->id] = 'Pre/Freshman/Remedial - ' . $v->college->shortname;
                     }
-                    $departments[$v['College']['name']][$v['Department']['id']] = $v['Department']['name'];
+                    $departments[$v->college->name][$v->id] = $v->name;
                 }
             }
         }
+
         return $departments;
     }
 
-    function allUnits($role_id = null, $unit_id = null, $allUnit = 0)
+    public function allUnits($role_id = null, $unit_id = null, $allUnit = 0): array
     {
-        $departments_organized = array();
-        //debug($allUnit);
+        $departments_organized = [];
 
         if ($role_id == ROLE_COLLEGE && $allUnit == 0) {
-            $departments_data = $this->College->find('all', array(
-                'conditions' => array('College.id' => $unit_id),
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array('Department.active' => 1),
-                        'Specialization',
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                )
-            ));
+            $departments_data = $this->Colleges->find()
+                ->where(['Colleges.id' => $unit_id])
+                ->contain([
+                    'Departments' => [
+                        'conditions' => ['Departments.active' => 1],
+                        'Specializations',
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
 
             if (!empty($departments_data)) {
-                foreach ($departments_data as $key => $college_and_department) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['name'] . '';
+                foreach ($departments_data as $college_and_department) {
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = 'All ' . $college_and_department->name;
                 }
             }
         } elseif ($role_id == ROLE_DEPARTMENT && $allUnit == 0) {
             debug($unit_id);
-            $departments_data = $this->find('all', array('conditions' => array('Department.id' => $unit_id), 'contain' => array('College', 'Specialization')));
+            $departments_data = $this->find()
+                ->where(['Departments.id' => $unit_id])
+                ->contain(['Colleges', 'Specializations'])
+                ->toArray();
+
             debug($departments_data);
 
             if (!empty($departments_data)) {
-                foreach ($departments_data as $key => $department) {
-                    $departments_organized[$department['College']['name']]['d~' . $department['Department']['id']] = 'Department of ' . $department['Department']['name'];
-                    if (!empty($department['Specialization'])) {
-                        foreach ($department['Specialization'] as $skey => $spec) {
-                            $departments_organized[$department['Department']['name']][$spec['id']] = $spec['name'];
+                foreach ($departments_data as $department) {
+                    $departments_organized[$department->college->name]['d~' . $department->id] = 'Department of ' . $department->name;
+                    if (!empty($department->specializations)) {
+                        foreach ($department->specializations as $spec) {
+                            $departments_organized[$department->name][$spec->id] = $spec->name;
                         }
                     }
                 }
             }
         } elseif ($role_id == ROLE_REGISTRAR && $allUnit == 0) {
-            $departments_data = $this->College->find('all', array(
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array('Department.active' => 1),
-                        'Specialization',
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                ),
-                'conditions' => array('College.active' => 1),
-            ));
+            $departments_data = $this->Colleges->find()
+                ->where(['Colleges.active' => 1])
+                ->contain([
+                    'Departments' => [
+                        'conditions' => ['Departments.active' => 1],
+                        'Specializations',
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
 
             if (!empty($departments_data)) {
-                foreach ($departments_data as $key => $college_and_department) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['name'] . '';
-                    foreach ($college_and_department['Department'] as $key => $department) {
-                        $departments_organized[$college_and_department['College']['name']]['d~' . $department['id']] =  $department['name'];
-                        if (!empty($department['Specialization'])) {
-                            foreach ($department['Specialization'] as $skey => $spec) {
-                                $departments_organized[$department['Department']['name']][$spec['id']] = $spec['name'];
+                foreach ($departments_data as $college_and_department) {
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = 'All ' . $college_and_department->name;
+                    foreach ($college_and_department->departments as $department) {
+                        $departments_organized[$college_and_department->name]['d~' . $department->id] = $department->name;
+                        if (!empty($department->specializations)) {
+                            foreach ($department->specializations as $spec) {
+                                $departments_organized[$department->name][$spec->id] = $spec->name;
                             }
                         }
                     }
                 }
             }
         } elseif ($allUnit == 1) {
-            $departments_data = $this->College->find('all', array(
-                'contain' => array(
-                    'Department' => array(
-                        'conditions' => array('Department.active' => 1),
-                        'Specialization',
-                        'order' => array('Department.college_id' => 'ASC', 'Department.name' => 'ASC')
-                    )
-                ),
-                'conditions' => array('College.active' => 1)
-            ));
+            $departments_data = $this->Colleges->find()
+                ->where(['Colleges.active' => 1])
+                ->contain([
+                    'Departments' => [
+                        'conditions' => ['Departments.active' => 1],
+                        'Specializations',
+                        'sort' => ['Departments.college_id' => 'ASC', 'Departments.name' => 'ASC']
+                    ]
+                ])
+                ->toArray();
 
             if (!empty($departments_data)) {
-                foreach ($departments_data as $key => $college_and_department) {
-                    $departments_organized[$college_and_department['College']['name']]['c~' . $college_and_department['College']['id']] = 'All ' . $college_and_department['College']['name'] . '';
-                    foreach ($college_and_department['Department'] as $key => $department) {
-                        $departments_organized[$college_and_department['College']['name']]['d~' . $department['id']] = 'Department of ' . $department['name'];
-                        if (!empty($department['Specialization'])) {
-                            foreach ($department['Specialization'] as $skey => $spec) {
-                                $departments_organized[$department['Department']['name']][$spec['id']] = $spec['name'];
+                foreach ($departments_data as $college_and_department) {
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = 'All ' . $college_and_department->name;
+                    foreach ($college_and_department->departments as $department) {
+                        $departments_organized[$college_and_department->name]['d~' . $department->id] = 'Department of ' . $department->name;
+                        if (!empty($department->specializations)) {
+                            foreach ($department->specializations as $spec) {
+                                $departments_organized[$department->name][$spec->id] = $spec->name;
                             }
                         }
                     }
                 }
             }
         }
+
+        return $departments_organized;
+    }
+
+    public function allDepartmentsByCampus($department_id = null, $include_freshman_program = 0, $only_active = 1): array
+    {
+        $departments_organized = [];
+
+        $active = $only_active ? 1 : [0, 1];
+
+        $department_college_id = $this->find('list')
+            ->where(['Departments.id' => $department_id])
+            ->select(['college_id'])
+            ->toArray();
+
+        $college_campus_ids = $this->Colleges->find('list')
+            ->where(['Colleges.id IN' => $department_college_id])
+            ->select(['campus_id'])
+            ->toArray();
+
+        $departments_data = $this->Colleges->find()
+            ->where(['Colleges.campus_id IN' => $college_campus_ids])
+            ->contain([
+                'Departments' => [
+                    'conditions' => ['Departments.active IN' => $active]
+                ]
+            ])
+            ->toArray();
+
+        debug($departments_data);
+
+        if (!empty($departments_data)) {
+            foreach ($departments_data as $college_and_department) {
+                $departments_organized[$college_and_department->name] = [];
+                if ($include_freshman_program == 1) {
+                    $departments_organized[$college_and_department->name]['c~' . $college_and_department->id] = $college_and_department->shortname . ' - Pre/Freshman/Remedial';
+                }
+                foreach ($college_and_department->departments as $department) {
+                    $departments_organized[$college_and_department->name][$department->id] = $department->name;
+                }
+            }
+        }
+
         return $departments_organized;
     }
 }

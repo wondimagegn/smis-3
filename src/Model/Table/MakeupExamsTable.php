@@ -1,21 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
 
 class MakeupExamsTable extends Table
 {
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
@@ -23,189 +15,237 @@ class MakeupExamsTable extends Table
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
-        $this->belongsTo('Students', [
-            'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
-        ]);
+        // Associations
         $this->belongsTo('PublishedCourses', [
             'foreignKey' => 'published_course_id',
             'joinType' => 'INNER',
         ]);
         $this->belongsTo('CourseRegistrations', [
             'foreignKey' => 'course_registration_id',
+            'joinType' => 'LEFT',
         ]);
         $this->belongsTo('CourseAdds', [
             'foreignKey' => 'course_add_id',
+            'joinType' => 'LEFT',
         ]);
-        $this->hasMany('ExamGradeChanges', [
-            'foreignKey' => 'makeup_exam_id',
-        ]);
-        $this->hasMany('ExamGrades', [
-            'foreignKey' => 'makeup_exam_id',
+        $this->belongsTo('Students', [
+            'foreignKey' => 'student_id',
+            'joinType' => 'INNER',
         ]);
         $this->hasMany('ExamResults', [
             'foreignKey' => 'makeup_exam_id',
+            'dependent' => false,
+        ]);
+        $this->hasMany('ExamGrades', [
+            'foreignKey' => 'makeup_exam_id',
+            'dependent' => false,
+        ]);
+        $this->hasMany('ExamGradeChanges', [
+            'foreignKey' => 'makeup_exam_id',
+            'dependent' => false,
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
     public function validationDefault(Validator $validator): Validator
     {
         $validator
             ->notEmptyString('minute_number', 'Please provide minute number.')
+            ->requirePresence('minute_number', 'create')
             ->notEmptyString('published_course_id', 'Please select course.')
-            ->numeric('published_course_id', 'Invalid course selection.')
+            ->requirePresence('published_course_id', 'create')
+            ->numeric('published_course_id')
             ->notEmptyString('student_id', 'Please select the student who is taking the makeup exam.')
-            ->numeric('student_id', 'Invalid student selection.');
+            ->requirePresence('student_id', 'create')
+            ->numeric('student_id');
 
         return $validator;
     }
 
-    function getmakeupExams($department_id = "", $acadamic_year = "", $program_id = "", $program_type_id = "0", $semester = "0")
+    public function getmakeupExams($department_id = "", $acadamic_year = "", $program_id = "", $program_type_id = "", $semester = "")
     {
-        $makeup_exams_formated = array();
-        if ($department_id != "" && $acadamic_year != "" && $program_id != "") {
-            $conditions['PublishedCourse.department_id'] = $department_id;
-            $conditions['PublishedCourse.academic_year'] = $acadamic_year;
-            $conditions['PublishedCourse.program_id'] = $program_id;
-            if ($program_type_id != "0") {
-                $conditions['PublishedCourse.program_type_id'] = $program_type_id;
-            }
-            if ($semester != "0") {
-                $conditions['PublishedCourse.semester'] = $semester;
+        $makeup_exams_formated = [];
+
+        if (!empty($department_id) && !empty($acadamic_year) && !empty($program_id)) {
+            $conditions = [
+                'PublishedCourses.department_id' => $department_id,
+                'PublishedCourses.academic_year' => $acadamic_year,
+                'PublishedCourses.program_id' => $program_id,
+            ];
+
+            if (!empty($program_type_id)) {
+                $conditions['PublishedCourses.program_type_id'] = $program_type_id;
             }
 
-            //Makeup exams which are assigned to the instructor
-            $all_makeup_exams = $this->PublishedCourse->find(
-                'all',
-                array(
-                    'conditions' => $conditions,
-                    'contain' =>
-                        array(
-                            'Section',
-                            'Course',
-                            'MakeupExam' =>
-                                array(
-                                    'ExamGradeChange',
-                                    'ExamResult',
-                                    'ExamGrade',
-                                    'CourseRegistration' =>
-                                        array(
-                                            'PublishedCourse' => array('Course'),
-                                            'Student'
-                                        ),
-                                    'CourseAdd' =>
-                                        array(
-                                            'PublishedCourse' => array('Course'),
-                                            'Student'
-                                        )
-                                ),
-                        )
-                )
-            );
-            //debug($all_makeup_exams);
+            if (!empty($semester)) {
+                $conditions['PublishedCourses.semester'] = $semester;
+            }
+
+            $publishedCoursesTable = TableRegistry::getTableLocator()->get('PublishedCourses');
+            $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+
+            // Makeup exams assigned to the instructor
+            $all_makeup_exams = $publishedCoursesTable->find()
+                ->where($conditions)
+                ->contain([
+                    'Sections' => [
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit']],
+                    ],
+                    'Courses',
+                    'MakeupExams' => [
+                        'ExamGradeChanges',
+                        'ExamResults',
+                        'ExamGrades',
+                        'CourseRegistrations' => [
+                            'PublishedCourses' => ['Courses'],
+                            'Students' => [
+                                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit']],
+                            ],
+                        ],
+                        'CourseAdds' => [
+                            'PublishedCourses' => ['Courses'],
+                            'Students' => [
+                                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit']],
+                            ],
+                        ],
+                    ],
+                ])
+                ->toArray();
+
             $count = 0;
-            foreach ($all_makeup_exams as $key => $makeup_exams) {
-                if (isset($makeup_exams['MakeupExam']) && !empty($makeup_exams['MakeupExam'])) {
-                    foreach ($makeup_exams['MakeupExam'] as $me_key => $makeup_exam) { //debug($makeup_exam);
-                        if (!empty($makeup_exam['CourseRegistration'])) {
-                            $makeup_exams_formated[$count]['student_name'] = $makeup_exam['CourseRegistration']['Student']['first_name'] . ' ' . $makeup_exam['CourseRegistration']['Student']['middle_name'] . ' ' . $makeup_exam['CourseRegistration']['Student']['last_name'];
-                            $makeup_exams_formated[$count]['student_id'] = $makeup_exam['CourseRegistration']['Student']['studentnumber'];
-                            $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_code'] . ') [Registered]';
-                        } else {
-                            $makeup_exams_formated[$count]['student_name'] = $makeup_exam['CourseAdd']['Student']['first_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['middle_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['last_name'];
-                            $makeup_exams_formated[$count]['student_id'] = $makeup_exam['CourseAdd']['Student']['studentnumber'];
-                            $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_code'] . ') [Added]';
+
+            if (!empty($all_makeup_exams)) {
+                foreach ($all_makeup_exams as $makeup_exams) {
+                    if (!empty($makeup_exams->makeup_exams)) {
+                        foreach ($makeup_exams->makeup_exams as $makeup_exam) {
+                            if (!empty($makeup_exam->course_registration) && !empty($makeup_exam->course_registration->student->id)) {
+                                $makeup_exams_formated[$count] = [
+                                    'student_name' => $makeup_exam->course_registration->student->full_name,
+                                    'student_id' => $makeup_exam->course_registration->student->studentnumber,
+                                    'exam_for' => $makeup_exam->course_registration->published_course->course->course_code_title . ' (Course Registration)',
+                                    'gender' => $makeup_exam->course_registration->student->gender,
+                                    'graduated' => $makeup_exam->course_registration->student->graduated,
+                                    'student_attached_curriculum' => !empty($makeup_exam->course_registration->student->curriculum)
+                                        ? $makeup_exam->course_registration->student->curriculum->name . ' - ' .
+                                        $makeup_exam->course_registration->student->curriculum->year_introduced . ' (' .
+                                        (stripos($makeup_exam->course_registration->student->curriculum->type_credit, 'ECTS') !== false ? 'ECTS' : 'Credit') . ')'
+                                        : '',
+                                ];
+                            } elseif (!empty($makeup_exam->course_add) && !empty($makeup_exam->course_add->student->id)) {
+                                $makeup_exams_formated[$count] = [
+                                    'student_name' => $makeup_exam->course_add->student->full_name,
+                                    'student_id' => $makeup_exam->course_add->student->studentnumber,
+                                    'exam_for' => $makeup_exam->course_add->published_course->course->course_code_title . ' (Course Add)',
+                                    'gender' => $makeup_exam->course_add->student->gender,
+                                    'graduated' => $makeup_exam->course_add->student->graduated,
+                                    'student_attached_curriculum' => !empty($makeup_exam->course_add->student->curriculum)
+                                        ? $makeup_exam->course_add->student->curriculum->name . ' - ' .
+                                        $makeup_exam->course_add->student->curriculum->year_introduced . ' (' .
+                                        (stripos($makeup_exam->course_add->student->curriculum->type_credit, 'ECTS') !== false ? 'ECTS' : 'Credit') . ')'
+                                        : '',
+                                ];
+                            } else {
+                                continue;
+                            }
+
+                            $makeup_exams_formated[$count]['minute_number'] = $makeup_exam->minute_number;
+                            $makeup_exams_formated[$count]['taken_exam'] = $makeup_exams->course->course_code_title;
+                            $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams->section->name . ' (' .
+                                (!empty($makeup_exams->section->year_level->name)
+                                    ? $makeup_exams->section->year_level->name
+                                    : ($makeup_exams->section->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' .
+                                $makeup_exams->section->academicyear . ') ' .
+                                ($makeup_exams->section->archive ? '<span class="rejected"> (Archived) </span>' : '<span class="accepted"> (Active) </span>');
+                            $makeup_exams_formated[$count]['section_curriculum'] = !empty($makeup_exams->section->curriculum)
+                                ? $makeup_exams->section->curriculum->name . ' - ' .
+                                $makeup_exams->section->curriculum->year_introduced . ' (' .
+                                (stripos($makeup_exams->section->curriculum->type_credit, 'ECTS') !== false ? 'ECTS' : 'Credit') . ')'
+                                : '';
+                            $makeup_exams_formated[$count]['created'] = $makeup_exam->created;
+                            $makeup_exams_formated[$count]['modified'] = $makeup_exam->modified;
+                            $makeup_exams_formated[$count]['ExamGrade'] = $makeup_exam->exam_grades;
+                            $makeup_exams_formated[$count]['ExamResult'] = $makeup_exam->exam_results;
+
+                            if (!empty($makeup_exam->exam_grade_changes)) {
+                                $makeup_exams_formated[$count]['ExamGradeChange'] = $makeup_exam->exam_grade_changes[0];
+                                $status = $examGradeChangesTable->examGradeChangeStateDescription($makeup_exam->exam_grade_changes[0]);
+                                $makeup_exams_formated[$count]['ExamGradeChange']['state'] = $status['state'];
+                                $makeup_exams_formated[$count]['ExamGradeChange']['description'] = $status['description'];
+                            }
+
+                            $makeup_exams_formated[$count]['id'] = $makeup_exam->id;
+                            $count++;
                         }
-
-                        $makeup_exams_formated[$count]['minute_number'] = $makeup_exam['minute_number'];
-
-                        $makeup_exams_formated[$count]['taken_exam'] = $makeup_exams['Course']['course_title'] . ' (' . $makeup_exams['Course']['course_code'] . ')';
-                        $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams['Section']['name'];
-
-                        $makeup_exams_formated[$count]['created'] = $makeup_exam['created'];
-                        $makeup_exams_formated[$count]['modified'] = $makeup_exam['modified'];
-
-                        $makeup_exams_formated[$count]['ExamGrade'] = $makeup_exam['ExamGrade'];
-                        $makeup_exams_formated[$count]['ExamResult'] = $makeup_exam['ExamResult'];
-                        if (!empty($makeup_exam['ExamGradeChange'])) {
-                            $makeup_exams_formated[$count]['ExamGradeChange'] = $makeup_exam['ExamGradeChange'][0];
-                            $status = $this->CourseRegistration->ExamGrade->ExamGradeChange->examGradeChangeStateDescription($makeup_exam['ExamGradeChange'][0]);
-                            $makeup_exams_formated[$count]['ExamGradeChange']['state'] = $status['state'];
-                            $makeup_exams_formated[$count]['ExamGradeChange']['description'] = $status['description'];
-                        }
-
-                        $makeup_exams_formated[$count]['id'] = $makeup_exam['id'];
-                        $count++;
                     }
                 }
             }
 
-            //Makeup exams which are directly submted by the department
-            $all_makeup_exams = $this->PublishedCourse->find(
-                'all',
-                array(
-                    'conditions' => $conditions,
-                    'contain' =>
-                        array(
-                            'Course',
-                            'CourseRegistration' =>
-                                array(
-                                    'Student',
-                                    'ExamGrade' =>
-                                        array(
-                                            'ExamGradeChange' =>
-                                                array(
-                                                    'conditions' =>
-                                                        array(
-                                                            'ExamGradeChange.initiated_by_department' => 1
-                                                        )
-                                                )
-                                        )
-                                ),
-                            'CourseAdd' =>
-                                array(
-                                    'Student',
-                                    'ExamGrade' =>
-                                        array(
-                                            'ExamGradeChange' =>
-                                                array(
-                                                    'conditions' =>
-                                                        array(
-                                                            'ExamGradeChange.initiated_by_department' => 1
-                                                        )
-                                                )
-                                        )
-                                )
-                        )
-                )
-            );
-            //debug($all_makeup_exams);
-            foreach ($all_makeup_exams as $key => $published_course) {
-                if (isset($published_course['CourseRegistration'])) {
-                    foreach ($published_course['CourseRegistration'] as $key => $course_registration) {
-                        if (isset($course_registration['ExamGrade'][0]['ExamGradeChange']) && !empty($course_registration['ExamGrade'][0]['ExamGradeChange'])) {
-                            foreach ($course_registration['ExamGrade'][0]['ExamGradeChange'] as $key => $exam_grade_change) {
-                                $makeup_exams_formated[$count]['student_name'] = $course_registration['Student']['first_name'] . ' ' . $course_registration['Student']['middle_name'] . ' ' . $course_registration['Student']['last_name'];
-                                $makeup_exams_formated[$count]['student_id'] = $course_registration['Student']['studentnumber'];
-                                $makeup_exams_formated[$count]['exam_for'] = $published_course['Course']['course_title'] . ' (' . $published_course['Course']['course_code'] . ') [Registered]';
+            // Makeup exams directly submitted by the department
+            $all_makeup_exams = $publishedCoursesTable->find()
+                ->where($conditions)
+                ->contain([
+                    'Courses',
+                    'CourseRegistrations' => [
+                        'Students',
+                        'ExamGrades' => [
+                            'ExamGradeChanges' => [
+                                'conditions' => ['ExamGradeChanges.initiated_by_department' => 1],
+                            ],
+                        ],
+                    ],
+                    'CourseAdds' => [
+                        'Students',
+                        'ExamGrades' => [
+                            'ExamGradeChanges' => [
+                                'conditions' => ['ExamGradeChanges.initiated_by_department' => 1],
+                            ],
+                        ],
+                    ],
+                ])
+                ->toArray();
 
-                                $makeup_exams_formated[$count]['taken_exam'] = null;
-                                $makeup_exams_formated[$count]['section_exam_taken'] = null;
-
-                                $makeup_exams_formated[$count]['ExamGradeChange'] = $exam_grade_change;
-                                $status = $this->CourseRegistration->ExamGrade->ExamGradeChange->examGradeChangeStateDescription($exam_grade_change);
-                                $makeup_exams_formated[$count]['ExamGradeChange']['state'] = $status['state'];
-                                $makeup_exams_formated[$count]['ExamGradeChange']['description'] = $status['description'];
-                                //$makeup_exams_formated[$count]['ExamGradeChange']['status'] = $this->CourseRegistration->getExamGradeChangeStatus($exam_grade_change);
-                                $count++;
+            if (!empty($all_makeup_exams)) {
+                foreach ($all_makeup_exams as $published_course) {
+                    if (!empty($published_course->course_registrations)) {
+                        foreach ($published_course->course_registrations as $course_registration) {
+                            if (!empty($course_registration->student->id) && !empty($course_registration->exam_grades) && !empty($course_registration->exam_grades[0]->exam_grade_changes)) {
+                                foreach ($course_registration->exam_grades[0]->exam_grade_changes as $exam_grade_change) {
+                                    $makeup_exams_formated[$count] = [
+                                        'student_name' => $course_registration->student->full_name,
+                                        'student_id' => $course_registration->student->studentnumber,
+                                        'exam_for' => $published_course->course->course_code_title . ' (Course Registration)',
+                                        'gender' => $course_registration->student->gender,
+                                        'graduated' => $course_registration->student->graduated,
+                                        'taken_exam' => null,
+                                        'section_exam_taken' => null,
+                                        'ExamGradeChange' => $exam_grade_change->toArray(),
+                                    ];
+                                    $status = $examGradeChangesTable->examGradeChangeStateDescription($exam_grade_change);
+                                    $makeup_exams_formated[$count]['ExamGradeChange']['state'] = $status['state'];
+                                    $makeup_exams_formated[$count]['ExamGradeChange']['description'] = $status['description'];
+                                    $count++;
+                                }
+                            }
+                        }
+                    } elseif (!empty($published_course->course_adds)) {
+                        foreach ($published_course->course_adds as $course_add) {
+                            if (!empty($course_add->student->id) && !empty($course_add->exam_grades) && !empty($course_add->exam_grades[0]->exam_grade_changes)) {
+                                foreach ($course_add->exam_grades[0]->exam_grade_changes as $exam_grade_change) {
+                                    $makeup_exams_formated[$count] = [
+                                        'student_name' => $course_add->student->full_name,
+                                        'student_id' => $course_add->student->studentnumber,
+                                        'exam_for' => $published_course->course->course_code_title . ' (Course Add)',
+                                        'gender' => $course_add->student->gender,
+                                        'graduated' => $course_add->student->graduated,
+                                        'taken_exam' => null,
+                                        'section_exam_taken' => null,
+                                        'ExamGradeChange' => $exam_grade_change->toArray(),
+                                    ];
+                                    $status = $examGradeChangesTable->examGradeChangeStateDescription($exam_grade_change);
+                                    $makeup_exams_formated[$count]['ExamGradeChange']['state'] = $status['state'];
+                                    $makeup_exams_formated[$count]['ExamGradeChange']['description'] = $status['description'];
+                                    $count++;
+                                }
                             }
                         }
                     }
@@ -213,165 +253,133 @@ class MakeupExamsTable extends Table
             }
         }
 
-
         return $makeup_exams_formated;
     }
 
-    function BACKUP_getmakeupExams($department_id = "", $acadamic_year = "", $program_id = "", $program_type_id = "0", $semester = "0")
+    public function BACKUP_getmakeupExams($department_id = "", $acadamic_year = "", $program_id = "", $program_type_id = "0", $semester = "0")
     {
-        $makeup_exams_formated = array();
-        if ($department_id != "" && $acadamic_year != "" && $program_id != "") {
-            $conditions['PublishedCourse.department_id'] = $department_id;
-            $conditions['PublishedCourse.academic_year'] = $acadamic_year;
-            $conditions['PublishedCourse.program_id'] = $program_id;
-            if ($program_type_id != "0") {
-                $conditions['PublishedCourse.program_type_id'] = $program_type_id;
-            }
-            if ($semester != "0") {
-                $conditions['PublishedCourse.semester'] = $semester;
+        $makeup_exams_formated = [];
+
+        if (!empty($department_id) && !empty($acadamic_year) && !empty($program_id)) {
+            $conditions = [
+                'PublishedCourses.department_id' => $department_id,
+                'PublishedCourses.academic_year' => $acadamic_year,
+                'PublishedCourses.program_id' => $program_id,
+            ];
+
+            if (!empty($program_type_id)) {
+                $conditions['PublishedCourses.program_type_id'] = $program_type_id;
             }
 
-            $all_makeup_exams = $this->PublishedCourse->find(
-                'all',
-                array(
-                    'conditions' => $conditions,
-                    'contain' =>
-                        array(
-                            'Section',
-                            'Course',
-                            'MakeupExam' =>
-                                array(
-                                    'ExamResult',
-                                    'ExamGrade',
-                                    'CourseRegistration' =>
-                                        array(
-                                            'PublishedCourse' => array('Course'),
-                                            'Student'
-                                        ),
-                                    'CourseAdd' =>
-                                        array(
-                                            'PublishedCourse' => array('Course'),
-                                            'Student'
-                                        )
-                                )
-                        )
-                )
-            );
+            if (!empty($semester)) {
+                $conditions['PublishedCourses.semester'] = $semester;
+            }
+
+            $publishedCoursesTable = TableRegistry::getTableLocator()->get('PublishedCourses');
+
+            $all_makeup_exams = $publishedCoursesTable->find()
+                ->where($conditions)
+                ->contain([
+                    'Sections',
+                    'Courses',
+                    'MakeupExams' => [
+                        'ExamResults',
+                        'ExamGrades',
+                        'CourseRegistrations' => [
+                            'PublishedCourses' => ['Courses'],
+                            'Students',
+                        ],
+                        'CourseAdds' => [
+                            'PublishedCourses' => ['Courses'],
+                            'Students',
+                        ],
+                    ],
+                ])
+                ->toArray();
 
             $count = 0;
-            foreach ($all_makeup_exams as $key => $makeup_exams) {
-                if (isset($makeup_exams['MakeupExam']) && !empty($makeup_exams['MakeupExam'])) {
-                    foreach ($makeup_exams['MakeupExam'] as $me_key => $makeup_exam) { //debug($makeup_exam);
-                        if (!empty($makeup_exam['CourseRegistration'])) {
-                            $makeup_exams_formated[$count]['student_name'] = $makeup_exam['CourseRegistration']['Student']['first_name'] . ' ' . $makeup_exam['CourseRegistration']['Student']['middle_name'] . ' ' . $makeup_exam['CourseRegistration']['Student']['last_name'];
-                            $makeup_exams_formated[$count]['student_id'] = $makeup_exam['CourseRegistration']['Student']['studentnumber'];
-                            $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseRegistration']['PublishedCourse']['Course']['course_code'] . ') [Registered]';
-                        } else {
-                            $makeup_exams_formated[$count]['student_name'] = $makeup_exam['CourseAdd']['Student']['first_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['middle_name'] . ' ' . $makeup_exam['CourseAdd']['Student']['last_name'];
-                            $makeup_exams_formated[$count]['student_id'] = $makeup_exam['CourseAdd']['Student']['studentnumber'];
-                            $makeup_exams_formated[$count]['exam_for'] = $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_title'] . ' (' . $makeup_exam['CourseAdd']['PublishedCourse']['Course']['course_code'] . ') [Added]';
+
+            if (!empty($all_makeup_exams)) {
+                foreach ($all_makeup_exams as $makeup_exams) {
+                    if (!empty($makeup_exams->makeup_exams)) {
+                        foreach ($makeup_exams->makeup_exams as $makeup_exam) {
+                            if (!empty($makeup_exam->course_registration)) {
+                                $makeup_exams_formated[$count] = [
+                                    'student_name' => $makeup_exam->course_registration->student->full_name,
+                                    'student_id' => $makeup_exam->course_registration->student->studentnumber,
+                                    'exam_for' => $makeup_exam->course_registration->published_course->course->course_code_title . ' (Course Registration)',
+                                ];
+                            } else {
+                                $makeup_exams_formated[$count] = [
+                                    'student_name' => $makeup_exam->course_add->student->full_name,
+                                    'student_id' => $makeup_exam->course_add->student->studentnumber,
+                                    'exam_for' => $makeup_exam->course_add->published_course->course->course_code_title . ' (Course Add)',
+                                ];
+                            }
+
+                            $makeup_exams_formated[$count]['minute_number'] = $makeup_exam->minute_number;
+                            $makeup_exams_formated[$count]['taken_exam'] = $makeup_exams->course->course_code_title;
+                            $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams->section->name;
+                            $makeup_exams_formated[$count]['created'] = $makeup_exam->created;
+                            $makeup_exams_formated[$count]['modified'] = $makeup_exam->modified;
+                            $makeup_exams_formated[$count]['ExamGrade'] = $makeup_exam->exam_grades;
+                            $makeup_exams_formated[$count]['ExamResult'] = $makeup_exam->exam_results;
+                            $makeup_exams_formated[$count]['id'] = $makeup_exam->id;
+                            $count++;
                         }
-
-                        $makeup_exams_formated[$count]['minute_number'] = $makeup_exam['minute_number'];
-
-                        $makeup_exams_formated[$count]['taken_exam'] = $makeup_exams['Course']['course_title'] . ' (' . $makeup_exams['Course']['course_code'] . ')';
-                        $makeup_exams_formated[$count]['section_exam_taken'] = $makeup_exams['Section']['name'];
-
-                        $makeup_exams_formated[$count]['created'] = $makeup_exam['created'];
-                        $makeup_exams_formated[$count]['modified'] = $makeup_exam['modified'];
-
-                        $makeup_exams_formated[$count]['ExamGrade'] = $makeup_exam['ExamGrade'];
-                        $makeup_exams_formated[$count]['ExamResult'] = $makeup_exam['ExamResult'];
-                        $makeup_exams_formated[$count]['id'] = $makeup_exam['id'];
-                        $count++;
                     }
                 }
             }
         }
-        //debug($makeup_exams_formated);
-        //debug($all_makeup_exams);
 
         return $makeup_exams_formated;
     }
 
     public function canItBeDeleted($id = "")
     {
-        if ($id != "") {
-            $result_and_grade = $this->find(
-                'first',
-                array(
-                    'conditions' =>
-                        array(
-                            'MakeupExam.id' => $id
-                        ),
-                    'contain' => array('ExamResult', 'ExamGrade', 'ExamGradeChange')
-                )
-            );
+        if (!empty($id)) {
+            $result_and_grade = $this->find()
+                ->where(['MakeupExams.id' => $id])
+                ->contain(['ExamResults', 'ExamGrades', 'ExamGradeChanges'])
+                ->first();
 
-            if (count($result_and_grade['ExamResult']) > 0 || count($result_and_grade['ExamGrade']) > 0 || count(
-                    $result_and_grade['ExamGradeChange']
-                )) {
+            if (
+                !empty($result_and_grade->exam_results) ||
+                !empty($result_and_grade->exam_grades) ||
+                !empty($result_and_grade->exam_grade_changes)
+            ) {
                 return false;
-            } else {
-                return true;
             }
+            return true;
         }
         return false;
     }
+
     public function makeUpExamApplied($student_id, $published_course_id, $reg_add_id, $reg = 0)
     {
+        $conditions = ['MakeupExams.student_id' => $student_id];
 
         if ($reg == 1) {
-            $return = $this->find(
-                'first',
-                array(
-                    'conditions' =>
-                        array(
-                            'MakeupExam.student_id' => $student_id,
-                            //'MakeupExam.published_course_id' => $published_course_id,
-                            'MakeupExam.course_registration_id' => $reg_add_id,
-                        ),
-                    'recursive' => -1
-                )
-            );
-        } elseif ($reg == 0) {
-            $return = $this->find(
-                'first',
-                array(
-                    'conditions' =>
-                        array(
-                            'MakeupExam.student_id' => $student_id,
-                            //'MakeupExam.published_course_id'=>$published_course_id,
-                            'MakeupExam.course_add_id' => $reg_add_id,
-                        ),
-                    'recursive' => -1
-                )
-            );
-        }
-        if (
-            isset($return['MakeupExam']['id'])
-            && !empty($return['MakeupExam']['id'])
-        ) {
-            return $return['MakeupExam']['id'];
+            $conditions['MakeupExams.course_registration_id'] = $reg_add_id;
+        } else {
+            $conditions['MakeupExams.course_add_id'] = $reg_add_id;
         }
 
-        return 0;
+        $result = $this->find()
+            ->where($conditions)
+            ->select(['id'])
+            ->first();
+
+        return !empty($result->id) ? $result->id : 0;
     }
 
     public function assignedMakeup($published_course_id)
     {
-        $assigned = $this->find(
-            'count',
-            array(
-                'conditions' =>
-                    array(
-
-                        'MakeupExam.published_course_id' => $published_course_id,
-                    ),
-                'recursive' => -1
-            )
-        );
-
-        return $assigned;
+        if (!empty($published_course_id)) {
+            return $this->find()
+                ->where(['MakeupExams.published_course_id' => $published_course_id])
+                ->count();
+        }
+        return 0;
     }
 }

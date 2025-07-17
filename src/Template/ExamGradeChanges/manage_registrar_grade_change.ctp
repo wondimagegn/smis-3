@@ -1,3 +1,4 @@
+
 <div class="box">
 	<div class="box-header bg-transparent">
         <div class="box-title" style="margin-top: 10px;"><i class="fontello-check" style="font-size: larger; font-weight: bold;"></i>
@@ -8,21 +9,23 @@
 		<div class="row">
 			<div class="large-12 columns">
 				<div style="margin-top: -30px;"><hr></div>
-				
-				<?php $st_count = 1; ?>
-				<?= $this->Form->create('ExamGradeChange', array('onSubmit' => 'return checkForm(this);')); ?>
 
-				<h6 id="validation-message_non_selected" class="text-red fs14"></h6>
+
+                <?php $st_count = 1; ?>
+                <?= $this->Form->create(null, ['id' => 'ExamGradeChangeForm', 'onsubmit' => 'return checkForm(this);']) ?>
+
+
+                <h6 id="validation-message_non_selected" class="text-red fs14"></h6>
 
 				<?php
-				if (!empty($exam_grade_changes)) { ?>
-			
+				if (!empty($examGradeChanges)) { ?>
+
 					<hr>
 					<h6 class="fs16 text-gray">Exam Grade Changes which are requested by Instructor and approved by the Department and College</h6>
 					<hr>
 
 					<?php
-					foreach ($exam_grade_changes as $college_name => $college_grade_changes) {
+					foreach ($examGradeChanges as $college_name => $college_grade_changes) {
 						foreach ($college_grade_changes as $department_name => $department_grade_changes) {
 							foreach ($department_grade_changes as $program_name => $program_grade_changes) {
 								foreach ($program_grade_changes as $program_type_name => $program_type_grade_changes) { ?>
@@ -33,18 +36,27 @@
 													<td colspan="9" style="vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85); line-height: 1.5;">
 														<span style="font-size:16px;font-weight:bold; margin-top: 25px;"><?= $department_name; ?></span>
 															<br>
-															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold"> 
+															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold">
 																<?= $college_name; ?>
 																<br>
 															</span>
 														</span>
-														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold"> 
+														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold">
 															<?= $program_name . ' &nbsp; | &nbsp; ' . $program_type_name; ?><br>
 														</span>
 													</td>
 												</tr>
 												<tr>
-													<th style="width:5%;" class="center"><div style="padding-left: 10%;"><?= $this->Form->input('Mass.ExamGradeChange.select_all', array('disabled', 'type' => 'checkbox', 'id' => 'select-all', 'label' => false)); ?></div></th>
+													<th style="width:5%;" class="center"><div style="padding-left: 10%;">
+
+                                                        <?= $this->Form->control('Mass.ExamGradeChange.select_all', [
+                                                            'type' => 'checkbox',
+                                                            'id' => 'select-all',
+                                                            'label' => false,
+                                                            'disabled' => true
+                                                        ]) ?>
+                                                        </div>
+                                                    </th>
 													<th style="width:2%;" class="center">#</th>
 													<th style="width:4%;" class="center">&nbsp;</th>
 													<th style="width:20%;" class="vcenter">Student Name</th>
@@ -58,12 +70,26 @@
 											<tbody>
 												<?php
 												$counter = 1;
-												foreach ($program_type_grade_changes as $key => $grade_change) { ?>
+												foreach ($program_type_grade_changes as $key => $grade_change) {
+
+                                                    ?>
 													<tr>
-														<td class="center">
-															<div style="padding-left: 15%;"><?= $this->Form->input('Mass.ExamGradeChange.' . $st_count . '.gp', array('disabled', 'type' => 'checkbox', 'label' => false, 'id' => 'ExamGradeChange' . $st_count, 'class' => 'checkbox1')); ?></div>
-															<?=  $this->Form->input('Mass.ExamGradeChange.' . $st_count . '.id', array('type' => 'hidden', 'value' => $grade_change['ExamGradeChange']['id'])); ?>
-														</td>
+
+                                                        <td class="center">
+                                                            <div style="padding-left: 15%;">
+                                                                <?= $this->Form->control('Mass.ExamGradeChange.' . $st_count . '.gp', [
+                                                                    'type' => 'checkbox',
+                                                                    'label' => false,
+                                                                    'id' => 'ExamGradeChange' . $st_count,
+                                                                    'class' => 'checkbox1',
+                                                                    'disabled' => true
+                                                                ]) ?>
+                                                                <?= $this->Form->control('Mass.ExamGradeChange.' . $st_count . '.id', [
+                                                                    'type' => 'hidden',
+                                                                    'value' => $grade_change['ExamGradeChange']['id']
+                                                                ]) ?>
+                                                            </div>
+                                                        </td>
 														<td class="center"><?= $counter++; ?></td>
 														<td onclick="toggleView(this)" id="<?= $st_count; ?>" class="center"><?= $this->Html->image('plus2.gif', array('id' => 'i' . $st_count)); ?></td>
 														<td class="vcenter"><?= $grade_change['Student']['first_name'] . ' ' . $grade_change['Student']['middle_name'] . ' ' . $grade_change['Student']['last_name']; ?></td>
@@ -79,7 +105,7 @@
 														<td colspan="6" style="background-color:white;">
 															<table cellpadding="0" cellspacing="0" class="table">
 																<?php
-																//debug($grade_change['Section']);
+
 																if ($grade_change['ExamGradeChange']['initiated_by_department'] == 1) { ?>
 																	<tr>
 																		<td class="fs14" style="font-weight:bold;" class="vcenter"><span class="text-red">Importnat Note: This exam grade change is requested by the department, not by the course instructor!.</span></td>
@@ -131,27 +157,52 @@
 																				<tr>
 																					<td style="width:20%; background-color:white;">Decision:</td>
 																					<td style="width:80%; background-color:white;">
-																						<?php
-																						echo $this->Form->input('ExamGradeChange.' . $st_count . '.id', array('type' => 'hidden', 'value' => $grade_change['ExamGradeChange']['id']));
-																						$options = array('1' => ' Accept (Finalize)', '-1' => ' Reject (Back to Department)');
-																						$attributes = array('legend' => false, 'label' => false, 'separator' => "<br />", 'default' => 1);
 
-																						if (!empty($grade_change['ExamGradeHistory'][0]['rejected'])) {
-																							//$options = array('1' => 'Accept(forward to Regisrar)', '-1' => 'Reject(Send back to department');
-																							//$attributes = array('legend' => false, 'label' => false, 'separator' => "<br />", 'default' => 1);
-																						}
-																						echo $this->Form->radio('ExamGradeChange.' . $st_count . '.registrar_approval', $options, $attributes); ?>
+                                                                                        <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_approval', [
+                                                                                            'type' => 'radio',
+                                                                                            'options' => [
+                                                                                                1 => __('Accept (Finalize)'),
+                                                                                                -1 => __('Reject (Back to Department)')
+                                                                                            ],
+                                                                                            'default' => 1,
+                                                                                            'label' => false,
+                                                                                            'templates' => [
+                                                                                                'radioWrapper' => '<div class="radio">{{label}}</div>',
+                                                                                                'nestingLabel' => '{{hidden}}{{input}}<label{{attrs}}>{{text}}</label><br>'
+                                                                                            ]
+                                                                                        ]) ?>
+
+                                                                                        <?= $this->Form->control('ExamGradeChange.' . $st_count . '.id', [
+                                                                                            'type' => 'hidden',
+                                                                                            'value' => $grade_change['ExamGradeChange']['id']
+                                                                                        ]) ?>
+
 																						<br>
 																					</td>
 																				</tr>
 																				<tr>
 																					<td style="background-color:white;">Remark:</td>
-																					<td style="background-color:white;"><?= $this->Form->input('ExamGradeChange.' . $st_count . '.registrar_reason', array('label' => false, 'cols' => 40)); ?></td>
+																					<td style="background-color:white;">
+                                                                                        <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_reason', [
+                                                                                            'label' => false,
+                                                                                            'cols' => 40
+                                                                                        ]) ?>
+                                                                                    </td>
 																				</tr>
-																				
+
 																			</table>
 																			<br>
-																			<?= $this->Form->Submit('Approve Grade Change Request', array('div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'approveGradeChangeByRegistrar_' . $st_count++)); ?>
+
+
+                                                                            <?= $this->Form->button(__('Approve Grade Change Request'), [
+                                                                                'class' => 'tiny radius button bg-blue',
+                                                                                'value' => 'Approve Grade Change Request ' . $st_count,
+                                                                                'name' => 'approveGradeChangeByRegistrar_' . $st_count++,
+
+                                                                                'type' => 'submit'
+                                                                            ]) ?>
+
+
 																			<?php
 																		} else { ?>
 																			<div class='warning-box warning-message'><span style='margin-right: 15px;'></span>Grade Change is not available for graduated student.</div>
@@ -184,12 +235,12 @@
 
 				/************************************  MAKEUP EXAM **************************************/
 
-				if (isset($makeup_exam_grade_changes) && !empty($makeup_exam_grade_changes)) { ?>
+				if (isset($makeupExamGradeChanges) && !empty($makeupExamGradeChanges)) { ?>
 					<hr>
 					<h6 class="fs14 text-gray">Makeup Exam approval which is requested by Instructors and approved by the departement.</h6>
 					<hr>
 					<?php
-					foreach ($makeup_exam_grade_changes as $college_name => $college_grade_changes) {
+					foreach ($makeupExamGradeChanges as $college_name => $college_grade_changes) {
 						foreach ($college_grade_changes as $department_name => $department_grade_changes) {
 							foreach ($department_grade_changes as $program_name => $program_grade_changes) {
 								foreach ($program_grade_changes as $program_type_name => $program_type_grade_changes) { ?>
@@ -200,12 +251,12 @@
 													<td colspan="8" style="vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85); line-height: 1.5;">
 														<span style="font-size:16px;font-weight:bold; margin-top: 25px;"><?= $department_name; ?></span>
 															<br>
-															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold"> 
+															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold">
 																<?= $college_name; ?>
 																<br>
 															</span>
 														</span>
-														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold"> 
+														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold">
 															<?= $program_name . ' &nbsp; | &nbsp; ' . $program_type_name; ?><br>
 														</span>
 													</td>
@@ -301,20 +352,47 @@
 																			<tr>
 																				<td style="width:20%; background-color: white;">Decision:</td>
 																				<td style="width:80%; background-color: white;">
-																					<?php
-																					echo $this->Form->input('ExamGradeChange.' . $st_count . '.id', array('type' => 'hidden', 'value' => $grade_change['ExamGradeChange']['id']));
-																					$options = array('1' => ' Accept (Finalize)', '-1' => ' Reject (Back to Department)');
-																					$attributes = array('legend' => false, 'label' => false, 'separator' => "<br />", 'default' => 1);
-																					echo $this->Form->radio('ExamGradeChange.' . $st_count . '.registrar_approval', $options, $attributes); ?>
+
+                                                                                    <?= $this->Form->control('ExamGradeChange.' . $st_count . '.id', [
+                                                                                        'type' => 'hidden',
+                                                                                        'value' => $grade_change['ExamGradeChange']['id']
+                                                                                    ]) ?>
+                                                                                    <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_approval', [
+                                                                                        'type' => 'radio',
+                                                                                        'options' => [
+                                                                                            1 => __('Accept (Finalize)'),
+                                                                                            -1 => __('Reject (Back to Department)')
+                                                                                        ],
+                                                                                        'default' => 1,
+                                                                                        'label' => false,
+                                                                                        'templates' => [
+                                                                                            'radioWrapper' => '<div class="radio">{{label}}</div>',
+                                                                                            'nestingLabel' => '{{hidden}}{{input}}<label{{attrs}}>{{text}}</label><br>'
+                                                                                        ]
+                                                                                    ]) ?>
+
+
+
 																				</td>
 																			</tr>
 																			<tr>
 																				<td style="background-color: white;">Remark:</td>
-																				<td style="background-color: white;"><?= $this->Form->input('ExamGradeChange.' . $st_count . '.registrar_reason', array('label' => false, 'cols' => 40)); ?></td>
+																				<td style="background-color: white;"> <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_reason', [
+                                                                                        'label' => false,
+                                                                                        'cols' => 40
+                                                                                    ]) ?></td>
 																			</tr>
 																		</table>
 																		<br>
-																		<?= $this->Form->Submit('Approve Grade Change Request', array('div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'approveGradeChangeByRegistrar_' . $st_count++)); ?>
+
+
+                                                                        <?= $this->Form->button(__('Approve Grade Change Request'), [
+                                                                            'class' => 'tiny radius button bg-blue',
+                                                                            'value' => 'Approve Grade Change Request ' . $st_count,
+                                                                            'name' => 'approveGradeChangeByRegistrar_' . $st_count++,
+
+                                                                            'type' => 'submit'
+                                                                        ]) ?>
 																	</td>
 																</tr>
 															</table>
@@ -338,19 +416,20 @@
 							}
 						}
 					}
-				} 
+				}
 
 
 				/************************************ MAKEUP REQUESTED BY THE DEPARTMENT **************************/
-				
-				if (isset($department_makeup_exam_grade_changes) && !empty($department_makeup_exam_grade_changes)) { ?>
-					
+
+				if (isset($departmentMakeupExamGradeChanges) && !empty($departmentMakeupExamGradeChanges)) {
+                    ?>
+
 					<hr>
 					<h6 class="fs16 text-gray">Exam Grade Change through Supplementary Exam <!-- (Requested by department) --></h6>
 					<hr>
 
 					<?php
-					foreach ($department_makeup_exam_grade_changes as $college_name => $college_grade_changes) {
+					foreach ($departmentMakeupExamGradeChanges as $college_name => $college_grade_changes) {
 						foreach ($college_grade_changes as $department_name => $department_grade_changes) {
 							foreach ($department_grade_changes as $program_name => $program_grade_changes) {
 								foreach ($program_grade_changes as $program_type_name => $program_type_grade_changes) { ?>
@@ -361,12 +440,12 @@
 													<td colspan="8" style="vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85); line-height: 1.5;">
 														<span style="font-size:16px;font-weight:bold; margin-top: 25px;"><?= $department_name; ?></span>
 															<br>
-															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold"> 
+															<span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold">
 																<?= $college_name; ?>
 																<br>
 															</span>
 														</span>
-														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold"> 
+														<span class="text-gray" style="padding-top: 14px; font-size: 13px; font-weight: bold">
 															<?= $program_name . ' &nbsp; | &nbsp; ' . $program_type_name; ?><br>
 														</span>
 													</td>
@@ -443,23 +522,50 @@
 																					<div style="font-weight:bold; font-size:14px">Grade Change Request Approval</div>
 																				</td>
 																			</tr>
-																			<tr>
-																				<td style="width:18%; background-color: white;">Decision:</td>
-																				<td style="width:82%; background-color: white;">
-																					<?php
-																					echo $this->Form->input('ExamGradeChange.' . $st_count . '.id', array('type' => 'hidden', 'value' => $grade_change['ExamGradeChange']['id']));
-																					$options = array('1' => ' Accept (Finalize)', '-1' => ' Reject (Back to Department)');
-																					$attributes = array('legend' => false, 'label' => false, 'separator' => "<br />", 'default' => 1);
-																					echo $this->Form->radio('ExamGradeChange.' . $st_count . '.registrar_approval', $options, $attributes); ?>
-																				</td>
-																			</tr>
-																			<tr>
-																				<td style="background-color: white;"><b>Remark:</b></td>
-																				<td style="background-color: white;"><?= $this->Form->input('ExamGradeChange.' . $st_count . '.registrar_reason', array('label' => false, 'cols' => 40)); ?></td>
-																			</tr>
+
+
+                                                                            <tr>
+                                                                                <td style="width:18%; background-color: white;"><?= __('Decision') ?>:</td>
+                                                                                <td style="width:82%; background-color: white;">
+                                                                                    <?= $this->Form->control('ExamGradeChange.' . $st_count . '.id', [
+                                                                                        'type' => 'hidden',
+                                                                                        'value' => $grade_change['ExamGradeChange']['id']
+                                                                                    ]) ?>
+                                                                                    <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_approval', [
+                                                                                        'type' => 'radio',
+                                                                                        'options' => [
+                                                                                            1 => __('Accept (Finalize)'),
+                                                                                            -1 => __('Reject (Back to Department)')
+                                                                                        ],
+                                                                                        'default' => 1,
+                                                                                        'label' => false,
+                                                                                        'templates' => [
+                                                                                            'radioWrapper' => '<div class="radio">{{label}}</div>',
+                                                                                            'nestingLabel' => '{{hidden}}{{input}}<label{{attrs}}>{{text}}</label><br>'
+                                                                                        ]
+                                                                                    ]) ?>
+                                                                                </td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td style="background-color: white;"><b><?= __('Remark') ?>:</b></td>
+                                                                                <td style="background-color: white;">
+                                                                                    <?= $this->Form->control('ExamGradeChange.' . $st_count . '.registrar_reason', [
+                                                                                        'label' => false,
+                                                                                        'cols' => 40
+                                                                                    ]) ?>
+                                                                                </td>
+                                                                            </tr>
+
 																		</table>
 																		<br>
-																		<?= $this->Form->Submit('Approve Grade Change Request', array('div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'approveGradeChangeByRegistrar_' . $st_count++)); ?>
+
+                                                                        <?= $this->Form->button(__('Approve Grade Change Request'), [
+                                                                            'class' => 'tiny radius button bg-blue',
+                                                                            'value' => 'Approve Grade Change Request ' . $st_count,
+                                                                            'name' => 'approveGradeChangeByRegistrar_' . $st_count++,
+
+                                                                            'type' => 'submit'
+                                                                        ]) ?>
 																	</td>
 																</tr>
 															</table>
@@ -485,15 +591,31 @@
 					}
 				}
 
-				if (count($exam_grade_changes) > 1) {
-					//echo $this->Form->Submit('Accept All Grade Change Request', array('id' => 'approveRejectGradeChange', 'div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'ApproveAllGradeChangeByRegistrar'));
+				if (count($examGradeChanges) > 1) {
+                   /*echo  $this->Form->button(__('Accept All Grade Change Request'), [
+                        'id' => 'approveRejectGradeChange',
+                        'class' => 'tiny radius button bg-blue',
+                        'name' => 'ApproveAllGradeChangeByRegistrar'
+                    ]);
+                   */
+				//	echo $this->Form->Submit('Accept All Grade Change Request', array('id' => 'approveRejectGradeChange', 'div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'ApproveAllGradeChangeByRegistrar'));
 					// they should check each and every grade change. Neway
 				}
 
-				echo $this->Form->input('grade_change_count', array('type' => 'hidden', 'value' => ($st_count - 1)));
 
-				if (empty($makeup_exam_grade_changes) && empty($exam_grade_changes) && empty($department_makeup_exam_grade_changes)) { ?>
-					<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style='margin-right: 15px;'></span>There is no Exam Grade Change or Makeup Exam Grade submission request to confirm <?= (!empty($years_to_look_list_for_display) ? $years_to_look_list_for_display : ''); ?>. Exam grade changes and makeup exams are required to be submitted by instructor and approved by department & college(for grade change) in-order to appear here. You can use the "View Grade Change" tool to see the status of any grade change from assigned and department.</div>
+               echo  $this->Form->control('grade_change_count', [
+                    'type' => 'hidden',
+                    'value' => ($st_count - 1)
+                ]) ;
+
+
+				if (empty($makeupExamGradeChanges) && empty($examGradeChanges) && empty($departmentMakeupExamGradeChanges)) { ?>
+					<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                        <span style='margin-right: 15px;'></span>There is no Exam Grade Change or Makeup Exam Grade submission
+                        request to confirm <?= (!empty($years_to_look_list_for_display) ? $years_to_look_list_for_display : ''); ?>.
+                        Exam grade changes and makeup exams are required to be submitted by instructor and approved by department
+                        & college(for grade change) in-order to appear here. You can use the "View Grade Change" tool to see the
+                        status of any grade change from assigned and department.</div>
 					<?php
 				} ?>
 				<?= $this->Form->end(); ?>
@@ -502,55 +624,46 @@
 	</div>
 </div>
 
-<script>
-	
-</script>
-
 <script type="text/javascript">
 
-	function toggleView(obj) {
-		if ($('#c' + obj.id).css("display") == 'none')
-			$('#i' + obj.id).attr("src", '/img/minus2.gif');
-		else
-			$('#i' + obj.id).attr("src", '/img/plus2.gif');
-		$('#c' + obj.id).toggle("slow");
-	}
+    function toggleView(obj) {
+        if ($('#c' + obj.id).css("display") == 'none')
+            $('#i' + obj.id).attr("src", '/img/minus2.gif');
+        else
+            $('#i' + obj.id).attr("src", '/img/plus2.gif');
+        $('#c' + obj.id).toggle("slow");
+    }
 
-	var form_being_submitted = false;
+    var form_being_submitted = false;
 
     const validationMessageNonSelected = document.getElementById('validation-message_non_selected');
 
-	var checkForm = function(form) {
+    var checkForm = function(form) {
 
         var radios = document.querySelectorAll('input[type="radio"]');
-		var checkedOneRadio = Array.prototype.slice.call(radios).some(x => x.checked);
+        var checkedOneRadio = Array.prototype.slice.call(radios).some(x => x.checked);
 
-		var checkboxes = document.querySelectorAll('input[type="checkbox"]');
-		var checkedOneCheckbox = Array.prototype.slice.call(checkboxes).some(x => x.checked);
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        var checkedOneCheckbox = Array.prototype.slice.call(checkboxes).some(x => x.checked);
 
-		if (!checkedOneRadio) {
+        if (!checkedOneRadio) {
             alert('At least one Grade Change Must be Accepted or Rejected!');
-			validationMessageNonSelected.innerHTML = 'At least one Grade Change Must be Accepted or Rejected!';
-			return false;
-		} /* else if (!checkedOneCheckbox) {
-			//I do not want to check it at this time, Neway
-            alert('At least one Grade Change Must be Accepted or Rejected!');
-			validationMessageNonSelected.innerHTML = 'At least one Grade Change Must be Accepted or Rejected!';
-			return false;
-		} */
+            validationMessageNonSelected.innerHTML = 'At least one Grade Change Must be Accepted or Rejected!';
+            return false;
+        }
+        if (form_being_submitted) {
+            alert("Approving/Rejecting Grade Change, please wait a moment...");
+            return false;
+        }
 
-		if (form_being_submitted) {
-			alert("Approving/Rejecting Grade Change, please wait a moment...");
-			//form.approveRejectGradeChange.disabled = true;
-			return false;
-		}
+        form_being_submitted = true;
+        return true;
+    };
 
-		//form.approveRejectAdd.value = 'Approving/Rejecting Course Add...';
-		form_being_submitted = true;
-		return true;
-	};
-
-	if (window.history.replaceState) {
-		window.history.replaceState(null, null, window.location.href);
-	}
+    if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
+    }
 </script>
+
+<?php $this->end(); ?>
+

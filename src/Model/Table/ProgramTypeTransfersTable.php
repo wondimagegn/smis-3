@@ -77,8 +77,21 @@ class ProgramTypeTransfersTable extends Table
         return true;
     }
 
-    public function getStudentProgramType($studentId = null, $academicYear = null, $semester = null)
+
+    /**
+     * Retrieves a student's program type for a given academic year and semester
+     *
+     * @param int|null $studentId Student ID
+     * @param string|null $academicYear Academic year (e.g., "2024/25")
+     * @param string|null $semester Semester (e.g., "I", "II", "III")
+     * @return int|null Program type ID or null if not found
+     */
+    public function getStudentProgramType($studentId = null, $academicYear = null, $semester = null): ?int
     {
+        if (!$studentId) {
+            return null;
+        }
+
         $studentTransfers = $this->find()
             ->where(['ProgramTypeTransfers.student_id' => $studentId])
             ->order(['ProgramTypeTransfers.transfer_date' => 'ASC'])
@@ -89,17 +102,28 @@ class ProgramTypeTransfersTable extends Table
             ->contain(['AcceptedStudents'])
             ->first();
 
-        if (!$studentDetail) {
+        if (!$studentDetail || !$studentDetail->program_type_id) {
             return null;
         }
 
         $programTypeId = $studentDetail->program_type_id;
+
+        // Check if accepted_student and academic_year are valid
+        if (!$studentDetail->accepted_student || empty($studentDetail->accepted_student->academic_year)) {
+            return $programTypeId; // Fallback to student's program_type_id
+        }
+
         $sysAcademicYear = $studentDetail->accepted_student->academic_year;
         $sysSemester = 'I';
 
+        // Validate academic year format (e.g., "2024/25")
+        if (!preg_match('/^\d{4}\/\d{2}$/', $sysAcademicYear)) {
+            return $programTypeId; // Fallback if format is invalid
+        }
+
         do {
             foreach ($studentTransfers as $transfer) {
-                if ($sysAcademicYear == $transfer->academic_year && $sysSemester == $transfer->semester) {
+                if ($sysAcademicYear === $transfer->academic_year && $sysSemester === $transfer->semester) {
                     $programTypeId = $transfer->program_type_id;
                 }
             }
@@ -111,7 +135,10 @@ class ProgramTypeTransfersTable extends Table
                     $sysSemester = 'III';
                 } else {
                     $sysSemester = 'I';
-                    $sysAcademicYear = (substr($sysAcademicYear, 0, 4) + 1) . '/' . substr((substr($sysAcademicYear, 0, 4) + 2), 2, 2);
+                    // Safely increment academic year
+                    $yearParts = explode('/', $sysAcademicYear);
+                    $startYear = (int)$yearParts[0];
+                    $sysAcademicYear = ($startYear + 1) . '/' . sprintf('%02d', ($startYear + 2) % 100);
                 }
             } else {
                 return $programTypeId;

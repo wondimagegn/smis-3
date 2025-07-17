@@ -25,6 +25,9 @@ use Cake\Utility\Inflector; // Import Inflector from the correct namespace
 
 use Cake\Cache\Cache;
 
+
+use Cake\Utility\Text;
+
 class UsersTable extends Table
 {
     /**
@@ -173,6 +176,9 @@ class UsersTable extends Table
         // Only hash the password if it's a new one
         if ($entity->isDirty('password')) {
             $entity->password = (new DefaultPasswordHasher())->hash($entity->password);
+        }
+        if ($entity->isNew() && (empty($entity->id) || $entity->id === '')) {
+            $entity->set('id', Text::uuid());
         }
         return true;
     }

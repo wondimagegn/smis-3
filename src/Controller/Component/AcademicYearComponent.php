@@ -7,6 +7,8 @@ use Cake\ORM\TableRegistry;
 use Cake\Core\Configure;
 use DateTime;
 
+use Cake\I18n\FrozenTime;
+
 class AcademicYearComponent extends Component
 {
     public $acyear;
@@ -224,32 +226,35 @@ class AcademicYearComponent extends Component
         return $result;
     }
 
-
     public function academicYearInArray($beginYear, $endYear)
     {
+        $academicYears = [];
 
         $thisYear = $endYear;
-        $thisMonth = date('m');
+        $thisMonth = FrozenTime::now()->month;
 
-        // Adjust year if the current month is between January and August
-        if (in_array($thisMonth, ["01", "02", "03", "04", "05", "06", "07", "08"])) {
-            $thisYear--;
+        if (in_array($thisMonth, [1, 2, 3, 4, 5, 6, 7, 8])) {
+            $thisYear = $thisYear;
         }
 
-        $front2DigitThisYear = substr($thisYear, 0, 2);
-        $shortThisYear = substr($thisYear, 2, 2);
+        $frontTwoDigits = substr($thisYear, 0, 2);
+        $shortThisYear = (int) substr($thisYear, 2, 2);
 
-        for ($i = substr($beginYear, 2, 2); $i <= $shortThisYear; $i++) {
-            $yearString = sprintf('%02d', $i);
-            $nextYearString = sprintf('%02d', $i + 1);
-
-            $formattedYear = "{$front2DigitThisYear}{$yearString}/{$nextYearString}";
-            $this->acyear_array_data[$formattedYear] = $formattedYear;
+        for ($i = (int) substr($beginYear, 2, 2); $i <= $shortThisYear; $i++) {
+            $nextYear = $i + 1;
+            $yearKey = sprintf(
+                '%s%02d/%02d',
+                $frontTwoDigits,
+                $i,
+                $nextYear
+            );
+            $academicYears[$yearKey] = $yearKey;
         }
 
-        arsort($this->acyear_array_data);
-        return $this->acyear_array_data;
+        krsort($academicYears);
+        return $academicYears;
     }
+
 
     public function isValidDateWithinYearRange($dateString, $minYear = null, $maxYear = null, $format = 'Y-m-d')
     {

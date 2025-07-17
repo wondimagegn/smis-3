@@ -1,15 +1,14 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
+/**
+ * Books Table
+ */
 class BooksTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -18,128 +17,69 @@ class BooksTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('books');
         $this->setDisplayField('title');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Courses', [
             'foreignKey' => 'course_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'Course',
-        ]);
-        $this->belongsToMany('Courses', [
-            'foreignKey' => 'book_id',
-            'targetForeignKey' => 'course_id',
-            'joinTable' => 'courses_books',
+            'joinType' => 'LEFT',
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('title')
-            ->maxLength('title', 100)
             ->requirePresence('title', 'create')
-            ->notEmptyString('title');
-
-        $validator
-            ->scalar('ISBN')
-            ->maxLength('ISBN', 100)
-            ->requirePresence('ISBN', 'create')
-            ->notEmptyString('ISBN');
-
-        $validator
-            ->scalar('publisher')
-            ->maxLength('publisher', 200)
-            ->allowEmptyString('publisher');
-
-        $validator
-            ->scalar('place_of_publication')
-            ->maxLength('place_of_publication', 100)
-            ->allowEmptyString('place_of_publication');
-
-        $validator
-            ->scalar('edition')
-            ->maxLength('edition', 15)
-            ->allowEmptyString('edition');
-
-        $validator
-            ->scalar('author')
-            ->maxLength('author', 100)
-            ->allowEmptyString('author');
-
-        $validator
-            ->scalar('year_of_publication')
-            ->allowEmptyString('year_of_publication');
+            ->notEmptyString('title', 'Please provide book title, it is required.');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Deletes books for a course except those specified in data
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $courseId Course ID
+     * @param array|null $data Book data with IDs to keep
+     * @return void
      */
-    public function buildRules(RulesChecker $rules)
+    public function deleteBookList($courseId = null, $data = null)
     {
+        if (!$courseId) {
+            return;
+        }
 
-        $rules->add($rules->existsIn(['course_id'], 'Courses'));
+        $deleteIds = $this->find('list')
+            ->where(['Books.course_id' => $courseId])
+            ->toArray();
 
-        return $rules;
-    }
+        if (empty($deleteIds)) {
+            return;
+        }
 
-    public function deleteBookList($course_id = null, $data = null)
-    {
-
-        $dontdeleteids = array();
-        $deleteids = array();
-        $deleteids = $this->find(
-            'list',
-            array(
-                'conditions' => array('Book.course_id' => $course_id),
-                'fields' => 'id'
-            )
-        );
+        $dontDeleteIds = [];
         if (!empty($data['Book'])) {
-            foreach ($data['Book'] as $in => $va) {
-                if (!empty($va['id'])) {
-                    if (in_array($va['id'], $deleteids)) {
-                        $dontdeleteids[] = $va['id'];
-                    }
-                }
-            }
-        }
-        if (!empty($dontdeleteids)) {
-            foreach ($deleteids as $in => &$va) {
-                if (in_array($va, $dontdeleteids)) {
-                    unset($deleteids[$in]);
+            foreach ($data['Book'] as $book) {
+                if (!empty($book['id']) && in_array($book['id'], $deleteIds)) {
+                    $dontDeleteIds[] = $book['id'];
                 }
             }
         }
 
+        $idsToDelete = array_diff($deleteIds, $dontDeleteIds);
 
-        if (!empty($deleteids)) {
-            $this->deleteAll(array(
-                'Book.id' => $deleteids
-            ), false);
+        if (!empty($idsToDelete)) {
+            $this->deleteAll(['Books.id IN' => $idsToDelete]);
         }
     }
 }

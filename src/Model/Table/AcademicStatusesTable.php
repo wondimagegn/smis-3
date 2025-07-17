@@ -1,46 +1,36 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
+/**
+ * AcademicStatuses Table
+ */
 class AcademicStatusesTable extends Table
 {
-
     /**
      * Initialize method
      *
      * @param array $config The configuration for the Table.
      * @return void
      */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
         $this->setTable('academic_statuses');
         $this->setDisplayField('name');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->hasMany('AcademicStands', [
             'foreignKey' => 'academic_status_id',
+            'dependent' => false,
         ]);
-        $this->hasMany('HistoricalStudentExamStatuses', [
-            'foreignKey' => 'academic_status_id',
-            'propertyName' => 'HistoricalStudentExamStatus',
-        ]);
-        $this->hasMany('OtherAcademicRules', [
-            'foreignKey' => 'academic_status_id',
-            'propertyName' => 'OtherAcademicRule',
-        ]);
+
         $this->hasMany('StudentExamStatuses', [
             'foreignKey' => 'academic_status_id',
-            'propertyName' => 'StudentExamStatus',
+            'dependent' => false,
         ]);
     }
 
@@ -50,44 +40,46 @@ class AcademicStatusesTable extends Table
      * @param \Cake\Validation\Validator $validator Validator instance.
      * @return \Cake\Validation\Validator
      */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('name')
-            ->maxLength('name', 20)
-            ->requirePresence('name', 'create')
-            ->notEmptyString('name');
-
-        $validator
-            ->requirePresence('order', 'create')
-            ->notEmptyString('order');
-
-        $validator
-            ->boolean('computable')
-            ->notEmptyString('computable');
+            ->notEmptyString('name', 'Please provide status name.')
+            ->add('name', 'unique', [
+                'rule' => function ($value, $context) {
+                    $conditions = ['name' => $value];
+                    if (!empty($context['data']['id'])) {
+                        $conditions['id !='] = $context['data']['id'];
+                    }
+                    return !$this->exists($conditions);
+                },
+                'message' => 'You already have this status.'
+            ])
+            ->numeric('order', 'Please provide order of status in number.')
+            ->notEmptyString('order', 'Please provide order of status in number.');
 
         return $validator;
     }
 
-    public function canItBeDeleted($id = null)
+    /**
+     * Checks if an academic status can be deleted
+     *
+     * @param int|null $id Academic status ID
+     * @return bool True if it can be deleted, false otherwise
+     */
+    public function canItBeDeleted(?int $id = null): bool
     {
+        if ($id === null) {
+            return false;
+        }
 
-        if ($this->StudentExamStatus->find(
-                'count',
-                array('conditions' => array('StudentExamStatus.academic_status_id' => $id))
-            ) > 0) {
+        if ($this->StudentExamStatuses->find()->where(['academic_status_id' => $id])->count() > 0) {
             return false;
         }
-        if ($this->AcademicStand->find('count', array('conditions' => array('AcademicStand.academic_status_id' => $id))
-            ) > 0) {
-            return false;
-        } else {
+
+        if ($this->AcademicStands->find()->where(['academic_status_id' => $id])->count() > 0) {
             return false;
         }
+
+        return true;
     }
 }

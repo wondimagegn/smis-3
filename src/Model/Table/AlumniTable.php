@@ -1,15 +1,15 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
 
+/**
+ * Alumni Table
+ */
 class AlumniTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -18,190 +18,129 @@ class AlumniTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('alumni');
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'Student',
+            'joinType' => 'LEFT',
+        ]);
+
+        $this->hasMany('AlumniResponses', [
+            'foreignKey' => 'alumni_id',
+            'dependent' => true,
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('full_name')
-            ->maxLength('full_name', 200)
             ->requirePresence('full_name', 'create')
-            ->notEmptyString('full_name');
-
-        $validator
+            ->notEmptyString('full_name', 'Please provide your full name.')
             ->scalar('father_name')
-            ->maxLength('father_name', 200)
             ->requirePresence('father_name', 'create')
-            ->notEmptyString('father_name');
-
-        $validator
+            ->notEmptyString('father_name', 'Please provide your father name.')
             ->scalar('region')
-            ->maxLength('region', 50)
             ->requirePresence('region', 'create')
-            ->notEmptyString('region');
-
-        $validator
+            ->notEmptyString('region', 'Please provide your region.')
             ->scalar('woreda')
-            ->maxLength('woreda', 50)
             ->requirePresence('woreda', 'create')
-            ->notEmptyString('woreda');
-
-        $validator
-            ->scalar('kebele')
-            ->maxLength('kebele', 50)
-            ->requirePresence('kebele', 'create')
-            ->notEmptyString('kebele');
-
-        $validator
+            ->notEmptyString('woreda', 'Please provide your woreda.')
             ->scalar('housenumber')
-            ->maxLength('housenumber', 50)
-            ->allowEmptyString('housenumber');
-
-        $validator
-            ->scalar('mobile')
-            ->maxLength('mobile', 15)
-            ->requirePresence('mobile', 'create')
-            ->notEmptyString('mobile');
-
-        $validator
-            ->scalar('home_second_phone')
-            ->maxLength('home_second_phone', 15)
-            ->allowEmptyString('home_second_phone');
-
-        $validator
-            ->email('email')
+            ->requirePresence('housenumber', 'create')
+            ->notEmptyString('housenumber', 'Please provide your house number.')
+            ->email('email', false, 'Please enter a valid email address.')
             ->requirePresence('email', 'create')
-            ->notEmptyString('email');
-
-        $validator
-            ->scalar('facebookaddress')
-            ->maxLength('facebookaddress', 200)
-            ->allowEmptyString('facebookaddress');
-
-        $validator
-            ->scalar('studentnumber')
-            ->maxLength('studentnumber', 200)
-            ->requirePresence('studentnumber', 'create')
-            ->notEmptyString('studentnumber');
-
-        $validator
+            ->notEmptyString('email', 'Please enter a valid email address.')
+            ->add('email', 'unique', [
+                'rule' => 'validateUnique',
+                'provider' => 'table',
+                'message' => 'The email address is used by someone. Please provide a unique different email.'
+            ])
+            ->scalar('mobile')
+            ->requirePresence('mobile', 'create')
+            ->notEmptyString('mobile', 'Please enter a valid mobile.')
             ->scalar('sex')
-            ->maxLength('sex', 6)
             ->requirePresence('sex', 'create')
-            ->notEmptyString('sex');
-
-        $validator
+            ->notEmptyString('sex', 'Please select your gender.')
             ->scalar('placeofbirthregion')
-            ->maxLength('placeofbirthregion', 20)
             ->requirePresence('placeofbirthregion', 'create')
-            ->notEmptyString('placeofbirthregion');
-
-        $validator
-            ->scalar('placeofbirthworeda')
-            ->maxLength('placeofbirthworeda', 20)
-            ->allowEmptyString('placeofbirthworeda');
-
-        $validator
+            ->notEmptyString('placeofbirthregion', 'Please provide place of birth region.')
             ->scalar('fieldofstudy')
-            ->maxLength('fieldofstudy', 200)
             ->requirePresence('fieldofstudy', 'create')
-            ->notEmptyString('fieldofstudy');
-
-        $validator
-            ->integer('age')
+            ->notEmptyString('fieldofstudy', 'Please provide field of study.')
+            ->numeric('age')
             ->requirePresence('age', 'create')
-            ->notEmptyString('age');
-
-        $validator
-            ->scalar('gradution_academic_year')
-            ->maxLength('gradution_academic_year', 10)
-            ->requirePresence('gradution_academic_year', 'create')
-            ->notEmptyString('gradution_academic_year');
+            ->notEmptyString('age', 'Please provide your current age.');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Formats alumni response data
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param array $data Alumni response data
+     * @return array Formatted data
      */
-    public function buildRules(RulesChecker $rules)
+    public function formatResponse(array $data)
     {
+        $formattedData = [
+            'Alumnus' => $data['Alumnus'],
+            'AlumniResponse' => []
+        ];
 
-        $rules->add($rules->isUnique(['email']));
-        $rules->add($rules->existsIn(['student_id'], 'Students'));
-
-        return $rules;
-    }
-
-
-    public function formatResponse($data)
-    {
-
-        $formattedData = array();
-        $formattedData['Alumnus'] = $data['Alumnus'];
         $count = 0;
-        foreach ($data['AlumniResponse'] as $k => $v) {
+        foreach ($data['AlumniResponse'] as $response) {
+            $answer = $response['answer'] ?? [];
             if (
-                isset($v['answer']['mother']) && !empty($v['answer']['mother']) && isset($v['answer']['father']) &&
-                !empty($v['answer']['father'])
+                !empty($answer['mother']) &&
+                !empty($answer['father'])
             ) {
-                $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
-                $formattedData['AlumniResponse'][$count]['mother'] = 1;
-                $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer']['mother'];
-
+                $formattedData['AlumniResponse'][$count] = [
+                    'survey_question_id' => $response['survey_question_id'],
+                    'mother' => 1,
+                    'survey_question_answer_id' => $answer['mother']
+                ];
                 $count++;
-                $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
-                $formattedData['AlumniResponse'][$count]['father'] = 1;
-                $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer']['father'];
+                $formattedData['AlumniResponse'][$count] = [
+                    'survey_question_id' => $response['survey_question_id'],
+                    'father' => 1,
+                    'survey_question_answer_id' => $answer['father']
+                ];
             } else {
-                if (empty($v['answer'])) {
-                    $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
-
-                    $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
-                } elseif (is_array($v['answer'])) {
-                    foreach ($v['answer'] as $ak => $av) {
-                        if ($av == 1) {
-                            $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
-
-                            $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
-                            $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $ak;
+                if (empty($answer)) {
+                    $formattedData['AlumniResponse'][$count] = [
+                        'survey_question_id' => $response['survey_question_id'],
+                        'specifiy' => $response['specifiy'] ?? null
+                    ];
+                } elseif (is_array($answer)) {
+                    foreach ($answer as $answerKey => $answerValue) {
+                        if ($answerValue == 1) {
+                            $formattedData['AlumniResponse'][$count] = [
+                                'survey_question_id' => $response['survey_question_id'],
+                                'specifiy' => $response['specifiy'] ?? null,
+                                'survey_question_answer_id' => $answerKey
+                            ];
                             $count++;
                         }
                     }
-                } elseif (!empty($v['answer']) && !is_array($v['answer'])) {
-                    $formattedData['AlumniResponse'][$count]['survey_question_id'] = $v['survey_question_id'];
-
-                    $formattedData['AlumniResponse'][$count]['specifiy'] = $v['specifiy'];
-                    $formattedData['AlumniResponse'][$count]['survey_question_answer_id'] = $v['answer'];
+                } elseif (!empty($answer) && !is_array($answer)) {
+                    $formattedData['AlumniResponse'][$count] = [
+                        'survey_question_id' => $response['survey_question_id'],
+                        'specifiy' => $response['specifiy'] ?? null,
+                        'survey_question_answer_id' => $answer
+                    ];
                 }
             }
             $count++;
@@ -210,124 +149,169 @@ class AlumniTable extends Table
         return $formattedData;
     }
 
-    public function completedRoundOneQuestionner($student_id)
+    /**
+     * Checks if an alumni has completed all round one survey questions
+     *
+     * @param int|null $studentId Student ID
+     * @return bool True if all questions answered, false otherwise
+     */
+    public function completedRoundOneQuestionnaire($studentId = null)
     {
-
-        $surveyQuestions = ClassRegistry::init('SurveyQuestion')->find(
-            'all',
-            array('contain' => array('SurveyQuestionAnswer'))
-        );
-        $alumni_id = $this->find(
-            'first',
-            array('conditions' => array('Alumnus.student_id' => $student_id), 'recursive' => -1)
-        );
-        if (empty($alumni_id['Alumnus']['student_id'])) {
+        if (!$studentId) {
             return false;
-        } else {
-            return true;
         }
 
+        $alumni = $this->find()
+            ->select(['Alumni.id'])
+            ->where(['Alumni.student_id' => $studentId])
+            ->first();
+
+        if (empty($alumni)) {
+            return false;
+        }
+
+        $surveyQuestions = $this->SurveyQuestions->find()
+            ->contain(['SurveyQuestionAnswers'])
+            ->toArray();
+
         if (!empty($surveyQuestions)) {
-            foreach ($surveyQuestions as $k => $v) {
-                $response = ClassRegistry::init('AlumniResponse')->find(
-                    'count',
-                    array(
-                        'conditions' => array(
-                            'AlumniResponse.alumni_id' => $alumni_id['Alumnus']['id'],
-                            'AlumniResponse.survey_question_id' => $v['SurveyQuestion']['id']
-                        )
-                    )
-                );
-                if (empty($response)) {
-                    debug($v['SurveyQuestion']['id']);
+            $alumniResponsesTable = TableRegistry::getTableLocator()->get('AlumniResponses');
+            foreach ($surveyQuestions as $question) {
+                $responseCount = $alumniResponsesTable->find()
+                    ->where([
+                        'AlumniResponses.alumni_id' => $alumni->id,
+                        'AlumniResponses.survey_question_id' => $question->id
+                    ])
+                    ->count();
+
+                if ($responseCount === 0) {
                     return false;
                 }
             }
             return true;
         }
+
         return false;
     }
 
-    public function getSelectedAlumniSurvey($student_ids)
+    /**
+     * Retrieves alumni survey responses for given student IDs
+     *
+     * @param array $studentIds Student IDs
+     * @return array Alumni survey responses
+     */
+    public function getSelectedAlumniSurvey(array $studentIds)
     {
-
-        $alumniresponse = $this->find(
-            'all',
-            array(
-                'conditions' => array('Alumnus.student_id' => $student_ids),
-                'contain' => array('AlumniResponse' => array('SurveyQuestion', 'SurveyQuestionAnswer'))
-            )
-        );
-        return $alumniresponse;
+        return $this->find()
+            ->where(['Alumni.student_id IN' => $studentIds])
+            ->contain([
+                'AlumniResponses' => [
+                    'SurveyQuestions',
+                    'SurveyQuestionAnswers'
+                ]
+            ])
+            ->toArray();
     }
 
-    public function getCompletedSurvey($student_ids)
+    /**
+     * Retrieves completed survey responses for given student IDs
+     *
+     * @param array $studentIds Student IDs
+     * @return array Completed survey responses
+     */
+    public function getCompletedSurvey(array $studentIds)
     {
+        $alumniResponses = $this->find()
+            ->where(['Alumni.student_id IN' => $studentIds])
+            ->contain([
+                'AlumniResponses' => [
+                    'SurveyQuestions',
+                    'SurveyQuestionAnswers'
+                ]
+            ])
+            ->toArray();
 
-        $alumniresponse = $this->find(
-            'all',
-            array(
-                'conditions' => array('Alumnus.student_id' => $student_ids),
-                'contain' => array('AlumniResponse' => array('SurveyQuestion', 'SurveyQuestionAnswer'))
-            )
-        );
-        $student = array();
-        foreach ($alumniresponse as $k => $v) {
-            foreach ($v['AlumniResponse'] as $alk => $alv) {
-                if ($alv['mother'] == 1) {
-                    $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['mother'] = $alv;
-                } elseif ($alv['father'] == 1) {
-                    $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['father'] = $alv;
+        $students = [];
+        foreach ($alumniResponses as $response) {
+            $key = $response->full_name . '~' . $response->student_id;
+            foreach ($response->alumni_responses as $alumniResponse) {
+                if (!empty($alumniResponse->mother)) {
+                    $students[$key][$alumniResponse->survey_question_id]['mother'] = $alumniResponse->toArray();
+                } elseif (!empty($alumniResponse->father)) {
+                    $students[$key][$alumniResponse->survey_question_id]['father'] = $alumniResponse->toArray();
                 } else {
-                    if ($alv['SurveyQuestion']['allow_multiple_answers'] == 1) {
-                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'][] = $alv;
-                    } elseif ($alv['SurveyQuestion']['answer_required_yn'] == 1 && !empty($alv['survey_question_answer_id'])) {
-                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'] = $alv;
-                    } elseif (empty($alv['survey_question_answer_id']) && !empty($alv['specifiy'])) {
-                        $student[$v['Alumnus']['full_name'] . '~' . $v['Alumnus']['student_id']][$alv['survey_question_id']]['answer'] = $alv['specifiy'];
+                    if ($alumniResponse->survey_question->allow_multiple_answers == 1) {
+                        $students[$key][$alumniResponse->survey_question_id]['answer'][] = $alumniResponse->toArray();
+                    } elseif (
+                        $alumniResponse->survey_question->answer_required_yn == 1 &&
+                        !empty($alumniResponse->survey_question_answer_id)
+                    ) {
+                        $students[$key][$alumniResponse->survey_question_id]['answer'] = $alumniResponse->toArray();
+                    } elseif (empty($alumniResponse->survey_question_answer_id) && !empty($alumniResponse->specifiy)) {
+                        $students[$key][$alumniResponse->survey_question_id]['answer'] = $alumniResponse->specifiy;
                     }
                 }
             }
         }
-        return $student;
+
+        return $students;
     }
 
-    public function checkIfStudentGradutingClass($student_id)
+    /**
+     * Checks if a student is part of a graduating class
+     *
+     * @param int|null $studentId Student ID
+     * @return bool True if graduating, false otherwise
+     */
+    public function checkIfStudentGraduatingClass($studentId = null)
     {
+        if (!$studentId) {
+            return false;
+        }
 
-        $studentCurriculum = ClassRegistry::init('Student')->find('first', array(
-            'conditions' => array('Student.id' => $student_id),
-            'contain' => array('Curriculum')
-        ));
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+        $courseExemptionsTable = TableRegistry::getTableLocator()->get('CourseExemptions');
 
-        $allRegistration = ClassRegistry::init('CourseRegistration')->find('all', array(
-            'conditions' => array('CourseRegistration.student_id' => $student_id),
-            'contain' => array('PublishedCourse' => array('Course'))
-        ));
+        $studentCurriculum = $studentsTable->find()
+            ->where(['Students.id' => $studentId])
+            ->contain(['Curriculums'])
+            ->first();
+
+        if (!$studentCurriculum) {
+            return false;
+        }
+
+        $registrations = $courseRegistrationsTable->find()
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses'])
+            ->toArray();
+
         $sumRegistered = 0;
         $graduatingCourseTaken = 0;
-        foreach ($allRegistration as $k => $v) {
-            $sumRegistered += $v['PublishedCourse']['Course']['credit'];
-            if ($v['PublishedCourse']['Course']['thesis']) {
+        foreach ($registrations as $registration) {
+            $sumRegistered += $registration->published_course->course->credit ?? 0;
+            if ($registration->published_course->course->thesis) {
                 $graduatingCourseTaken = 1;
                 break;
             }
         }
 
-        $exemptionMaximum = $this->query(
-            "SELECT SUM(course_taken_credit) as sumex
-		FROM  course_exemptions
-		WHERE student_id =" . $student_id . "
-		order by SUM(course_taken_credit)
-		DESC limit 1
-		"
-        );
+        $exemptionSum = $courseExemptionsTable->find()
+            ->select(['sumex' => 'SUM(course_taken_credit)'])
+            ->where(['CourseExemptions.student_id' => $studentId])
+            ->order(['sumex' => 'DESC'])
+            ->first();
 
-        if (($sumRegistered + $exemptionMaximum[0][0]['sumex']) >= $studentCurriculum['Curriculum']['minimum_credit_points']) {
-            return true;
-        } elseif ($graduatingCourseTaken == 1) {
+        $exemptionCredit = $exemptionSum->sumex ?? 0;
+
+        if (
+            ($sumRegistered + $exemptionCredit) >= $studentCurriculum->curriculum->minimum_credit_points ||
+            $graduatingCourseTaken == 1
+        ) {
             return true;
         }
+
         return false;
     }
 }

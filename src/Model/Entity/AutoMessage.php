@@ -16,9 +16,8 @@ class AutoMessage extends Entity
      * @var array
      */
     protected $_accessible = [
-        'message' => true,
-        'is_read' => true,
-        'user_id' => true,
+        '*' => true,
+        'id' => false,
     ];
 
 }

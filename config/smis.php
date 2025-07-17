@@ -562,6 +562,13 @@ define('ACY_BACK_FOR_GRADE_CHANGE_APPROVAL', 7);
 define('MAXIMUM_C_PLUS_GRADES_ALLOWED_FOR_POST_GRADUATE', 1);
 define('MAXIMUM_C_GRADES_ALLOWED_FOR_POST_GRADUATE', 1);
 
+//// 1, force students to fill basic profile and prevent grade view, registration etc, 0, disable
+// Graduating class students are always forced to fill basic profile and FAIDA FIN on their last year any semester
+define('FORCE_ALL_STUDENTS_TO_FILL_BASIC_PROFILE', 1);
+
+define('FORCE_ALL_STUDENTS_TO_FILL_FAIDA_FIN', 1);
+
+
 define('USE_CALENDAR_GRADE_SUBMISSION_END_DATE_INSTEAD_OF_GRADE_SUBMITTED_DATE_FOR_GRADE_CHANGE_DEADLINE_CALCULATION', 0); // 0 = don't allow grade change before any approved grade.
 // 0, is the default and will use the grade submitted date for the student and calculates the grade change deadline by adding days available for grade change from general settings.
 // 1, will use the grade submission deadline set in academic calendar and calculates the grade change deadline by adding days available for grade change from general settings regardless of the date student grade is submitted.
@@ -611,6 +618,8 @@ Configure::write('exemptedCourseGradesOptions', $exemptedCourseGradesOptions);
 define('MAXIMUM_YEAR_LEVELS_ALLOWED', 10);
 
 define('APPLICATION_START_YEAR', '2012');
+
+Configure::write('APPLICATION_START_YEAR', '2012');
 define('UNIVERSITY_START_YEAR', '1986');
 
 
@@ -737,6 +746,10 @@ define('DEFAULT_DAYS_AVAILABLE_FOR_STAFF_EVALUATION', DEFAULT_WEEK_COUNT_FOR_ONE
 
 define('DEFAULT_MINIMUM_CREDIT_FOR_STATUS', 6);
 define('DEFAULT_MAXIMUM_CREDIT_PER_SEMESTER', 24);
+
+define('CREDIT_ECTS', 24);
+
+
 
 define('ACY_BACK_COURSE_ADD_DROP_APPROVAL', 3); //0= Current academic year only, 1= current acy and 1 year back, 2= current acy and 2 year back etc..
 define('ACY_BACK_GRADE_APPROVAL_DASHBOARD', 2); //0= Current academic year only, 1= current acy and 1 year back, 2= current acy and 2 year back etc..

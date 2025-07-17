@@ -18,13 +18,15 @@ class StudentsSectionsTable extends Table
         // BelongsTo Associations
         $this->belongsTo('Sections', [
             'foreignKey' => 'section_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT',
         ]);
 
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT',
         ]);
+
+
     }
 
     public function validationDefault(Validator $validator)
@@ -59,6 +61,7 @@ class StudentsSectionsTable extends Table
     }
 
 
+
     public function getMostRecentSectionPublishedCourseNotRegistered($student_id)
     {
         $section = $this->find('first', array(
@@ -67,7 +70,8 @@ class StudentsSectionsTable extends Table
                 'StudentsSection.archive' => 0
             ),
             //'order' => array('StudentsSection.created' => 'DESC')
-            'order' => array('StudentsSection.id' => 'DESC', 'StudentsSection.section_id' => 'DESC', 'StudentsSection.created' => 'DESC')
+            'sort' => array('StudentsSection.id' => 'DESC', 'StudentsSection.section_id' => 'DESC',
+                'StudentsSection.created' => 'DESC')
         ));
 
         if (isset($section['StudentsSection']) && !empty($section['StudentsSection']['section_id'])) {
@@ -95,7 +99,7 @@ class StudentsSectionsTable extends Table
                         )
                     )
                 ),
-                'order' => array('PublishedCourse.course_id' => 'ASC', 'PublishedCourse.created' => 'DESC')
+                'sort' => array('PublishedCourse.course_id' => 'ASC', 'PublishedCourse.created' => 'DESC')
             ));
 
             return $publishedCourseNotRegistered;

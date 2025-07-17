@@ -1,20 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
 
 class PlacementAdditionalPointsTable extends Table
 {
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
@@ -22,116 +15,69 @@ class PlacementAdditionalPointsTable extends Table
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
+
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
-
         $validator
-            ->scalar('type')
-            ->maxLength('type', 200)
-            ->requirePresence('type', 'create')
-            ->notEmptyString('type');
-
-        $validator
-            ->numeric('point')
-            ->requirePresence('point', 'create')
-            ->notEmptyString('point');
-
-        $validator
-            ->requirePresence('round', 'create')
-            ->notEmptyString('round');
-
-        $validator
-            ->scalar('applied_for')
-            ->maxLength('applied_for', 200)
-            ->requirePresence('applied_for', 'create')
-            ->notEmptyString('applied_for');
-
-        $validator
-            ->integer('group_identifier')
-            ->requirePresence('group_identifier', 'create')
-            ->notEmptyString('group_identifier');
-
-        $validator
-            ->scalar('academic_year')
-            ->maxLength('academic_year', 30)
-            ->requirePresence('academic_year', 'create')
-            ->notEmptyString('academic_year');
+            ->notEmptyString('type', 'Please select type')
+            ->notEmptyString('point', 'Please provide point value')
+            ->notEmptyString('applied_for', 'Please select the unit to apply')
+            ->notEmptyString('academic_year', 'Please select academic year')
+            ->numeric('round', 'Please select placement round')
+            ->notEmptyString('round', 'Please select placement round')
+            ->numeric('program_id', 'Please select program')
+            ->notEmptyString('program_id', 'Please select program')
+            ->numeric('program_type_id', 'Please select program type')
+            ->notEmptyString('program_type_id', 'Please select program type');
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function reformat(array $data = [])
     {
-        $rules->add($rules->existsIn(['program_id'], 'Programs'));
-        $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
+        $reformatedData = [];
 
-        return $rules;
-    }
-
-
-    public function reformat($data = array())
-    {
-        debug($data);
-        $reformatedData = array();
-        //  $group_identifier = strtotime(date('Y-m-d h:i:sa'));
-        if (isset($data) && !empty($data)) {
+        if (!empty($data)) {
             $firstData = $data['PlacementAdditionalPoint'][1];
-            $findSettingGroup = classRegistry::init('PlacementRoundParticipant')->find("first", array(
-                'conditions' => array(
 
-                    'PlacementRoundParticipant.applied_for' => $firstData['applied_for'],
-                    'PlacementRoundParticipant.program_id' => $firstData['program_id'],
-                    'PlacementRoundParticipant.program_type_id'
-                    => $firstData['program_type_id'],
-
-                    'PlacementRoundParticipant.academic_year' => $firstData['academic_year'],
-                    'PlacementRoundParticipant.placement_round' => $firstData['round']
-                ),
-                'recursive' => -1
-            ));
+            $findSettingGroup = TableRegistry::getTableLocator()->get('PlacementRoundParticipants')->find('first')
+                ->where([
+                    'PlacementRoundParticipants.applied_for' => $firstData['applied_for'],
+                    'PlacementRoundParticipants.program_id' => $firstData['program_id'],
+                    'PlacementRoundParticipants.program_type_id' => $firstData['program_type_id'],
+                    'PlacementRoundParticipants.academic_year' => $firstData['academic_year'],
+                    'PlacementRoundParticipants.placement_round' => $firstData['round']
+                ])
+                ->disableHydration()
+                ->first();
 
             foreach ($data['PlacementAdditionalPoint'] as $dk => $dv) {
-                $isSettingAlreadyRecorded = $this->find('first', array(
-                    'conditions' => array(
-                        'PlacementAdditionalPoint.type' => $firstData['type'],
-                        'PlacementAdditionalPoint.point' => $firstData['point'],
-                        'PlacementAdditionalPoint.round' => $firstData['round'],
-                        'PlacementAdditionalPoint.applied_for' => $firstData['applied_for'],
+                $isSettingAlreadyRecorded = $this->find('first')
+                    ->where([
+                        'PlacementAdditionalPoints.type' => $firstData['type'],
+                        'PlacementAdditionalPoints.point' => $firstData['point'],
+                        'PlacementAdditionalPoints.round' => $firstData['round'],
+                        'PlacementAdditionalPoints.applied_for' => $firstData['applied_for'],
+                        'PlacementAdditionalPoints.academic_year' => $firstData['academic_year'],
+                        'PlacementAdditionalPoints.program_id' => $firstData['program_id'],
+                        'PlacementAdditionalPoints.program_type_id' => $firstData['program_type_id']
+                    ])
+                    ->disableHydration()
+                    ->first();
 
-                        'PlacementAdditionalPoint.academic_year' => $firstData['academic_year'],
-                        'PlacementAdditionalPoint.program_id' => $firstData['program_id'],
-                        'PlacementAdditionalPoint.program_type_id' => $firstData['program_type_id'],
-                ),
-                    'recursive' => -1
-                ));
                 $reformatedData['PlacementAdditionalPoint'][$dk] = $dv;
-                if (isset($isSettingAlreadyRecorded['PlacementAdditionalPoint']) && !empty($isSettingAlreadyRecorded['PlacementAdditionalPoint'])) {
+
+                if (!empty($isSettingAlreadyRecorded['PlacementAdditionalPoint'])) {
                     $reformatedData['PlacementAdditionalPoint'][$dk]['id'] = $isSettingAlreadyRecorded['PlacementAdditionalPoint']['id'];
                 }
 
@@ -143,45 +89,38 @@ class PlacementAdditionalPointsTable extends Table
                 $reformatedData['PlacementAdditionalPoint'][$dk]['round'] = $firstData['round'];
             }
         }
-        // Array after removing duplicates
-        //$xunique=array_unique($reformatedData);
 
         $reformatedDataDuplicateRemoved['PlacementAdditionalPoint'] = array_unique($reformatedData['PlacementAdditionalPoint'], SORT_REGULAR);
+
         if (count($reformatedData['PlacementAdditionalPoint']) > count($reformatedDataDuplicateRemoved['PlacementAdditionalPoint'])) {
-            $this->invalidate(
-                'result_type',
-                'Please remove the duplicated rows, and try again.'
-            );
+            $this->validationErrors['result_type'] = 'Please remove the duplicated rows, and try again.';
             return false;
         }
 
-
         return $reformatedData;
     }
-    public function isDuplicated($data = array())
+
+    public function isDuplicated(array $data = [])
     {
-
-        if (isset($data) && !empty($data)) {
+        if (!empty($data)) {
             $firstData = $data['PlacementAdditionalPoint'][1];
-            $count = $this->find("first", array(
-                'conditions' => array(
-                    'PlacementAdditionalPoint.type' =>
-                        $firstData['type'],
+            $count = $this->find('first')
+                ->where([
+                    'PlacementAdditionalPoints.type' => $firstData['type'],
+                    'PlacementAdditionalPoints.applied_for' => $firstData['applied_for'],
+                    'PlacementAdditionalPoints.program_id' => $firstData['program_id'],
+                    'PlacementAdditionalPoints.program_type_id' => $firstData['program_type_id'],
+                    'PlacementAdditionalPoints.academic_year' => $firstData['academic_year'],
+                    'PlacementAdditionalPoints.round' => $firstData['round']
+                ])
+                ->disableHydration()
+                ->first();
 
-                    'PlacementAdditionalPoint.applied_for' => $firstData['applied_for'],
-                    'PlacementAdditionalPoint.program_id' => $firstData['program_id'],
-                    'PlacementAdditionalPoint.program_type_id'
-                    => $firstData['program_type_id'],
-
-                    'PlacementAdditionalPoint.academic_year' => $firstData['academic_year'],
-                    'PlacementAdditionalPoint.round' => $firstData['round']
-                ),
-                'recursive' => -1
-            ));
-            if (isset($count['PlacementAdditionalPoint']['group_identifier']) && !empty($count['PlacementAdditionalPoint']['group_identifier'])) {
+            if (!empty($count['PlacementAdditionalPoint']['group_identifier'])) {
                 return $count['PlacementAdditionalPoint']['group_identifier'];
             }
         }
+
         return false;
     }
 }

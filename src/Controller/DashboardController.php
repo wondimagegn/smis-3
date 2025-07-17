@@ -246,7 +246,7 @@ class DashboardController extends AppController
         $this->viewBuilder()->setClassName('Json');
         $profile_not_buildc = 0;
 
-        if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/Students/profile_not_build_list') && ($this->role_id != ROLE_STUDENT)) {
+        if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/Students/profileNotBuildList') && ($this->role_id != ROLE_STUDENT)) {
             if (!empty($this->department_ids)) {
                 $profile_not_buildc = TableRegistry::getTableLocator()->get('Students')->getProfileNotBuildListCount(
                     DAYS_BACK_PROFILE,
@@ -255,6 +255,7 @@ class DashboardController extends AppController
                     $this->program_ids,
                     $this->program_type_ids
                 );
+
             } elseif (!empty($this->college_ids)) {
                 $profile_not_buildc = TableRegistry::getTableLocator()->get('Students')->getProfileNotBuildListCount(
                     DAYS_BACK_PROFILE,
@@ -316,7 +317,8 @@ class DashboardController extends AppController
                     $this->AcademicYear->currentAcademicYear()
                 );
                 if (!empty($this->college_ids)) {
-                    $clearance_request = TableRegistry::getTableLocator()->get('Clearances')->countClearanceRequest(null, $this->college_ids, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
+                    $clearance_request = TableRegistry::getTableLocator()->get('Clearances')->countClearanceRequest(null,
+                        $this->college_ids, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
                 } elseif (!empty($this->department_ids)) {
                     $clearance_request = TableRegistry::getTableLocator()->get('Clearances')->countClearanceRequest($this->department_ids, null, DAYS_BACK_CLEARANCE, $current_academic_year_start_date);
                 }
@@ -364,7 +366,6 @@ class DashboardController extends AppController
         //course_drops/approve_drops
         $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
-
         $drop_request = 0;
         $drop_request_dpt = 0;
         $forced_drops = 0;
@@ -581,7 +582,6 @@ class DashboardController extends AppController
             == ROLE_DEPARTMENT) {
             if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGrades/approve_non_freshman_grade_submission')) {
                 $courses_for_dpt_approvals = TableRegistry::getTableLocator()->get('ExamGrades')->getRejectedOrNonApprovedPublishedCourseList($this->department_id, '', '', array(), array(), array(), $ac_years, $this->role_id);
-
                 $this->set([
                     'courses_for_dpt_approvals'=>$courses_for_dpt_approvals,
                     '_serialize' => [ 'courses_for_dpt_approvals']
@@ -607,8 +607,6 @@ class DashboardController extends AppController
 
         $this->request->allowMethod(['post','get', 'ajax']); // Allow only AJAX and POST requests
         $this->viewBuilder()->setClassName('Json');
-
-
         $exam_grade_change_requests = 0;
         $makeup_exam_grades = 0;
         $rejected_makeup_exams = 0;
@@ -629,8 +627,7 @@ class DashboardController extends AppController
         }
 
         //If the user has college grade change approval privilage
-        if ($this->request->getSession()->read('Auth.User.role_id')
-            == ROLE_COLLEGE) {
+        if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE) {
             if ($this->MenuOptimized->check($this->Auth->user(),
                 'controllers/ExamGradeChanges/manageCollegeGradeChange')) {
                 $exam_grade_changes_for_college_approval = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForCollegeApproval($this->college_id);
@@ -643,7 +640,6 @@ class DashboardController extends AppController
             || $this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE
         ) {
             $departmentIDs = array();
-
             if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
                 $departmentIDs[] = $this->department_id;
             } else {
@@ -654,17 +650,18 @@ class DashboardController extends AppController
             if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manageDepartmentGradeChange')) {
                 if ($this->request->getSession()->read('Auth.User')['role_id']
                     == ROLE_DEPARTMENT) {
-                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs,"Stat");
-                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs,'Stat');
-                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs,'Stat');
-                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs,'Stat');
+                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs);
+                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs);
+                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs);
+                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs);
                 } else {
-                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs,'Stat');
-                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs,'Stat');
-                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs,'Stat');
-                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs,'Stat');
+                    $exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs);
+                    $makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChange')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs);
+                    $rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs);
+                    $rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs);
                 }
             }
+
         }
 
         //If the user has freshman grade change approval privilage
@@ -674,15 +671,15 @@ class DashboardController extends AppController
         ) {
             if ($this->MenuOptimized->check($this->Auth->user(), 'controllers/ExamGradeChanges/manageFreshmanGradeChange')) {
                 if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT) {
-                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs,'Stat');
-                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs,'Stat');
-                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs,'Stat');
-                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs,'Stat');
+                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->department_id, 1, $departmentIDs);
+                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 0, 1, $departmentIDs);
+                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->department_id, 1, 1, $departmentIDs);
+                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->department_id, 1, $departmentIDs);
                 } else {
-                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs,'Stat');
-                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs,'Stat');
-                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs,'Stat');
-                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs,'Stat');
+                    $fm_exam_grade_change_requests = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfGradeChangeForDepartmentApproval($this->college_id, 0, $departmentIDs);
+                    $fm_makeup_exam_grades = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 0, 0, $departmentIDs);
+                    $fm_rejected_makeup_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getListOfMakeupGradeChangeForDepartmentApproval($this->college_id, 1, 0, $departmentIDs);
+                    $fm_rejected_supplementary_exams = TableRegistry::getTableLocator()->get('ExamGradeChanges')->getMakeupGradesAskedByDepartmentRejectedByRegistrar($this->college_id, 0, $departmentIDs);
                 }
             }
         }
@@ -691,19 +688,23 @@ class DashboardController extends AppController
 
         if ($this->request->getSession()->read('Auth.User.role_id')
             == ROLE_REGISTRAR) {
+
             if ($this->MenuOptimized->check($this->Auth->user(),
-                'controllers/ExamGradeChanges/manageRegistrarGradeChange')) {
-                $serviceType='Stat';
+                'controllers/ExamGradeChanges/manageRegistrarGradeChange') || true) {
+
                 $reg_exam_grade_change_requests =
                     TableRegistry::getTableLocator()->get('ExamGradeChanges')->
                     getListOfGradeChangeForRegistrarApproval($this->department_ids,
                         $this->college_ids, $this->program_ids,
-                        $this->program_type_ids,$serviceType);
+                        $this->program_type_ids);
+                $reg_exam_grade_change_requests_count= $reg_exam_grade_change_requests['count'];
+
+
                 $reg_makeup_exam_grades = TableRegistry::getTableLocator()->
                 get('ExamGradeChanges')->
                 getListOfMakeupGradeChangeForRegistrarApproval($this->department_ids,
-                    $this->college_ids, $this->program_ids, $this->program_type_ids,
-                    $serviceType);
+                    $this->college_ids, $this->program_ids, $this->program_type_ids);
+                $reg_makeup_exam_grades_count=$reg_makeup_exam_grades['count'];
 
                 $reg_supplementary_exam_grades = TableRegistry::getTableLocator()->get(
                     'ExamGradeChanges'
@@ -712,8 +713,9 @@ class DashboardController extends AppController
                     $this->college_ids,
                     $this->program_ids,
                     $this->program_type_ids,
-                    $serviceType
                 );
+                $reg_supplementary_exam_grades_count=$reg_supplementary_exam_grades['count'];
+
 
             }
         }
@@ -723,10 +725,10 @@ class DashboardController extends AppController
             'makeup_exam_grades'=>$makeup_exam_grades,
             'rejected_makeup_exams'=>$rejected_makeup_exams,
             'rejected_supplementary_exams'=>$rejected_supplementary_exams,
-            'exam_grade_changes_for_college_approval'=>$exam_grade_changes_for_college_approval,
-            'reg_exam_grade_change_requests'=>$reg_exam_grade_change_requests,
-            'reg_makeup_exam_grades'=>$reg_makeup_exam_grades,
-            'reg_supplementary_exam_grades'=>$reg_supplementary_exam_grades,
+            'exam_grade_changes_for_college_approval'=>$exam_grade_changes_for_college_approval['count'],
+            'reg_exam_grade_change_requests'=>$reg_exam_grade_change_requests_count,
+            'reg_makeup_exam_grades'=>$reg_makeup_exam_grades_count,
+            'reg_supplementary_exam_grades'=>$reg_supplementary_exam_grades_count,
             'fm_exam_grade_change_requests'=>$fm_exam_grade_change_requests,
             'fm_makeup_exam_grades'=>$fm_makeup_exam_grades,
             'fm_rejected_makeup_exams'=>$fm_rejected_makeup_exams,

@@ -1,2109 +1,1505 @@
 <?php
-
 namespace App\Controller;
 
-use Cake\Core\Configure;
-use Cake\Event\Event;
+use App\Controller\AppController;
+use Cake\Event\EventInterface;
+use Cake\Http\Exception\NotFoundException;
+use Cake\ORM\TableRegistry;
+use DateTime;
 
+/**
+ * SectionsController
+ */
 class SectionsController extends AppController
 {
-
-    public $name = 'Sections';
-
-
-    public $paginate = array();
-
-    public $menuOptions = array(
+    protected $menuOptions = [
         'parent' => 'placement',
-        'exclude' => array(
+        'exclude' => [
             'export',
             'view_pdf',
             'deleteStudentforThisSection',
             'archieveUnarchieveStudentSection',
             'move',
-            'section_move_update',
-            'mass_student_section_add',
-            'add_student_section',
-            'add_student_section_update',
-            'get_sections_by_program',
-            'get_sections_by_dept',
-            'get_sections_by_academic_year',
-            'get_sections_of_college',
-            'get_modal_box',
-            'get_section_students',
-            'un_assigned_summeries',
-            'get_sections_by_program_and_dept',
-            'get_year_level',
+            'sectionMoveUpdate',
+            'massStudentSectionAdd',
+            'addStudentSection',
+            'addStudentSectionUpdate',
+            'getSectionsByProgram',
+            'getSectionsByDept',
+            'getSectionsByAcademicYear',
+            'getSectionsOfCollege',
+            'getModalBox',
+            'getSectionStudents',
+            'unAssignedSummeries',
+            'getSectionsByProgramAndDept',
+            'getYearLevel',
             'deleteStudent',
-            'move_selected_student_section',
-            'move_student_section_to_new',
-            'add_student_to_section',
-            'add_student_prev_section',
-            'get_sections_by_dept_data_entry',
-            'get_sections_by_year_level',
-            'get_sup_students',
-            'get_sections_by_program_supp_exam',
-            'get_sections_by_program_and_dept_supp_exam',
-            'upgrade_selected_student_section',
-            'get_sections_by_dept_add_drop',
-            'restore_student_section',
-            'search'
-        ),
-        'alias' => array(
+            'moveSelectedStudentSection',
+            'moveStudentSectionToNew',
+            'addStudentToSection',
+            'addStudentPrevSection',
+            'getSectionsByDeptDataEntry',
+            'getSectionsByYearLevel',
+            'getSupStudents',
+            'getSectionsByProgramSuppExam',
+            'getSectionsByProgramAndDeptSuppExam',
+            'upgradeSelectedStudentSection',
+            'getSectionsByDeptAddDrop',
+            'restoreStudentSection',
+            'search',
+        ],
+        'alias' => [
             'index' => 'List Sections',
             'add' => 'Add New Section',
             'assign' => 'Assign Students to Section',
-            'upgrade_sections' => 'Upgrade Year Level',
-            'downgrade_sections' => 'Downgrade Year Level',
-            'dispaly_section_less_students' => 'Dispaly Sectionless Students'
-        )
-    );
+            'upgradeSections' => 'Upgrade Year Level',
+            'downgradeSections' => 'Downgrade Year Level',
+            'dispalySectionLessStudents' => 'Display Sectionless Students',
+        ],
+    ];
 
-    public function initialize()
+    public function initialize(): void
     {
-
         parent::initialize();
+        $this->loadComponent('Paginator');
+        $this->loadComponent('Flash');
+        $this->loadComponent('Auth');
         $this->loadComponent('AcademicYear');
         $this->loadComponent('EthiopicDateTime');
-        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
 
-        $this->viewBuilder()->setHelpers(['DatePicker', 'Media.Media', 'Csv']);
+        $this->Paginator->settings = [
+            'limit' => 100,
+            'maxLimit' => 500,
+            'order' => [
+                'Sections.academicyear' => 'DESC',
+                'Sections.department_id' => 'ASC',
+                'Sections.program_id' => 'ASC',
+                'Sections.program_type_id' => 'ASC',
+                'Sections.year_level_id' => 'ASC',
+                'Sections.name' => 'ASC',
+                'Sections.id' => 'ASC',
+            ],
+        ];
     }
 
-    public function beforeFilter(Event $event)
+    public function beforeFilter(EventInterface $event): void
     {
-
         parent::beforeFilter($event);
-        $this->Auth->allow(
-            'get_year_level',
-            'get_modal_box',
-            'get_sections_by_dept',
-            'get_section_students',
-            'get_sections_of_college',
-            'get_sections_by_academic_year',
-            'get_sections_by_dept_data_entry',
-            'get_sections_by_program',
-            'get_sections_by_program_supp_exam',
-            'get_sections_by_program_and_dept',
-            'get_sections_by_program_and_dept_supp_exam',
-            'get_sections_by_year_level',
-            'get_sup_students',
+        $this->Auth->allow([
+            'getYearLevel',
+            'getModalBox',
+            'getSectionsByDept',
+            'getSectionStudents',
+            'getSectionsOfCollege',
+            'getSectionsByAcademicYear',
+            'getSectionsByDeptDataEntry',
+            'getSectionsByProgram',
+            'getSectionsByProgramSuppExam',
+            'getSectionsByProgramAndDept',
+            'getSectionsByProgramAndDeptSuppExam',
+            'getSectionsByYearLevel',
+            'getSupStudents',
             'archieveUnarchieveStudentSection',
             'export',
-            'view_pdf',
-            'get_sections_by_dept_add_drop',
-            'restore_student_section'
-        );
+            'viewPdf',
+            'getSectionsByDeptAddDrop',
+            'restoreStudentSection',
+        ]);
     }
 
-    public function beforeRender(Event $event)
+    public function beforeRender(EventInterface $event): void
     {
-
         parent::beforeRender($event);
-        //$acyear_array_data = $this->AcademicYear->academicYearInArray(date('Y') - 12, date('Y'));
 
-        $current_academicyear = $thisacademicyear = $this->AcademicYear->currentAcademicYear();
-        $acyear_array_data = $this->AcademicYear->academicYearInArray(
-            APPLICATION_START_YEAR,
-            (explode('/', $current_academicyear)[0])
-        );
+        $currentAcademicYear = $this->AcademicYear->currentAcademicYear();
+        $acyearArrayData = $this->AcademicYear->academicYearInArray(APPLICATION_START_YEAR, explode('/', $currentAcademicYear)[0]);
 
-        //debug($acyear_array_data);
-        //$this->set('thisacademicyear', $thisacademicyear);
+        $programs = $this->Sections->Programs->find('list')
+            ->where(['Programs.id IN' => $this->program_ids, 'Programs.active' => 1])
+            ->toArray();
 
-        $programs = $this->Section->Program->find(
-            'list',
-            array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-        );
-        $program_types = $programTypes = $this->Section->ProgramType->find(
-            'list',
-            array('conditions' => array('ProgramType.id' => $this->program_type_ids, 'ProgramType.active' => 1))
-        );
+        $programTypes = $this->Sections->ProgramTypes->find('list')
+            ->where(['ProgramTypes.id IN' => $this->program_type_ids, 'ProgramTypes.active' => 1])
+            ->toArray();
 
         $yearLevels = $this->year_levels;
-
         if ($this->role_id == ROLE_DEPARTMENT) {
-            $yearLevels = $this->Section->YearLevel->find(
-                'list',
-                array(
-                    'conditions' => array(
-                        'YearLevel.department_id' => $this->department_id,
-                        'YearLevel.name' => $this->year_levels
-                    )
-                )
-            );
+            $yearLevels = $this->Sections->YearLevels->find('list')
+                ->where(['YearLevels.department_id' => $this->department_id, 'YearLevels.name IN' => $this->year_levels])
+                ->toArray();
         }
 
-        $this->set(
-            compact(
-                'acyear_array_data',
-                'thisacademicyear',
-                'current_academicyear',
-                'program_types',
-                'programTypes',
-                'programs',
-                'yearLevels'
-            )
-        );
+        $this->set(compact(
+            'acyearArrayData',
+            'currentAcademicYear',
+            'programTypes',
+            'programs',
+            'yearLevels'
+        ));
     }
 
-    public function __init_search_sections()
+    protected function initSearchSections(): void
     {
-
-        if (!empty($this->request->data['Section'])) {
-            $this->Session->write('search_sections', $this->request->data['Section']);
-        } else {
-            if ($this->Session->check('search_sections')) {
-                $this->request->data['Section'] = $this->Session->read('search_sections');
-            }
+        $session = $this->request->getSession();
+        if (!empty($this->request->getData('Section'))) {
+            $session->write('search_sections', $this->request->getData('Section'));
+        } elseif ($session->check('search_sections')) {
+            $this->request = $this->request->withData('Section', $session->read('search_sections'));
         }
     }
 
-    public function __init_clear_session_filters($data = null)
+    protected function clearSessionFilters(?array $data = null): void
     {
-
-        if ($this->Session->check('search_sections')) {
-            $this->Session->delete('search_sections');
+        $session = $this->request->getSession();
+        if ($session->check('search_sections')) {
+            $session->delete('search_sections');
         }
-        //return $this->redirect(array('action' => 'index', $data));
     }
 
     public function search()
     {
-
-        $url['action'] = 'index';
-
-        if (isset($this->request->data) && !empty($this->request->data)) {
-            foreach ($this->request->data as $k => $v) {
+        $url = ['action' => 'index'];
+        if (!empty($this->request->getData())) {
+            foreach ($this->request->getData() as $k => $v) {
                 if (!empty($v)) {
                     foreach ($v as $kk => $vv) {
                         if (!empty($vv) && is_array($vv)) {
                             foreach ($vv as $kkk => $vvv) {
-                                $url[$k . '.' . $kk . '.' . $kkk] = str_replace('/', '-', trim($vvv));
+                                $url["$k.$kk.$kkk"] = str_replace('/', '-', trim($vvv));
                             }
                         } else {
-                            $url[$k . '.' . $kk] = str_replace('/', '-', trim($vv));
+                            $url["$k.$kk"] = str_replace('/', '-', trim($vv));
                         }
                     }
                 }
             }
         }
 
-        return $this->redirect($url, null, true);
+        return $this->redirect($url);
     }
 
-
-    public function index($data = null)
+    public function index(?array $data = null)
     {
-
         $limit = 100;
         $name = '';
-        $turn_off_search = true;
-
-        $options = array();
-
-        //$page = 1;
+        $turnOffSearch = true;
+        $options = [];
         $page = '';
 
-        //$archive = 0;
-        /* $sort = 'academicyear';
-		$direction = 'DESC'; */
-
-        //$this->__init_search_sections();
-
-        if (isset($this->passedArgs)) {
-            if (isset($this->passedArgs['page'])) {
-                $page = $this->request->data['Section']['page'] = $this->passedArgs['page'];
+        if (!empty($this->request->getQueryParams())) {
+            if (!empty($this->request->getQuery('page'))) {
+                $page = $this->request->getData('Section.page', $this->request->getQuery('page'));
             }
-            /* if (isset($this->passedArgs['sort'])) {
-				$sort = $this->request->data['Section']['sort'] = $this->passedArgs['sort'];
-			}
-			if (isset($this->passedArgs['direction'])) {
-				$direction = $this->request->data['Section']['direction'] = $this->passedArgs['direction'];
-			} */
-
-            ////////////////////
-
-            if (isset($this->passedArgs['page'])) {
-                $page = $this->request->data['Section']['page'] = $this->passedArgs['page'];
+            if (!empty($this->request->getQuery('sort'))) {
+                $this->request->getData('Section.sort', $this->request->getQuery('sort'));
             }
-
-            if (isset($this->passedArgs['sort'])) {
-                $this->request->data['Section']['sort'] = $this->passedArgs['sort'];
+            if (!empty($this->request->getQuery('direction'))) {
+                $this->request->getData('Section.direction', $this->request->getQuery('direction'));
             }
-
-            if (isset($this->passedArgs['direction'])) {
-                $this->request->data['Section']['direction'] = $this->passedArgs['direction'];
-            }
-
-            ////////////////////
-
-            $this->__init_search_sections();
+            $this->initSearchSections();
         }
 
-
-        if (isset($data) && !empty($data['Section'])) {
-            $this->request->data['Section'] = $data['Section'];
-            debug($this->request->data);
-            $this->__init_search_sections();
+        if (!empty($data['Section'])) {
+            $this->request = $this->request->withData('Section', $data['Section']);
+            $this->initSearchSections();
         }
 
-        if (isset($this->request->data['search'])) {
-            if (isset($this->passedArgs)) {
-                unset($this->passedArgs);
-            }
-            $this->__init_clear_session_filters();
-            $this->__init_search_sections();
+        if ($this->request->getData('search')) {
+            $this->clearSessionFilters();
+            $this->initSearchSections();
         }
 
-        if (!empty($this->request->data['Section']['limit'])) {
-            $limit = $this->request->data['Section']['limit'];
-        } else {
-            $this->request->data['Section']['limit'] = $limit;
+        $limit = $this->request->getData('Section.limit', $limit);
+        $this->request = $this->request->withData('Section.limit', $limit);
+
+        $name = $this->request->getData('Section.section_name', $name);
+        $this->request = $this->request->withData('Section.section_name', $name);
+
+        if (empty($this->request->getData('Section.active'))) {
+            $this->request = $this->request->withData('Section.active', '');
         }
 
-        if (!empty($this->request->data['Section']['section_name'])) {
-            $name = $this->request->data['Section']['section_name'];
-        } else {
-            $this->request->data['Section']['section_name'] = $name;
-        }
+        $selectedAcademicYear = $this->request->getData('Section.academicyearSection') ??
+            $this->request->getData('Section.academicyear') ??
+            $this->AcademicYear->currentAcademicYear();
+        $this->request = $this->request->withData('Section.academicyearSection', $selectedAcademicYear)
+            ->withData('Section.academicyear', $selectedAcademicYear);
 
-        /* if (!empty($this->request->data['Section']['active'])) {
-			$archive = $this->request->data['Section']['active'];
-		} else {
-			$this->request->data['Section']['active'] = $archive;
-		} */
+        if (!empty($this->request->getData())) {
+            $session = $this->request->getSession();
+            $user = $session->read('Auth.User');
 
-        if (empty($this->request->data['Section']['active'])) {
-            $this->request->data['Section']['active'] = '';
-        }
-
-        if (isset($this->request->data['Section']['academicyearSection'])) {
-            $selected_academic_year = $this->request->data['Section']['academicyearSection'];
-        } else {
-            if (isset($this->request->data['Section']['academicyear'])) {
-                $selected_academic_year = $this->request->data['Section']['academicyear'];
-            } else {
-                $selected_academic_year = $this->request->data['Section']['academicyearSection'] = $this->request->data['Section']['academicyear'] = $this->AcademicYear->current_academicyear(
-                );
-            }
-        }
-
-
-        if (/* isset($this->request->data) &&  */ !empty($this->request->data)) {
-            //$this->__init_search_sections();
-            debug($this->request->data);
-
-            if (!empty($page) && !isset($this->request->data['search'])) {
-                $this->request->data['Search']['page'] = $page;
+            if (!empty($page) && !$this->request->getData('search')) {
+                $this->request = $this->request->withData('Search.page', $page);
             }
 
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                $departments = $this->Section->Department->find(
-                    'list',
-                    array('conditions' => array('Department.id' => $this->department_id, 'Department.active' => 1))
-                );
-                $options['conditions'][] = array('Section.department_id' => $this->department_id);
-            } else {
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $departments = array();
-
-                    if ($this->onlyPre == 0) {
-                        $departments = $this->Section->Department->find(
-                            'list',
-                            array(
-                                'conditions' => array(
-                                    'Department.college_id' => $this->college_ids,
-                                    'Department.active' => 1
-                                )
-                            )
-                        );
-                    } else {
-                        $colleges = $this->Section->College->find(
-                            'list',
-                            array('conditions' => array('College.id' => $this->college_ids, 'College.active' => 1))
-                        );
-                        $this->request->data['Section']['college_id'] = $this->college_id;
-                        $this->request->data['Section']['year_level_id'] = '0';
-                    }
-
-                    $options['conditions'][] = array('Section.college_id' => $this->college_id);
-
-                    /* if ((isset($this->request->data['Section']['department_id']) && !empty($this->request->data['Section']['department_id']) && $this->request->data['Section']['department_id'] == 0) || (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] == 0)) {
-					$options['conditions'][] = array('Section.department_id IS NULL');
-				} else  */
-
-                    if (isset($this->request->data['Section']['department_id']) && !empty($this->request->data['Section']['department_id']) && $this->request->data['Section']['department_id'] > 0) {
-                        $options['conditions'][] = array('Section.department_id' => $this->request->data['Section']['department_id']);
-                    }
+            if ($user['role_id'] == ROLE_DEPARTMENT) {
+                $departments = $this->Sections->Departments->find('list')
+                    ->where(['Departments.id' => $this->department_id, 'Departments.active' => 1])
+                    ->toArray();
+                $options['conditions'][] = ['Sections.department_id' => $this->department_id];
+            } elseif ($user['role_id'] == ROLE_COLLEGE) {
+                $departments = [];
+                if ($this->onlyPre == 0) {
+                    $departments = $this->Sections->Departments->find('list')
+                        ->where(['Departments.college_id IN' => $this->college_ids, 'Departments.active' => 1])
+                        ->toArray();
                 } else {
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-                        if (!empty($this->department_ids)) {
-                            $colleges = array();
-                            $departments = $this->Section->Department->find(
-                                'list',
-                                array(
-                                    'conditions' => array(
-                                        'Department.id' => $this->department_ids,
-                                        'Department.active' => 1
-                                    )
-                                )
-                            );
+                    $colleges = $this->Sections->Colleges->find('list')
+                        ->where(['Colleges.id IN' => $this->college_ids, 'Colleges.active' => 1])
+                        ->toArray();
+                    $this->request = $this->request->withData('Section.college_id', $this->college_id)
+                        ->withData('Section.year_level_id', '0');
+                }
+                $options['conditions'][] = ['Sections.college_id' => $this->college_id];
 
-                            if (!empty($this->request->data['Section']['department_id'])) {
-                                $options['conditions'][] = array('Section.department_id' => $this->request->data['Section']['department_id']);
-                            } else {
-                                $options['conditions'][] = array('Section.department_id' => $this->department_ids);
-                            }
-                        } else {
-                            if (!empty($this->college_ids)) {
-                                $departments = array();
-                                $colleges = $this->Section->College->find(
-                                    'list',
-                                    array(
-                                        'conditions' => array(
-                                            'College.id' => $this->college_ids,
-                                            'College.active' => 1
-                                        )
-                                    )
-                                );
+                if ($this->request->getData('Section.department_id') > 0) {
+                    $options['conditions'][] = ['Sections.department_id' => $this->request->getData('Section.department_id')];
+                }
+            } elseif ($user['role_id'] == ROLE_REGISTRAR) {
+                if (!empty($this->department_ids)) {
+                    $colleges = [];
+                    $departments = $this->Sections->Departments->find('list')
+                        ->where(['Departments.id IN' => $this->department_ids, 'Departments.active' => 1])
+                        ->toArray();
 
-                                if (!empty($this->request->data['Section']['college_id'])) {
-                                    $options['conditions'][] = array(
-                                        'Section.college_id' => $this->request->data['Section']['college_id'],
-                                        'Section.department_id IS NULL'
-                                    );
-                                } else {
-                                    $options['conditions'][] = array(
-                                        'Section.college_id' => $this->college_ids,
-                                        'Section.department_id IS NULL'
-                                    );
-                                }
-
-                                $this->request->data['Section']['year_level_id'] = '0';
-                            }
-                        }
+                    if ($this->request->getData('Section.department_id')) {
+                        $options['conditions'][] = ['Sections.department_id' => $this->request->getData('Section.department_id')];
                     } else {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) {
-                            // nothing
-                        } else {
-                            $departments = $this->Section->Department->find(
-                                'list',
-                                array('conditions' => array('Department.active' => 1))
-                            );
-                            $colleges = $this->Section->College->find(
-                                'list',
-                                array('conditions' => array('College.active' => 1))
-                            );
-
-                            if (!empty($this->request->data['Section']['department_id'])) {
-                                $options['conditions'][] = array('Section.department_id' => $this->request->data['Section']['department_id']);
-                            } else {
-                                if (empty($this->request->data['Section']['department_id']) && !empty($this->request->data['Section']['college_id'])) {
-                                    $departments = $this->Section->Department->find(
-                                        'list',
-                                        array(
-                                            'conditions' => array(
-                                                'Department.college_id' => $this->request->data['Section']['college_id'],
-                                                'Department.active' => 1
-                                            )
-                                        )
-                                    );
-                                    $options['conditions'][] = array('Section.college_id' => $this->request->data['Section']['college_id']);
-                                } else {
-                                    if (!empty($colleges) && !empty($departments)) {
-                                        $options['conditions'][] = array(
-                                            'OR' => array(
-                                                'Section.college_id' => array_keys($colleges),
-                                                'Section.department_id' => array_keys($departments)
-                                            )
-                                        );
-                                    } else {
-                                        if (!empty($departments)) {
-                                            $options['conditions'][] = array(
-                                                'Section.department_id' => array_keys(
-                                                    $departments
-                                                )
-                                            );
-                                        } else {
-                                            if (!empty($colleges)) {
-                                                $options['conditions'][] = array(
-                                                    'Section.college_id' => array_keys(
-                                                        $colleges
-                                                    )
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        $options['conditions'][] = ['Sections.department_id IN' => $this->department_ids];
                     }
+                } elseif (!empty($this->college_ids)) {
+                    $departments = [];
+                    $colleges = $this->Sections->Colleges->find('list')
+                        ->where(['Colleges.id IN' => $this->college_ids, 'Colleges.active' => 1])
+                        ->toArray();
+
+                    if ($this->request->getData('Section.college_id')) {
+                        $options['conditions'][] = [
+                            'Sections.college_id' => $this->request->getData('Section.college_id'),
+                            'Sections.department_id IS' => null,
+                        ];
+                    } else {
+                        $options['conditions'][] = [
+                            'Sections.college_id IN' => $this->college_ids,
+                            'Sections.department_id IS' => null,
+                        ];
+                    }
+                    $this->request = $this->request->withData('Section.year_level_id', '0');
                 }
-            }
-
-            if (!empty($selected_academic_year)) {
-                //debug($selected_academic_year);
-                $options['conditions'][] = array('Section.academicyear' => $selected_academic_year);
-            }
-
-            if (!empty($this->request->data['Section']['program_id'])) {
-                $options['conditions'][] = array('Section.program_id' => $this->request->data['Section']['program_id']);
             } else {
-                if (empty($this->request->data['Section']['program_id'])) {
-                    $options['conditions'][] = array('Section.program_id' => $this->program_ids);
-                }
-            }
+                $departments = $this->Sections->Departments->find('list')
+                    ->where(['Departments.active' => 1])
+                    ->toArray();
+                $colleges = $this->Sections->Colleges->find('list')
+                    ->where(['Colleges.active' => 1])
+                    ->toArray();
 
-            if (!empty($this->request->data['Section']['program_type_id'])) {
-                $options['conditions'][] = array('Section.program_type_id' => $this->request->data['Section']['program_type_id']);
-            } else {
-                if (empty($this->request->data['Section']['program_type_id'])) {
-                    $options['conditions'][] = array('Section.program_type_id' => $this->program_type_ids);
-                }
-            }
-
-            if (isset($this->request->data['Section']['college_id']) && $this->request->data['Section']['college_id'] > 0 && $this->Session->read(
-                    'Auth.User'
-                )['role_id'] != ROLE_REGISTRAR) {
-                $departments = $this->Section->Department->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'Department.college_id' => $this->request->data['Section']['college_id'],
-                            'Department.active' => 1
-                        )
-                    )
-                );
-            }
-
-            if (!($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE && $this->Session->read(
-                    'Auth.User'
-                )['is_admin'] == 0)) {
-                if (isset($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] == '0') {
-                    $options['conditions'][] = array('Section.department_id IS NULL');
-                    debug($this->request->data['Section']['year_level_id']);
+                if ($this->request->getData('Section.department_id')) {
+                    $options['conditions'][] = ['Sections.department_id' => $this->request->getData('Section.department_id')];
+                } elseif ($this->request->getData('Section.college_id')) {
+                    $departments = $this->Sections->Departments->find('list')
+                        ->where(['Departments.college_id' => $this->request->getData('Section.college_id'), 'Departments.active' => 1])
+                        ->toArray();
+                    $options['conditions'][] = ['Sections.college_id' => $this->request->getData('Section.college_id')];
                 } else {
-                    if (isset($this->request->data['Section']['year_level_id']) && is_numeric(
-                            $this->request->data['Section']['year_level_id']
-                        ) && $this->request->data['Section']['year_level_id'] > 0) {
-                        $options['conditions'][] = array('Section.year_level_id' => $this->request->data['Section']['year_level_id']);
-                        debug($this->request->data['Section']['year_level_id']);
-                    } else {
-                        isset($this->request->data['Section']['year_level_id']) ? debug(
-                            $this->request->data['Section']['year_level_id']
-                        ) : '';
+                    if (!empty($colleges) && !empty($departments)) {
+                        $options['conditions'][] = [
+                            'OR' => [
+                                'Sections.college_id IN' => array_keys($colleges),
+                                'Sections.department_id IN' => array_keys($departments),
+                            ],
+                        ];
+                    } elseif (!empty($departments)) {
+                        $options['conditions'][] = ['Sections.department_id IN' => array_keys($departments)];
+                    } elseif (!empty($colleges)) {
+                        $options['conditions'][] = ['Sections.college_id IN' => array_keys($colleges)];
+                    }
+                }
+            }
 
-                        if (($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE && $this->Session->read(
-                                    'Auth.User'
-                                )['is_admin'] == 0) || ($this->Session->read(
-                                    'Auth.User'
-                                )['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids) && $this->onlyPre == 1)) {
-                            $options['conditions'][] = array('Section.department_id IS NULL');
+            if (!empty($selectedAcademicYear)) {
+                $options['conditions'][] = ['Sections.academicyear' => $selectedAcademicYear];
+            }
+
+            if ($this->request->getData('Section.program_id')) {
+                $options['conditions'][] = ['Sections.program_id' => $this->request->getData('Section.program_id')];
+            } else {
+                $options['conditions'][] = ['Sections.program_id IN' => $this->program_ids];
+            }
+
+            if ($this->request->getData('Section.program_type_id')) {
+                $options['conditions'][] = ['Sections.program_type_id' => $this->request->getData('Section.program_type_id')];
+            } else {
+                $options['conditions'][] = ['Sections.program_type_id IN' => $this->program_type_ids];
+            }
+
+            if ($this->request->getData('Section.college_id') > 0 && $user['role_id'] != ROLE_REGISTRAR) {
+                $departments = $this->Sections->Departments->find('list')
+                    ->where(['Departments.college_id' => $this->request->getData('Section.college_id'), 'Departments.active' => 1])
+                    ->toArray();
+            }
+
+            if (!($user['role_id'] == ROLE_COLLEGE && $user['is_admin'] == 0)) {
+                if ($this->request->getData('Section.year_level_id') == '0') {
+                    $options['conditions'][] = ['Sections.department_id IS' => null];
+                } elseif (is_numeric($this->request->getData('Section.year_level_id')) && $this->request->getData('Section.year_level_id') > 0) {
+                    $options['conditions'][] = ['Sections.year_level_id' => $this->request->getData('Section.year_level_id')];
+                } else {
+                    if (($user['role_id'] == ROLE_COLLEGE && $user['is_admin'] == 0) || ($user['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids) && $this->onlyPre == 1)) {
+                        $options['conditions'][] = ['Sections.department_id IS' => null];
+                    } elseif ($this->request->getData('Section.department_id')) {
+                        $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                            ->where([
+                                'YearLevels.department_id' => $this->request->getData('Section.department_id'),
+                                'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                            ])
+                            ->toArray();
+                        $options['conditions'][] = ['Sections.year_level_id IN' => $yearLevelIds];
+                    } elseif (!empty($departments)) {
+                        if ($user['role_id'] == ROLE_COLLEGE && empty($this->request->getData('Section.department_id')) && empty($this->request->getData('Section.year_level_id'))) {
+                            $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                                ->where([
+                                    'YearLevels.department_id IN' => array_keys($departments),
+                                    'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                                ])
+                                ->toArray();
+                            $options['conditions'][] = [
+                                'OR' => [
+                                    'Sections.year_level_id IS' => null,
+                                    'Sections.year_level_id' => 0,
+                                    'Sections.year_level_id' => '',
+                                    'Sections.year_level_id IN' => $yearLevelIds,
+                                ],
+                            ];
                         } else {
-                            if (!empty($this->request->data['Section']['department_id'])) {
-                                $options['conditions'][] = array(
-                                    'Section.year_level_id' => $this->Section->YearLevel->find(
-                                        'list',
-                                        array(
-                                            'fields' => array('YearLevel.id'),
-                                            'conditions' => array(
-                                                'YearLevel.department_id' => $this->request->data['Section']['department_id'],
-                                                'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                            )
-                                        )
-                                    )
-                                );
-                            } else {
-                                if (!empty($departments)) {
-                                    if ($this->Session->read(
-                                            'Auth.User'
-                                        )['role_id'] == ROLE_COLLEGE && empty($this->request->data['Section']['department_id']) && empty($this->request->data['Section']['year_level_id'])) {
-                                        $options['conditions'][] = array(
-                                            'OR' => array(
-                                                'Section.year_level_id IS NULL',
-                                                'Section.year_level_id = 0',
-                                                'Section.year_level_id = ""',
-                                                'Section.year_level_id' => $this->Section->YearLevel->find(
-                                                    'list',
-                                                    array(
-                                                        'fields' => array('YearLevel.id'),
-                                                        'conditions' => array(
-                                                            'YearLevel.department_id' => array_keys(
-                                                                $departments
-                                                            ),
-                                                            'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        );
-                                    } else {
-                                        $options['conditions'][] = array(
-                                            'Section.year_level_id' => $this->Section->YearLevel->find(
-                                                'list',
-                                                array(
-                                                    'fields' => array('YearLevel.id'),
-                                                    'conditions' => array(
-                                                        'YearLevel.department_id' => array_keys($departments),
-                                                        'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                                    )
-                                                )
-                                            )
-                                        );
-                                    }
-                                } else {
-                                    if (isset($this->department_ids) && !empty($this->department_ids)) {
-                                        if ($this->Session->read(
-                                                'Auth.User'
-                                            )['role_id'] == ROLE_COLLEGE && empty($this->request->data['Section']['department_id']) && empty($this->request->data['Section']['year_level_id'])) {
-                                            $options['conditions'][] = array(
-                                                'OR' => array(
-                                                    'Section.year_level_id IS NULL',
-                                                    'Section.year_level_id = 0',
-                                                    'Section.year_level_id = ""',
-                                                    'Section.year_level_id' => $this->Section->YearLevel->find(
-                                                        'list',
-                                                        array(
-                                                            'fields' => array('YearLevel.id'),
-                                                            'conditions' => array(
-                                                                'YearLevel.department_id' => $this->department_ids,
-                                                                'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                                            )
-                                                        )
-                                                    )
-                                                )
-                                            );
-                                        } else {
-                                            $options['conditions'][] = array(
-                                                'Section.year_level_id' => $this->Section->YearLevel->find(
-                                                    'list',
-                                                    array(
-                                                        'fields' => array('YearLevel.id'),
-                                                        'conditions' => array(
-                                                            'YearLevel.department_id' => $this->department_ids,
-                                                            'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                                        )
-                                                    )
-                                                )
-                                            );
-                                        }
-                                    } else {
-                                        if ($this->Session->read(
-                                                'Auth.User'
-                                            )['role_id'] == ROLE_COLLEGE || $this->onlyPre || $this->college_ids) {
-                                            $options['conditions'][] = array('Section.department_id IS NULL');
-                                        } else {
-                                            $options['conditions'][] = array('Section.department_id = ""');
-                                        }
-                                    }
-                                }
-                            }
+                            $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                                ->where([
+                                    'YearLevels.department_id IN' => array_keys($departments),
+                                    'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                                ])
+                                ->toArray();
+                            $options['conditions'][] = ['Sections.year_level_id IN' => $yearLevelIds];
+                        }
+                    } elseif (!empty($this->department_ids)) {
+                        if ($user['role_id'] == ROLE_COLLEGE && empty($this->request->getData('Section.department_id')) && empty($this->request->getData('Section.year_level_id'))) {
+                            $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                                ->where([
+                                    'YearLevels.department_id IN' => $this->department_ids,
+                                    'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                                ])
+                                ->toArray();
+                            $options['conditions'][] = [
+                                'OR' => [
+                                    'Sections.year_level_id IS' => null,
+                                    'Sections.year_level_id' => 0,
+                                    'Sections.year_level_id' => '',
+                                    'Sections.year_level_id IN' => $yearLevelIds,
+                                ],
+                            ];
+                        } else {
+                            $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                                ->where([
+                                    'YearLevels.department_id IN' => $this->department_ids,
+                                    'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                                ])
+                                ->toArray();
+                            $options['conditions'][] = ['Sections.year_level_id IN' => $yearLevelIds];
+                        }
+                    } else {
+                        if ($user['role_id'] == ROLE_COLLEGE || $this->onlyPre || !empty($this->college_ids)) {
+                            $options['conditions'][] = ['Sections.department_id IS' => null];
+                        } else {
+                            $options['conditions'][] = ['Sections.department_id' => ''];
                         }
                     }
                 }
             } else {
-                $options['conditions'][] = array('Section.department_id IS NULL');
+                $options['conditions'][] = ['Sections.department_id IS' => null];
             }
 
-            /* if (!empty($this->request->data['Section']['year_level_id'])) {
-				if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-					$options['conditions'][] = array('Section.year_level_id' => $this->request->data['Section']['year_level_id']);
-				} else {
-					if (empty($this->request->data['Section']['department_id']) && $this->request->data['Section']['year_level_id'] == 0) {
-						$options['conditions'][] = array('Section.department_id IS NULL');
-					} else if ((isset($this->request->data['Section']['department_id']) && $this->request->data['Section']['department_id'] == 0) || $this->request->data['Section']['year_level_id'] == 0) {
-						$options['conditions'][] = array('Section.department_id IS NULL');
-					} else if (isset($this->department_ids) && !empty($this->department_ids)) {
-						$options['conditions'][] = array('Section.year_level_id' => $this->Section->YearLevel->find('list', array('fields' => array('YearLevel.id'), 'conditions' => array('YearLevel.department_id' => $this->department_ids, 'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)))));
-					}
-				}
-			} else if ($this->request->data['Section']['year_level_id'] == 0) {
-				$options['conditions'][] = array('Section.department_id IS NULL');
-			} else {
-				if (!empty($this->request->data['Section']['department_id']) && $this->request->data['Section']['department_id'] == 0) {
-					$options['conditions'][] = array('Section.department_id IS NULL');
-				} else if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-					$options['conditions'][] = array('Section.year_level_id' => $this->Section->YearLevel->find('list', array('fields' => array('YearLevel.id'), 'conditions' => array('YearLevel.department_id' => $this->department_ids, 'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)))));
-				} else {
-					if (isset($this->department_ids) && !empty($this->department_ids) &&  $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE && $this->Session->read('Auth.User')['is_admin'] == 1) {
-						$options['conditions'][] = array(
-							'OR' => array(
-								'Section.department_id IS NULL',
-								'Section.year_level_id' => $this->Section->YearLevel->find('list', array('fields' => array('YearLevel.id'), 'conditions' => array('YearLevel.department_id' => $this->department_ids, 'YearLevel.name' =>  $this->year_levels))),
-							)
-						);
-					} else if (($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE && $this->Session->read('Auth.User')['is_admin'] == 0) || ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids) && $this->onlyPre == 1)) {
-						$options['conditions'][] = array('Section.department_id IS NULL');
-					} else if (isset($this->department_ids) && !empty($this->department_ids)) {
-						$options['conditions'][] = array('Section.year_level_id' => $this->Section->YearLevel->find('list', array('fields' => array('YearLevel.id'), 'conditions' => array('YearLevel.department_id' => $this->department_ids, 'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)))));
-					} else {
-						$options['conditions'][] = array('Section.department_id IS NULL');
-					}
-				}
-			} */
-
-            if (isset($name) && !empty($name)) {
-                //unset($options);
-                $options['conditions'][] = array('Section.name LIKE ' => '%' . $name . '%');
+            if (!empty($name)) {
+                $options['conditions'][] = ['Sections.name LIKE' => "%$name%"];
             }
 
-            if (is_numeric($this->request->data['Section']['active'])) {
-                $options['conditions'][] = array('Section.archive' => $this->request->data['Section']['active']);
+            if (is_numeric($this->request->getData('Section.active'))) {
+                $options['conditions'][] = ['Sections.archive' => $this->request->getData('Section.active')];
             }
         } else {
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                $departments = array();
+            $session = $this->request->getSession();
+            $user = $session->read('Auth.User');
 
+            if ($user['role_id'] == ROLE_COLLEGE) {
+                $departments = [];
                 if ($this->onlyPre != 1) {
-                    $departments = $this->Section->Department->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                'Department.college_id' => $this->college_id,
-                                'Department.active' => 1
-                            )
-                        )
-                    );
+                    $departments = $this->Sections->Departments->find('list')
+                        ->where(['Departments.college_id' => $this->college_id, 'Departments.active' => 1])
+                        ->toArray();
                 } else {
-                    $colleges = $this->Section->College->find(
-                        'list',
-                        array('conditions' => array('College.id' => $this->college_id, 'College.active' => 1))
-                    );
-                    $this->request->data['Section']['college_id'] = $this->college_id;
-                    $this->request->data['Section']['year_level_id'] = '0';
+                    $colleges = $this->Sections->Colleges->find('list')
+                        ->where(['Colleges.id' => $this->college_id, 'Colleges.active' => 1])
+                        ->toArray();
+                    $this->request = $this->request->withData('Section.college_id', $this->college_id)
+                        ->withData('Section.year_level_id', '0');
                 }
-
-                $options['conditions'][] = array('Section.college_id' => $this->college_id);
-            } else {
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                    $departments = $this->Section->Department->find(
-                        'list',
-                        array('conditions' => array('Department.id' => $this->department_id))
-                    );
-                    $options['conditions'][] = array('Section.department_id' => $this->department_id);
-                } else {
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-                        if (!empty($this->department_ids)) {
-                            $colleges = array();
-                            $departments = $this->Section->Department->find(
-                                'list',
-                                array(
-                                    'conditions' => array(
-                                        'Department.id' => $this->department_ids,
-                                        'Department.active' => 1
-                                    )
-                                )
-                            );
-
-                            if (!empty($departments)) {
-                                $options['conditions'][] = array(
-                                    'Section.department_id' => $this->department_ids,
-                                    'Section.program_id' => $this->program_ids,
-                                    'Section.program_type_id' => $this->program_type_ids
-                                );
-                            }
-                        } else {
-                            if (!empty($this->college_ids)) {
-                                $departments = array();
-                                $colleges = $this->Section->College->find(
-                                    'list',
-                                    array(
-                                        'conditions' => array(
-                                            'College.id' => $this->college_ids,
-                                            'College.active' => 1
-                                        )
-                                    )
-                                );
-
-                                if (!empty($colleges)) {
-                                    $options['conditions'][] = array(
-                                        'Section.college_id' => $this->college_ids,
-                                        'Section.program_id' => $this->program_ids,
-                                        'Section.program_type_id' => $this->program_type_ids
-                                    );
-                                }
-
-                                $this->request->data['Section']['year_level_id'] = '0';
-                            }
-                        }
-                    } else {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) {
-                            // nothing
-                        } else {
-                            $departments = $this->Section->Department->find(
-                                'list',
-                                array('conditions' => array('Department.active' => 1))
-                            );
-                            $colleges = $this->Section->College->find(
-                                'list',
-                                array('conditions' => array('College.active' => 1))
-                            );
-
-                            if (!empty($colleges) && !empty($departments)) {
-                                $options['conditions'][] = array(
-                                    'OR' => array(
-                                        'Section.department_id' => array_keys($departments),
-                                        'Section.college_id' => array_keys($colleges)
-                                    )
-                                );
-                            } else {
-                                if (!empty($departments)) {
-                                    $options['conditions'][] = array(
-                                        'Section.department_id' => array_keys(
-                                            $departments
-                                        )
-                                    );
-                                } else {
-                                    if (!empty($colleges)) {
-                                        $options['conditions'][] = array('Section.college_id' => array_keys($colleges));
-                                    }
-                                }
-                            }
-                        }
+                $options['conditions'][] = ['Sections.college_id' => $this->college_id];
+            } elseif ($user['role_id'] == ROLE_DEPARTMENT) {
+                $departments = $this->Sections->Departments->find('list')
+                    ->where(['Departments.id' => $this->department_id])
+                    ->toArray();
+                $options['conditions'][] = ['Sections.department_id' => $this->department_id];
+            } elseif ($user['role_id'] == ROLE_REGISTRAR) {
+                if (!empty($this->department_ids)) {
+                    $colleges = [];
+                    $departments = $this->Sections->Departments->find('list')
+                        ->where(['Departments.id IN' => $this->department_ids, 'Departments.active' => 1])
+                        ->toArray();
+                    if (!empty($departments)) {
+                        $options['conditions'][] = [
+                            'Sections.department_id IN' => $this->department_ids,
+                            'Sections.program_id IN' => $this->program_ids,
+                            'Sections.program_type_id IN' => $this->program_type_ids,
+                        ];
                     }
+                } elseif (!empty($this->college_ids)) {
+                    $departments = [];
+                    $colleges = $this->Sections->Colleges->find('list')
+                        ->where(['Colleges.id IN' => $this->college_ids, 'Colleges.active' => 1])
+                        ->toArray();
+                    if (!empty($colleges)) {
+                        $options['conditions'][] = [
+                            'Sections.college_id IN' => $this->college_ids,
+                            'Sections.program_id IN' => $this->program_ids,
+                            'Sections.program_type_id IN' => $this->program_type_ids,
+                        ];
+                    }
+                    $this->request = $this->request->withData('Section.year_level_id', '0');
+                }
+            } else {
+                $departments = $this->Sections->Departments->find('list')
+                    ->where(['Departments.active' => 1])
+                    ->toArray();
+                $colleges = $this->Sections->Colleges->find('list')
+                    ->where(['Colleges.active' => 1])
+                    ->toArray();
+
+                if (!empty($colleges) && !empty($departments)) {
+                    $options['conditions'][] = [
+                        'OR' => [
+                            'Sections.department_id IN' => array_keys($departments),
+                            'Sections.college_id IN' => array_keys($colleges),
+                        ],
+                    ];
+                } elseif (!empty($departments)) {
+                    $options['conditions'][] = ['Sections.department_id IN' => array_keys($departments)];
+                } elseif (!empty($colleges)) {
+                    $options['conditions'][] = ['Sections.college_id IN' => array_keys($colleges)];
                 }
             }
 
             if (!empty($options)) {
-                $options['conditions'][] = array('Section.archive' => 0);
-                $this->request->data['Section']['active'] = 0;
+                $options['conditions'][] = ['Sections.archive' => 0];
+                $this->request = $this->request->withData('Section.active', 0);
 
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                    $options['conditions'][] = array('Section.year_level_id' => $this->year_levels);
+                if ($user['role_id'] == ROLE_DEPARTMENT) {
+                    $options['conditions'][] = ['Sections.year_level_id IN' => $this->year_levels];
                 } else {
-                    if (isset($this->department_ids) && !empty($this->department_ids) && $this->Session->read(
-                            'Auth.User'
-                        )['role_id'] == ROLE_COLLEGE && $this->Session->read('Auth.User')['is_admin'] == 1) {
-                        $options['conditions'][] = array(
-                            'OR' => array(
-                                'Section.department_id IS NULL',
-                                'Section.year_level_id' => $this->Section->YearLevel->find(
-                                    'list',
-                                    array(
-                                        'fields' => array('YearLevel.id'),
-                                        'conditions' => array(
-                                            'YearLevel.department_id' => $this->department_ids,
-                                            'YearLevel.name' => $this->year_levels
-                                        )
-                                    )
-                                ),
-                            )
-                        );
+                    if (!empty($this->department_ids) && $user['role_id'] == ROLE_COLLEGE && $user['is_admin'] == 1) {
+                        $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                            ->where([
+                                'YearLevels.department_id IN' => $this->department_ids,
+                                'YearLevels.name IN' => $this->year_levels,
+                            ])
+                            ->toArray();
+                        $options['conditions'][] = [
+                            'OR' => [
+                                'Sections.department_id IS' => null,
+                                'Sections.year_level_id IN' => $yearLevelIds,
+                            ],
+                        ];
+                    } elseif (($user['role_id'] == ROLE_COLLEGE && $user['is_admin'] == 0) || ($user['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids) && $this->onlyPre == 1)) {
+                        $options['conditions'][] = ['Sections.department_id IS' => null];
+                    } elseif (!empty($this->department_ids)) {
+                        $yearLevelIds = $this->Sections->YearLevels->find('list', ['keyField' => 'id', 'valueField' => 'id'])
+                            ->where([
+                                'YearLevels.department_id IN' => $this->department_ids,
+                                'YearLevels.name' => $this->request->getData('Section.year_level_id') ?: $this->year_levels,
+                            ])
+                            ->toArray();
+                        $options['conditions'][] = ['Sections.year_level_id IN' => $yearLevelIds];
                     } else {
-                        if (($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE && $this->Session->read(
-                                    'Auth.User'
-                                )['is_admin'] == 0) || ($this->Session->read(
-                                    'Auth.User'
-                                )['role_id'] == ROLE_REGISTRAR && !empty($this->college_ids) && $this->onlyPre == 1)) {
-                            $options['conditions'][] = array('Section.department_id IS NULL');
-                        } else {
-                            if (isset($this->department_ids) && !empty($this->department_ids)) {
-                                $options['conditions'][] = array(
-                                    'Section.year_level_id' => $this->Section->YearLevel->find(
-                                        'list',
-                                        array(
-                                            'fields' => array('YearLevel.id'),
-                                            'conditions' => array(
-                                                'YearLevel.department_id' => $this->department_ids,
-                                                'YearLevel.name' => (isset($this->request->data['Section']['year_level_id']) && !empty($this->request->data['Section']['year_level_id']) && $this->request->data['Section']['year_level_id'] != 0 ? $this->request->data['Section']['year_level_id'] : $this->year_levels)
-                                            )
-                                        )
-                                    )
-                                );
-                            } else {
-                                $options['conditions'][] = array('Section.department_id IS NULL');
-                            }
-                        }
+                        $options['conditions'][] = ['Sections.department_id IS' => null];
                     }
                 }
             }
         }
 
-        debug($options['conditions']);
-
         if (!empty($options['conditions'])) {
-            $this->Paginator->settings = array(
+            $this->Paginator->settings = array_merge($this->Paginator->settings, [
                 'conditions' => $options['conditions'],
-                'contain' => array(
-                    'Department' => array(
-                        'fields' => array(
-                            'Department.id',
-                            'Department.name',
-                            'Department.shortname',
-                            'Department.college_id',
-                            'Department.institution_code'
-                        )
-                    ),
-                    'College' => array(
-                        'fields' => array(
-                            'College.id',
-                            'College.name',
-                            'College.shortname',
-                            'College.institution_code',
-                            'College.campus_id',
-                        ),
-                        'Campus' => array('id', 'name', 'campus_code')
-                    ),
-                    'Program' => array(
-                        'fields' => array(
-                            'Program.id',
-                            'Program.name',
-                            'Program.shortname',
-                        )
-                    ),
-                    'ProgramType' => array(
-                        'fields' => array(
-                            'ProgramType.id',
-                            'ProgramType.name',
-                            'ProgramType.shortname',
-                        )
-                    ),
-                    'Curriculum' => array(
-                        'fields' => array(
-                            'Curriculum.id',
-                            'Curriculum.name',
-                            'Curriculum.year_introduced',
-                            'Curriculum.type_credit',
-                            'Curriculum.active',
-                        )
-                    ),
-                    'YearLevel' => array('id', 'name'),
-                ),
-                'order' => /* (isset($sort) && isset($direction) ? array('Section.'.$sort.'' => $direction) :  */
-                    array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.department_id' => 'ASC',
-                        'Section.program_id' => 'ASC',
-                        'Section.program_type_id' => 'ASC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.name' => 'ASC',
-                        'Section.id' => 'ASC'
-                    )/* ) */,
-                'limit' => $limit,
-                'maxLimit' => 500,
-                'recursive' => -1,
-                'page' => $page
-            );
-
-            //$sections = $this->paginate($options);
+                'contain' => [
+                    'Departments' => [
+                        'fields' => ['id', 'name', 'shortname', 'college_id', 'institution_code'],
+                    ],
+                    'Colleges' => [
+                        'fields' => ['id', 'name', 'shortname', 'institution_code', 'campus_id'],
+                        'Campuses' => ['fields' => ['id', 'name', 'campus_code']],
+                    ],
+                    'Programs' => [
+                        'fields' => ['id', 'name', 'shortname'],
+                    ],
+                    'ProgramTypes' => [
+                        'fields' => ['id', 'name', 'shortname'],
+                    ],
+                    'Curriculums' => [
+                        'fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active'],
+                    ],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                ],
+                'page' => $page,
+            ]);
 
             try {
-                $sections = $this->Paginator->paginate($this->modelClass);
+                $sections = $this->Paginator->paginate($this->Sections);
                 $this->set(compact('sections'));
             } catch (NotFoundException $e) {
-                if (!empty($this->request->data['Search'])) {
-                    unset($this->request->data['Search']['page']);
-                    unset($this->request->data['Search']['sort']);
-                    unset($this->request->data['Search']['direction']);
-                }
-                if (!empty($this->request->data['Section'])) {
-                    unset($this->request->data['Section']['page']);
-                    unset($this->request->data['Section']['sort']);
-                    unset($this->request->data['Section']['direction']);
-                }
-                unset($this->passedArgs);
-                $this->__init_search_sections();
-                return $this->redirect(array('action' => 'index'/* , $this->request->data */));
-            } catch (Exception $e) {
-                if (!empty($this->request->data['Search'])) {
-                    unset($this->request->data['Search']['page']);
-                    unset($this->request->data['Search']['sort']);
-                    unset($this->request->data['Search']['direction']);
-                }
-                if (!empty($this->request->data['Section'])) {
-                    unset($this->request->data['Section']['page']);
-                    unset($this->request->data['Section']['sort']);
-                    unset($this->request->data['Section']['direction']);
-                }
-                unset($this->passedArgs);
-                $this->__init_search_sections();
-                return $this->redirect(array('action' => 'index'/* , $this->request->data */));
+                $this->request = $this->request->withData('Section', array_diff_key(
+                    $this->request->getData('Section') ?? [],
+                    array_flip(['page', 'sort', 'direction'])
+                ));
+                $this->initSearchSections();
+                return $this->redirect(['action' => 'index']);
+            } catch (\Exception $e) {
+                $this->request = $this->request->withData('Section', array_diff_key(
+                    $this->request->getData('Section') ?? [],
+                    array_flip(['page', 'sort', 'direction'])
+                ));
+                $this->initSearchSections();
+                return $this->redirect(['action' => 'index']);
             }
         } else {
-            $sections = array();
+            $sections = [];
         }
 
         if (empty($sections) && !empty($options['conditions'])) {
             $this->Flash->info('No Section is found in the given search criteria. Try changing the search criterias.');
-            $turn_off_search = false;
+            $turnOffSearch = false;
         } else {
-            $turn_off_search = false;
-            //debug($acceptedStudents[0]);
+            $turnOffSearch = false;
         }
 
-        //$this->__init_search_index();
-
-        $current_acy = $this->AcademicYear->current_academicyear();
-
-        $acyear_array_options = $this->AcademicYear->academicYearInArray(
-            ((explode('/', $current_acy)[0]) - ACY_BACK_FOR_ALL),
-            (explode('/', $current_acy)[0])
+        $currentAcy = $this->AcademicYear->currentAcademicYear();
+        $acyearArrayOptions = $this->AcademicYear->academicYearInArray(
+            (explode('/', $currentAcy)[0]) - ACY_BACK_FOR_ALL,
+            explode('/', $currentAcy)[0]
         );
 
-        $applicable_department_ids = $this->department_ids;
-        $applicable_college_ids = $this->college_ids;
-        $applicable_program_ids = $this->program_ids;
-        $applicable_program_type_ids = $this->program_type_ids;
+        $applicableDepartmentIds = $this->department_ids;
+        $applicableCollegeIds = $this->college_ids;
+        $applicableProgramIds = $this->program_ids;
+        $applicableProgramTypeIds = $this->program_type_ids;
+        $onlyFreshman = $this->onlyPre ? 1 : 0;
 
-        $onlyFreshman = (isset($this->onlyPre) && $this->onlyPre == 1 ? 1 : 0);
-
-        $this->set(
-            compact(
-                'acyear_array_options',
-                'colleges',
-                'departments',
-                /* 'sections', */
-                'turn_off_search',
-                'limit',
-                'name',
-                'applicable_department_ids',
-                'applicable_college_ids',
-                'applicable_program_ids',
-                'applicable_program_type_ids',
-                'onlyFreshman',
-                'page',
-                //'sort',
-                //'direction',
-                'selected_academic_year'
-            )
-        );
+        $this->set(compact(
+            'acyearArrayOptions',
+            'colleges',
+            'departments',
+            'turnOffSearch',
+            'limit',
+            'name',
+            'applicableDepartmentIds',
+            'applicableCollegeIds',
+            'applicableProgramIds',
+            'applicableProgramTypeIds',
+            'onlyFreshman',
+            'page',
+            'selectedAcademicYear'
+        ));
     }
 
-    public function view($id = null)
+    public function view(?int $id = null)
     {
-
         if (!$id) {
             $this->Flash->error('Invalid section');
-            return $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        $section = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $id,
-                'OR' => array(
-                    'Section.department_id' => $this->department_id,
-                    'Section.college_id' => $this->college_id
-                )
-            ),
-            'contain' => array(
-                'Department' => array('id', 'name'),
-                'YearLevel' => array('id', 'name'),
-                'Program' => array('id', 'name', 'shortname'),
-                'ProgramType' => array('id', 'name'),
-                'College' => array('id', 'name', 'shortname'),
-                'Student' => array(
-                    'fields' => array(
+        $section = $this->Sections->find('first')
+            ->where([
+                'Sections.id' => $id,
+                'OR' => [
+                    'Sections.department_id' => $this->department_id,
+                    'Sections.college_id' => $this->college_id,
+                ],
+            ])
+            ->contain([
+                'Departments' => ['fields' => ['id', 'name']],
+                'YearLevels' => ['fields' => ['id', 'name']],
+                'Programs' => ['fields' => ['id', 'name', 'shortname']],
+                'ProgramTypes' => ['fields' => ['id', 'name']],
+                'Colleges' => ['fields' => ['id', 'name', 'shortname']],
+                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                'Students' => [
+                    'fields' => [
                         'id',
                         'full_name',
                         'studentnumber',
                         'email',
                         'phone_mobile',
                         'gender',
-                        'academicyear'
-                    ),
-                    'Department' => array('id', 'name'),
-                    'College' => array('id', 'name', 'shortname'),
-                    'Program' => array('id', 'name', 'shortname'),
-                    'ProgramType' => array('id', 'name'),
-                    'order' => array(
-                        'Student.academicyear' => 'DESC',
-                        'Student.studentnumber' => 'ASC',
-                        'Student.id' => 'ASC',
-                        'Student.full_name' => 'ASC'
-                    ),
-                )
-            )
-        ));
+                        'academicyear',
+                    ],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'Colleges' => ['fields' => ['id', 'name', 'shortname']],
+                    'Programs' => ['fields' => ['id', 'name', 'shortname']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'order' => [
+                        'Students.academicyear' => 'DESC',
+                        'Students.studentnumber' => 'ASC',
+                        'Students.id' => 'ASC',
+                        'Students.full_name' => 'ASC',
+                    ],
+                ],
+            ])
+            ->first();
 
-        $this->set('section', $section);
+        $this->set(compact('section'));
     }
 
     public function add()
     {
-
         $isEverything = true;
 
-        if (!empty($this->request->data)) {
-            $this->request->data['Section']['college_id'] = $this->college_id;
+        if ($this->request->is('post')) {
+            $sectionData = $this->request->getData('Section');
+            $sectionData['college_id'] = $this->college_id;
 
-            if (!empty($this->request->data['Section']['number_of_class'])) {
-                if (is_numeric($this->request->data['Section']['number_of_class'])) {
-                    $numberofclass = $this->request->data['Section']['number_of_class'];
+            if (!empty($sectionData['number_of_class'])) {
+                if (is_numeric($sectionData['number_of_class'])) {
+                    $numberOfClass = $sectionData['number_of_class'];
                 } else {
-                    $this->Flash->error(
-                        'The Number of Section must be number, Please provide number of section to create.'
-                    );
+                    $this->Flash->error('The Number of Section must be a number.');
                     $isEverything = false;
                 }
             } else {
-                $this->Flash->error(
-                    'The number of class should not be empty. Please provide number of section(s) to create.'
-                );
+                $this->Flash->error('The number of classes should not be empty.');
                 $isEverything = false;
             }
 
-            $programTypeShortName = $this->Section->ProgramType->field(
-                'ProgramType.shortname',
-                array('ProgramType.id' => $this->request->data['Section']['program_type_id'])
-            );
+            $programTypeShortName = $this->Sections->ProgramTypes->find()
+                ->select(['shortname'])
+                ->where(['ProgramTypes.id' => $sectionData['program_type_id']])
+                ->first()
+                ->shortname;
 
-            if (!empty($this->request->data['Section']['fixed_section_name'])) {
-                if (strpos(trim($this->request->data['Section']['fixed_section_name']), ' ') === false) {
-                    $fixedsectionname = trim($this->request->data['Section']['fixed_section_name']);
+            if (!empty($sectionData['fixed_section_name'])) {
+                if (strpos(trim($sectionData['fixed_section_name']), ' ') === false) {
+                    $fixedSectionName = trim($sectionData['fixed_section_name']);
                 } else {
-                    $this->Flash->error('Please provide fixed section name with out space');
+                    $this->Flash->error('Fixed section name should not contain spaces.');
                     $isEverything = false;
                 }
             } else {
-                $this->Flash->error('Fixed section name should not be empty. Please provide Fixed Section Name');
+                $this->Flash->error('Fixed section name should not be empty.');
                 $isEverything = false;
             }
 
-            if (!empty($this->request->data['Section']['variable_section_name'])) {
-                $variable_section_name = trim($this->request->data['Section']['variable_section_name']);
+            if (!empty($sectionData['variable_section_name'])) {
+                $variableSectionName = trim($sectionData['variable_section_name']);
             } else {
-                $this->Flash->error('Please select variable section name.');
+                $this->Flash->error('Please select a variable section name.');
                 $isEverything = false;
             }
 
-            //Save department as well if user role is not college (use role is department)
-            if (ROLE_COLLEGE != $this->role_id) {
-                $this->request->data['Section']['department_id'] = $this->department_id;
+            if ($this->role_id != ROLE_COLLEGE) {
+                $sectionData['department_id'] = $this->department_id;
 
-                $yearlevel = $this->request->data['Section']['year_level_id'];
-                $yearlevelname = $this->Section->YearLevel->field('YearLevel.name', array('YearLevel.id' => $yearlevel)
-                );
-                $yearlevelnameshort = substr($yearlevelname, 0, 1);
+                $yearLevel = $sectionData['year_level_id'];
+                $yearLevelEntity = $this->Sections->YearLevels->find()
+                    ->select(['name'])
+                    ->where(['YearLevels.id' => $yearLevel])
+                    ->first();
+                $yearLevelName = $yearLevelEntity ? $yearLevelEntity->name : '';
+                $yearLevelNameShort = substr($yearLevelName, 0, 1);
 
-                if (!empty($this->request->data['Section']['prefix_section_name'])) {
-                    if (strpos(trim($this->request->data['Section']['prefix_section_name']), ' ') === false) {
-                        $prefixsectionname = trim(
-                                $this->request->data['Section']['prefix_section_name']
-                            ) . '' . $programTypeShortName;
+                if (!empty($sectionData['prefix_section_name'])) {
+                    if (strpos(trim($sectionData['prefix_section_name']), ' ') === false) {
+                        $prefixSectionName = trim($sectionData['prefix_section_name']) . $programTypeShortName;
                     } else {
-                        $this->Flash->error('Please provide prefix section name with out space');
+                        $this->Flash->error('Prefix section name should not contain spaces.');
                         $isEverything = false;
                     }
                 } else {
-                    $this->Flash->error('Prefix Section name should not be empty. Please provide prefix section name.');
+                    $this->Flash->error('Prefix section name should not be empty.');
                     $isEverything = false;
                 }
 
-                if (!empty($this->request->data['Section']['additionalprefix_section_name'])) {
-                    if (strpos(trim($this->request->data['Section']['additionalprefix_section_name']), ' ') === false) {
-                        $additionalprefix_section_name = trim(
-                            $this->request->data['Section']['additionalprefix_section_name']
-                        );
-                    }
-                } else {
-                    $additionalprefix_section_name = '';
-                }
+                $additionalPrefixSectionName = !empty($sectionData['additionalprefix_section_name'])
+                    ? trim($sectionData['additionalprefix_section_name'])
+                    : '';
             }
 
             if ($isEverything) {
-                //********** To maintain the uniqueness of section name for the same college and/or department/academicyear/program/program type
+                $frontSectionName = ($this->role_id != ROLE_COLLEGE)
+                    ? $prefixSectionName . $yearLevelNameShort . ' ' . $fixedSectionName . ' ' . $additionalPrefixSectionName
+                    : $fixedSectionName;
 
-                if (ROLE_COLLEGE != $this->role_id) {
-                    $front_section_name = $prefixsectionname . $yearlevelnameshort . ' ' . $fixedsectionname . ' ' . $additionalprefix_section_name;
+                $conditions = [
+                    'Sections.academicyear LIKE' => $sectionData['academicyear'] . '%',
+                    'Sections.college_id' => $this->college_id,
+                    'Sections.program_id' => $sectionData['program_id'],
+                    'Sections.program_type_id' => $sectionData['program_type_id'],
+                    'Sections.name LIKE' => $frontSectionName . ' %',
+                ];
+
+                if ($this->role_id != ROLE_COLLEGE) {
+                    $conditions['Sections.department_id'] = $this->department_id;
+                    $conditions['Sections.year_level_id'] = $sectionData['year_level_id'];
                 } else {
-                    $front_section_name = $fixedsectionname;
+                    $conditions['OR'] = [
+                        'Sections.department_id IS' => null,
+                        'Sections.department_id IN' => ['0', ''],
+                    ];
                 }
 
-                //Search using by department and year level as well if user role is not college (use role is department)
-                if (ROLE_COLLEGE != $this->role_id) {
-                    $conditions = array(
-                        'Section.academicyear LIKE' => $this->request->data['Section']['academicyear'] . '%',
-                        'Section.college_id' => $this->college_id,
-                        'Section.department_id' => $this->department_id,
-                        'Section.year_level_id' => $this->request->data['Section']['year_level_id'],
-                        'Section.program_id' => $this->request->data['Section']['program_id'],
-                        'Section.program_type_id' => $this->request->data['Section']['program_type_id'],
-                        'Section.name LIKE ' => $front_section_name . ' ' . '%'
-                    );
+                $similarSections = $this->Sections->find('list', [
+                    'keyField' => 'id',
+                    'valueField' => 'name',
+                ])
+                    ->where($conditions)
+                    ->toArray();
+
+                $similarSectionVariableNames = array_map(function ($name) use ($frontSectionName) {
+                    return substr($name, strrpos($name, ' ') + 1);
+                }, $similarSections);
+
+                $numericVariableSectionNames = array_filter($similarSectionVariableNames, 'is_numeric');
+                $alphabetVariableSectionNames = array_diff($similarSectionVariableNames, $numericVariableSectionNames);
+
+                if ($variableSectionName == 'Alphabet') {
+                    if (empty($alphabetVariableSectionNames)) {
+                        $variableSectionNameValue = 'A';
+                    } else {
+                        rsort($alphabetVariableSectionNames);
+                        $variableSectionNameValue = chr(ord($alphabetVariableSectionNames[0]) + 1);
+                    }
                 } else {
-                    $conditions = array(
-                        'Section.academicyear LIKE' => $this->request->data['Section']['academicyear'] . '%',
-                        'Section.college_id' => $this->college_id,
-                        'Section.year_level_id' => $this->request->data['Section']['year_level_id'],
-                        'Section.program_id' => $this->request->data['Section']['program_id'],
-                        'Section.program_type_id' => $this->request->data['Section']['program_type_id'],
-                        'Section.name LIKE ' => $front_section_name . ' ' . '%',
-                        "OR" => array("Section.department_id is null", "Section.department_id" => array(0, ''))
-                    );
-                }
-
-                $similar_sections = $this->Section->find(
-                    'list',
-                    array('fields' => array('Section.name'), 'conditions' => $conditions)
-                );
-                $similar_section_variablename = array();
-
-                if (!empty($similar_sections)) {
-                    foreach ($similar_sections as $ssv) {
-                        $similar_section_variablename[] = substr($ssv, strrpos($ssv, " ") + 1);
-                    }
-                }
-
-                $numeric_variablesectionname = array();
-                $alphabet_variablesectionname = array();
-
-                if (!empty($similar_section_variablename)) {
-                    foreach ($similar_section_variablename as $ssvnv) {
-                        if (is_numeric($ssvnv)) {
-                            $numeric_variablesectionname[] = $ssvnv;
-                        } else {
-                            $alphabet_variablesectionname[] = $ssvnv;
-                        }
-                    }
-                }
-
-                //****************end of maintain...***************//
-
-                if ($variable_section_name == "Alphabet") {
-                    if (empty($alphabet_variablesectionname)) {
-                        $variablesectionname = "A";
+                    if (empty($numericVariableSectionNames)) {
+                        $variableSectionNameValue = 1;
                     } else {
-                        rsort($alphabet_variablesectionname);
-                        $variablesectionname = ord($alphabet_variablesectionname[0]);
-                        $variablesectionname = $variablesectionname + 1;
-                        $variablesectionname = chr($variablesectionname);
+                        rsort($numericVariableSectionNames);
+                        $variableSectionNameValue = (int)$numericVariableSectionNames[0] + 1;
                     }
                 }
 
-                if ($variable_section_name == "Number") {
-                    if (empty($numeric_variablesectionname)) {
-                        $variablesectionname = 1;
-                    } else {
-                        rsort($numeric_variablesectionname);
-                        $variablesectionname = $numeric_variablesectionname[0] + 1;
-                    }
-                }
+                unset($sectionData['number_of_class'], $sectionData['fixed_section_name'], $sectionData['variable_section_name']);
+                unset($sectionData['prefix_section_name'], $sectionData['additionalprefix_section_name']);
 
-                unset($this->request->data['Section']['number_of_class']);
-                unset($this->request->data['Section']['fixed_section_name']);
-                unset($this->request->data['Section']['variable_section_name']);
-
-                if (isset($this->request->data['Section']['prefix_section_name'])) {
-                    unset($this->request->data['Section']['prefix_section_name']);
-                }
-
-                if (isset($this->request->data['Section']['additionalprefix_section_name'])) {
-                    unset($this->request->data['Section']['additionalprefix_section_name']);
-                }
-
-                $issave = 0;
+                $isSave = false;
                 $errMsg = '';
 
-                for ($i = 0; $i < $numberofclass; $i++) {
-                    if (ROLE_COLLEGE != $this->role_id) {
-                        $name = $prefixsectionname . $yearlevelnameshort . ' ' . $fixedsectionname . ' ' . $additionalprefix_section_name . ' ' . $variablesectionname;
-                    } else {
-                        $name = $fixedsectionname . ' ' . $variablesectionname;
-                    }
+                for ($i = 0; $i < $numberOfClass; $i++) {
+                    $name = ($this->role_id != ROLE_COLLEGE)
+                        ? $prefixSectionName . $yearLevelNameShort . ' ' . $fixedSectionName . ' ' . $additionalPrefixSectionName . ' ' . $variableSectionNameValue
+                        : $fixedSectionName . ' ' . $variableSectionNameValue;
 
-                    $this->request->data['Section']['name'] = $name;
-                    $this->Section->create();
+                    $sectionData['name'] = $name;
+                    $section = $this->Sections->newEntity($sectionData);
 
-                    if ($this->Section->save($this->request->data)) {
-                        $issave = 1;
+                    if ($this->Sections->save($section)) {
+                        $isSave = true;
                     } else {
                         $errMsg = "$name is already taken. Please use another section name.";
                     }
 
-                    if ($variable_section_name == "Alphabet") {
-                        $variablesectionname = ord($variablesectionname);
-                        $variablesectionname = $variablesectionname + 1;
-                        $variablesectionname = chr($variablesectionname);
-                    } else {
-                        $variablesectionname = $variablesectionname + 1;
-                    }
+                    $variableSectionNameValue = ($variableSectionName == 'Alphabet')
+                        ? chr(ord($variableSectionNameValue) + 1)
+                        : $variableSectionNameValue + 1;
                 }
 
-                if ($issave) {
-                    $this->Flash->success('The section(s) has been saved');
+                if ($isSave) {
+                    $this->Flash->success('The section(s) have been saved');
 
-                    $redirectSearchDataFilters['Section']['academicyear'] = $this->request->data['Section']['academicyear'];
-                    $redirectSearchDataFilters['Section']['program_id'] = $this->request->data['Section']['program_id'];
-                    $redirectSearchDataFilters['Section']['program_type_id'] = $this->request->data['Section']['program_type_id'];
+                    $redirectSearchDataFilters = [
+                        'Section' => [
+                            'academicyear' => $sectionData['academicyear'],
+                            'program_id' => $sectionData['program_id'],
+                            'program_type_id' => $sectionData['program_type_id'],
+                        ],
+                    ];
 
                     if ($this->role_id == ROLE_DEPARTMENT) {
-                        $redirectSearchDataFilters['Section']['year_level_id'] = $this->request->data['Section']['year_level_id'];
+                        $redirectSearchDataFilters['Section']['year_level_id'] = $sectionData['year_level_id'];
                         $redirectSearchDataFilters['Section']['department_id'] = $this->department_id;
                     } else {
-                        //$redirectSearchDataFilters['Section']['year_level_id'] = null;
                         $redirectSearchDataFilters['Section']['college_id'] = $this->college_id;
-
-                        if (isset($this->request->data['Section']['department_id'])) {
-                            $redirectSearchDataFilters['Section']['department_id'] = $this->request->data['Section']['department_id'];
+                        if (!empty($sectionData['department_id'])) {
+                            $redirectSearchDataFilters['Section']['department_id'] = $sectionData['department_id'];
                         }
                     }
 
-                    $this->__init_clear_session_filters();
+                    $this->clearSessionFilters();
+                    $this->request->getSession()->write('search_sections', $redirectSearchDataFilters['Section']);
 
-                    $this->Session->write('search_sections', $redirectSearchDataFilters['Section']);
-
-                    return $this->redirect(array('action' => 'index'));
+                    return $this->redirect(['action' => 'index']);
                 } else {
-                    if (!empty($errMsg)) {
-                        $this->Flash->error($errMsg . '.');
-                    } else {
-                        $this->Flash->error('The section could not be saved. Please try again.');
-                    }
+                    $this->Flash->error($errMsg ?: 'The section could not be saved. Please try again.');
                 }
             }
         }
 
-        $curriculums = array();
-
+        $curriculums = [];
         if ($this->role_id != ROLE_COLLEGE) {
-            $curriculums = ClassRegistry::init('Curriculum')->find('list', array(
-                'conditions' => array(
-                    'Curriculum.department_id' => $this->department_ids,
-                    'Curriculum.program_id' => array_values($this->program_ids)[0],
-                    'Curriculum.registrar_approved' => 1,
-                    'Curriculum.active' => 1
-                ),
-                'fields' => array('Curriculum.id', 'Curriculum.curriculum_detail'),
-                'order' => array('Curriculum.program_id' => 'ASC', 'Curriculum.created' => 'DESC'),
-            ));
-
-            if (!empty($curriculums)) {
-                $this->set(compact('curriculums'));
-            }
+            $curriculums = TableRegistry::getTableLocator()->get('Curriculums')
+                ->find('list', [
+                    'keyField' => 'id',
+                    'valueField' => 'curriculum_detail',
+                ])
+                ->where([
+                    'Curriculums.department_id IN' => $this->department_ids,
+                    'Curriculums.program_id' => reset($this->program_ids),
+                    'Curriculums.registrar_approved' => 1,
+                    'Curriculums.active' => 1,
+                ])
+                ->order(['Curriculums.program_id' => 'ASC', 'Curriculums.created' => 'DESC'])
+                ->toArray();
         }
 
-        if (isset($this->request->data['Section']['academicyear']) && !empty($this->request->data['Section']['academicyear'])) {
-            $thisacademicyear = $this->request->data['Section']['academicyear'];
-        } else {
-            $thisacademicyear = $this->AcademicYear->current_academicyear();
-        }
-
-        if (isset($this->request->data['Section']['program_id'])) {
-            $selectedProgram = $this->request->data['Section']['program_id'];
-        } else {
-            $selectedProgram = array_values($this->program_ids)[0];
-        }
-
-        if (isset($this->request->data['Section']['program_type_id'])) {
-            $selectedProgramType = $this->request->data['Section']['program_type_id'];
-        } else {
-            $selectedProgramType = array_values($this->program_type_ids)[0];
-        }
+        $thisAcademicYear = $this->request->getData('Section.academicyear') ?: $this->AcademicYear->currentAcademicYear();
+        $selectedProgram = $this->request->getData('Section.program_id') ?: reset($this->program_ids);
+        $selectedProgramType = $this->request->getData('Section.program_type_id') ?: reset($this->program_type_ids);
 
         if ($this->role_id == ROLE_DEPARTMENT) {
-            if (isset($this->request->data['Section']['year_level_id'])) {
-                $yearLevelsss = $this->Section->YearLevel->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'YearLevel.department_id' => $this->department_ids,
-                            'YearLevel.id' => $this->request->data['Section']['year_level_id']
-                        )
-                    )
-                );
-                $selectedYearLevelId = array_keys($yearLevelsss)[0];
-                $selectedYearLevelName = array_values($yearLevelsss)[0];
-            } else {
-                $yearLevelsss = $this->Section->YearLevel->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'YearLevel.department_id' => $this->department_ids,
-                            'YearLevel.name' => $this->year_levels
-                        )
-                    )
-                );
-                $selectedYearLevelId = array_keys($yearLevelsss)[0];
-                $selectedYearLevelName = array_values($yearLevelsss)[0];
-            }
+            $yearLevelData = $this->Sections->YearLevels->find('list')
+                ->where([
+                    'YearLevels.department_id IN' => $this->department_ids,
+                    'YearLevels.id' => $this->request->getData('Section.year_level_id') ?: array_key_first(
+                        $this->Sections->YearLevels->find('list')
+                            ->where(['YearLevels.department_id IN' => $this->department_ids, 'YearLevels.name IN' => $this->year_levels])
+                            ->toArray()
+                    ),
+                ])
+                ->toArray();
+            $selectedYearLevelId = array_key_first($yearLevelData);
+            $selectedYearLevelName = reset($yearLevelData);
 
-            if (isset($this->request->data['Section']['curriculum_id'])) {
-                $selectedCcurriculumId = $this->request->data['Section']['curriculum_id'];
-            } elseif (!empty($curriculums)) {
-                $selectedCcurriculumId = array_keys($curriculums)[0];
-            } else {
-                $selectedCcurriculumId = '%';
-            }
+            $selectedCurriculumId = !empty($curriculums)
+                ? ($this->request->getData('Section.curriculum_id') ?: array_key_first($curriculums))
+                : '%';
         } else {
             $selectedYearLevelId = null;
-            $selectedCcurriculumId = null;
+            $selectedCurriculumId = null;
             $selectedYearLevelName = null;
         }
 
-        debug($selectedYearLevelName);
-
-        //Summery of section un allocated students
-        $summary_data = $this->Section->getsectionlessstudentsummary(
-            $thisacademicyear,
+        $summaryData = $this->Sections->getSectionLessStudentSummary(
+            $thisAcademicYear,
             $this->college_id,
             $this->department_id,
             $this->role_id
         );
-        $curriculum_unattached_student_count = $this->Section->getcurriculumunattachedstudentsummary(
-            $thisacademicyear,
+        $curriculumUnattachedStudentCount = $this->Sections->getCurriculumUnattachedStudentSummary(
+            $thisAcademicYear,
             $this->college_id,
             $this->department_id,
             $this->role_id
         );
-        //$section_less_total_students = $this->Section->countsectionlessstudents($this->college_id,
-        //$this->role_id,$this->department_id,$thisacademicyear);
 
-        $variable_section_name_array = array();
-        $variable_section_name_array['Alphabet'] = ("A, B, C ...");
-        $variable_section_name_array['Number'] = ("1, 2, 3 ...");
+        $variableSectionNameArray = [
+            'Alphabet' => 'A, B, C ...',
+            'Number' => '1, 2, 3 ...',
+        ];
 
-        $collegename = $this->Section->College->field('College.name', array('College.id' => $this->college_id));
-        $collegeshortname = $this->Section->College->field('College.shortname', array('College.id' => $this->college_id)
-        );
+        $collegeName = $this->Sections->Colleges->find()
+            ->select(['name'])
+            ->where(['Colleges.id' => $this->college_id])
+            ->first()
+            ->name;
+        $collegeShortName = $this->Sections->Colleges->find()
+            ->select(['shortname'])
+            ->where(['Colleges.id' => $this->college_id])
+            ->first()
+            ->shortname;
 
-        $departmentname = $this->Section->Department->field(
-            'Department.name',
-            array('Department.id' => $this->department_id)
-        );
-        $departmentshortname = $this->Section->Department->field(
-            'Department.shortname',
-            array('Department.id' => $this->department_id)
-        );
+        $departmentName = $this->Sections->Departments->find()
+            ->select(['name'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->name;
+        $departmentShortName = $this->Sections->Departments->find()
+            ->select(['shortname'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->shortname;
 
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
-        // $programs = $this->Section->Program->find('list');
-        // $programTypes = $this->Section->ProgramType->find('list');
+        $yearLevels = $this->Sections->YearLevels->find('list')
+            ->where(['YearLevels.department_id' => $this->department_id])
+            ->toArray();
 
-        $programTypeShortName = $this->Section->ProgramType->field(
-            'ProgramType.shortname',
-            array(
-                'ProgramType.id' => (isset($this->request->data['Section']['program_type_id']) ? $this->request->data['Section']['program_type_id'] : array_values(
-                    $this->program_type_ids
-                )[0])
-            )
-        );
-        $programShortName = $this->Section->Program->field(
-            'Program.shortname',
-            array(
-                'Program.id' => (isset($this->request->data['Section']['program_id']) ? $this->request->data['Section']['program_id'] : array_values(
-                    $this->program_ids
-                )[0])
-            )
-        );
+        $programTypeShortName = $this->Sections->ProgramTypes->find()
+            ->select(['shortname'])
+            ->where(['ProgramTypes.id' => $this->request->getData('Section.program_type_id') ?: reset($this->program_type_ids)])
+            ->first()
+            ->shortname;
+        $programShortName = $this->Sections->Programs->find()
+            ->select(['shortname'])
+            ->where(['Programs.id' => $this->request->getData('Section.program_id') ?: reset($this->program_ids)])
+            ->first()
+            ->shortname;
 
-        $programss = $this->Section->Program->find(
-            'list',
-            array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-        );
-        $program_typess = $programTypess = $this->Section->ProgramType->find(
-            'list',
-            array('conditions' => array('ProgramType.id' => $this->program_type_ids, 'ProgramType.active' => 1))
-        );
+        $programs = $this->Sections->Programs->find('list')
+            ->where(['Programs.id IN' => $this->program_ids, 'Programs.active' => 1])
+            ->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')
+            ->where(['ProgramTypes.id IN' => $this->program_type_ids, 'ProgramTypes.active' => 1])
+            ->toArray();
 
-        $acyear = $this->AcademicYear->current_academicyear();
+        $acyear = $this->AcademicYear->currentAcademicYear();
+        $gcYear = substr($acyear, 0, 4);
+        $gcMonth = date('n');
+        $gcDay = date('j');
 
-        $GCyear = substr(($this->AcademicYear->current_academicyear()), 0, 4);
-
-        $GCmonth = date('n');
-        $GCday = date('j');
-
-        if ($GCmonth >= 9) {
-            $GCyear = $GCyear;
-        } else {
-            $GCyear = $GCyear + 1;
+        if ($gcMonth < 9) {
+            $gcYear++;
         }
 
-        $ETY = $this->EthiopicDateTime->GetEthiopicYear($GCday, $GCmonth, $GCyear);
+        $ety = $this->EthiopicDateTime->getEthiopicYear($gcDay, $gcMonth, $gcYear);
 
-        if ($GCmonth == 9) {
-            //$ETY+=1;
+        $fixedSectionName = ($this->role_id == ROLE_COLLEGE)
+            ? $collegeShortName . $ety
+            : ($departmentShortName ?? $collegeShortName) . $ety;
+
+        $numberOfClass = array_combine(range(1, 26), range(1, 26));
+
+        $prefixSectionName = $this->Sections->Programs->find('list', [
+            'keyField' => 'shortname',
+            'valueField' => 'shortname',
+        ])
+            ->where(['Programs.id IN' => $this->program_ids, 'Programs.active' => 1])
+            ->order(['Programs.id' => 'ASC'])
+            ->toArray();
+
+        if (empty($prefixSectionName)) {
+            $prefixSectionName = $this->Sections->Programs->find('list', [
+                'keyField' => 'shortname',
+                'valueField' => 'shortname',
+            ])
+                ->where(['Programs.active' => 1])
+                ->order(['Programs.id' => 'ASC'])
+                ->toArray();
         }
 
-        if (ROLE_COLLEGE == $this->role_id) {
-            $FixedSectionName = isset($collegeshortname) ? /* 'PRE-'. */
-                $collegeshortname . $ETY : $collegeshortname/* 'PRE-' */ . $ETY;
-        } else {
-            $FixedSectionName = isset($departmentshortname) ? $departmentshortname . $ETY : $collegeshortname . $ETY;
-        }
-
-        for ($i = 1; $i <= 26; $i++) {
-            $number_of_class[$i] = $i;
-        }
-
-        $prefix_section_name = array();
-
-        $programForPrefix = $this->Section->Program->find(
-            'list',
-            array(
-                'conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1),
-                'fields' => array('Program.shortname', 'Program.shortname'),
-                'order' => array('Program.id' => 'ASC')
-            )
-        );
-
-        if (empty($programForPrefix)) {
-            $programForPrefix = $this->Section->Program->find(
-                'list',
-                array(
-                    'conditions' => array(/* 'Program.id' => $this->program_ids, */ 'Program.active' => 1),
-                    'fields' => array('Program.shortname', 'Program.shortname'),
-                    'order' => array('Program.id' => 'ASC')
-                )
-            );
-        }
-
-        if (!empty($programForPrefix)) {
-            foreach ($programForPrefix as $key => $shortname) {
-                $prefix_section_name[$key] = $shortname;
-            }
-        }
-
-        $this->set(
-            compact(
-                'departmentname',
-                'yearLevels',
-                'prefix_section_name',
-                'variable_section_name_array',
-                'collegename',
-                'number_of_class',
-                'programss',
-                'FixedSectionName',
-                'programTypess',
-                'summary_data',
-                'thisacademicyear',
-                'curriculum_unattached_student_count'
-            )
-        );
+        $this->set(compact(
+            'departmentName',
+            'yearLevels',
+            'prefixSectionName',
+            'variableSectionNameArray',
+            'collegeName',
+            'numberOfClass',
+            'programs',
+            'fixedSectionName',
+            'programTypes',
+            'summaryData',
+            'thisAcademicYear',
+            'curriculumUnattachedStudentCount',
+            'curriculums',
+            'selectedProgram',
+            'selectedProgramType',
+            'selectedYearLevelId',
+            'selectedYearLevelName',
+            'selectedCurriculumId'
+        ));
     }
 
-    public function edit($id = null)
+    public function edit(?int $id = null)
     {
-
-        if (!$id && empty($this->request->data)) {
+        if (!$id && empty($this->request->getData())) {
             $this->Flash->error('Invalid section');
-            return $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        if (!empty($this->request->data)) {
-            $this->request->data['Section']['name'] = trim($this->request->data['Section']['name']);
+        if ($this->request->is(['post', 'put'])) {
+            $sectionData = $this->request->getData();
+            $sectionData['Section']['name'] = trim($sectionData['Section']['name']);
+            $section = $this->Sections->get($id);
+            $section = $this->Sections->patchEntity($section, $sectionData['Section']);
 
-            if ($this->Section->save($this->request->data)) {
+            if ($this->Sections->save($section)) {
                 $this->Flash->success('The section has been saved');
-                return $this->redirect(array('action' => 'index'));
+                return $this->redirect(['action' => 'index']);
             } else {
-                $this->Flash->error('The section could not be saved. Please, try again.');
+                $this->Flash->error('The section could not be saved. Please try again.');
             }
         }
 
-        if (empty($this->request->data)) {
-            //$this->request->data = $this->Section->read(null, $id);
+        $section = $this->Sections->find('first')
+            ->where([
+                'Sections.id' => $id,
+                'OR' => [
+                    'Sections.department_id' => $this->department_id,
+                    'Sections.college_id' => $this->college_id,
+                ],
+            ])
+            ->contain([
+                'Departments' => ['fields' => ['id', 'name']],
+                'YearLevels' => ['fields' => ['id', 'name']],
+                'Programs' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name']],
+                'Colleges' => ['fields' => ['id', 'name']],
+                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+            ])
+            ->first();
 
-            $section = $this->request->data = $this->Section->find('first', array(
-                'conditions' => array(
-                    'Section.id' => $id,
-                    'OR' => array(
-                        'Section.department_id' => $this->department_id,
-                        'Section.college_id' => $this->college_id
-                    )
-                ),
-                'contain' => array(
-                    'Department' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name'),
-                    'College' => array('id', 'name'),
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                )
-            ));
-        }
+        $this->request = $this->request->withData('Section', $section->toArray());
 
-        $curriculums = array();
-
+        $curriculums = [];
         if ($this->role_id != ROLE_COLLEGE) {
-            $curriculums = ClassRegistry::init('Curriculum')->find('list', array(
-                'conditions' => array(
-                    'Curriculum.department_id' => $this->department_ids,
-                    'Curriculum.program_id' => array_values($this->program_ids)[0],
-                    'Curriculum.registrar_approved' => 1,
-                    'Curriculum.active' => 1
-                ),
-                'fields' => array('Curriculum.id', 'Curriculum.curriculum_detail'),
-                'order' => array('Curriculum.program_id' => 'ASC', 'Curriculum.created' => 'DESC'),
-            ));
-
-            if (!empty($curriculums)) {
-                $this->set(compact('curriculums'));
-            }
+            $curriculums = TableRegistry::getTableLocator()->get('Curriculums')
+                ->find('list', [
+                    'keyField' => 'id',
+                    'valueField' => 'curriculum_detail',
+                ])
+                ->where([
+                    'Curriculums.department_id IN' => $this->department_ids,
+                    'Curriculums.program_id' => reset($this->program_ids),
+                    'Curriculums.registrar_approved' => 1,
+                    'Curriculums.active' => 1,
+                ])
+                ->order(['Curriculums.program_id' => 'ASC', 'Curriculums.created' => 'DESC'])
+                ->toArray();
         }
 
-        $colleges = $this->Section->College->find(
-            'list',
-            array('conditions' => array('College.id' => $this->college_id))
-        );
-        $departments = $this->Section->Department->find(
-            'list',
-            array('conditions' => array('Department.id' => $this->department_id))
-        );
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
+        $colleges = $this->Sections->Colleges->find('list')
+            ->where(['Colleges.id' => $this->college_id])
+            ->toArray();
+        $departments = $this->Sections->Departments->find('list')
+            ->where(['Departments.id' => $this->department_id])
+            ->toArray();
+        $yearLevels = $this->Sections->YearLevels->find('list')
+            ->where(['YearLevels.department_id' => $this->department_id])
+            ->toArray();
+        $programs = $this->Sections->Programs->find('list')->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')->toArray();
 
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-
-        $this->set(compact('section', 'colleges', 'departments', 'yearLevels', 'programs', 'programTypes'));
+        $this->set(compact('section', 'colleges', 'departments', 'yearLevels', 'programs', 'programTypes', 'curriculums'));
     }
 
-    public function delete($id = null)
+    public function delete(?int $id = null)
     {
-
         if (!$id) {
             $this->Flash->error('Invalid id for section');
-            return $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        if ($this->Section->isSectionEmpty($id)) {
-            //If the course empty, then hard deletion can be performed
-            // is course published in the name of the section ?
-            // debug($this->Section->isCoursePublishedInTheSection($id));
-            if ($this->Section->isCoursePublishedInTheSection($id) == false) {
-                if ($this->Section->delete($id)) {
+        $section = $this->Sections->get($id);
+
+        if ($this->Sections->isSectionEmpty($id)) {
+            if (!$this->Sections->isCoursePublishedInTheSection($id)) {
+                if ($this->Sections->delete($section)) {
                     $this->Flash->success('Section deleted.');
-                    $this->redirect(array('action' => 'index'));
+                    return $this->redirect(['action' => 'index']);
                 }
             } else {
-                $this->Flash->error(
-                    'Course has been published in the name of the section. You can not delete the section right now. If you have to delete the section, you need to Unpublish/delete publisehd course first.'
-                );
+                $this->Flash->error('Course has been published in the name of the section. Unpublish/delete published course first.');
+                return $this->redirect(['action' => 'index']);
             }
-            return $this->redirect(array('action' => 'index'));
         } else {
-            //In order to soft delete (archive) section the section must have not active student. If the section have active students, the system shoud notify the user first to move or delete all active student in that section
-            $studentssections = $this->Section->StudentsSection->find(
-                'all',
-                array('conditions' => array('StudentsSection.section_id' => $id))
-            );
-            $active_students_ofsection_count = 0;
+            $studentsSections = $this->Sections->StudentsSections->find()
+                ->where(['StudentsSections.section_id' => $id])
+                ->toArray();
+            $activeStudentsCount = count(array_filter($studentsSections, fn($ss) => $ss->archive == 0));
 
-            if (!empty($studentssections)) {
-                foreach ($studentssections as $ssk => $ssv) {
-                    if ($ssv['StudentsSection']['archive'] == 0) {
-                        $active_students_ofsection_count++;
-                        //$this->Section->StudentsSection->id = $ssv['StudentsSection']['id'];
-                        //$this->Section->StudentsSection->saveField('archive','1');
-                    }
+            if ($activeStudentsCount == 0) {
+                $section->archive = 1;
+                if ($this->Sections->save($section)) {
+                    $this->Flash->success('Section is now archived (soft deleted)');
+                    return $this->redirect(['action' => 'index']);
                 }
-            }
-
-            if ($active_students_ofsection_count == 0) {
-                //then soft delete (archive) section
-                $this->Section->id = $id;
-                if ($this->Section->saveField('archive', '1')) {
-                    $this->Flash->success('Section is now Archieved(soft deleted)');
-                    return $this->redirect(array('action' => 'index'));
-                }
-                $this->Flash->error('Section was not deleted or archieved');
-                return $this->redirect(array('action' => 'index'));
+                $this->Flash->error('Section was not deleted or archived');
             } else {
-                $this->Session->setFlash(
-                    '<span style="margin-right: 15px;"></span>Section have ' . $active_students_ofsection_count . ' active student(s), In order to delete this section, first you have to move or delete all students of the section in ',
-                    "session_flash_link",
-                    array(
-                        "class" => 'error-box error-message',
-                        "link_text" => " this page",
-                        "link_url" => array(
-                            "controller" => "sections",
-                            "action" => "display_sections",
-                            "admin" => false
-                        )
-                    )
-                );
-                return $this->redirect(array('action' => 'index'));
+
+                 $this->Flash->error(
+                     __('Section has {0} active student(s). To delete this section, first move or delete all students.', $activeStudentsCount),
+                     [
+                         'element' => 'error_with_link',
+                         'params' => [
+                             'link_text' => __('this page'),
+                             'link_url' => ['controller' => 'Sections', 'action' => 'display_sections']
+                         ]
+                     ]
+                 );
             }
+            return $this->redirect(['action' => 'index']);
         }
     }
 
     public function assign()
     {
-
-        if ($this->Session->read('sdata')) {
-            $this->request->data['continue'] = true;
-            $this->request->data = $this->Session->read('sdata');
+        $session = $this->request->getSession();
+        if ($session->check('sdata')) {
+            $this->request = $this->request->withData('continue', true)
+                ->withData('', $session->read('sdata'));
         }
 
-        $this->Session->delete('sdata');
+        $session->delete('sdata');
 
-        debug($this->request->data);
+        // debug($this->request->getData());
 
-        if (!empty($this->request->data['Section']['academicyearSearch'])) {
-            $academicyear = $this->request->data['Section']['academicyearSearch'];
+        $academicyear = !empty($this->request->getData('Section.academicyearSearch'))
+            ? $this->request->getData('Section.academicyearSearch')
+            : $this->AcademicYear->currentAcademicYear();
+
+        $selected_program = !empty($this->request->getData('Section.program_id'))
+            ? $this->request->getData('Section.program_id')
+            : 1;
+
+        $selected_program_type = !empty($this->request->getData('Section.program_type_id'))
+            ? $this->request->getData('Section.program_type_id')
+            : 1;
+
+        $summary_data = $this->Sections->getSectionLessStudentSummary($academicyear, $this->college_id, $this->department_id, $this->role_id);
+
+        $curriculum_unattached_student_count = $this->Sections->getCurriculumUnattachedStudentSummary($academicyear, $this->college_id, $this->department_id, $this->role_id);
+        $programs = $this->Sections->Programs->find('list')->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')->toArray();
+
+        $assignment_type_array = [
+            'alphabet' => 'By Alphabet',
+            'result' => 'Fairly By Result',
+        ];
+
+        if ($this->role_id != ROLE_COLLEGE) {
+            $yearLevels = $this->Sections->YearLevels->find('list')
+                ->where([
+                    'YearLevels.department_id' => $this->department_id,
+                    'YearLevels.name' => '1st',
+                ])
+                ->toArray();
+            $section_less_total_students = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, $this->department_id, $academicyear, $selected_program, $selected_program_type, null);
         } else {
-            $academicyear = $this->AcademicYear->current_academicyear();
+            $section_less_total_students = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, null, $academicyear, $selected_program, $selected_program_type, null);
         }
 
-        if (!empty($this->request->data['Section']['program_id'])) {
-            $selected_program = $this->request->data['Section']['program_id'];
-        } else {
-            $selected_program = 1;
-        }
-
-        if (!empty($this->request->data['Section']['program_type_id'])) {
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-        } else {
-            $selected_program_type = 1;
-        }
-
-        //$academicyear = $this->AcademicYear->current_academicyear();
-        $summary_data = $this->Section->getsectionlessstudentsummary(
-            $academicyear,
-            $this->college_id,
-            $this->department_id,
-            $this->role_id
-        );
-
-        $curriculum_unattached_student_count = $this->Section->getcurriculumunattachedstudentsummary(
-            $academicyear,
-            $this->college_id,
-            $this->department_id,
-            $this->role_id
-        );
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-
-        /* if (count($this->college_ids) == 1 && (in_array(14, $this->college_ids) || in_array(15, $this->college_ids))) {
-			$programs = $this->Section->Program->find('list', array('conditions' => array('Program.id'=> PROGRAM_REMEDIAL)));
-		} */
-
-        $assignment_type_array = array();
-        $assignment_type_array['alphabet'] = "By Alphabet";
-        $assignment_type_array['result'] = "Fairly By Result";
-
-        if (ROLE_COLLEGE != $this->role_id) {
-            $yearLevels = $this->Section->YearLevel->find('list', array(
-                'conditions' => array(
-                    'YearLevel.department_id' => $this->department_id,
-                    'YearLevel.name' => '1st'
-                )
-            ));
-            $section_less_total_students = $this->Section->countsectionlessstudents(
-                $this->college_id,
-                $this->role_id,
-                $this->department_id,
-                $academicyear,
-                $selected_program,
-                $selected_program_type,
-                null
-            );
-        } else {
-            $section_less_total_students = $section_less_total_students = $this->Section->countsectionlessstudents(
-                $this->college_id,
-                $this->role_id,
-                null,
-                $academicyear,
-                $selected_program,
-                $selected_program_type,
-                null
-            );
-        }
-
-        //$section_less_total_students = 0;
         $isbeforesearch = 1;
 
-        $collegename = $this->Section->College->field('College.name', array('College.id' => $this->college_id));
-        $departmentname = $this->Section->Department->field(
-            'Department.name',
-            array('Department.id' => $this->department_id)
-        );
+        $collegename = $this->Sections->Colleges->find()
+            ->select(['name'])
+            ->where(['Colleges.id' => $this->college_id])
+            ->first()
+            ->name;
+        $departmentname = $this->Sections->Departments->find()
+            ->select(['name'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->name;
 
-        $this->set(
-            compact(
-                'collegename',
-                'departmentname',
-                'programs',
-                'programTypes',
-                'assignment_type_array',
-                'academicyear',
-                'isbeforesearch',
-                'summary_data',
-                'curriculum_unattached_student_count',
-                'yearLevels',
-                'section_less_total_students'
-            )
-        );
+        $this->set(compact(
+            'collegename',
+            'departmentname',
+            'programs',
+            'programTypes',
+            'assignment_type_array',
+            'academicyear',
+            'isbeforesearch',
+            'summary_data',
+            'curriculum_unattached_student_count',
+            'yearLevels',
+            'section_less_total_students'
+        ));
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
-            if ($this->Session->read('sdata')) {
-                $this->Session->delete('sdata');
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
+            if ($session->check('sdata')) {
+                $session->delete('sdata');
             }
 
             $isbeforesearch = 0;
-            $academicyear = $this->request->data['Section']['academicyearSearch'];
-            $assignmenttype = $this->request->data['Section']['assignment_type'];
+            $academicyear = $this->request->getData('Section.academicyearSearch');
+            $assignmenttype = $this->request->getData('Section.assignment_type');
 
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_name = $this->Section->Program->field(
-                'Program.name',
-                array('Program.id' => $selected_program)
-            );
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
+            $selected_program = $this->request->getData('Section.program_id');
+            $selected_program_name = $this->Sections->Programs->find()
+                ->select(['name'])
+                ->where(['Programs.id' => $selected_program])
+                ->first()
+                ->name;
+            $selected_program_type = $this->request->getData('Section.program_type_id');
 
-            //$selected_program_type = $this->Section->ProgramType->field('ProgramType.name', array('ProgramType.id'=>$selected_program_type_id));
-            if (ROLE_COLLEGE != $this->role_id) {
-                $yearlevel = $this->request->data['Section']['year_level_id'];
-                $yearlevelname = $this->Section->YearLevel->field('YearLevel.name', array('YearLevel.id' => $yearlevel)
-                );
+            if ($this->role_id != ROLE_COLLEGE) {
+                $yearlevel = $this->request->getData('Section.year_level_id');
+                $yearlevelname = $this->Sections->YearLevels->find()
+                    ->select(['name'])
+                    ->where(['YearLevels.id' => $yearlevel])
+                    ->first()
+                    ->name;
             }
 
-            $summary_data = $this->Section->getsectionlessstudentsummary(
-                $academicyear,
-                $this->college_id,
-                $this->department_id,
-                $this->role_id
-            );
-            $curriculum_unattached_student_count = $this->Section->getcurriculumunattachedstudentsummary(
-                $academicyear,
-                $this->college_id,
-                $this->department_id,
-                $this->role_id
-            );
-            $section_less_total_students = $this->Section->countsectionlessstudents(
-                $this->college_id,
-                $this->role_id,
-                $this->department_id,
-                $academicyear,
-                $selected_program,
-                $selected_program_type
-            );
+            $summary_data = $this->Sections->getSectionLessStudentSummary($academicyear, $this->college_id, $this->department_id, $this->role_id);
+            $curriculum_unattached_student_count = $this->Sections->getCurriculumUnattachedStudentSummary($academicyear, $this->college_id, $this->department_id, $this->role_id);
+            $section_less_total_students = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, $this->department_id, $academicyear, $selected_program, $selected_program_type);
 
-            //*******check number of curriculum among students in selected criteria and if there is more than one curriculum, the user must selected one curriculum
-            $sectionlessStudentCurriculum = $this->Section->getSectionlessStudentCurriculum(
-                $academicyear,
-                $this->college_id,
-                $this->department_id,
-                $this->role_id,
-                $selected_program,
-                $selected_program_type
-            );
+            $sectionlessStudentCurriculum = $this->Sections->getSectionLessStudentCurriculum($academicyear, $this->college_id, $this->department_id, $this->role_id, $selected_program, $selected_program_type);
 
             $curriculum_id = null;
             $curriculum_count = count($sectionlessStudentCurriculum);
 
-            if ($this->Session->read('empty_Curriculum')) {
-                $this->Session->delete('empty_Curriculum');
+            if ($session->check('empty_Curriculum')) {
+                $session->delete('empty_Curriculum');
             }
 
             if ($curriculum_count == 1) {
                 if (empty($curriculum_id)) {
                     $empty_Curriculum = 1;
-                    $this->Session->write('empty_Curriculum', $empty_Curriculum);
+                    $session->write('empty_Curriculum', $empty_Curriculum);
                 }
 
                 $curriculum_id = $sectionlessStudentCurriculum[0];
-                $this->request->data['Section']['Curriculum'] = $curriculum_id;
-                $this->Session->write('selected_curriculum', $curriculum_id);
-                $this->request->data['Section']['curriculum_search'] = 1;
-                $this->Session->write('curriculum_search', $this->request->data['Section']['curriculum_search']);
-                $this->request->data['continue'] = true;
-            } else {
-                if ($curriculum_count > 1) {
-                    $sectionlessStudentCurriculumArray = array();
+                $this->request = $this->request->withData('Section.Curriculum', $curriculum_id);
+                $session->write('selected_curriculum', $curriculum_id);
+                $this->request = $this->request->withData('Section.curriculum_search', 1);
+                $session->write('curriculum_search', $this->request->getData('Section.curriculum_search'));
+                $this->request = $this->request->withData('continue', true);
+            } elseif ($curriculum_count > 1) {
+                $sectionlessStudentCurriculumArray = [];
 
-                    if (!empty($sectionlessStudentCurriculum)) {
-                        foreach ($sectionlessStudentCurriculum as $sscv) {
-                            $sectionlessStudentCurriculumArray[$sscv] = Classregistry::init('Curriculum')->field(
-                                'Curriculum.curriculum_detail',
-                                array('Curriculum.id' => $sscv)
-                            );
-                        }
+                if (!empty($sectionlessStudentCurriculum)) {
+                    $curriculumsTable = TableRegistry::getTableLocator()->get('Curriculums');
+                    foreach ($sectionlessStudentCurriculum as $sscv) {
+                        $sectionlessStudentCurriculumArray[$sscv] = $curriculumsTable->find()
+                            ->select(['curriculum_detail'])
+                            ->where(['Curriculums.id' => $sscv])
+                            ->first()
+                            ->curriculum_detail;
                     }
-
-                    if ($this->Session->read('curriculum_search')) {
-                        $this->Session->delete('curriculum_search');
-                    }
-
-                    $isbeforesearch = 1;
-
-                    $this->set(
-                        compact(
-                            'sectionlessStudentCurriculum',
-                            'sectionlessStudentCurriculumArray',
-                            'isbeforesearch',
-                            'section_less_total_students'
-                        )
-                    );
                 }
+
+                if ($session->check('curriculum_search')) {
+                    $session->delete('curriculum_search');
+                }
+
+                $isbeforesearch = 1;
+
+                $this->set(compact(
+                    'sectionlessStudentCurriculum',
+                    'sectionlessStudentCurriculumArray',
+                    'isbeforesearch',
+                    'section_less_total_students'
+                ));
             }
 
             $this->set(compact('isbeforesearch', 'section_less_total_students'));
-            debug($this->request->data);
+            // debug($this->request->getData());
         }
 
-        if (!empty($this->request->data) && isset($this->request->data['continue'])) {
-            debug($this->request->data);
+        if (!empty($this->request->getData()) && $this->request->getData('continue')) {
+            // debug($this->request->getData());
             $empty_Curriculum = 0;
 
-            if ($this->Session->read('empty_Curriculum')) {
-                $empty_Curriculum = $this->Session->read('empty_Curriculum');
+            if ($session->check('empty_Curriculum')) {
+                $empty_Curriculum = $session->read('empty_Curriculum');
             }
 
-            if (!empty($this->request->data['Section']['Curriculum']) || $empty_Curriculum == 1) {
+            if (!empty($this->request->getData('Section.Curriculum')) || $empty_Curriculum == 1) {
                 $isbeforesearch = 0;
-                $academicyear = $this->request->data['Section']['academicyearSearch'];
-                $selected_program = $this->request->data['Section']['program_id'];
-                $selected_program_type = $this->request->data['Section']['program_type_id'];
+                $academicyear = $this->request->getData('Section.academicyearSearch');
+                $selected_program = $this->request->getData('Section.program_id');
+                $selected_program_type = $this->request->getData('Section.program_type_id');
                 $yearlevel = null;
 
-                if (ROLE_DEPARTMENT == $this->role_id) {
-                    $yearlevel = $this->request->data['Section']['year_level_id'];
+                if ($this->role_id == ROLE_DEPARTMENT) {
+                    $yearlevel = $this->request->getData('Section.year_level_id');
                 }
 
-                $assignmenttype = $this->request->data['Section']['assignment_type'];
-                $selected_curriculum = $this->request->data['Section']['Curriculum'];
-                $selected_program_name = $this->Section->Program->field(
-                    'Program.name',
-                    array('Program.id' => $selected_program)
-                );
+                $assignmenttype = $this->request->getData('Section.assignment_type');
+                $selected_curriculum = $this->request->getData('Section.Curriculum');
+                $selected_program_name = $this->Sections->Programs->find()
+                    ->select(['name'])
+                    ->where(['Programs.id' => $selected_program])
+                    ->first()
+                    ->name;
 
-                $this->Session->write('academicyear', $academicyear);
-                $this->Session->write('selected_program', $selected_program);
-                $this->Session->write('selected_program_type', $selected_program_type);
-                $this->Session->write('yearlevel', $yearlevel);
-                $this->Session->write('assignmenttype', $assignmenttype);
-                $this->Session->write('selected_curriculum', $selected_curriculum);
+                $session->write('academicyear', $academicyear);
+                $session->write('selected_program', $selected_program);
+                $session->write('selected_program_type', $selected_program_type);
+                $session->write('yearlevel', $yearlevel);
+                $session->write('assignmenttype', $assignmenttype);
+                $session->write('selected_curriculum', $selected_curriculum);
 
-                $sections = $this->Section->getSectionForAssignment(
-                    $academicyear,
-                    $this->college_id,
-                    $this->department_id,
-                    $this->role_id,
-                    $selected_program,
-                    $selected_program_type,
-                    $yearlevel,
-                    $selected_curriculum
-                );
-                $current_sections_occupation = $this->Section->currentsectionsoccupation($sections);
+                $sections = $this->Sections->getSectionForAssignment($academicyear, $this->college_id, $this->department_id, $this->role_id, $selected_program, $selected_program_type, $yearlevel, $selected_curriculum);
+                $current_sections_occupation = $this->Sections->currentSectionsOccupation($sections);
 
-                //Find section curriculum for one of section students
-                $sections_curriculum_name = $this->Section->sectionscurriculum($sections);
-                debug($sections_curriculum_name);
+                $sections_curriculum_name = $this->Sections->sectionsCurriculum($sections);
+                // debug($sections_curriculum_name);
 
-                $section_less_total_students = $this->Section->countsectionlessstudents(
-                    $this->college_id,
-                    $this->role_id,
-                    $this->department_id,
-                    $academicyear,
-                    $selected_program,
-                    $selected_program_type,
-                    $selected_curriculum
-                );
-                debug($section_less_total_students);
+                $section_less_total_students = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, $this->department_id, $academicyear, $selected_program, $selected_program_type, $selected_curriculum);
+                // debug($section_less_total_students);
 
-                $collegename = $this->Section->College->field('College.name', array('College.id' => $this->college_id));
-                $departmentname = $this->Section->Department->field(
-                    'Department.name',
-                    array('Department.id' => $this->department_id)
-                );
-                $yearLevels = $this->Section->YearLevel->find(
-                    'list',
-                    array('conditions' => array('YearLevel.department_id' => $this->department_id))
-                );
+                $collegename = $this->Sections->Colleges->find()
+                    ->select(['name'])
+                    ->where(['Colleges.id' => $this->college_id])
+                    ->first()
+                    ->name;
+                $departmentname = $this->Sections->Departments->find()
+                    ->select(['name'])
+                    ->where(['Departments.id' => $this->department_id])
+                    ->first()
+                    ->name;
+                $yearLevels = $this->Sections->YearLevels->find('list')
+                    ->where(['YearLevels.department_id' => $this->department_id])
+                    ->toArray();
 
-                if (!isset($this->request->data['Section']['curriculum_search'])) {
-                    $sectionlessStudentCurriculum = $this->Section->getSectionlessStudentCurriculum(
-                        $academicyear,
-                        $this->college_id,
-                        $this->department_id,
-                        $this->role_id,
-                        $selected_program,
-                        $selected_program_type
-                    );
-                    $sectionlessStudentCurriculumArray = array();
+                if (!$this->request->getData('Section.curriculum_search')) {
+                    $sectionlessStudentCurriculum = $this->Sections->getSectionLessStudentCurriculum($academicyear, $this->college_id, $this->department_id, $this->role_id, $selected_program, $selected_program_type);
+                    $sectionlessStudentCurriculumArray = [];
 
                     if (!empty($sectionlessStudentCurriculum)) {
+                        $curriculumsTable = TableRegistry::getTableLocator()->get('Curriculums');
                         foreach ($sectionlessStudentCurriculum as $sscv) {
-                            $sectionlessStudentCurriculumArray[$sscv] = Classregistry::init('Curriculum')->field(
-                                'Curriculum.curriculum_detail',
-                                array('Curriculum.id' => $sscv)
-                            );
+                            $sectionlessStudentCurriculumArray[$sscv] = $curriculumsTable->find()
+                                ->select(['curriculum_detail'])
+                                ->where(['Curriculums.id' => $sscv])
+                                ->first()
+                                ->curriculum_detail;
                         }
                     }
 
                     $this->set(compact('sectionlessStudentCurriculum', 'sectionlessStudentCurriculumArray'));
                 }
 
-                $this->set(
-                    compact(
-                        'sections',
-                        'section_less_total_students',
-                        'isbeforesearch',
-                        'summary_data',
-                        'curriculum_unattached_student_count',
-                        'sections_curriculum_name',
-                        'collegename',
-                        'departmentname',
-                        'yearLevels',
-                        'students',
-                        'academicyear',
-                        'selected_program_name',
-                        'current_sections_occupation'
-                    )
-                );
+                $this->set(compact(
+                    'sections',
+                    'section_less_total_students',
+                    'isbeforesearch',
+                    'summary_data',
+                    'curriculum_unattached_student_count',
+                    'sections_curriculum_name',
+                    'collegename',
+                    'departmentname',
+                    'yearLevels',
+
+                    'academicyear',
+                    'selected_program_name',
+                    'current_sections_occupation'
+                ));
             } else {
                 $this->Flash->error('Please select curriculum.');
 
-                $academicyear = $this->request->data['Section']['academicyearSearch'];
-                $selected_program = $this->request->data['Section']['program_id'];
-                $selected_program_type = $this->request->data['Section']['program_type_id'];
+                $academicyear = $this->request->getData('Section.academicyearSearch');
+                $selected_program = $this->request->getData('Section.program_id');
+                $selected_program_type = $this->request->getData('Section.program_type_id');
 
-                $section_less_total_students = $this->Section->countsectionlessstudents(
-                    $this->college_id,
-                    $this->role_id,
-                    $this->department_id,
-                    $academicyear,
-                    $selected_program,
-                    $selected_program_type
-                );
-                $sectionlessStudentCurriculum = $this->Section->getSectionlessStudentCurriculum(
-                    $academicyear,
-                    $this->college_id,
-                    $this->department_id,
-                    $this->role_id,
-                    $selected_program,
-                    $selected_program_type
-                );
-                $sectionlessStudentCurriculumArray = array();
+                $section_less_total_students = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, $this->department_id, $academicyear, $selected_program, $selected_program_type);
+                $sectionlessStudentCurriculum = $this->Sections->getSectionLessStudentCurriculum($academicyear, $this->college_id, $this->department_id, $this->role_id, $selected_program, $selected_program_type);
+                $sectionlessStudentCurriculumArray = [];
 
                 if (!empty($sectionlessStudentCurriculum)) {
+                    $curriculumsTable = TableRegistry::getTableLocator()->get('Curriculums');
                     foreach ($sectionlessStudentCurriculum as $sscv) {
-                        $sectionlessStudentCurriculumArray[$sscv] = Classregistry::init('Curriculum')->field(
-                            'Curriculum.curriculum_detail',
-                            array('Curriculum.id' => $sscv)
-                        );
+                        $sectionlessStudentCurriculumArray[$sscv] = $curriculumsTable->find()
+                            ->select(['curriculum_detail'])
+                            ->where(['Curriculums.id' => $sscv])
+                            ->first()
+                            ->curriculum_detail;
                     }
                 }
 
-                $this->set(
-                    compact(
-                        'sectionlessStudentCurriculum',
-                        'sectionlessStudentCurriculumArray',
-                        'section_less_total_students'
-                    )
-                );
+                $this->set(compact('sectionlessStudentCurriculum', 'sectionlessStudentCurriculumArray', 'section_less_total_students'));
             }
         }
 
         $isassign = 0;
 
-        if (isset($this->request->data['assign'])) {
-            $academicyear = $this->Session->read('academicyear');
-            $assignmenttype = $this->Session->read('assignmenttype');
-            $selected_program = $this->Session->read('selected_program');
-            $selected_program_type = $this->Session->read('selected_program_type');
-            $selected_curriculum = $this->Session->read('selected_curriculum');
+        if ($this->request->getData('assign')) {
+            $academicyear = $session->read('academicyear');
+            $assignmenttype = $session->read('assignmenttype');
+            $selected_program = $session->read('selected_program');
+            $selected_program_type = $session->read('selected_program_type');
+            $selected_curriculum = $session->read('selected_curriculum');
 
-            if (ROLE_COLLEGE != $this->role_id) {
-                $yearlevel = $this->Session->read('yearlevel');
-                $yearlevelname = $this->Section->YearLevel->field('YearLevel.name', array('YearLevel.id' => $yearlevel)
-                );
+            if ($this->role_id != ROLE_COLLEGE) {
+                $yearlevel = $session->read('yearlevel');
+                $yearlevelname = $this->Sections->YearLevels->find()
+                    ->select(['name'])
+                    ->where(['YearLevels.id' => $yearlevel])
+                    ->first()
+                    ->name;
             }
 
-            $sectionlesstotalstudents = $this->Section->countsectionlessstudents(
-                $this->college_id,
-                $this->role_id,
-                $this->department_id,
-                $academicyear,
-                $selected_program,
-                $selected_program_type,
-                $selected_curriculum
-            );
+            $sectionlesstotalstudents = $this->Sections->countSectionLessStudents($this->college_id, $this->role_id, $this->department_id, $academicyear, $selected_program, $selected_program_type, $selected_curriculum);
             $program_type_id = $selected_program_type;
-            $find_the_equvilaent_program_type = unserialize(
-                $this->Section->Student->ProgramType->field(
-                    'ProgramType.equivalent_to_id',
-                    array('ProgramType.id' => $selected_program_type)
-                )
-            );
+            $find_the_equivalent_program_type = unserialize($this->Sections->ProgramTypes->find()
+                ->select(['equivalent_to_id'])
+                ->where(['ProgramTypes.id' => $selected_program_type])
+                ->first()
+                ->equivalent_to_id);
 
-            if (!empty($find_the_equvilaent_program_type)) {
-                $selected_program_type_array = array();
-                $selected_program_type_array[] = $selected_program_type;
-                $program_type_id = array_merge($selected_program_type_array, $find_the_equvilaent_program_type);
+            if (!empty($find_the_equivalent_program_type)) {
+                $selected_program_type_array = [$selected_program_type];
+                $program_type_id = array_merge($selected_program_type_array, $find_the_equivalent_program_type);
             }
 
-            //Search using by department and year level as well if user role is not college (use role is department)
-            if (ROLE_COLLEGE != $this->role_id) {
-                $conditions = array(
-                    'AcceptedStudent.academicyear' => $academicyear,
-                    //'Student.college_id' => $this->college_id,
-                    'Student.department_id' => $this->department_id,
-                    'Student.program_id' => $selected_program,
-                    'Student.program_type_id' => $program_type_id,
-                    'Student.curriculum_id' => $selected_curriculum,
-                    'Student.graduated' => 0,
-                );
-            } else {
-                $conditions = array(
-                    'AcceptedStudent.academicyear' => $academicyear,
-                    'Student.college_id' => $this->college_id,
-                    'Student.program_id' => $selected_program,
-                    'Student.program_type_id' => $program_type_id,
-                    //'Student.curriculum_id' => $selected_curriculum,
-                    'Student.curriculum_id IS NULL',
-                    'Student.department_id is null',
-                    'Student.graduated' => 0,
-                );
-            }
+            $conditions = ($this->role_id != ROLE_COLLEGE) ? [
+                'AcceptedStudents.academicyear' => $academicyear,
+                'Students.department_id' => $this->department_id,
+                'Students.program_id' => $selected_program,
+                'Students.program_type_id IN' => $program_type_id,
+                'Students.curriculum_id' => $selected_curriculum,
+                'Students.graduated' => 0,
+            ] : [
+                'AcceptedStudents.academicyear' => $academicyear,
+                'Students.college_id' => $this->college_id,
+                'Students.program_id' => $selected_program,
+                'Students.program_type_id IN' => $program_type_id,
+                'Students.curriculum_id IS' => null,
+                'Students.department_id IS' => null,
+                'Students.graduated' => 0,
+            ];
 
-            $selected_assignment_type = $this->request->data['Section']['assignment_type'];
+            $selected_assignment_type = $this->request->getData('Section.assignment_type');
 
             if ($sectionlesstotalstudents != 0) {
                 if ($selected_assignment_type == 'result') {
-                    $students = $this->Section->Student->find('all', array(
-                        'conditions' => $conditions,
-                        'fields' => array(
-                            'Student.id',
-                            'Student.full_name',
-                            'Student.studentnumber',
-                            'Student.gender',
-                            'Student.academicyear'
-                        ),
-                        'contain' => array(
-                            'Section' => array(
-                                'fields' => array('Section.id', 'Section.name')
-                            ),
-                            'AcceptedStudent' => array(
-                                'fields' => array('AcceptedStudent.id')
-                            )
-                        ),
-                        'order' => array(
-                            'AcceptedStudent.EHEECE_total_results' => 'DESC',
-                            'AcceptedStudent.sex' => 'ASC',
-                            'AcceptedStudent.region_id' => 'ASC'
-                        )
-                    ));
+                    $students = $this->Sections->Students->find()
+                        ->where($conditions)
+                        ->select([
+                            'Students.id',
+                            'Students.full_name',
+                            'Students.studentnumber',
+                            'Students.gender',
+                            'Students.academicyear',
+                        ])
+                        ->contain([
+                            'Sections' => ['fields' => ['Sections.id', 'Sections.name']],
+                            'AcceptedStudents' => ['fields' => ['AcceptedStudents.id']],
+                        ])
+                        ->order([
+                            'AcceptedStudents.EHEECE_total_results' => 'DESC',
+                            'AcceptedStudents.sex' => 'ASC',
+                            'AcceptedStudents.region_id' => 'ASC',
+                        ])
+                        ->toArray();
 
-                    $sectionless_student = array();
+                    $sectionless_student = [];
 
                     if (!empty($students)) {
-                        foreach ($students as $k => $v) {
-                            $check_student_section = count($v['Section']);
+                        foreach ($students as $v) {
+                            $check_student_section = count($v->sections);
                             if ($check_student_section == 0) {
-                                $sectionless_student[] = $v['Student']['id'];
+                                $sectionless_student[] = $v->id;
                             } else {
                                 $is_pre_student = 1;
-                                foreach ($v['Section'] as $psk => $psv) {
-                                    if (isset($psv['department_id']) && is_numeric(
-                                            $psv['department_id']
-                                        ) && $psv['department_id'] > 0) {
+                                foreach ($v->sections as $psv) {
+                                    if (isset($psv->department_id) && is_numeric($psv->department_id) && $psv->department_id > 0) {
                                         $is_pre_student = 0;
                                         break;
                                     } else {
-                                        $last_registration_semester = ClassRegistry::init('CourseRegistration')->field(
-                                            'CourseRegistration.semester',
-                                            array('CourseRegistration.section_id' => $psv['StudentsSection']['section_id'])
-                                        );
-                                        debug($last_registration_semester);
-                                        if ($psv['StudentsSection']['archive'] == 0) {
+                                        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+                                        $last_registration_semester = $courseRegistrationsTable->find()
+                                            ->select(['semester'])
+                                            ->where(['CourseRegistrations.section_id' => $psv->_joinData->section_id])
+                                            ->first()
+                                            ->semester ?? null;
+                                        // debug($last_registration_semester);
+                                        if ($psv->_joinData->archive == 0) {
                                             $is_pre_student = 0;
                                             break;
                                         } else {
@@ -2112,92 +1508,78 @@ class SectionsController extends AppController
                                     }
                                 }
                                 if ($is_pre_student == 1) {
-                                    $sectionless_student[] = $v['Student']['id'];
+                                    $sectionless_student[] = $v->id;
                                 }
                             }
                         }
                     }
 
                     $sectionless_student_count = count($sectionless_student);
-                    $data = $this->request->data['Section']['Sections']; //Selected Section array
-
-                    unset($this->request->data['Section']['Sections']);
+                    $data = $this->request->getData('Section.Sections');
+                    $this->request = $this->request->withData('Section.Sections', null);
                     $selected_section_count = count($data);
 
-                    $j = 0; //index for selected student section
+                    $j = 0;
 
                     if ($sectionless_student_count > 0 && $selected_section_count > 0) {
-                        for ($i = 0; $i < $sectionless_student_count; $i++) {
+                        foreach ($sectionless_student as $student_id) {
                             if ($j >= $selected_section_count) {
                                 $j = $j % $selected_section_count;
                             }
-                            //$available_section = $this->request->data['Section'][$data[$j]]['id'];
-                            //$student_for_this_section = $sectionless_student[$i];
-
-                            $this->request->data['StudentsSection']['section_id'] = $this->request->data['Section'][$data[$j]]['id'];
-                            $this->request->data['StudentsSection']['student_id'] = $sectionless_student[$i];
-                            $this->Section->StudentsSection->create();
-                            $this->Section->StudentsSection->save($this->request->data['StudentsSection']);
-                            //$this->Section->habtmAdd('Student', $available_section, $student_for_this_section);
-                            $j = $j + 1;
-                            $isassign = 1; //used to flash message
+                            $studentsSection = $this->Sections->StudentsSections->newEntity([
+                                'section_id' => $this->request->getData("Section.$data[$j].id"),
+                                'student_id' => $student_id,
+                            ]);
+                            $this->Sections->StudentsSections->save($studentsSection);
+                            $j++;
+                            $isassign = 1;
                         }
                     }
 
                     if ($isassign) {
                         $this->Flash->success('The section(s) assignment has(have) been completed successfully');
-                        return $this->redirect(
-                            array('action' => 'display_sections', $this->request->data['StudentsSection']['section_id'])
-                        );
+                        return $this->redirect(['action' => 'displaySections', $this->request->getData('StudentsSection.section_id')]);
                     } else {
                         $this->Flash->error('The section(s) assignment could not be completed. Please, try again.');
                     }
                 } else {
-                    if ($this->Section->isSectionAssignedStudentsEqualToTotalNumberofAvaliableStudents(
-                        $this->request->data['Section'],
-                        $sectionlesstotalstudents
-                    )) {
-                        $students = $this->Section->Student->find('all', array(
-                            'conditions' => $conditions,
-                            'fields' => array(
-                                'Student.id',
-                                'Student.full_name',
-                                'Student.studentnumber',
-                                'Student.gender',
-                                'Student.academicyear'
-                            ),
-                            'contain' => array(
-                                'Section' => array(
-                                    'fields' => array('Section.id', 'Section.name')
-                                ),
-                                'AcceptedStudent' => array(
-                                    'fields' => array('AcceptedStudent.id')
-                                )
-                            ),
-                            // distribute based on name, sex and region
-                            'order' => array(
-                                'AcceptedStudent.first_name' => 'ASC',
-                                'AcceptedStudent.sex' => 'ASC',
-                                'AcceptedStudent.region_id' => 'ASC',
-                                'AcceptedStudent.EHEECE_total_results' => 'DESC'
-                            )
-                        ));
+                    if ($this->Sections->isSectionAssignedStudentsEqualToTotalNumberOfAvailableStudents($this->request->getData('Section'), $sectionlesstotalstudents)) {
+                        $students = $this->Sections->Students->find()
+                            ->where($conditions)
+                            ->select([
+                                'Students.id',
+                                'Students.full_name',
+                                'Students.studentnumber',
+                                'Students.gender',
+                                'Students.academicyear',
+                            ])
+                            ->contain([
+                                'Sections' => ['fields' => ['Sections.id', 'Sections.name']],
+                                'AcceptedStudents' => ['fields' => ['AcceptedStudents.id']],
+                            ])
+                            ->order([
+                                'AcceptedStudents.first_name' => 'ASC',
+                                'AcceptedStudents.sex' => 'ASC',
+                                'AcceptedStudents.region_id' => 'ASC',
+                                'AcceptedStudents.EHEECE_total_results' => 'DESC',
+                            ])
+                            ->toArray();
 
-                        $sectionless_student = array();
+                        $sectionless_student = [];
 
                         if (!empty($students)) {
-                            foreach ($students as $k => $v) {
-                                $check_student_section = count($v['Section']);
+                            foreach ($students as $v) {
+                                $check_student_section = count($v->sections);
                                 if ($check_student_section == 0) {
-                                    $sectionless_student[] = $v['Student']['id'];
+                                    $sectionless_student[] = $v->id;
                                 } else {
                                     $is_pre_student = 1;
-                                    foreach ($v['Section'] as $psk => $psv) {
-                                        if (!empty($psv['department_id'])) {
+                                    foreach ($v->sections as $psv) {
+                                        if (!empty($psv->department_id)) {
                                             $is_pre_student = 0;
                                             break;
                                         } else {
-                                            if ($psv['StudentsSection']['archive'] == 0) {
+                                            if ($psv->_joinData->archive == 0) {
                                                 $is_pre_student = 0;
                                                 break;
                                             } else {
@@ -2206,249 +1588,211 @@ class SectionsController extends AppController
                                         }
                                     }
                                     if ($is_pre_student == 1) {
-                                        $sectionless_student[] = $v['Student']['id'];
+                                        $sectionless_student[] = $v->id;
                                     }
                                 }
                             }
                         }
-                        //call participating sections
+
                         if ($this->role_id == ROLE_COLLEGE) {
                             $yearlevel = 0;
                         }
 
-                        $sections = $this->Section->getSectionForAssignment(
-                            $academicyear,
-                            $this->college_id,
-                            $this->department_id,
-                            $this->role_id,
-                            $selected_program,
-                            $selected_program_type,
-                            $yearlevel,
-                            $selected_curriculum
-                        );
+                        $sections = $this->Sections->getSectionForAssignment($academicyear, $this->college_id, $this->department_id, $this->role_id, $selected_program, $selected_program_type, $yearlevel, $selected_curriculum);
                         $sections_count = count($sections);
                         $student_index = 0;
                         $isassign = 0;
                         $available_section = null;
 
                         if ($sections_count > 0) {
-                            for ($i = 0; $i < $sections_count; $i++) {
-                                $number_per_section = $this->request->data['Section'][$i]['number'];
-                                $available_section = $this->request->data['Section'][$i]['id'];
+                            foreach ($sections as $i => $section) {
+                                $number_per_section = $this->request->getData("Section.$i.number");
+                                $available_section = $this->request->getData("Section.$i.id");
                                 for ($j = 0; $j < $number_per_section; $j++) {
-                                    //$student_for_this_section = $sectionless_student[$student_index];
-                                    debug($student_index);
-                                    debug($sectionless_student);
-                                    $this->request->data['StudentsSection']['student_id'] = $sectionless_student[$student_index];
-                                    $this->request->data['StudentsSection']['section_id'] = $available_section;
-                                    $this->Section->StudentsSection->create();
-                                    $this->Section->StudentsSection->save($this->request->data['StudentsSection']);
-                                    //$this->Section->habtmAdd('Student', $available_section, $student_for_this_section);
-
-                                    $student_index = $student_index + 1;
-                                    $isassign = 1; //used to flash message
+                                    // debug($student_index);
+                                    // debug($sectionless_student);
+                                    $studentsSection = $this->Sections->StudentsSections->newEntity([
+                                        'student_id' => $sectionless_student[$student_index],
+                                        'section_id' => $available_section,
+                                    ]);
+                                    $this->Sections->StudentsSections->save($studentsSection);
+                                    $student_index++;
+                                    $isassign = 1;
                                 }
                             }
                         } else {
-                            $this->Flash->error('The no sections found for assignment.');
-                            //return $this->redirect(array('action' => 'display_sections', $available_section));
+                            $this->Flash->error('No sections found for assignment.');
                         }
 
                         if ($isassign) {
                             $this->Flash->success('The section(s) assignment has(have) been completed successfully.');
-                            return $this->redirect(array('action' => 'display_sections', $available_section));
+                            return $this->redirect(['action' => 'displaySections', $available_section]);
                         } else {
-                            $this->Flash->error('The section(s) assignment could not be complete. Please, try again.');
+                            $this->Flash->error('The section(s) assignment could not be completed. Please, try again.');
                         }
                     } else {
-                        $error = $this->Section->invalidFields();
-
-                        if (isset($error['section'])) {
-                            $this->Flash->error($error['section'][0]);
+                        $errors = $this->Sections->validationErrors;
+                        if (isset($errors['section'])) {
+                            $this->Flash->error($errors['section'][0]);
                         }
 
-                        $this->set('academicyear', $this->request->data['Section']['academicyear']);
-                        $this->set('section_less_total_students', $sectionlesstotalstudents);
-                        $this->request->data['Section']['Curriculum'] = $selected_curriculum;
+                        $this->set(compact('academicyear', 'section_less_total_students'));
+                        $this->request = $this->request->withData('Section.Curriculum', $selected_curriculum);
 
-                        if ($this->Session->read('curriculum_search')) {
-                            $this->request->data['Section']['curriculum_search'] = $this->Session->read(
-                                'curriculum_search'
-                            );
+                        if ($session->check('curriculum_search')) {
+                            $this->request = $this->request->withData('Section.curriculum_search', $session->read('curriculum_search'));
                         }
-                        //$this->Session->write('sdata',$this->request->data);
-                        //return $this->redirect(array('action'=>'assign',true));
                     }
                 }
             } else {
                 $this->Flash->error('There is no Student to assign section in given parameters');
-                $this->set('academicyear', $this->request->data['Section']['academicyear']);
-                $this->set('section_less_total_students', $sectionlesstotalstudents);
+                $this->set(compact('academicyear', 'section_less_total_students'));
             }
         }
 
         $this->set(compact('assignmenttype', 'selected_program_type', 'selected_program'));
     }
 
-    public function display_sections($id = null)
+    public function displaySections(?int $id = null)
     {
+        $this->initSearchSections();
 
-        $this->__init_search_sections();
-
-        if (isset($this->request->data['swapStudentSection']) && !empty($this->request->data['swapStudentSection'])) {
+        if ($this->request->getData('swapStudentSection') && !empty($this->request->getData('swapStudentSection'))) {
             $rearrangePossible = null;
             if ($this->role_id == ROLE_COLLEGE) {
-                $rearrangePossible = $this->Section->rearrangeSectionList(
-                    $this->request->data['Section']['academicyear'],
+                $rearrangePossible = $this->Sections->rearrangeSectionList(
+                    $this->request->getData('Section.academicyear'),
                     $this->college_id,
-                    $this->request->data['Section']['year_level_id'],
-                    $this->request->data['Section']['program_id'],
-                    $this->request->data['Section']['program_type_id'],
-                    $this->request->data['Section']['swap'],
+                    $this->request->getData('Section.year_level_id'),
+                    $this->request->getData('Section.program_id'),
+                    $this->request->getData('Section.program_type_id'),
+                    $this->request->getData('Section.swap'),
                     1
                 );
-            } else {
-                if ($this->role_id == ROLE_DEPARTMENT) {
-                    $rearrangePossible = $this->Section->rearrangeSectionList(
-                        $this->request->data['Section']['academicyear'],
-                        $this->department_id,
-                        $this->request->data['Section']['year_level_id'],
-                        $this->request->data['Section']['program_id'],
-                        $this->request->data['Section']['program_type_id'],
-                        $this->request->data['Section']['swap']
-                    );
-                }
+            } elseif ($this->role_id == ROLE_DEPARTMENT) {
+                $rearrangePossible = $this->Sections->rearrangeSectionList(
+                    $this->request->getData('Section.academicyear'),
+                    $this->department_id,
+                    $this->request->getData('Section.year_level_id'),
+                    $this->request->getData('Section.program_id'),
+                    $this->request->getData('Section.program_type_id'),
+                    $this->request->getData('Section.swap')
+                );
             }
 
             if ($rearrangePossible == 3) {
-                $this->Flash->error(
-                    'You can not swap students once you published courses. Please delete published courses if grade is not submitted.'
-                );
-            } else {
+                $this->Flash->error('You cannot swap students once you published courses. Please delete published courses if grade is not submitted.');
             }
-            $this->request->data['search'] = true;
+            $this->request = $this->request->withData('search', true);
         }
 
+        if (!empty($id) && !$this->request->getData('search')) {
+            $selectedSectionDetails = $this->Sections->find()
+                ->where(['Sections.id' => $id])
+                ->first();
 
-        if (!empty($id) && !isset($this->request->data['search'])) {
-            $selectedSectionDetails = $this->Section->find(
-                'first',
-                array('conditions' => array('Section.id' => $id), 'recursive' => -1)
-            );
-
-            debug($selectedSectionDetails);
+            // debug($selectedSectionDetails);
 
             if (!empty($selectedSectionDetails)) {
-                $this->request->data['Section'] = $selectedSectionDetails['Section'];
+                $this->request = $this->request->withData('Section', $selectedSectionDetails->toArray());
             } else {
-                $this->request->data['Section']['program_id'] = $this->Section->field(
-                    'Section.program_id',
-                    array('Section.id' => $id)
-                );
-                $this->request->data['Section']['program_type_id'] = $this->Section->field(
-                    'Section.program_type_id',
-                    array('Section.id' => $id)
-                );
-                if (empty($this->request->data['Section']['academicyear'])) {
-                    $this->request->data['Section']['academicyear'] = $this->AcademicYear->current_academicyear();
+                $this->request = $this->request->withData('Section.program_id', $this->Sections->find()
+                    ->select(['program_id'])
+                    ->where(['Sections.id' => $id])
+                    ->first()
+                    ->program_id);
+                $this->request = $this->request->withData('Section.program_type_id', $this->Sections->find()
+                    ->select(['program_type_id'])
+                    ->where(['Sections.id' => $id])
+                    ->first()
+                    ->program_type_id);
+                if (empty($this->request->getData('Section.academicyear'))) {
+                    $this->request = $this->request->withData('Section.academicyear', $this->AcademicYear->currentAcademicYear());
                 }
-                if (ROLE_COLLEGE != $this->role_id) {
-                    $this->request->data['Section']['year_level_id'] = $this->Section->field(
-                        'Section.year_level_id',
-                        array('Section.id' => $id)
-                    );
+                if ($this->role_id != ROLE_COLLEGE) {
+                    $this->request = $this->request->withData('Section.year_level_id', $this->Sections->find()
+                        ->select(['year_level_id'])
+                        ->where(['Sections.id' => $id])
+                        ->first()
+                        ->year_level_id);
                 }
             }
 
-            $this->request->data['search'] = true;
+            $this->request = $this->request->withData('search', true);
 
-            $this->__init_clear_session_filters();
-            $this->__init_search_sections();
+            $this->clearSessionFilters();
+            $this->initSearchSections();
         }
 
-        //$programs = $this->Section->Program->find('list');
-        //$programTypes = $this->Section->ProgramType->find('list');
-        //$yearLevels = $this->Section->YearLevel->find('list', array('conditions' => array('YearLevel.department_id' => $this->department_id)));
-
-        $collegename = $this->Section->College->field('College.name', array('College.id' => $this->college_id));
-        $departmentname = $this->Section->Department->field(
-            'Department.name',
-            array('Department.id' => $this->department_id)
-        );
+        $collegename = $this->Sections->Colleges->find()
+            ->select(['name'])
+            ->where(['Colleges.id' => $this->college_id])
+            ->first()
+            ->name;
+        $departmentname = $this->Sections->Departments->find()
+            ->select(['name'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->name;
         $isbeforesearch = 1;
-        $this->set(
-            compact(/* 'programs', 'programTypes', 'yearLevels', */ 'isbeforesearch', 'collegename', 'departmentname')
-        );
+        $this->set(compact('isbeforesearch', 'collegename', 'departmentname'));
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
-            debug($this->request->data);
-            $this->__init_clear_session_filters();
-            $this->__init_search_sections();
-            debug($this->request->data);
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
+            // debug($this->request->getData());
+            $this->clearSessionFilters();
+            $this->initSearchSections();
+            // debug($this->request->getData());
 
             $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            //$program_type_id = $selected_program_type;
+            $selected_program = $this->request->getData('Section.program_id');
+            $selected_program_type = $this->request->getData('Section.program_type_id');
 
-            $program_type_id = $this->Section->getEquivalentProgramTypes($selected_program_type);
-            //debug($program_type_id);
+            $program_type_id = $this->Sections->getEquivalentProgramTypes($selected_program_type);
+            // debug($program_type_id);
 
-            if (isset($this->request->data['Section']['academicyear']) && !empty($this->request->data['Section']['academicyear'])) {
-                $thisacademicyear = $this->request->data['Section']['academicyear'];
-            } else {
-                $thisacademicyear = $this->request->data['Section']['academicyear'] = $this->AcademicYear->current_academicyear(
-                );
-                $this->__init_clear_session_filters();
-                $this->__init_search_sections();
-            }
+            $thisacademicyear = !empty($this->request->getData('Section.academicyear'))
+                ? $this->request->getData('Section.academicyear')
+                : $this->AcademicYear->currentAcademicYear();
+            $this->request = $this->request->withData('Section.academicyear', $thisacademicyear);
+            $this->clearSessionFilters();
+            $this->initSearchSections();
 
-            ////To display each section current hosted students:
-            //Search using by department and year level as well if user role is not college (use role is department)
             $selected_year_level = null;
 
-            if (ROLE_COLLEGE != $this->role_id) {
-                $selected_year_level = $this->request->data['Section']['year_level_id'];
-                if (empty($selected_year_level)) {
-                    $selected_year_level = '%';
-                }
+            if ($this->role_id != ROLE_COLLEGE) {
+                $selected_year_level = $this->request->getData('Section.year_level_id') ?: '%';
+                $conditions = [
+                    'Sections.department_id' => $this->department_id,
+                    'Sections.archive' => 0,
+                    'Sections.program_id' => $selected_program,
+                    'Sections.program_type_id IN' => $program_type_id,
+                    'Sections.year_level_id LIKE' => $selected_year_level,
+                    'Sections.academicyear' => $this->request->getData('Section.academicyear'),
+                ];
 
-                $conditions = array(
-                    'Section.department_id' => $this->department_id,
-                    'Section.archive' => 0,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.year_level_id' => $selected_year_level,
-                    'Section.academicyear' => $this->request->data['Section']['academicyear']
-                );
-
-                //Get Student in there sections
-                //$this->college_id will be null
-                $studentsections = $this->Section->studentsection(
+                $studentsections = $this->Sections->getStudentsSectionById(
                     $this->college_id,
                     $this->role_id,
                     $this->department_id,
                     $selected_program,
                     $program_type_id,
-                    //$this->request->data['Section']['academicyear'],
                     $thisacademicyear,
                     $selected_year_level
                 );
             } else {
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.archive' => 0,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.academicyear' => $thisacademicyear, //$this->request->data['Section']['academicyear'],
-                    "OR" => array(
-                        "Section.department_id is null",
-                        "Section.department_id = ''"
-                    )
-                );
+                $conditions = [
+                    'Sections.college_id' => $this->college_id,
+                    'Sections.archive' => 0,
+                    'Sections.program_id' => $selected_program,
+                    'Sections.program_type_id IN' => $program_type_id,
+                    'Sections.academicyear' => $thisacademicyear,
+                    'OR' => [
+                        'Sections.department_id IS' => null,
+                        'Sections.department_id' => '',
+                    ],
+                ];
 
-                //Get Student in there sections
-                $studentsections = $this->Section->studentsection(
+                $studentsections = $this->Sections->getStudentsSectionById(
                     $this->college_id,
                     $this->role_id,
                     $this->department_id,
@@ -2459,715 +1803,299 @@ class SectionsController extends AppController
                 );
             }
 
-            $sections = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.year_level_id',
-                    'Section.program_id',
-                    'Section.program_type_id',
-                    'Section.academicyear',
-                    'Section.department_id',
-                    'Section.college_id'
-                ),
-                'contain' => array(
-                    'Student' => array(
-                        'fields' => array(
-                            'Student.id',
-                            'Student.studentnumber',
-                            'Student.full_name',
-                            'Student.gender',
-                            'Student.graduated',
-                            'Student.academicyear'
-                        ),
-                        'order' => array(
-                            'Student.academicyear' => 'DESC',
-                            'Student.studentnumber' => 'ASC',
-                            'Student.id' => 'ASC',
-                            'Student.full_name' => 'ASC'
-                        ),
-                    ),
-                    'StudentsSection',
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                    'Department' => array(
-                        'fields' => array('id', 'name', 'type', 'college_id'),
-                        'College' => array('id', 'name', 'type', 'campus_id', 'stream'),
-                    ),
-                    'College' => array('id', 'name', 'type', 'campus_id', 'stream'),
-                    'YearLevel' => array('id', 'name'),
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name'),
-                )
-            ));
+            $sections = $this->Sections->find()
+                ->where($conditions)
+                ->select([
+                    'Sections.id',
+                    'Sections.name',
+                    'Sections.year_level_id',
+                    'Sections.program_id',
+                    'Sections.program_type_id',
+                    'Sections.academicyear',
+                    'Sections.department_id',
+                    'Sections.college_id',
+                ])
+                ->contain([
+                    'Students' => [
+                        'fields' => [
+                            'Students.id',
+                            'Students.studentnumber',
+                            'Students.full_name',
+                            'Students.gender',
+                            'Students.graduated',
+                            'Students.academicyear',
+                        ],
+                        'order' => [
+                            'Students.academicyear' => 'DESC',
+                            'Students.studentnumber' => 'ASC',
+                            'Students.id' => 'ASC',
+                            'Students.full_name' => 'ASC',
+                        ],
+                    ],
+                    'StudentsSections',
+                    'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                    'Departments' => [
+                        'fields' => ['id', 'name', 'type', 'college_id'],
+                        'Colleges' => ['fields' => ['id', 'name', 'type', 'campus_id', 'stream']],
+                    ],
+                    'Colleges' => ['fields' => ['id', 'name', 'type', 'campus_id', 'stream']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->toArray();
 
-            //debug($sections);
-
-            debug($this->Section->updateSectionCurriculumIDFromPublishedCoursesOfTheSection());
+            // debug($this->Sections->updateSectionCurriculumIdFromPublishedCoursesOfTheSection());
 
             if (!empty($sections)) {
-                foreach ($sections as $key => $section) {
-                    if (isset($section['Student']) && count($section['Student']) > 0) {
-                        //debug($section['Section']['id']);
-                        $this->Section->remove_duplicate_student_sections($section['Section']['id']);
-                        $this->Section->updateSectionCurriculumIDFromPublishedCoursesOfTheSection(
-                            $section['Section']['id']
-                        );
-                        //$this->Section->updateSectionCurriculumIDFromPublishedCoursesOfTheSection();
-
+                foreach ($sections as $section) {
+                    if (isset($section->students) && count($section->students) > 0) {
+                        // debug($section->id);
+                        $this->Sections->removeDuplicateStudentSections($section->id);
+                        $this->Sections->updateSectionCurriculumIdFromPublishedCoursesOfTheSection($section->id);
                     }
                 }
             }
 
-            $current_sections_occupation = $this->Section->currentsectionsoccupation($sections);
-            //Find section curriculum for one of section students
-            $sections_curriculum_name = $this->Section->sectionscurriculum($studentsections);
+            $current_sections_occupation = $this->Sections->currentSectionsOccupation($sections);
+            $sections_curriculum_name = $this->Sections->sectionsCurriculum($studentsections);
 
-            $this->set(
-                compact(
-                    'studentsections',
-                    'collegename',
-                    'departmentname',
-                    'current_sections_occupation',
-                    'sections_curriculum_name',
-                    'sections',
-                    'isbeforesearch'
-                )
-            );
+            $this->set(compact(
+                'studentsections',
+                'collegename',
+                'departmentname',
+                'current_sections_occupation',
+                'sections_curriculum_name',
+                'sections',
+                'isbeforesearch'
+            ));
         }
 
-
-        $swapOptions = array(
+        $swapOptions = [
             'middle_name' => 'Middle Name',
             'last_name' => 'Last Name',
-            'studentnumber' => 'Student ID'
-        );
+            'studentnumber' => 'Student ID',
+        ];
         $this->set(compact('swapOptions'));
     }
 
-    public function merge_sections()
+    public function splitSection()
     {
+        $programs = $this->Sections->Programs->find('list')
+            ->where(['Programs.id IN' => $this->program_ids])
+            ->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')
+            ->where(['ProgramTypes.id IN' => $this->program_type_ids])
+            ->toArray();
 
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-        $yearLevels = $this->Section->YearLevel->find('list', array(
-            'conditions' =>
-                array('YearLevel.department_id' => $this->department_id)
-        ));
-        $isbeforesearch = 1;
-        $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels'));
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
-            $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            $selected_academic_year = $this->request->data['Section']['academicyear'];
+        $yearLevels = [];
 
-            $selected_year_level = $this->request->data['Section']['year_level_id'];
-
-            $program_type_id = $this->Section->getEquivalentProgramTypes($selected_program_type);
-            debug($program_type_id);
-
-            /* $find_the_equvilaent_program_type = unserialize($this->Section->ProgramType->field('ProgramType.equivalent_to_id', array(
-				'ProgramType.id' => $selected_program_type
-			)));
-			if (!empty($find_the_equvilaent_program_type)) {
-				$selected_program_type_array = array();
-				$selected_program_type_array[] = $selected_program_type;
-				$program_type_id = array_merge($selected_program_type_array, $find_the_equvilaent_program_type);
-			} */
-            //Search using by department and year level as well if user role is not college (use role is department)
-            if (ROLE_COLLEGE != $this->role_id) {
-                $selected_year_level = $this->request->data['Section']['year_level_id'];
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.department_id' => $this->department_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.academicyear' => $selected_academic_year,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.year_level_id' => $selected_year_level,
-                    'Section.archive' => 0
-                );
-            } else {
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.academicyear' => $selected_academic_year,
-                    'Section.archive' => 0,
-                    "OR" => array("Section.department_id is null", "Section.department_id" => array(0, ''))
-                );
-            }
-            $sections = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'fields' => array('Section.id', 'Section.name'),
-                'contain' => array(
-                    'Student' => array(
-                        'fields' => array(
-                            'Student.id',
-                            'Student.full_name',
-                            'Student.studentnumber'
-                        )
-                    )
-                )
-            ));
-            $current_sections_occupation = $this->Section->currentsectionsoccupation($sections);
-            //to display curriculum
-            //TODO: repetative query,remove it during optimization period, section curriculum
-            // can be find from the above query by containing curriculum
-            $studentsections = $this->Section->studentsection(
-                $this->college_id,
-                $this->role_id,
-                $this->department_id,
-                $selected_program,
-                $program_type_id,
-                $selected_academic_year,
-                $selected_year_level
-            );
-
-            //Find section curriculum for one of section students
-            $sections_curriculum_name = $this->Section->sectionscurriculum($studentsections);
-
-
-            $this->set(
-                compact('sections', 'isbeforesearch', 'current_sections_occupation', 'sections_curriculum_name')
-            );
+        if ($this->role_id == ROLE_DEPARTMENT) {
+            $yearLevels = $this->Sections->YearLevels->find('list')
+                ->where(['YearLevels.department_id' => $this->department_id])
+                ->toArray();
         }
-        if (!empty($this->request->data) && isset($this->request->data['merge'])) {
-            $count_selected_sections = 0;
-            $selected_sections = $this->request->data['Section']['Sections'];
-            if (!empty($this->request->data['Section']['academicyear'])) {
-                $current_academic_year = $this->request->data['Section']['academicyear'];
-            } else {
-                $current_academic_year = $this->AcademicYear->current_academicyear();
-            }
-            $merged_section_ids = $this->Section->mergedSectionIds($this->request->data);
-            $new_section_id = $this->request->data['Section'][$selected_sections[0]]['id'];
-            $count_selected_sections = count($selected_sections);
-            //check whether 2 or more sections are selected
-            if ($count_selected_sections >= 2) {
-                //Is merging possible for the selected section
-                $isMergingPossible = $this->Section->PublishedCourse->CourseRegistration->checkMergingIsPossible(
-                    $new_section_id,
-                    $merged_section_ids,
-                    $current_academic_year
-                );
 
-
-                if (is_array($isMergingPossible)) {
-                    //check whether sections have the same curriculum or not
-                    if ($this->Section->isSectionsHaveTheSameCurriculum($this->request->data)) {
-                        $mergedSection = array();
-                        $new_section_id = $this->request->data['Section'][$selected_sections[0]]['id'];
-                        $merged_section_id = $this->Section->mergedSectionIds($this->request->data);
-                        $new_section_name = $this->Section->field('Section.name', array('Section.id' => $new_section_id)
-                        );
-                        $mergedSection['Section']['id'] = $new_section_id;
-                        $mergedSection['Section']['name'] = $new_section_name;
-                        $mergedSection['Section']['college_id'] = $this->college_id;
-                        $mergedSection['Section']['program_id'] = $this->request->data['Section']['program_id'];
-                        $mergedSection['Section']['program_type_id'] = $this->request->data['Section']['program_type_id'];
-                        $mergedSection['Section']['academicyear'] = $current_academic_year;
-                        if (ROLE_COLLEGE != $this->role_id) {
-                            $mergedSection['Section']['department_id'] = $this->department_id;
-                            $mergedSection['Section']['year_level_id'] = $this->request->data['Section']['year_level_id'];
-                        }
-                        // TODO: we need to implement transaction  roll back in here ?????
-                        $studentListsNotInMergedSec = array();
-                        if (1) {
-                            $mergedSectionsName = null;
-                            $deleteArchiveSec['Delete'] = array();
-                            $deleteArchiveSec['Archive'] = array();
-                            foreach ($this->request->data['Section']['Sections'] as $k => $v) {
-                                if ($this->request->data['Section'][$v]['id'] != $new_section_id) {
-                                    if ($this->Section->CourseRegistration->ExamGrade->isEverGradeSubmitInTheNameOfSection(
-                                        $this->request->data['Section'][$v]['id']
-                                    )) {
-                                        $deleteArchiveSec['Archive'][] = $this->request->data['Section'][$v]['id'];
-                                    } else {
-                                        $deleteArchiveSec['Delete'][] = $this->request->data['Section'][$v]['id'];
-                                    }
-                                }
-                            }
-                            $mergedSection_id = $new_section_id;
-
-                            // update course registration, published course, and course instructor
-                            // assignment with the merged section id
-                            if (!empty($mergedSection_id)) {
-                                $this->Section->PublishedCourse->CourseRegistration->updateCourseRegistrationPublishedCourseInstructorAssignmentAfterSectionMerge(
-                                    $isMergingPossible,
-                                    $mergedSection_id
-                                );
-                            }
-                            //Hard deletion is possible
-                            if (!empty($deleteArchiveSec['Delete'])) {
-                                //Dont delete merged section
-
-                                $studentListsNotInMergedSec = ClassRegistry::init('StudentsSection')->find(
-                                    'all',
-                                    array('conditions' => array('StudentsSection.section_id' => $deleteArchiveSec['Delete']))
-                                );
-                                //delete All students in that section and section itself
-                                ClassRegistry::init('StudentsSection')->deleteAll(
-                                    array('StudentsSection.section_id' => $deleteArchiveSec['Delete']),
-                                    false
-                                );
-                                $this->Section->deleteAll(array('Section.id' => $deleteArchiveSec['Delete']), false);
-                            }
-                            //soft deletion is possible
-                            if (!empty($deleteArchiveSec['Archive'])) {
-                                //Dont delete merged section
-
-                                $studentListsNotInMergedSec = array_merge(
-                                    $studentListsNotInMergedSec,
-                                    ClassRegistry::init('StudentsSection')->find(
-                                        'all',
-                                        array('conditions' => array('StudentsSection.section_id' => $deleteArchiveSec['Archive']))
-                                    )
-                                );
-                                //archive All students in that section and section itself
-                                ClassRegistry::init('StudentsSection')->updateAll(array('StudentsSection.archive' => 1),
-                                    array('StudentsSection.section_id' => $deleteArchiveSec['Archive']));
-                                $this->Section->updateAll(array('Section.archive' => 1),
-                                    array('Section.id' => $deleteArchiveSec['Archive']));
-                            }
-                            $saveToNesSection = false;
-                            foreach ($studentListsNotInMergedSec as $sLM => $sLV) {
-                                $studentsSections = array();
-                                $studentsSections['StudentsSection']['student_id'] = $sLV['StudentsSection']['student_id'];
-                                $studentsSections['StudentsSection']['section_id'] = $mergedSection_id;
-                                if (!empty($studentsSections)) {
-                                    ClassRegistry::init('StudentsSection')->create();
-                                    if (ClassRegistry::init('StudentsSection')->save(
-                                        $studentsSections['StudentsSection']
-                                    )) {
-                                        $saveToNesSection = true;
-                                    }
-                                }
-                            }
-                            if ($saveToNesSection) {
-                                $this->Session->setFlash(
-                                    __(
-                                        '<span></span> Sections ' . $mergedSectionsName . ' are merged into section ' .
-                                        $mergedSection['Section']['name'],
-                                        true
-                                    ),
-                                    'default',
-                                    array('class' => 'success-box success-message')
-                                );
-                                return $this->redirect(array('action' => 'display_sections', $mergedSection_id));
-                            } else {
-                                $this->Session->setFlash(
-                                    __('<span></span> Sections is not merged , please try again ', true),
-                                    'default',
-                                    array('class' => 'success-box success-message')
-                                );
-                            }
-                        } else {
-                            // roll back
-                        }
-                    } else {
-                        $this->Session->setFlash(
-                            __(
-                                '<span></span> In order to merge sections,
-					all selected section students must have
-						the same curriculum. Please select sections that have the
-						same students curriculum or empty section.',
-                                true
-                            ),
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                    }
-                } else {
-                    if ($isMergingPossible == 2) {
-                        $this->Session->setFlash(
-                            __(
-                                '<span></span> Merging of the selected
-			            section is not possible because year level upgrade has been
-			            performed and courses published for the sections.',
-                                true
-                            ),
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                    } else {
-                        if ($isMergingPossible == 3) {
-                            $this->Session->setFlash(
-                                __(
-                                    '<span></span> Merging of the selected
-			            section is not possible because courses taken by the
-			            selected section is not similar.',
-                                    true
-                                ),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
-                        } else {
-                            if ($isMergingPossible == 4) {
-                                $this->Session->setFlash(
-                                    __(
-                                        '<span></span> Merging of the selected
-			            section is not possible because grade has been submitted to one
-			            of the published courses of the ' . $this->request->data['Section']['academicyear'] . '
-			            academic year .',
-                                        true
-                                    ),
-                                    'default',
-                                    array('class' => 'error-box error-message')
-                                );
-                            }
-                        }
-                    }
-                }
-            } else {
-                $this->Session->setFlash(
-                    __('<span></span> At least select 2 sections to merge '),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->set('selected_program', $this->request->data['Section']['program_id']);
-                $this->set('selected_program_type', $this->request->data['Section']['program_type_id']);
-            }
-
-            $this->request->data['search'] = true;
-            $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-
-            $selected_academic_year = $this->request->data['Section']['academicyear'];
-
-            $selected_year_level = $this->request->data['Section']['year_level_id'];
-
-
-            $program_type_id = $selected_program_type;
-            $find_the_equvilaent_program_type = unserialize(
-                $this->Section->ProgramType->field('ProgramType.equivalent_to_id', array(
-                    'ProgramType.id' => $selected_program_type
-                ))
-            );
-
-            if (!empty($find_the_equvilaent_program_type)) {
-                $selected_program_type_array = array();
-                $selected_program_type_array[] = $selected_program_type;
-                $program_type_id = array_merge($selected_program_type_array, $find_the_equvilaent_program_type);
-            }
-            //Search using by department and year level as well if user role is not college (use role is department)
-            if (ROLE_COLLEGE != $this->role_id) {
-                $selected_year_level = $this->request->data['Section']['year_level_id'];
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.department_id' =>
-                        $this->department_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.academicyear' => $selected_academic_year,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.year_level_id' => $selected_year_level,
-                    'Section.archive' => 0
-                );
-            } else {
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.program_id' =>
-                        $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.academicyear' => $selected_academic_year,
-                    'Section.archive' => 0,
-                    "OR" => array("Section.department_id is null", "Section.department_id" => array(0, ''))
-                );
-            }
-
-            $sections = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'fields' => array('Section.id', 'Section.name'),
-                'contain' => array(
-                    'Student' => array(
-                        'fields' => array(
-                            'Student.id',
-                            'Student.full_name',
-                            'Student.studentnumber'
-                        )
-                    )
-                )
-            ));
-            $current_sections_occupation = $this->Section->currentsectionsoccupation($sections);
-            //to display curriculum
-            //TODO: repetative query,remove it during optimization period, section curriculum
-            // can be find from the above query by containing curriculum
-            $studentsections = $this->Section->studentsection(
-                $this->college_id,
-                $this->role_id,
-                $this->department_id,
-                $selected_program,
-                $program_type_id,
-                $selected_academic_year,
-                $selected_year_level
-            );
-
-            //Find section curriculum for one of section students
-            $sections_curriculum_name = $this->Section->sectionscurriculum($studentsections);
-
-            $yearLevels = $this->Section->YearLevel->find('list', array(
-                'conditions' =>
-                    array('YearLevel.department_id' => $this->department_id)
-            ));
-            $this->set(
-                compact(
-                    'sections',
-                    'isbeforesearch',
-                    'current_sections_occupation',
-                    'yearLevels',
-                    'sections_curriculum_name'
-                )
-            );
-        }
-    }
-
-    public function split_section()
-    {
-
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
         $isbeforesearch = 1;
 
-        $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels'));
+        $current_academic_year = $this->AcademicYear->currentAcademicYear();
+        $custom_acy_list = [$current_academic_year => $current_academic_year];
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
-            $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            $selected_academic_year = $this->request->data['Section']['academicyear'];
-            $selected_year_level = $this->request->data['Section']['year_level_id'];
-
-            $this->Session->write('selected_program', $selected_program);
-            $this->Session->write('selected_program_type', $selected_program_type);
-            $this->Session->write('selected_academic_year', $selected_academic_year);
-            $this->Session->write('selected_year_level', $selected_year_level);
-
-            ////To display each section current hosted students:
-            $program_type_id = $selected_program_type;
-
-            $find_the_equvilaent_program_type = unserialize(
-                $this->Section->ProgramType->field(
-                    'ProgramType.equivalent_to_id',
-                    array('ProgramType.id' => $selected_program_type)
-                )
+        if (is_numeric(ACY_BACK_FOR_SECTION_ADD) && ACY_BACK_FOR_SECTION_ADD > 0) {
+            $custom_acy_list = $this->AcademicYear->academicYearInArray(
+                (explode('/', $current_academic_year)[0]) - ACY_BACK_FOR_SECTION_ADD,
+                explode('/', $current_academic_year)[0]
             );
+        }
 
-            if (!empty($find_the_equvilaent_program_type)) {
-                $selected_program_type_array = array();
-                $selected_program_type_array[] = $selected_program_type;
-                $program_type_id = array_merge($selected_program_type_array, $find_the_equvilaent_program_type);
+        $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels', 'custom_acy_list'));
+
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
+            $isbeforesearch = 0;
+            $selected_program = $this->request->getData('Section.program_id');
+            $selected_program_type = $this->request->getData('Section.program_type_id');
+            $selected_academic_year = $this->request->getData('Section.academicyear');
+            $selected_year_level = $this->request->getData('Section.year_level_id');
+
+            $session = $this->request->getSession();
+            $session->write('selected_program', $selected_program);
+            $session->write('selected_program_type', $selected_program_type);
+            $session->write('selected_academic_year', $selected_academic_year);
+            $session->write('selected_year_level', $selected_year_level);
+
+            $program_type_id = $selected_program_type;
+            $find_the_equivalent_program_type = unserialize($this->Sections->ProgramTypes->find()
+                ->select(['equivalent_to_id'])
+                ->where(['ProgramTypes.id' => $selected_program_type])
+                ->first()
+                ->equivalent_to_id);
+
+            if (!empty($find_the_equivalent_program_type)) {
+                $selected_program_type_array = [$selected_program_type];
+                $program_type_id = array_merge($selected_program_type_array, $find_the_equivalent_program_type);
             }
 
-            //Search using by department and year level as well if user role is not college (use role is department)
+            $conditions = ($this->role_id == ROLE_DEPARTMENT) ? [
+                'Sections.college_id' => $this->college_id,
+                'Sections.department_id' => $this->department_id,
+                'Sections.program_id' => $selected_program,
+                'Sections.program_type_id IN' => $program_type_id,
+                'Sections.academicyear' => $selected_academic_year,
+                'Sections.year_level_id' => $selected_year_level,
+                'Sections.archive' => 0,
+            ] : [
+                'Sections.college_id' => $this->college_id,
+                'Sections.program_id' => $selected_program,
+                'Sections.program_type_id IN' => $program_type_id,
+                'Sections.academicyear' => $selected_academic_year,
+                'Sections.archive' => 0,
+                'OR' => [
+                    'Sections.department_id IS' => null,
+                    'Sections.department_id' => '',
+                    'Sections.department_id' => 0,
+                ],
+            ];
 
-            if (ROLE_COLLEGE != $this->role_id) {
-                $selected_year_level = $this->request->data['Section']['year_level_id'];
-                $this->Session->write('selected_year_level', $selected_year_level);
+            $sections = $this->Sections->find()
+                ->where($conditions)
+                ->select(['Sections.id', 'Sections.name'])
+                ->contain([
+                    'Students' => [
+                        'fields' => ['Students.id', 'Students.full_name', 'Students.studentnumber', 'Students.gender'],
+                    ],
+                ])
+                ->toArray();
 
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.department_id' => $this->department_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.academicyear' => $selected_academic_year,
-                    'Section.year_level_id' => $selected_year_level,
-                    'Section.archive' => 0
-                );
-            } else {
-                $conditions = array(
-                    'Section.college_id' => $this->college_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $program_type_id,
-                    'Section.archive' => 0,
-                    'Section.academicyear' => $selected_academic_year,
-                    "OR" => array(
-                        "Section.department_id is null",
-                        "Section.department_id = ''",
-                        "Section.department_id = 0"
-                    )
-                );
-            }
+            $current_sections_occupation = $this->Sections->currentSectionsOccupation($sections);
 
-            $sections = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'fields' => array('Section.id', 'Section.name'),
-                'contain' => array(
-                    'Student' => array(
-                        'fields' => array('Student.id', 'Student.full_name', 'Student.studentnumber', 'Student.gender')
-                    )
-                )
-            ));
-
-            $current_sections_occupation = $this->Section->currentsectionsoccupation($sections);
-            $this->Session->write('current_sections_occupation', $current_sections_occupation);
-            $this->Session->write('sections', $sections);
+            $session->write('current_sections_occupation', $current_sections_occupation);
+            $session->write('sections', $sections);
             $this->set(compact('sections', 'current_sections_occupation', 'isbeforesearch'));
         }
 
-        if (!empty($this->request->data) && isset($this->request->data['split'])) {
+        if (!empty($this->request->getData()) && $this->request->getData('split')) {
             $is_course_published = 0;
-            $selected_section = $this->request->data['Section']['selectedsection'];
+            $selected_section = $this->request->getData('Section.selectedsection');
+            $number_of_section = $this->request->getData('Section.number_of_section');
+            $session = $this->request->getSession();
+            $sections = $session->read('sections');
+            // debug($sections);
 
-            $number_of_section = $this->request->data['Section']['number_of_section'];
-            $sections = $this->Session->read('sections');
-            debug($sections);
+            $current_sections_occupation = $session->read('current_sections_occupation');
+            $selected_program = $session->read('selected_program');
+            $selected_program_type = $session->read('selected_program_type');
+            $selected_academic_year = $session->read('selected_academic_year');
 
-            $current_sections_occupation = $this->Session->read('current_sections_occupation');
-            $selected_program = $this->Session->read('selected_program');
-            $selected_program_type = $this->Session->read('selected_program_type');
-            $selected_academic_year = $this->Session->read('selected_academic_year');
+            $selected_section_id = $this->request->getData("Section.$selected_section.id");
 
+            $current_academic_year = !empty($selected_academic_year)
+                ? $selected_academic_year
+                : $this->AcademicYear->currentAcademicYear();
 
-            //
-            //////////////////////////////////////////////////////////////////////////
-
-            $selected_section_id = $this->request->data['Section'][$selected_section]['id'];
-
-            if (!empty($selected_academic_year)) {
-                $current_academic_year = $selected_academic_year;
-            } else {
-                $current_academic_year = $this->AcademicYear->current_academicyear();
-            }
-
-            $section_semester = ClassRegistry::init('CourseRegistration')->checkCourseIsPublishedForSection(
-                $this->request->data['Section'][$selected_section]['id'],
-                $current_academic_year
-            );
-
+            $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+            $section_semester = $courseRegistrationsTable->checkCourseIsPublishedForSection($this->request->getData("Section.$selected_section.id"), $current_academic_year);
 
             if ($section_semester != 2) {
                 if ($this->role_id == ROLE_DEPARTMENT) {
-                    $is_course_published = $this->Section->PublishedCourse->find('count', array(
-                        'conditions' => array(
-                            'PublishedCourse.department_id' => $this->department_id,
-                            'PublishedCourse.section_id' => $selected_section_id,
-                            'PublishedCourse.semester' => $section_semester,
-                            'PublishedCourse.academic_year' => $current_academic_year
-                        )
-                    ));
-                } else {
-                    if ($this->role_id == ROLE_COLLEGE) {
-                        $is_course_published = $this->Section->PublishedCourse->find('count', array(
-                            'conditions' => array(
-                                'PublishedCourse.college_id' => $this->college_id,
-                                'PublishedCourse.section_id' => $selected_section_id,
-                                'PublishedCourse.semester' => $section_semester,
-                                'PublishedCourse.academic_year' => $current_academic_year,
-                                'PublishedCourse.department_id is null'
-                            )
-                        ));
-                    }
+                    $is_course_published = $this->Sections->PublishedCourses->find()
+                        ->where([
+                            'PublishedCourses.department_id' => $this->department_id,
+                            'PublishedCourses.section_id' => $selected_section_id,
+                            'PublishedCourses.semester' => $section_semester,
+                            'PublishedCourses.academic_year' => $current_academic_year,
+                        ])
+                        ->count();
+                } elseif ($this->role_id == ROLE_COLLEGE) {
+                    $is_course_published = $this->Sections->PublishedCourses->find()
+                        ->where([
+                            'PublishedCourses.college_id' => $this->college_id,
+                            'PublishedCourses.section_id' => $selected_section_id,
+                            'PublishedCourses.semester' => $section_semester,
+                            'PublishedCourses.academic_year' => $current_academic_year,
+                            'PublishedCourses.department_id IS' => null,
+                        ])
+                        ->count();
                 }
             }
-
 
             if ($selected_section == -1) {
                 $is_course_published = 0;
             }
 
-            //////////////////////////////////////////////////////////////
-
             if (!$is_course_published) {
                 if (($selected_section != -1) && $current_sections_occupation[$selected_section] >= $number_of_section) {
-                    //find selected section id and name
-                    $selected_section_id = $sections[$selected_section]['Section']['id'];
-                    $selected_section_name = $sections[$selected_section]['Section']['name'];
-                    debug($selected_section_name);
-                    //retrieve parts of selected section name
-                    $variable_selected_sectionname = substr(
-                        $selected_section_name,
-                        strrpos($selected_section_name, " ") + 1
-                    );
-                    debug($variable_selected_sectionname);
+                    $selected_section_id = $sections[$selected_section]['id'];
+                    $selected_section_name = $sections[$selected_section]['name'];
+                    // debug($selected_section_name);
+                    $variable_selected_sectionname = substr($selected_section_name, strrpos($selected_section_name, ' ') + 1);
+                    // debug($variable_selected_sectionname);
 
-                    if (ROLE_COLLEGE != $this->role_id) {
-                        $first_space = strpos($selected_section_name, " ");
-                        $second_space = strrpos($selected_section_name, " ");
+                    if ($this->role_id != ROLE_COLLEGE) {
+                        $first_space = strpos($selected_section_name, ' ');
+                        $second_space = strrpos($selected_section_name, ' ');
                         $prefix_selected_sectionname = substr($selected_section_name, 0, $first_space);
-                        $fixed_selected_sectionname = substr(
-                            $selected_section_name,
-                            ($first_space + 1),
-                            ($second_space - ($first_space + 1))
-                        );
-                        //$name = $prefixsectionname.$yearlevelnameshort.' '.$fixedsectionname.' '.$variablesectionname;
+                        $fixed_selected_sectionname = substr($selected_section_name, ($first_space + 1), ($second_space - ($first_space + 1)));
                     } else {
-                        $first_space = strpos($selected_section_name, " ");
+                        $first_space = strpos($selected_section_name, ' ');
                         $fixed_selected_sectionname = substr($selected_section_name, 0, $first_space);
-                        // $name = $fixedsectionname.' '.$variablesectionname;
                     }
 
                     $program_type_id = $selected_program_type;
-                    $find_the_equvilaent_program_type = unserialize(
-                        $this->Section->ProgramType->field(
-                            'ProgramType.equivalent_to_id',
-                            array('ProgramType.id' => $selected_program_type)
-                        )
-                    );
+                    $find_the_equivalent_program_type = unserialize($this->Sections->ProgramTypes->find()
+                        ->select(['equivalent_to_id'])
+                        ->where(['ProgramTypes.id' => $selected_program_type])
+                        ->first()
+                        ->equivalent_to_id);
 
-                    if (!empty($find_the_equvilaent_program_type)) {
-                        $selected_program_type_array = array();
-                        $selected_program_type_array[] = $selected_program_type;
-                        $program_type_id = array_merge($selected_program_type_array, $find_the_equvilaent_program_type);
+                    if (!empty($find_the_equivalent_program_type)) {
+                        $selected_program_type_array = [$selected_program_type];
+                        $program_type_id = array_merge($selected_program_type_array, $find_the_equivalent_program_type);
                     }
 
-                    //find all section name in selected program/program type and year level
+                    $conditions = ($this->role_id == ROLE_DEPARTMENT) ? [
+                        'Sections.college_id' => $this->college_id,
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_type_id,
+                        'Sections.academicyear' => $current_academic_year,
+                        'Sections.year_level_id' => $session->read('selected_year_level'),
+                        'Sections.archive' => 0,
+                    ] : [
+                        'Sections.college_id' => $this->college_id,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_type_id,
+                        'Sections.academicyear' => $current_academic_year,
+                        'Sections.archive' => 0,
+                        'OR' => [
+                            'Sections.department_id IS' => null,
+                            'Sections.department_id' => '',
+                            'Sections.department_id' => 0,
+                        ],
+                    ];
 
-                    if (ROLE_COLLEGE != $this->role_id) {
-                        $selected_year_level = $this->Session->read('selected_year_level');
-                        $conditions = array(
-                            'Section.college_id' => $this->college_id,
-                            'Section.department_id' => $this->department_id,
-                            'Section.program_id' => $selected_program,
-                            'Section.academicyear' => $current_academic_year,
-                            'Section.program_type_id' => $program_type_id,
-                            'Section.year_level_id' => $selected_year_level,
-                            'Section.archive' => 0
-                        );
-                    } else {
-                        $conditions = array(
-                            'Section.college_id' => $this->college_id,
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_type_id,
-                            'Section.academicyear' => $current_academic_year,
-                            'Section.archive' => 0,
-                            "OR" => array(
-                                "Section.department_id is null",
-                                "Section.department_id = ''",
-                                "Section.department_id = 0"
-                            )
-                        );
-                    }
+                    $all_section_name = $this->Sections->find('list')
+                        ->where($conditions)
+                        ->select(['Sections.name'])
+                        ->order(['Sections.name'])
+                        ->toArray();
 
-                    $all_section_name = $this->Section->find('list', array(
-                        'conditions' => $conditions,
-                        'fields' => array('Section.name'),
-                        'order' => array('Section.name')
-                    ));
-
-                    $numeric_section_variablename = array();
-                    $character_seection_variablename = array();
+                    $numeric_section_variablename = [];
+                    $character_section_variablename = [];
 
                     if (!empty($all_section_name)) {
                         foreach ($all_section_name as $sv) {
-                            $variable = substr($sv, strrpos($sv, " ") + 1);
+                            $variable = substr($sv, strrpos($sv, ' ') + 1);
                             if (is_numeric($variable)) {
                                 $numeric_section_variablename[] = $variable;
                             } else {
-                                $character_seection_variablename[] = $variable;
+                                $character_section_variablename[] = $variable;
                             }
                         }
                     }
 
-                    //find the last available variable name from database,construct full variable section name in order to find the gap
-                    //in varable section name and find unused section name
                     $last_section_variablename = null;
-                    $full_variablename_array = array();
-                    $gap_section_name_array = array();
+                    $full_variablename_array = [];
+                    $gap_section_name_array = [];
 
                     if (is_numeric($variable_selected_sectionname)) {
                         $section_variablename_count = count($numeric_section_variablename);
@@ -3179,8 +2107,8 @@ class SectionsController extends AppController
 
                         $gap_section_name_array = array_diff($full_variablename_array, $numeric_section_variablename);
                     } else {
-                        $section_variablename_count = count($character_seection_variablename);
-                        $last_section_variablename = $character_seection_variablename[$section_variablename_count - 1];
+                        $section_variablename_count = count($character_section_variablename);
+                        $last_section_variablename = $character_section_variablename[$section_variablename_count - 1];
                         $last_section_variablename = ord($last_section_variablename);
 
                         for ($i = $last_section_variablename; $i >= 65; $i--) {
@@ -3188,25 +2116,19 @@ class SectionsController extends AppController
                         }
 
                         $last_section_variablename = chr($last_section_variablename);
-                        $gap_section_name_array = array_diff(
-                            $full_variablename_array,
-                            $character_seection_variablename
-                        );
+                        $gap_section_name_array = array_diff($full_variablename_array, $character_section_variablename);
                     }
 
                     sort($gap_section_name_array);
 
-                    //check if section name is already taken and find unique section
-                    $split_section_names_array = array();
+                    $split_section_names_array = [];
                     $i = 0;
                     $j = 1;
 
                     while ($i < $number_of_section) {
-                        //check if the section name is already taken ?
-                        $checkIfSectionNameTaken = $this->Section->find(
-                            'count',
-                            array('conditions' => array('Section.name' => $selected_section_name . ' ' . $j))
-                        );
+                        $checkIfSectionNameTaken = $this->Sections->find()
+                            ->where(['Sections.name' => $selected_section_name . ' ' . $j])
+                            ->count();
                         if ($checkIfSectionNameTaken == 0) {
                             $split_section_names_array[$i] = $selected_section_name . ' ' . $j;
                             $i++;
@@ -3214,91 +2136,66 @@ class SectionsController extends AppController
                         $j++;
                     }
 
-                    //Create newly merged Section and save to Section table database
-                    $SplitedSection = array();
-                    $SplitedSection['Section']['college_id'] = $this->college_id;
-                    //$selectedsection_id = $this->request->data['Section'][$this->request->data['Section']['selectedsection']]['id'];
-                    $SplitedSection['Section']['program_id'] = $selected_program;
-                    $SplitedSection['Section']['program_type_id'] = $selected_program_type;
-                    $SplitedSection['Section']['academicyear'] = $current_academic_year;
+                    $splitedSection = [
+                        'college_id' => $this->college_id,
+                        'program_id' => $selected_program,
+                        'program_type_id' => $selected_program_type,
+                        'academicyear' => $current_academic_year,
+                    ];
 
-                    if (ROLE_COLLEGE != $this->role_id) {
-                        $SplitedSection['Section']['department_id'] = $this->department_id;
-                        $SplitedSection['Section']['year_level_id'] = $selected_year_level;
+                    if ($this->role_id != ROLE_COLLEGE) {
+                        $splitedSection['department_id'] = $this->department_id;
+                        $splitedSection['year_level_id'] = $selected_year_level;
                     }
 
-                    //Check split section status whether grade submitted on the name of section or not
-                    // for soft delete (archive) or hard Delete
-                    //before delete hold names for display
                     $deleteOk = true;
                     $secSave = false;
 
-                    if ($this->Section->CourseRegistration->ExamGrade->isEverGradeSubmitInTheNameOfSection(
-                        $selected_section_id
-                    )) {
+                    if ($this->Sections->CourseRegistrations->ExamGrades->isEverGradeSubmitInTheNameOfSection($selected_section_id)) {
                         $deleteOk = false;
-                        $this->Section->id = $selected_section_id;
-                        $this->Section->saveField('archive', '1');
-                        //archive students of the section in associate table
-                        $studentssections = $this->Section->StudentsSection->find('all', array(
-                            'conditions' => array(
-                                'StudentsSection.section_id' => $selected_section_id,
-                                'StudentsSection.archive' => 0
-                            )
-                        ));
-                        /*
-						foreach ($studentssections as $ssk => $ssv) {
-							$this->Section->StudentsSection->id = $ssv['StudentsSection']['id'];
-							$this->Section->StudentsSection->saveField('archive', '1');
-						}
-						*/
-                    } else {
+                        $section = $this->Sections->get($selected_section_id);
+                        $section->archive = 1;
+                        $this->Sections->save($section);
                     }
 
-                    $Split_Section_id_array = array();
+                    $split_section_id_array = [];
+                    $section_id_for_redirect = $selected_section_id;
 
-                    for ($i = 0; $i < $number_of_section; $i++) {
-                        $SplitedSection['Section']['name'] = $split_section_names_array[$i];
-                        if (!empty($SplitedSection)) {
-                            $this->Section->create();
-                            if ($this->Section->save($SplitedSection)) {
-                                $Split_Section_id_array[$i] = $this->Section->id;
-                                $secSave = true;
-                            } else {
-                                $error = $this->Section->invalidFields();
-                                debug($error);
-                            }
+                    foreach ($split_section_names_array as $name) {
+                        $splitedSection['name'] = $name;
+                        $sectionEntity = $this->Sections->newEntity($splitedSection);
+                        if ($this->Sections->save($sectionEntity)) {
+                            $split_section_id_array[] = $sectionEntity->id;
+                            $secSave = true;
+                            $section_id_for_redirect = $sectionEntity->id;
+                        } else {
+                            $error = $sectionEntity->getErrors();
+                            // debug($error);
                         }
                     }
 
-                    if (!empty($Split_Section_id_array) && $secSave) {
-                        //newly created children section students is saved in associated database table
-                        $studentssections = ClassRegistry::init('StudentsSection')->find('all', array(
-                            'conditions' => array(
-                                'StudentsSection.section_id' => $selected_section_id,
-                                'StudentsSection.archive' => 0
-                            )
-                        ));
+                    if (!empty($split_section_id_array) && $secSave) {
+                        $studentssections = $this->Sections->StudentsSections->find()
+                            ->where([
+                                'StudentsSections.section_id' => $selected_section_id,
+                                'StudentsSections.archive' => 0,
+                            ])
+                            ->toArray();
 
-                        debug($studentssections);
-                        $k = 0; //first child section index
+                        // debug($studentssections);
+                        $k = 0;
 
                         if (!empty($studentssections)) {
-                            foreach ($studentssections as $ssk => $ssv) {
-                                $studentsSections = array();
-
-                                if (isset($Split_Section_id_array[$k]) && !empty($Split_Section_id_array[$k]) && isset($ssv['StudentsSection']['student_id']) && !empty($ssv['StudentsSection']['student_id'])) {
-                                    $studentsSections['StudentsSection']['student_id'] = $ssv['StudentsSection']['student_id'];
-                                    $studentsSections['StudentsSection']['section_id'] = $Split_Section_id_array[$k];
-                                    debug($studentsSections);
-
-                                    if (!empty($studentsSections['StudentsSection'])) {
-                                        $this->Section->StudentsSection->create();
-                                        $this->Section->StudentsSection->save($studentsSections['StudentsSection']);
-                                    }
+                            foreach ($studentssections as $ssv) {
+                                if (isset($split_section_id_array[$k]) && !empty($split_section_id_array[$k]) && isset($ssv->student_id) && !empty($ssv->student_id)) {
+                                    $studentsSection = $this->Sections->StudentsSections->newEntity([
+                                        'student_id' => $ssv->student_id,
+                                        'section_id' => $split_section_id_array[$k],
+                                    ]);
+                                    $this->Sections->StudentsSections->save($studentsSection);
                                 }
 
-                                $k = $k + 1;
+                                $k++;
                                 if (($k % $number_of_section) == 0) {
                                     $k = 0;
                                 }
@@ -3306,1010 +2203,641 @@ class SectionsController extends AppController
                         }
                     }
 
-                    //delete historical section
                     if ($deleteOk && $secSave) {
-                        //delete students of the section in associate table
+                        $this->Sections->deleteAll(['Sections.id' => $selected_section_id], false);
 
-                        $this->Section->delete($selected_section_id);
-
-                        $studentssections = $this->Section->StudentsSection->find('all', array(
-                            'conditions' => array(
-                                'StudentsSection.section_id' => $selected_section_id,
-                                'StudentsSection.archive' => 0
-                            )
-                        ));
+                        $studentssections = $this->Sections->StudentsSections->find()
+                            ->where([
+                                'StudentsSections.section_id' => $selected_section_id,
+                                'StudentsSections.archive' => 0,
+                            ])
+                            ->toArray();
 
                         if (!empty($studentssections)) {
-                            foreach ($studentssections as $ssk => $ssv) {
-                                $this->Section->StudentsSection->delete($ssv['StudentsSection']['id']);
+                            foreach ($studentssections as $ssv) {
+                                $this->Sections->StudentsSections->delete($ssv);
                             }
                         }
                     }
 
                     if ($secSave) {
-                        $split_sections = null;
-
-                        if (!empty($split_section_names_array)) {
-                            foreach ($split_section_names_array as $split_section_names) {
-                                $split_sections = $split_sections . $split_section_names . ', ';
-                            }
-                        }
-                        $this->Flash->success(
-                            'Section ' . $selected_section_name . ' is split into sections ' . $split_sections . ' successfully.'
-                        );
+                        $split_sections = implode(', ', $split_section_names_array);
+                        $this->Flash->success("Section $selected_section_name is split into $split_sections sections successfully.");
                     } else {
-                        $this->Flash->error(
-                            'Section ' . $selected_section_name . ' not able split into sections, please try again.'
-                        );
+                        $this->Flash->error("Section $selected_section_name is not split, please try again.");
                     }
-                    //	return $this->redirect(array('action' => 'display_sections',$selected_section_id));
 
+                    return $this->redirect(['action' => 'displaySections', $section_id_for_redirect]);
                 } else {
-                    $this->Flash->error(
-                        'Please select section which have students greater than or equal to the number of section to split which is: ' . $number_of_section . '.'
-                    );
+                    $this->Flash->error("Please select a section with students greater than or equal to the number of sections to split, which is: $number_of_section.");
                 }
             } else {
-                $this->Flash->error(
-                    'You can not split the selected section since course has been published for ' . $section_semester['semester'] . '/' . $current_academic_year . '. First unpublish the courses and split the section.'
-                );
-                return $this->redirect(array('controller' => 'published_courses', 'action' => 'unpublish'));
+                $this->Flash->error("You cannot split the selected section since a course has been published for $section_semester[semester]/$current_academic_year. First unpublish the courses and split the section.");
+                return $this->redirect(['controller' => 'PublishedCourses', 'action' => 'unpublish']);
             }
 
-            $this->request->data['search'] = true;
+            $this->request = $this->request->withData('search', true);
             $isbeforesearch = 0;
             $this->set(compact('sections', 'current_sections_occupation', 'isbeforesearch'));
         }
     }
 
-    public function export($sectionid = null)
+    public function export(?int $sectionid = null)
     {
-
-        $students_per_section = $this->Section->studentsSectionById($sectionid);
-        //debug($students_per_section);
-
+        $students_per_section = $this->Sections->getStudentsSectionById($sectionid);
         $this->set(compact('students_per_section'));
     }
 
-    public function view_pdf($id = null)
+    public function view_pdf(?int $id = null)
     {
-
         if (!$id) {
             $this->Flash->error('Sorry, Invalid request.');
-            $this->redirect(array('action' => 'index'), null, true);
+            return $this->redirect(['action' => 'index']);
         }
 
-        $colleges = $this->Section->College->find('list', array(
-            'conditions' => array(
-                'College.id' => $this->college_id,
-                'College.active' => 1
-            )
-        ));
-        $collegename = $colleges[$this->college_id];
+        $colleges = $this->Sections->Colleges->find('list')
+            ->where(['Colleges.id' => $this->college_id, 'Colleges.active' => 1])
+            ->toArray();
+        $collegename = $colleges[$this->college_id] ?? '';
 
+        $departmentname = '';
         if (!empty($this->department_id)) {
-            $departments = $this->Section->Department->find('list', array(
-                'conditions' => array(
-                    'Department.id' => $this->department_id,
-                    'Department.active' => 1
-                )
-            ));
-
-            $departmentname = $departments[$this->department_id];
+            $departments = $this->Sections->Departments->find('list')
+                ->where(['Departments.id' => $this->department_id, 'Departments.active' => 1])
+                ->toArray();
+            $departmentname = $departments[$this->department_id] ?? '';
         }
 
-        $studentsections = $this->Section->studentsSectionById($id);
+        $studentsections = $this->Sections->getStudentsSectionById($id);
 
         $this->set(compact('studentsections', 'collegename', 'departmentname'));
-        $this->response->type('application/pdf');
-        $this->layout = '/pdf/default';
+        $this->response = $this->response->withType('application/pdf');
+        $this->viewBuilder()->setLayout('pdf/default');
         $this->render();
     }
 
-    public function deleteStudentforThisSection($section_id = null, $student_number = null)
-    {
 
+    public function deleteStudentForThisSection(?int $section_id = null, ?string $student_number = null)
+    {
         if (!$section_id || !$student_number) {
             $this->Flash->error('Invalid ID for Section or/and Student');
-            return $this->redirect(array('action' => 'display_sections'));
+            return $this->redirect(['action' => 'displaySections']);
         }
 
         $student_number = str_replace('-', '/', $student_number);
-        $section_name = $this->Section->field('Section.name', array('Section.id' => $section_id));
+        $section_name = $this->Sections->find()
+            ->select(['name'])
+            ->where(['Sections.id' => $section_id])
+            ->first()
+            ->name ?? '';
 
-        $student_id = $this->Section->Student->field('Student.id', array('Student.studentnumber' => $student_number));
+        $student_id = $this->Sections->Students->find()
+            ->select(['id'])
+            ->where(['Students.studentnumber' => $student_number])
+            ->first()
+            ->id ?? null;
 
-        //now delete this student from this section from associate table check student deletion from section is possible ?
-
-        if ($this->Section->Student->CourseRegistration->ExamResult->isStudenSectionChangePossible(
-            $student_id,
-            $section_id
-        )) {
-            $this->Section->StudentsSection->id = $this->Section->StudentsSection->field('StudentsSection.id', array(
-                'StudentsSection.student_id' => $student_id,
-                'StudentsSection.section_id' => $section_id,
-                'StudentsSection.archive' => 0
-            ));
-            $this->Section->StudentsSection->delete($this->Section->StudentsSection->id);
+        if ($this->Sections->Students->CourseRegistrations->ExamResults->isStudentSectionChangePossible($student_id, $section_id)) {
+            $studentsSection = $this->Sections->StudentsSections->find()
+                ->where([
+                    'StudentsSections.student_id' => $student_id,
+                    'StudentsSections.section_id' => $section_id,
+                    'StudentsSections.archive' => 0,
+                ])
+                ->first();
+            if ($studentsSection) {
+                $this->Sections->StudentsSections->delete($studentsSection);
+            }
         } else {
-            if ($this->Section->Student->CourseRegistration->ExamResult->isRegistredInNameOfSectionAndSubmittedGrade(
-                $student_id,
-                $section_id
-            )) {
-                $this->Flash->error(
-                    $student_number . ' can not be deleted from  ' . $section_name . ' section since one or more course registered by the student in this section, his/her grade not full submitted.'
-                );
-                $this->redirect(array('action' => 'display_sections', $section_id));
+            if ($this->Sections->Students->CourseRegistrations->ExamResults->isRegisteredInNameOfSectionAndSubmittedGrade($student_id, $section_id)) {
+                $this->Flash->error("$student_number cannot be removed from $section_name section because the student is registered for one or more courses in this section, and grades have not been fully submitted.");
+                return $this->redirect(['action' => 'displaySections', $section_id]);
             } else {
-                $this->Section->StudentsSection->id = $this->Section->StudentsSection->field(
-                    'StudentsSection.id',
-                    array(
-                        'StudentsSection.student_id' => $student_id,
-                        'StudentsSection.section_id' => $section_id,
-                        'StudentsSection.archive' => 0
-                    )
-                );
-                $this->Section->StudentsSection->saveField('archive', '1');
+                $studentsSection = $this->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $student_id,
+                        'StudentsSections.section_id' => $section_id,
+                        'StudentsSections.archive' => 0,
+                    ])
+                    ->first();
+                if ($studentsSection) {
+                    $studentsSection->archive = 1;
+                    $this->Sections->StudentsSections->save($studentsSection);
+                }
             }
         }
-        //$this->Section->habtmDelete('Student', $section_id,$student_id);
-        //find section name from id for the purpose of display
 
-        $this->Flash->success($student_number . ' is now deleted from ' . $section_name . ' Section');
-        return $this->redirect(array('action' => 'display_sections', $section_id));
+        $this->Flash->success("$student_number is now removed from $section_name section");
+        return $this->redirect(['action' => 'displaySections', $section_id]);
     }
 
-    public function archieveUnarchieveStudentSection($section_id = null, $student_id = null, $archieve = null)
+    public function archieveUnarchieveStudentSection($section_id,  $student_id,  $archive)
     {
-
         if (!$section_id || !$student_id) {
             $this->Flash->error('Invalid ID for Section or/and Student');
-            //return $this->redirect(array('action' => 'display_sections'));
-            $this->redirect($this->referer());
+            return $this->redirect($this->referer());
         }
 
-        $section_name = $this->Section->field('Section.name', array('Section.id' => $section_id));
-        $student_number = $this->Section->Student->field('Student.studentnumber', array('Student.id' => $student_id));
+        $section_name = $this->Sections->find()
+            ->select(['name'])
+            ->where(['Sections.id' => $section_id])
+            ->first()
+            ->name ?? '';
+        $student_number = $this->Sections->Students->find()
+            ->select(['studentnumber'])
+            ->where(['Students.id' => $student_id])
+            ->first()
+            ->studentnumber ?? '';
 
-        if ($archieve) {
-            if ($this->Section->Student->CourseRegistration->ExamResult->isStudenSectionChangePossible(
-                $student_id,
-                $section_id
-            )) {
-                $this->Section->StudentsSection->id = $this->Section->StudentsSection->field(
-                    'StudentsSection.id',
-                    array(
-                        'StudentsSection.student_id' => $student_id,
-                        'StudentsSection.section_id' => $section_id,
-                        'StudentsSection.archive' => 0
-                    )
-                );
-
-                if ($this->Section->StudentsSection->id) {
-                    $this->Section->StudentsSection->saveField('archive', '1');
-                    $this->Flash->success($student_number . ' is now archieved form ' . $section_name . ' Section');
+        if ($archive) {
+            if ($this->Sections->Students->CourseRegistrations->ExamResults->isStudentSectionChangePossible($student_id, $section_id)) {
+                $studentsSection = $this->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $student_id,
+                        'StudentsSections.section_id' => $section_id,
+                        'StudentsSections.archive' => 0,
+                    ])
+                    ->first();
+                if ($studentsSection) {
+                    $studentsSection->archive = 1;
+                    $this->Sections->StudentsSections->save($studentsSection);
+                    $this->Flash->success("$student_number has been successfully archived from $section_name section.");
                 } else {
-                    $this->Flash->error('Could\'t archieve ' . $student_number . ' form ' . $section_name . ' Section');
+                    $this->Flash->error("Could not archive $student_number from $section_name section.");
                 }
             } else {
-                /* if ($this->Section->Student->CourseRegistration->ExamResult->isRegistredInNameOfSectionAndSubmittedGrade($student_id, $section_id)) {
-					$this->Flash->error($student_number . ' can not be archieved from Section ' . $section_name . ' at this time. One or more courses are registered by the student in this section and grades are not fully submitted. Try again when all of the grades are submitted!');
-					//$this->redirect(array('action' => 'display_sections', $section_id));
-					$this->redirect($this->referer());
-				} else { */
 
-                if ($this->Section->chceck_all_registered_added_courses_are_graded(
-                    $student_id,
-                    $section_id,
-                    $check_for_invalid_grades = 0
-                )) {
-                    $this->Section->StudentsSection->id = $this->Section->StudentsSection->field(
-                        'StudentsSection.id',
-                        array(
-                            'StudentsSection.student_id' => $student_id,
-                            'StudentsSection.section_id' => $section_id,
-                            'StudentsSection.archive' => 0
-                        )
-                    );
+                if ($this->Sections->checkAllRegisteredAddedCoursesAreGraded($student_id, $section_id, 0)) {
+                    $studentsSection = $this->Sections->StudentsSections->find()
+                        ->where([
+                            'StudentsSections.student_id' => $student_id,
+                            'StudentsSections.section_id' => $section_id,
+                            'StudentsSections.archive' => 0,
+                        ])
+                        ->first();
 
-                    if ($this->Section->StudentsSection->id) {
-                        $this->Section->StudentsSection->saveField('archive', '1');
-                        $this->Flash->success($student_number . ' is now archieved form ' . $section_name . ' Section');
+                    if ($studentsSection) {
+                        $studentsSection->archive = 1;
+                        $this->Sections->StudentsSections->save($studentsSection);
+                        $this->Flash->success("$student_number has been successfully archived from $section_name section.");
                     } else {
-                        $this->Flash->error(
-                            'Could\'t archieve ' . $student_number . ' form ' . $section_name . ' Section'
-                        );
+                        $this->Flash->error("Could not archive $student_number from $section_name section.");
                     }
                 } else {
-                    $this->Flash->error(
-                        $student_number . ' can not be archieved from Section ' . $section_name . ' at this time. One or more courses are registered by the student in this section and grades are not fully submitted. Try again when all of the grades are submitted!'
-                    );
-                    //$this->redirect(array('action' => 'display_sections', $section_id));
-                    //$this->redirect($this->referer());
+                    $this->Flash->error("$student_number cannot be archived from $section_name section at this time.
+                    The student is registered for one or more courses in this section,
+                    and grades have not been fully submitted. Please try again once all grades are submitted!");
                 }
             }
         } else {
-            $this->Section->StudentsSection->id = $this->Section->StudentsSection->field('StudentsSection.id', array(
-                'StudentsSection.student_id' => $student_id,
-                'StudentsSection.section_id' => $section_id,
-                'StudentsSection.archive' => 1
-            ));
-
-            if ($this->Section->StudentsSection->id) {
-                $this->Section->StudentsSection->saveField('archive', '0');
-                $this->Flash->success($student_number . ' is now unarchieved for ' . $section_name . ' Section');
+            $studentsSection = $this->Sections->StudentsSections->find()
+                ->where([
+                    'StudentsSections.student_id' => $student_id,
+                    'StudentsSections.section_id' => $section_id,
+                    'StudentsSections.archive' => 1,
+                ])
+                ->first();
+            if ($studentsSection) {
+                $studentsSection->archive = 0;
+                $this->Sections->StudentsSections->save($studentsSection);
+                $this->Flash->success("$student_number has been successfully unarchived for $section_name section.");
             } else {
-                $this->Flash->error('Could\'t unarchieve ' . $student_number . ' for ' . $section_name . ' Section');
+                $this->Flash->error("Could not unarchive $student_number for $section_name section.");
             }
         }
 
         $refererUrl = explode('/', $this->referer());
-        //debug($refererUrl);
+        // debug($refererUrl);
 
-        if (is_array($refererUrl) && !empty($refererUrl) && in_array('student_academic_profile', $refererUrl)) {
-            return $this->redirect(
-                array('controller' => 'students', 'action' => 'student_academic_profile', $student_id)
-            );
+        if (is_array($refererUrl) && !empty($refererUrl) && in_array('studentAcademicProfile', $refererUrl)) {
+            return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
+        } elseif (is_array($refererUrl) && !empty($refererUrl) && in_array('display_sections', $refererUrl)) {
+            return $this->redirect(['action' => 'displaySections', $section_id]);
         } else {
-            if (is_array($refererUrl) && !empty($refererUrl) && in_array('display_sections', $refererUrl)) {
-                return $this->redirect(array('action' => 'display_sections', $section_id));
-            } else {
-                $this->redirect($this->referer());
-            }
+            return $this->redirect($this->referer());
         }
-
-        //return $this->redirect(array('action' => 'display_sections', $section_id));
-        //$this->redirect($this->referer());
     }
 
-
-    public function deleteStudent($section_id = null, $student_numberr = null)
+    public function deleteStudent(?int $section_id = null, ?string $student_number = null)
     {
-
-        $student_number = str_replace('-', '/', $student_numberr);
-        $student_id = $this->Section->Student->field('Student.id', array('Student.studentnumber' => $student_number));
+        $student_number = str_replace('-', '/', $student_number);
+        $student_id = $this->Sections->Students->find()
+            ->select(['id'])
+            ->where(['Students.studentnumber' => $student_number])
+            ->first()
+            ->id ?? null;
 
         if (!$section_id || !$student_number) {
             $this->Flash->error('Invalid id for section or/and student.');
-            return $this->redirect(array('action' => 'display_sections'));
+            return $this->redirect(['action' => 'displaySections']);
         }
 
-        $section_name = $this->Section->field('Section.name', array('Section.id' => $section_id));
-        //now delete this student from this section from associate table .  check student deletion from section is possible ?
+        $section_name = $this->Sections->find()
+            ->select(['name'])
+            ->where(['Sections.id' => $section_id])
+            ->first()
+            ->name ?? '';
 
-        if ($this->Section->Student->CourseRegistration->ExamResult->isStudenSectionChangePossible(
-            $student_id,
-            $section_id
-        )) {
-            $this->Section->StudentsSection->id = $this->Section->StudentsSection->field(
-                'StudentsSection.id',
-                array('StudentsSection.student_id' => $student_id, 'StudentsSection.section_id' => $section_id)
-            );
-            $this->Section->StudentsSection->delete($this->Section->StudentsSection->id);
-            $this->Flash->success($student_number . ' is deleted from ' . $section_name . ' section.');
-            return $this->redirect(
-                array('controller' => 'students', 'action' => 'student_academic_profile', $student_id)
-            );
+        if ($this->Sections->Students->CourseRegistrations->ExamResults->isStudentSectionChangePossible($student_id, $section_id)) {
+            $studentsSection = $this->Sections->StudentsSections->find()
+                ->where([
+                    'StudentsSections.student_id' => $student_id,
+                    'StudentsSections.section_id' => $section_id,
+                ])
+                ->first();
+            if ($studentsSection) {
+                $this->Sections->StudentsSections->delete($studentsSection);
+                $this->Flash->success("$student_number has been successfully removed from $section_name section.");
+                return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
+            }
         } else {
-            if ($this->Section->Student->CourseRegistration->ExamResult->isRegistredInNameOfSectionAndSubmittedGrade(
-                $student_id,
-                $section_id
-            )) {
-                $this->Flash->error(
-                    $student_number . ' can not be deleted from ' . $section_name . ' section since one or more course registered by the student in this section, his/her grade full submitted.'
-                );
-                $this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $student_id));
+            if ($this->Sections->Students->CourseRegistrations->ExamResults->isRegisteredInNameOfSectionAndSubmittedGrade($student_id, $section_id)) {
+                $this->Flash->error("$student_number cannot be removed from $section_name section because the student is registered for one or more courses in this section, and grades have not been fully submitted.");
+                return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
             } else {
-                $this->Section->StudentsSection->id = $this->Section->StudentsSection->field(
-                    'StudentsSection.id',
-                    array('StudentsSection.student_id' => $student_id, 'StudentsSection.section_id' => $section_id)
-                );
-                $this->Section->StudentsSection->delete($this->Section->StudentsSection->id);
-                $this->Flash->success($student_number . ' is deleted from ' . $section_name . ' section.');
-                return $this->redirect(
-                    array('controller' => 'students', 'action' => 'student_academic_profile', $student_id)
-                );
+                $studentsSection = $this->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $student_id,
+                        'StudentsSections.section_id' => $section_id,
+                    ])
+                    ->first();
+                if ($studentsSection) {
+                    $this->Sections->StudentsSections->delete($studentsSection);
+                    $this->Flash->success("$student_number has been successfully removed from $section_name section.");
+                    return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
+                }
             }
         }
 
-        $this->Flash->error($student_number . ' can not be deleted from ' . $section_name . ' section.');
-        $this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $student_id));
+        $this->Flash->error("$student_number cannot be removed from $section_name section.");
+        return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
     }
 
-    public function move($student_number = null, $previous_section_id = null)
+    public function move(?string $student_number = null, ?int $previous_section_id = null)
     {
-
-        $this->layout = 'ajax';
+        $this->viewBuilder()->setLayout('ajax');
         $student_number = str_replace('-', '/', $student_number);
 
-        $student_id = $this->Section->Student->field('Student.id', array('Student.studentnumber' => $student_number));
-        //find all participating sections and pass as an array
-        //Search using by department and year level as well if user role is not college (use role is department)
+        $student_id = $this->Sections->Students->find()
+            ->select(['id'])
+            ->where(['Students.studentnumber' => $student_number])
+            ->first()
+            ->id ?? null;
 
-
-        $prevSectionsDetail = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $previous_section_id
-            ),
-            'contain' => array(
-                'YearLevel' => array('id', 'name')
-            ),
-            'recursive' => 1
-        ));
+        $prevSectionsDetail = $this->Sections->find()
+            ->where(['Sections.id' => $previous_section_id])
+            ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+            ->first();
 
         if ($this->role_id == ROLE_DEPARTMENT) {
-            $next_year_level_exists = $this->Section->YearLevel->find('first', array(
-                'conditions' => array(
-                    'YearLevel.department_id' => $this->department_id,
-                    'YearLevel.id >' => $prevSectionsDetail['YearLevel']['id']
-                ),
-                'order' => array('YearLevel.id' => 'ASC'),
-                'limit' => 1,
-                'recursive' => -1
-            ));
+            $next_year_level_exists = $this->Sections->YearLevels->find()
+                ->where([
+                    'YearLevels.department_id' => $this->department_id,
+                    'YearLevels.id >' => $prevSectionsDetail->year_level->id,
+                ])
+                ->order(['YearLevels.id' => 'ASC'])
+                ->first();
 
-            //debug($next_year_level_exists['YearLevel']['id']);
+            $next_year_level = [];
 
-            $next_year_level = array();
-
-            if (isset($next_year_level_exists['YearLevel']['id']) && !empty($next_year_level_exists['YearLevel']['id'])) {
-                $next_year_level = $this->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                        'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                        'Section.department_id' => $this->department_id,
-                        'Section.year_level_id' => $next_year_level_exists['YearLevel']['id'],
-                        'Section.academicyear <>' => $prevSectionsDetail['Section']['academicyear'],
-                        'Section.id >' => $prevSectionsDetail['Section']['id'],
-                        'Section.archive' => 0,
-                    ),
-                    'contain' => array(
-                        'YearLevel' => array('id', 'name')
-                    ),
-                    'recursive' => -1
-                ));
+            if (!empty($next_year_level_exists)) {
+                $next_year_level = $this->Sections->find()
+                    ->where([
+                        'Sections.program_id' => $prevSectionsDetail->program_id,
+                        'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.year_level_id' => $next_year_level_exists->id,
+                        'Sections.academicyear <>' => $prevSectionsDetail->academicyear,
+                        'Sections.id >' => $prevSectionsDetail->id,
+                        'Sections.archive' => 0,
+                    ])
+                    ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+                    ->first();
             }
 
-            if (isset($next_year_level) && !empty($next_year_level['Section']['year_level_id'])) {
-                $conditions = array(
-                    //'Section.college_id' => $this->college_id,
-                    'Section.id <>' => $prevSectionsDetail['Section']['id'],
-                    'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                    'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                    'Section.department_id' => $this->department_id,
-                    'Section.year_level_id >= ' => $prevSectionsDetail['YearLevel']['id'],
-                    'Section.year_level_id <= ' => $next_year_level['YearLevel']['id'],
-                    'OR' => array(
-                        'Section.academicyear' => $prevSectionsDetail['Section']['academicyear'],
-                        'Section.academicyear' => $next_year_level['Section']['academicyear'],
-                    ),
-                    'OR' => array(
-                        'Section.curriculum_id IS NULL',
-                        'Section.curriculum_id' => $prevSectionsDetail['Section']['curriculum_id'],
-                    ),
-                    'Section.archive' => 0
-                );
-            } else {
-                $conditions = array(
-                    //'Section.college_id' => $this->college_id,
-                    'Section.id <>' => $prevSectionsDetail['Section']['id'],
-                    'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                    'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                    'Section.department_id' => $this->department_id,
-                    'Section.year_level_id' => $prevSectionsDetail['YearLevel']['id'],
-                    'Section.academicyear' => $prevSectionsDetail['Section']['academicyear'],
-                    'OR' => array(
-                        'Section.curriculum_id IS NULL',
-                        'Section.curriculum_id' => $prevSectionsDetail['Section']['curriculum_id'],
-                    ),
-                    'Section.archive' => 0
-                );
-            }
+            $conditions = (!empty($next_year_level) && !empty($next_year_level->year_level_id)) ? [
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.department_id' => $this->department_id,
+                'Sections.year_level_id >=' => $prevSectionsDetail->year_level->id,
+                'Sections.year_level_id <=' => $next_year_level->year_level->id,
+                'Sections.academicyear IN' => [$prevSectionsDetail->academicyear, $next_year_level->academicyear],
+                'OR' => [
+                    'Sections.curriculum_id IS' => null,
+                    'Sections.curriculum_id' => $prevSectionsDetail->curriculum_id,
+                ],
+                'Sections.archive' => 0,
+            ] : [
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.department_id' => $this->department_id,
+                'Sections.year_level_id' => $prevSectionsDetail->year_level->id,
+                'Sections.academicyear' => $prevSectionsDetail->academicyear,
+                'OR' => [
+                    'Sections.curriculum_id IS' => null,
+                    'Sections.curriculum_id' => $prevSectionsDetail->curriculum_id,
+                ],
+                'Sections.archive' => 0,
+            ];
         } else {
-            $conditions = array(
-                'Section.college_id' => $this->college_id,
-                'Section.id <>' => $prevSectionsDetail['Section']['id'],
-                'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                'Section.academicyear' => $prevSectionsDetail['Section']['academicyear'],
-                'Section.department_id is null',
-                'Section.archive' => 0,
-            );
+            $conditions = [
+                'Sections.college_id' => $this->college_id,
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.academicyear' => $prevSectionsDetail->academicyear,
+                'Sections.department_id IS' => null,
+                'Sections.archive' => 0,
+            ];
         }
 
-        $sections_all = $this->Section->find(
-            'all',
-            array(
-                'conditions' => $conditions,
-                'order' => array(
-                    'Section.academicyear' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-                'contain' => array('YearLevel' => array('id', 'name')),
-                'recursive' => -1
-            )
-        );
+        $sections_all = $this->Sections->find()
+            ->where($conditions)
+            ->order([
+                'Sections.academicyear' => 'ASC',
+                'Sections.year_level_id' => 'ASC',
+                'Sections.id' => 'ASC',
+                'Sections.name' => 'ASC',
+            ])
+            ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+            ->toArray();
 
-        $sections = array();
+        $sections = [];
 
         if (!empty($sections_all)) {
-            foreach ($sections_all as $key => $section) {
-                //debug($sections);
-                $sections[$section['Section']['id']] = $section['Section']['name'] . ' (' . (isset($section['YearLevel']['name']) ? $section['YearLevel']['name'] : ($section['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $section['Section']['academicyear'] . ')';
+            foreach ($sections_all as $section) {
+                $sections[$section->id] = $section->name . ' (' . ($section->year_level->name ?? ($section->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $section->academicyear . ')';
             }
         }
 
-        //unset($sections[$previous_section_id]);
         $this->set(compact('previous_section_id', 'student_id', 'sections', 'student_number'));
     }
 
-    public function move_selected_student_section($previous_section_id = null)
+    public function moveSelectedStudentSection(?int $previous_section_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $studentsections = $this->Sections->getAllActiveStudents($previous_section_id);
 
-        $studentsections = $this->Section->getAllActiveStudents($previous_section_id);
+        $prevSectionsDetail = $this->Sections->find()
+            ->where(['Sections.id' => $previous_section_id])
+            ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+            ->first();
 
-        $prevSectionsDetail = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $previous_section_id
-            ),
-            'contain' => array(
-                'YearLevel' => array('id', 'name')
-            ),
-            'recursive' => 1
-        ));
-
-        $sectionCreatedDate = new DateTime($prevSectionsDetail['Section']['created']);
+        $sectionCreatedDate = new DateTime($prevSectionsDetail->created);
         $sectionCreatedDate->modify('-1 month');
         $sectionCreatedDate = $sectionCreatedDate->format('Y-m-d');
 
-        $student_curriculum_id = null;
-
-        if (count($this->Section->getAllActiveStudents($previous_section_id)['Student'])) {
-            $student_curriculum_id = $this->Section->getAllActiveStudents(
-                $previous_section_id
-            )['Student'][0]['curriculum_id'];
-        }
+        $student_curriculum_id = !empty($this->Sections->getAllActiveStudents($previous_section_id)['students'])
+            ? $this->Sections->getAllActiveStudents($previous_section_id)['students'][0]['curriculum_id']
+            : null;
 
         if ($this->role_id == ROLE_DEPARTMENT) {
-            $next_year_level_exists = $this->Section->YearLevel->find('first', array(
-                'conditions' => array(
-                    'YearLevel.department_id' => $this->department_id,
-                    'YearLevel.id > ' => $prevSectionsDetail['YearLevel']['id']
-                ),
-                'order' => array('YearLevel.id' => 'ASC'),
-                'limit' => 1,
-                'recursive' => -1
-            ));
+            $next_year_level_exists = $this->Sections->YearLevels->find()
+                ->where([
+                    'YearLevels.department_id' => $this->department_id,
+                    'YearLevels.id >' => $prevSectionsDetail->year_level->id,
+                ])
+                ->order(['YearLevels.id' => 'ASC'])
+                ->first();
 
-            $next_year_level = array();
+            $next_year_level = [];
 
-            if (ALLOW_STDENT_SECTION_MOVE_TO_NEXT_YEAR_LEVEL && isset($next_year_level_exists['YearLevel']['id']) && !empty($next_year_level_exists['YearLevel']['id'])) {
-                $next_year_level = $this->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                        'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                        'Section.department_id' => $this->department_id,
-                        'Section.year_level_id' => $next_year_level_exists['YearLevel']['id'],
-                        'Section.academicyear <> ' => $prevSectionsDetail['Section']['academicyear'],
-                        'Section.id > ' => $prevSectionsDetail['Section']['id'],
-                        'Section.archive' => 0,
-                    ),
-                    'contain' => array(
-                        'YearLevel' => array('id', 'name')
-                    ),
-                    'recursive' => -1
-                ));
+            if (ALLOW_STUDENT_SECTION_MOVE_TO_NEXT_YEAR_LEVEL && !empty($next_year_level_exists)) {
+                $next_year_level = $this->Sections->find()
+                    ->where([
+                        'Sections.program_id' => $prevSectionsDetail->program_id,
+                        'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.year_level_id' => $next_year_level_exists->id,
+                        'Sections.academicyear <>' => $prevSectionsDetail->academicyear,
+                        'Sections.id >' => $prevSectionsDetail->id,
+                        'Sections.archive' => 0,
+                    ])
+                    ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+                    ->first();
             }
 
-            if (isset($next_year_level['Section']['year_level_id']) && !empty($next_year_level['Section']['year_level_id'])) {
-                $conditions = array(
-                    'Section.id <>' => $prevSectionsDetail['Section']['id'],
-                    'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                    'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                    'Section.department_id' => $this->department_id,
-                    'Section.year_level_id >= ' => $prevSectionsDetail['YearLevel']['id'],
-                    'Section.year_level_id <= ' => $next_year_level['YearLevel']['id'],
-                    'Section.created > ' => $sectionCreatedDate,
-                    'Section.academicyear' => array(
-                        $prevSectionsDetail['Section']['academicyear'],
-                        $next_year_level['Section']['academicyear']
-                    ),
-                    'OR' => array(
-                        'Section.curriculum_id IS NULL',
-                        'Section.curriculum_id' => $prevSectionsDetail['Section']['curriculum_id']
-                    ),
-                    'Section.archive' => 0
-                );
-            } else {
-                $conditions = array(
-                    'Section.id <> ' => $prevSectionsDetail['Section']['id'],
-                    'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                    'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                    'Section.department_id' => $this->department_id,
-                    'Section.year_level_id' => $prevSectionsDetail['YearLevel']['id'],
-                    'Section.academicyear' => $prevSectionsDetail['Section']['academicyear'],
-                    'OR' => array(
-                        'Section.curriculum_id IS NULL',
-                        'Section.curriculum_id' => array(
-                            $student_curriculum_id,
-                            $prevSectionsDetail['Section']['curriculum_id']
-                        ),
-                    ),
-                    'Section.archive' => 0
-                );
-                debug($conditions);
-            }
+            $conditions = (!empty($next_year_level) && !empty($next_year_level->year_level_id)) ? [
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.department_id' => $this->department_id,
+                'Sections.year_level_id >=' => $prevSectionsDetail->year_level->id,
+                'Sections.year_level_id <=' => $next_year_level->year_level->id,
+                'Sections.created >' => $sectionCreatedDate,
+                'Sections.academicyear IN' => [$prevSectionsDetail->academicyear, $next_year_level->academicyear],
+                'OR' => [
+                    'Sections.curriculum_id IS' => null,
+                    'Sections.curriculum_id' => $prevSectionsDetail->curriculum_id,
+                ],
+                'Sections.archive' => 0,
+            ] : [
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.department_id' => $this->department_id,
+                'Sections.year_level_id' => $prevSectionsDetail->year_level->id,
+                'Sections.academicyear' => $prevSectionsDetail->academicyear,
+                'OR' => [
+                    'Sections.curriculum_id IS' => null,
+                    'Sections.curriculum_id IN' => [$student_curriculum_id, $prevSectionsDetail->curriculum_id],
+                ],
+                'Sections.archive' => 0,
+            ];
         } else {
-            $conditions = array(
-                'Section.college_id' => $this->college_id,
-                'Section.id <> ' => $prevSectionsDetail['Section']['id'],
-                'Section.program_id' => $prevSectionsDetail['Section']['program_id'],
-                'Section.program_type_id' => $prevSectionsDetail['Section']['program_type_id'],
-                'Section.created > ' => $sectionCreatedDate,
-                'Section.academicyear' => $prevSectionsDetail['Section']['academicyear'],
-                'Section.department_id is null',
-                'Section.archive' => 0,
-            );
+            $conditions = [
+                'Sections.college_id' => $this->college_id,
+                'Sections.id <>' => $prevSectionsDetail->id,
+                'Sections.program_id' => $prevSectionsDetail->program_id,
+                'Sections.program_type_id' => $prevSectionsDetail->program_type_id,
+                'Sections.created >' => $sectionCreatedDate,
+                'Sections.academicyear' => $prevSectionsDetail->academicyear,
+                'Sections.department_id IS' => null,
+                'Sections.archive' => 0,
+            ];
         }
 
-        $sections_all = $this->Section->find(
-            'all',
-            array(
-                'conditions' => $conditions,
-                'order' => array(
-                    'Section.year_level_id' => 'ASC',
-                    'Section.academicyear' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-                'contain' => array('YearLevel' => array('id', 'name')),
-                'recursive' => -1
-            )
-        );
+        $sections_all = $this->Sections->find()
+            ->where($conditions)
+            ->order([
+                'Sections.year_level_id' => 'ASC',
+                'Sections.academicyear' => 'ASC',
+                'Sections.id' => 'ASC',
+                'Sections.name' => 'ASC',
+            ])
+            ->contain(['YearLevels' => ['fields' => ['id', 'name']]])
+            ->toArray();
 
-        $sections = array();
+        $sections = [];
 
         if (!empty($sections_all)) {
-            foreach ($sections_all as $key => $section) {
-                $sections[$section['Section']['id']] = $section['Section']['name'] . ' (' . (isset($section['YearLevel']['name']) ? $section['YearLevel']['name'] : ($section['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $section['Section']['academicyear'] . ')  (' . (count(
-                        $this->Section->getAllActiveStudents($section['Section']['id'])['Student']
-                    )) . ')';
+            foreach ($sections_all as $section) {
+                $sections[$section->id] = $section->name . ' (' . ($section->year_level->name ?? ($section->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $section->academicyear . ') (' . count($this->Sections->getAllActiveStudents($section->id)['students']) . ')';
             }
         }
 
-        $previousSectionName = $this->Section->find('first', array(
-                'conditions' => array(
-                    'Section.id' => $previous_section_id
-                ),
-                'contain' => array(
-                    'Program',
-                    'ProgramType',
-                    'YearLevel',
-                    'Department',
-                    'College'
-                )
-            )
-        );
+        $previousSectionName = $this->Sections->find()
+            ->where(['Sections.id' => $previous_section_id])
+            ->contain([
+                'Programs',
+                'ProgramTypes',
+                'YearLevels',
+                'Departments',
+                'Colleges',
+            ])
+            ->first();
 
-        if (!empty($studentsections['Student'])) {
-            foreach ($studentsections['Student'] as $key => $student) {
-                //debug($student['id']);
-                //check registration and grades are full submitted
-                /* $count_registion = ClassRegistry::init('CourseRegistration')->find('count', array('conditions' => array('CourseRegistration.student_id' => $student['id'], 'CourseRegistration.section_id' => $prevSectionsDetail['Section']['id'])));
-				//debug($count_registion);
-				if ($count_registion > 0) {
-					unset($studentsections['Student'][$key]);
-				} */
-
-                if (!$this->Section->chceck_all_registered_added_courses_are_graded(
-                    $student['id'],
-                    $section_id = $prevSectionsDetail['Section']['id'],
-                    $check_for_invalid_grades = 1,
-                    $from_student = ''
-                )) {
-                    unset($studentsections['Student'][$key]);
+        if (!empty($studentsections['students'])) {
+            foreach ($studentsections['students'] as $key => $student) {
+                if (!$this->Sections->checkAllRegisteredAddedCoursesAreGraded($student['id'], $previous_section_id, 1)) {
+                    unset($studentsections['students'][$key]);
                 }
             }
         }
 
-        //unset($sections[$previous_section_id]);
         $this->set(compact('previous_section_id', 'sections', 'previousSectionName', 'studentsections'));
     }
 
-
-    public function move_student_section_to_new($previous_section_id, $student_id)
+    public function moveStudentSectionToNew(int $previous_section_id, int $student_id)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $student = $this->Sections->Students->find()
+            ->where(['Students.id' => $student_id])
+            ->first();
+        $previousSection = $this->Sections->find()
+            ->where(['Sections.id' => $previous_section_id])
+            ->first();
+        $equivalentProgramTypes = $this->getEquivalentProgramTypes($student->program_type_id);
+        $current_academicyear = $this->AcademicYear->currentAcademicYear();
 
-        $students = $this->Section->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
-        $previousSection = $this->Section->find(
-            'first',
-            array('conditions' => array('Section.id' => $previous_section_id), 'recursive' => -1)
-        );
-        $equivalentProgramTypes = $this->__getEquivalentProgramTypes($students['Student']['program_type_id']);
-        $current_academicyear = $this->AcademicYear->current_academicyear();
+        $conditions = [];
 
-        $conditions = array();
-
-        /* if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-			$conditions = array(
-				//'Section.college_id' => $this->college_id,
-				'Section.id <>' => $previous_section_id,
-				'Section.department_id' => $this->department_id,
-				'Section.archive' => 0,
-				'Section.program_id' => $students['Student']['program_id'],
-				'Section.program_type_id' => $equivalentProgramTypes,
-				'Section.academicyear' => $previousSection['Section']['academicyear'],
-				//'Section.year_level_id >=' => $previousSection['Section']['year_level_id'],
-				'Section.year_level_id' => $previousSection['Section']['year_level_id']
-			);
-		} else if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-			if (is_null($students['Student']['department_id'])) {
-				$conditions = array(
-					'Section.college_id' => $this->college_id,
-					'Section.id <>' => $previous_section_id,
-					'Section.archive' => 0,
-					'Section.program_id' => $students['Student']['program_id'],
-					'Section.program_type_id' => $equivalentProgramTypes,
-					'Section.academicyear' => $previousSection['Section']['academicyear'],
-					"OR" => array(
-						"Section.department_id is null",
-						"Section.department_id = ''"
-					)
-				);
-			}
-		} else if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-			if (!empty($this->department_ids)) {
-				$conditions = array(
-					'Section.program_id' => $students['Student']['program_id'],
-					'Section.id <>' => $previous_section_id,
-					'Section.program_type_id' => $equivalentProgramTypes,
-					'Section.academicyear' => $previousSection['Section']['academicyear'],
-					'Section.department_id' => $students['Student']['department_id'],
-					'Section.archive' => 0
-				);
-			} else if (!empty($this->college_ids)) {
-				if (is_null($students['Student']['department_id'])) {
-					$conditions = array(
-						'Section.college_id' => $students['Student']['college_id'],
-						'Section.id <>' => $previous_section_id,
-						'Section.program_id' => $students['Student']['program_id'],
-						'Section.program_type_id' => $equivalentProgramTypes,
-						'Section.academicyear' => $previousSection['Section']['academicyear'],
-						'Section.department_id is null',
-						'Section.archive' => 0
-					);
-				}
-			} else {
-				$conditions = array(
-					'Section.college_id' => $students['Student']['college_id'],
-					'Section.id <>' => $previous_section_id,
-					'Section.program_id' => $students['Student']['program_id'],
-					'Section.program_type_id' => $equivalentProgramTypes,
-					'Section.academicyear' => $previousSection['Section']['academicyear'],
-					'Section.department_id is null',
-					'Section.archive' => 0
-				);
-			}
-		} else {
-		} */
-
-        if (!$previousSection['Section']['archive'] || ($previousSection['Section']['archive'] && $previousSection['Section']['academicyear'] == $current_academicyear)) {
-            if (is_null($students['Student']['department_id']) || empty($students['Student']['department_id'])) {
-                $conditions = array(
-                    'Section.college_id' => $students['Student']['college_id'],
-                    'Section.id <>' => $previous_section_id,
-                    'Section.archive' => 0,
-                    'Section.program_id' => $students['Student']['program_id'],
-                    'Section.program_type_id' => $equivalentProgramTypes,
-                    'Section.academicyear' => $previousSection['Section']['academicyear'],
-                    "OR" => array(
-                        "Section.department_id is null",
-                        "Section.department_id = ''"
-                    )
-                );
-            } else {
-                $conditions = array(
-                    'Section.department_id' => $students['Student']['department_id'],
-                    'Section.id <>' => $previous_section_id,
-                    'Section.archive' => 0,
-                    'Section.program_id' => $students['Student']['program_id'],
-                    'Section.program_type_id' => $equivalentProgramTypes,
-                    'Section.academicyear' => $previousSection['Section']['academicyear'],
-                    'Section.year_level_id' => $previousSection['Section']['year_level_id']
-                );
-            }
-        } else {
-            if ($previousSection['Section']['archive'] && $previousSection['Section']['academicyear'] != $current_academicyear) {
-                if (is_null($students['Student']['department_id']) || empty($students['Student']['department_id'])) {
-                    $conditions = array(
-                        'Section.college_id' => $students['Student']['college_id'],
-                        'Section.id <>' => $previous_section_id,
-                        'Section.archive' => 0,
-                        'Section.program_id' => $students['Student']['program_id'],
-                        'Section.program_type_id' => $equivalentProgramTypes,
-                        'Section.academicyear' => $current_academicyear,
-                        "OR" => array(
-                            "Section.department_id is null",
-                            "Section.department_id = ''"
-                        )
-                    );
-                } else {
-                    $conditions = array(
-                        'Section.department_id' => $students['Student']['department_id'],
-                        'Section.id <>' => $previous_section_id,
-                        'Section.archive' => 0,
-                        'Section.program_id' => $students['Student']['program_id'],
-                        'Section.program_type_id' => $equivalentProgramTypes,
-                        'Section.academicyear' => $current_academicyear,
-                        'Section.year_level_id >' => $previousSection['Section']['year_level_id']
-                    );
-                }
-            }
+        if (!$previousSection->archive || ($previousSection->archive && $previousSection->academicyear == $current_academicyear)) {
+            $conditions = (empty($student->department_id)) ? [
+                'Sections.college_id' => $student->college_id,
+                'Sections.id <>' => $previous_section_id,
+                'Sections.archive' => 0,
+                'Sections.program_id' => $student->program_id,
+                'Sections.program_type_id IN' => $equivalentProgramTypes,
+                'Sections.academicyear' => $previousSection->academicyear,
+                'OR' => [
+                    'Sections.department_id IS' => null,
+                    'Sections.department_id' => '',
+                ],
+            ] : [
+                'Sections.department_id' => $student->department_id,
+                'Sections.id <>' => $previous_section_id,
+                'Sections.archive' => 0,
+                'Sections.program_id' => $student->program_id,
+                'Sections.program_type_id IN' => $equivalentProgramTypes,
+                'Sections.academicyear' => $previousSection->academicyear,
+                'Sections.year_level_id' => $previousSection->year_level_id,
+            ];
+        } elseif ($previousSection->archive && $previousSection->academicyear != $current_academicyear) {
+            $conditions = (empty($student->department_id)) ? [
+                'Sections.college_id' => $student->college_id,
+                'Sections.id <>' => $previous_section_id,
+                'Sections.archive' => 0,
+                'Sections.program_id' => $student->program_id,
+                'Sections.program_type_id IN' => $equivalentProgramTypes,
+                'Sections.academicyear' => $current_academicyear,
+                'OR' => [
+                    'Sections.department_id IS' => null,
+                    'Sections.department_id' => '',
+                ],
+            ] : [
+                'Sections.department_id' => $student->department_id,
+                'Sections.id <>' => $previous_section_id,
+                'Sections.archive' => 0,
+                'Sections.program_id' => $student->program_id,
+                'Sections.program_type_id IN' => $equivalentProgramTypes,
+                'Sections.academicyear' => $current_academicyear,
+                'Sections.year_level_id >' => $previousSection->year_level_id,
+            ];
         }
 
-        $sectionsList = array();
+        $sectionsList = [];
 
         if (!empty($conditions)) {
-            $sectionsList = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'contain' => array('YearLevel'),
-                'order' => array(
-                    //'Section.created' => 'DESC',
-                    'Section.academicyear' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.college_id' => 'ASC',
-                    'Section.department_id' => 'ASC',
-                    'Section.program_id' => 'ASC',
-                    'Section.program_type_id' => 'ASC',
-                    'Section.name' => 'ASC',
-                    'Section.id' => 'ASC',
-                ),
-            ));
+            $sectionsList = $this->Sections->find()
+                ->where($conditions)
+                ->contain(['YearLevels'])
+                ->order([
+                    'Sections.academicyear' => 'ASC',
+                    'Sections.year_level_id' => 'ASC',
+                    'Sections.college_id' => 'ASC',
+                    'Sections.department_id' => 'ASC',
+                    'Sections.program_id' => 'ASC',
+                    'Sections.program_type_id' => 'ASC',
+                    'Sections.name' => 'ASC',
+                    'Sections.id' => 'ASC',
+                ])
+                ->toArray();
         }
 
-        $sections = array();
+        $sections = [];
 
         if (!empty($sectionsList)) {
-            foreach ($sectionsList as $k => $v) {
-                $sections[$v['Section']['id']] = $v['Section']['name'] . ' (' . (isset ($v['YearLevel']) && !empty($v['YearLevel']['name']) ? $v['YearLevel']['name'] : ($v['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $v['Section']['academicyear'] . ')';
+            foreach ($sectionsList as $v) {
+                $sections[$v->id] = trim($v->name) . ' (' . ($v->year_level->name ?? ($v->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $v->academicyear . ')';
             }
         }
 
-        $previousSectionName = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $previous_section_id
-            ),
-            'contain' => array(
-                'Program',
-                'ProgramType',
-                'YearLevel',
-                'Department',
-                'College'
-            )
-        ));
+        $previousSectionName = $this->Sections->find()
+            ->where(['Sections.id' => $previous_section_id])
+            ->contain([
+                'Programs',
+                'ProgramTypes',
+                'YearLevels',
+                'Departments',
+                'Colleges',
+            ])
+            ->first();
 
-        $this->set(
-            compact(
-                'previous_section_id',
-                'sections',
-                'previousSectionName',
-                'students'
-            )
-        );
+        $this->set(compact(
+            'previous_section_id',
+            'sections',
+            'previousSectionName',
+            'student'
+        ));
     }
 
-
-    public function __getEquivalentProgramTypes($program_type_id = 0)
+    private function getEquivalentProgramTypes(int $program_type_id = 0): array
     {
+        $program_types_to_look = [];
 
-        $program_types_to_look = array();
-
-        $equivalentProgramType = unserialize(
-            $this->Section->Student->ProgramType->field(
-                'ProgramType.equivalent_to_id',
-                array('ProgramType.id' => $program_type_id)
-            )
-        );
+        $equivalentProgramType = unserialize($this->Sections->ProgramTypes->find()
+            ->select(['equivalent_to_id'])
+            ->where(['ProgramTypes.id' => $program_type_id])
+            ->first()
+            ->equivalent_to_id ?? '');
 
         if (!empty($equivalentProgramType)) {
-            $selected_program_type_array = array();
-            $selected_program_type_array[] = $program_type_id;
+            $selected_program_type_array = [$program_type_id];
             $program_types_to_look = array_merge($selected_program_type_array, $equivalentProgramType);
         } else {
             $program_types_to_look[] = $program_type_id;
         }
 
-        debug($program_types_to_look);
-
+        // debug($program_types_to_look);
         return $program_types_to_look;
     }
 
-
-    /*
-	public function section_move_update()
-	{
-		if (!empty($this->request->data)) {
-			$selected_section_curriculum = $this->Section->get_section_curriculum($this->request->data['Section']['Selected_section_id']);
-
-			$isSectionCollegeSection = $this->Section->find('count', array(
-				'conditions' => array(
-					'Section.id' => $this->request->data['Section']['Selected_section_id'],
-					'Section.department_id is null',
-					'Section.college_id' => $this->college_id
-				)
-			));
-
-			if (!empty($selected_section_curriculum) || $isSectionCollegeSection > 0) {
-
-				$previous_section_curriculum = $this->Section->get_section_curriculum($this->request->data['Section']['previous_section_id']);
-
-				$similarAcademicYear = false;
-				$sameCurriculum = false;
-
-				$college_selected_section = $this->Section->field('academicyear', array(
-					'Section.id' => $this->request->data['Section']['Selected_section_id'],
-					'Section.department_id is null',
-					'Section.college_id' => $this->college_id
-				));
-
-				$college_previous_section_selected = $this->Section->field('academicyear', array(
-					'Section.id' => $this->request->data['Section']['previous_section_id'],
-					'Section.department_id is null',
-					'Section.college_id' => $this->college_id
-				));
-
-				if ((!empty($previous_section_curriculum) && !empty($selected_section_curriculum)) && ($previous_section_curriculum == $selected_section_curriculum)) {
-					$sameCurriculum = true;
-				}
-
-
-				if (strcasecmp($college_selected_section, $college_previous_section_selected) === 0) {
-					$similarAcademicYear = true;
-				}
-
-				$student_full_name = $this->Section->Student->field('Student.full_name', array('Student.id' => $this->request->data['Section']['student_id']));
-				$new_section_name = $this->Section->field('Section.name', array('Section.id' => $this->request->data['Section']['Selected_section_id']));
-
-				if ($sameCurriculum || $similarAcademicYear ) {
-
-					if ($this->Section->isMoveAllowed($this->request->data['Section']['previous_section_id'], $this->request->data['Section']['student_id'], $this->request->data['Section']['Selected_section_id'])) {
-
-						$preparedForSave = $this->Section->isMoveAllowed($this->request->data['Section']['previous_section_id'], $this->request->data['Section']['student_id'], $this->request->data['Section']['Selected_section_id']);
-
-						$this->request->data['StudentsSection']['student_id'] = $this->request->data['Section']['student_id'];
-						$this->request->data['StudentsSection']['section_id'] = $this->request->data['Section']['Selected_section_id'];
-
-						$transaction = false;
-
-						if ($preparedForSave !== true) {
-							// synchronize the course registration table with published course
-							if ($this->Section->Student->CourseRegistration->saveAll($preparedForSave['CourseRegistration'])) {
-								// do the move if course registration is succeeded.
-								//To check whether the record is already there as archive, if so just turnoff the archive is enough
-								$already_recorded_id = $this->_check_the_record_in_archive($this->request->data['StudentsSection']['section_id'], $this->request->data['StudentsSection']['student_id']);
-
-								if (!empty($already_recorded_id)) {
-									$this->Section->StudentsSection->id = $already_recorded_id;
-									$this->Section->StudentsSection->saveField('archive', '0');
-								} else {
-									$this->Section->StudentsSection->save($this->request->data['StudentsSection']);
-								}
-								$transaction = true;
-
-							} else {
-								$this->Flash->error('Synchronization problem, students course regisration is not synchronized with published courses.');
-								$this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-							}
-						}
-
-						if ($preparedForSave == 3) {
-							$transaction = true;
-							//To check whether the record is already there as archive, if so just turnoff the archive is enough
-							$already_recorded_id = $this->_check_the_record_in_archive($this->request->data['StudentsSection']['section_id'], $this->request->data['StudentsSection']['student_id']);
-
-							if (!empty($already_recorded_id)) {
-								$this->Section->StudentsSection->id = $already_recorded_id;
-								$this->Section->StudentsSection->saveField('archive', '0');
-							} else {
-								$this->Section->StudentsSection->save($this->request->data['StudentsSection']);
-							}
-						}
-
-						//$this->Section->StudentsSection->save($this->request->data['StudentsSection']);
-						//now delete this student from previous section from associate table
-						//check student deletion from section is possible ?
-
-						$previous_section_name = $this->Section->field('Section.name', array('Section.id' => $this->request->data['Section']['previous_section_id']));
-
-						if ($transaction) {
-							if (!$this->Section->Student->CourseRegistration->ExamGrade->isCourseGradeSubmitted($this->request->data['Section']['student_id'], $this->request->data['Section']['previous_section_id'])) {
-
-								$this->Section->StudentsSection->id = $this->Section->StudentsSection->field('StudentsSection.id', array(
-									'StudentsSection.student_id' => $this->request->data['Section']['student_id'],
-									'StudentsSection.section_id' => $this->request->data['Section']['previous_section_id'],
-									'StudentsSection.archive' => 0
-								));
-
-								$this->Section->StudentsSection->delete($this->Section->StudentsSection->id);
-							} else {
-								$this->Section->StudentsSection->id = $this->Section->StudentsSection->field('StudentsSection.id', array(
-									'StudentsSection.student_id' => $this->request->data['Section']['student_id'],
-									'StudentsSection.section_id' => $this->request->data['Section']['previous_section_id'],
-									'StudentsSection.archive' => 0
-								));
-								$this->Section->StudentsSection->saveField('archive', '1');
-							}
-
-							$this->Flash->success($student_full_name . ' is moved from  ' . $previous_section_name . ' section to section ' . $new_section_name . '.');
-							$this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-
-						} else {
-							$this->Flash->error($student_full_name . ' could\'t be moved from ' .$previous_section_name . ' to Section ' . $new_section_name . ' something went wrong, please try again.');
-							$this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-						}
-					} else {
-						$error = $this->Section->invalidFields();
-						if (isset($error['move_not_allowed'])) {
-							$this->Flash->error($error['move_not_allowed'][0]);
-						}
-						$this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-					}
-				} else {
-
-					$new_section_curriculum_name = $this->Section->Student->Curriculum->field('Curriculum.curriculum_detail', array('Curriculum.id' => $selected_section_curriculum));
-					$student_curriculum_name = $this->Section->Student->Curriculum->field('Curriculum.curriculum_detail', array('Curriculum.id' => $previous_section_curriculum));
-
-					if ($this->role_id == ROLE_DEPARTMENT) {
-						$this->Flash->error($student_full_name . ' will not be moved to ' . $new_section_name . ' section. Because The student attached curriculum  "' . $student_curriculum_name . '" is different from ' . $new_section_name . ' attached section curiculum "' . $new_section_curriculum_name. '".');
-					} else if ($this->role_id == ROLE_COLLEGE) {
-						//$college_selected_section, $college_previous_section_selected
-						$this->Flash->error($student_full_name . ' will not beto moved to ' . $new_section_name . ' section. The student is accepted in ' . $college_selected_section . ' academic year, which is different from Section ' . $new_section_name . ' ' . $college_previous_section_selected . ' academic year "' . $new_section_curriculum_name. '".');
-					}
-					return $this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-				}
-			} else {
-
-				$student_full_name = $this->Section->Student->field('Student.full_name', array('Student.id' => $this->request->data['Section']['student_id']));
-				$new_section_name = $this->Section->field('Section.name', array('Section.id' => $this->request->data['Section']['Selected_section_id']));
-
-				if ($this->role_id == ROLE_DEPARTMENT) {
-					$this->Flash->error($student_full_name . ' will not be moved to ' . $new_section_name . ' section. The target section is empty.');
-				} else if ($this->role_id == ROLE_COLLEGE) {
-					$this->Flash->error($student_full_name . ' will not be moved to ' . $new_section_name . ' section. The target section batch is different.');
-				}
-
-				$this->redirect(array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id']));
-			}
-		}
-	}
-	*/
-
-
-    public function section_move_update()
+    public function sectionMoveUpdate()
     {
+        if (!empty($this->request->getData()) && $this->request->getData('move_to_section')) {
+            // debug($this->request->getData('Section'));
+            $selectedStudents = $this->request->getData();
 
-        if (!empty($this->request->data) && isset($this->request->data['move_to_section'])) {
-            debug($this->request->data['Section']);
-            $selectedStudents = $this->request->data;
-
-            unset($selectedStudents['Section']['Selected_section_id']);
-            unset($selectedStudents['Section']['previous_section_id']);
-            unset($selectedStudents['Section']['SelectAll']);
-
-            $selectedStudentsId = array();
+            $selectedStudentsId = [];
             $selected_student_id = '';
 
             if (!empty($selectedStudents['Section'])) {
-                foreach ($selectedStudents['Section'] as $ss => $vv) {
+                foreach ($selectedStudents['Section'] as $vv) {
                     if (!empty($vv['selected_id'])) {
                         $selectedStudentsId[] = $vv['student_id'];
                         $selected_student_id = $vv['student_id'];
@@ -4321,205 +2849,168 @@ class SectionsController extends AppController
                 $selectedStudentsId[] = $selectedStudents['Section']['student_id'];
             }
 
-            if ($this->Section->isSectionMoveAllowedM(
-                $this->request->data['Section']['previous_section_id'],
-                $selectedStudentsId,
-                $this->request->data['Section']['Selected_section_id']
-            )) {
-                $new_section_name = $this->Section->field(
-                    'Section.name',
-                    array('Section.id' => $this->request->data['Section']['Selected_section_id'])
-                );
-                $previous_section_name = $this->Section->field(
-                    'Section.name',
-                    array('Section.id' => $this->request->data['Section']['previous_section_id'])
-                );
-                $this->Flash->success(
-                    'The selected student is moved from ' . $previous_section_name . ' section to ' . $new_section_name . ' section.'
-                );
+            if ($this->Sections->isSectionMoveAllowed($this->request->getData('Section.previous_section_id'), $selectedStudentsId, $this->request->getData('Section.Selected_section_id'))) {
+                $new_section_name = $this->Sections->find()
+                    ->select(['name'])
+                    ->where(['Sections.id' => $this->request->getData('Section.Selected_section_id')])
+                    ->first()
+                    ->name;
+                $previous_section_name = $this->Sections->find()
+                    ->select(['name'])
+                    ->where(['Sections.id' => $this->request->getData('Section.previous_section_id')])
+                    ->first()
+                    ->name;
+                $this->Flash->success("The selected student is moved from $previous_section_name section to $new_section_name section.");
             } else {
-                $error = $this->Section->invalidFields();
-                if (isset($error['move_not_allowed'])) {
-                    $this->Flash->error($error['move_not_allowed'][0]);
+                $errors = $this->Sections->validationErrors;
+                if (isset($errors['move_not_allowed'])) {
+                    $this->Flash->error($errors['move_not_allowed'][0]);
                 }
             }
 
-            $this->redirect(
-                array('controller' => 'students', 'action' => 'student_academic_profile', $selected_student_id)
-            );
-        } else {
-            if (!empty($this->request->data) && !isset($this->request->data['move_to_section'])) {
-                $selected_section_curriculum = $this->Section->get_section_curriculum(
-                    $this->request->data['Section']['Selected_section_id']
-                );
+            return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $selected_student_id]);
+        } elseif (!empty($this->request->getData())) {
+            $selected_section_curriculum = $this->Sections->getSectionCurriculum($this->request->getData('Section.Selected_section_id'));
 
-                $isSectionCollegeSection = $this->Section->find('count', array(
-                    'conditions' => array(
-                        'Section.id' => $this->request->data['Section']['Selected_section_id'],
-                        'Section.department_id is null',
-                        'Section.college_id' => $this->college_id
-                    )
-                ));
+            $isSectionCollegeSection = $this->Sections->find()
+                ->where([
+                    'Sections.id' => $this->request->getData('Section.Selected_section_id'),
+                    'Sections.department_id IS' => null,
+                    'Sections.college_id' => $this->college_id,
+                ])
+                ->count();
 
-                if (!empty($selected_section_curriculum) || $isSectionCollegeSection > 0) {
-                    $previous_section_curriculum = $this->Section->get_section_curriculum(
-                        $this->request->data['Section']['previous_section_id']
-                    );
-                    $similarAcademicYear = false;
-                    $sameCurriculum = false;
+            if (!empty($selected_section_curriculum) || $isSectionCollegeSection > 0) {
+                $previous_section_curriculum = $this->Sections->getSectionCurriculum($this->request->getData('Section.previous_section_id'));
+                $similarAcademicYear = false;
+                $sameCurriculum = false;
 
-                    $college_selected_section = $this->Section->field('academicyear', array(
-                        'Section.id' => $this->request->data['Section']['Selected_section_id'],
-                        'Section.department_id is null',
-                        'Section.college_id' => $this->college_id
-                    ));
+                $college_selected_section = $this->Sections->find()
+                    ->select(['academicyear'])
+                    ->where([
+                        'Sections.id' => $this->request->getData('Section.Selected_section_id'),
+                        'Sections.department_id IS' => null,
+                        'Sections.college_id' => $this->college_id,
+                    ])
+                    ->first()
+                    ->academicyear ?? '';
 
-                    $college_previous_section_selected = $this->Section->field('academicyear', array(
-                        'Section.id' => $this->request->data['Section']['previous_section_id'],
-                        'Section.department_id is null',
-                        'Section.college_id' => $this->college_id
-                    ));
+                $college_previous_section_selected = $this->Sections->find()
+                    ->select(['academicyear'])
+                    ->where([
+                        'Sections.id' => $this->request->getData('Section.previous_section_id'),
+                        'Sections.department_id IS' => null,
+                        'Sections.college_id' => $this->college_id,
+                    ])
+                    ->first()
+                    ->academicyear ?? '';
 
-                    if ($selected_section_curriculum == "nostudentinsection" && !empty($previous_section_curriculum)) {
-                        $selected_section_curriculum = $previous_section_curriculum;
-                    }
+                if ($selected_section_curriculum == "nostudentinsection" && !empty($previous_section_curriculum)) {
+                    $selected_section_curriculum = $previous_section_curriculum;
+                }
 
-                    if ((!empty($previous_section_curriculum) && !empty($selected_section_curriculum)) && ($previous_section_curriculum == $selected_section_curriculum)) {
-                        $sameCurriculum = true;
-                    }
+                if (!empty($previous_section_curriculum) && !empty($selected_section_curriculum) && $previous_section_curriculum == $selected_section_curriculum) {
+                    $sameCurriculum = true;
+                }
 
-                    if (strcasecmp($college_selected_section, $college_previous_section_selected) === 0) {
-                        $similarAcademicYear = true;
-                    }
+                if (strcasecmp($college_selected_section, $college_previous_section_selected) === 0) {
+                    $similarAcademicYear = true;
+                }
 
-                    if ($sameCurriculum || $similarAcademicYear) {
-                        $selectedStudents = $this->request->data;
+                if ($sameCurriculum || $similarAcademicYear) {
+                    $selectedStudents = $this->request->getData();
 
-                        unset($selectedStudents['Section']['Selected_section_id']);
-                        unset($selectedStudents['Section']['previous_section_id']);
-                        unset($selectedStudents['Section']['SelectAll']);
+                    $selectedStudentsId = [];
 
-                        $selectedStudentsId = array();
-
-                        if (!empty($selectedStudents['Section'])) {
-                            foreach ($selectedStudents['Section'] as $ss => $vv) {
-                                if (!empty($vv['selected_id'])) {
-                                    $selectedStudentsId[] = $vv['student_id'];
-                                }
+                    if (!empty($selectedStudents['Section'])) {
+                        foreach ($selectedStudents['Section'] as $vv) {
+                            if (!empty($vv['selected_id'])) {
+                                $selectedStudentsId[] = $vv['student_id'];
                             }
                         }
+                    }
 
-                        if (empty($selectedStudentsId)) {
-                            $selectedStudentsId[] = $selectedStudents['Section']['student_id'];
-                        }
+                    if (empty($selectedStudentsId)) {
+                        $selectedStudentsId[] = $selectedStudents['Section']['student_id'];
+                    }
 
-                        if ($this->Section->isSectionMoveAllowedM(
-                            $this->request->data['Section']['previous_section_id'],
-                            $selectedStudentsId,
-                            $this->request->data['Section']['Selected_section_id']
-                        )) {
-                            $new_section_name = $this->Section->field(
-                                'Section.name',
-                                array('Section.id' => $this->request->data['Section']['Selected_section_id'])
-                            );
-                            $previous_section_name = $this->Section->field(
-                                'Section.name',
-                                array('Section.id' => $this->request->data['Section']['previous_section_id'])
-                            );
-                            $this->Flash->success(
-                                'The selected student is moved from ' . $previous_section_name . ' section to ' . $new_section_name . ' section.'
-                            );
-                            $this->redirect(
-                                array(
-                                    'action' => 'display_sections',
-                                    $this->request->data['Section']['Selected_section_id']
-                                )
-                            );
-                        } else {
-                            $error = $this->Section->invalidFields();
-                            if (isset($error['move_not_allowed'])) {
-                                $this->Flash->error($error['move_not_allowed'][0]);
-                            }
-                            $this->redirect(
-                                array(
-                                    'action' => 'display_sections',
-                                    $this->request->data['Section']['Selected_section_id']
-                                )
-                            );
-                        }
+                    if ($this->Sections->isSectionMoveAllowed($this->request->getData('Section.previous_section_id'), $selectedStudentsId, $this->request->getData('Section.Selected_section_id'))) {
+                        $new_section_name = $this->Sections->find()
+                            ->select(['name'])
+                            ->where(['Sections.id' => $this->request->getData('Section.Selected_section_id')])
+                            ->first()
+                            ->name;
+                        $previous_section_name = $this->Sections->find()
+                            ->select(['name'])
+                            ->where(['Sections.id' => $this->request->getData('Section.previous_section_id')])
+                            ->first()
+                            ->name;
+                        $this->Flash->success("The selected student is moved from $previous_section_name section to $new_section_name section.");
+                        return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.Selected_section_id')]);
                     } else {
-                        $new_section_name = $this->Section->field(
-                            'Section.name',
-                            array('Section.id' => $this->request->data['Section']['Selected_section_id'])
-                        );
-                        $new_section_curriculum_name = $this->Section->Student->Curriculum->field(
-                            'Curriculum.curriculum_detail',
-                            array('Curriculum.id' => $selected_section_curriculum)
-                        );
-                        $student_curriculum_name = $this->Section->Student->Curriculum->field(
-                            'Curriculum.curriculum_detail',
-                            array('Curriculum.id' => $previous_section_curriculum)
-                        );
-
-                        if ($this->role_id == ROLE_DEPARTMENT) {
-                            $this->Flash->error(
-                                'The selected student will not be moved to ' . $new_section_name . ' section. The student attached curriculum "' . $student_curriculum_name . '" curriculum is different from ' . $new_section_name . ' section attached curiculum "' . $new_section_curriculum_name . '".'
-                            );
-                        } else {
-                            if ($this->role_id == ROLE_COLLEGE) {
-                                $this->Flash->error(
-                                    'The selected student will not be moved to ' . $new_section_name . ' section.' . $college_selected_section . ' sections academic year is different from ' . $new_section_name . ' section academic year,  ' . $college_previous_section_selected . '.'
-                                );
-                            }
+                        $errors = $this->Sections->validationErrors;
+                        if (isset($errors['move_not_allowed'])) {
+                            $this->Flash->error($errors['move_not_allowed'][0]);
                         }
-                        return $this->redirect(
-                            array(
-                                'action' => 'display_sections',
-                                $this->request->data['Section']['Selected_section_id']
-                            )
-                        );
+                        return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.Selected_section_id')]);
                     }
                 } else {
-                    $new_section_name = $this->Section->field(
-                        'Section.name',
-                        array('Section.id' => $this->request->data['Section']['Selected_section_id'])
-                    );
+                    $new_section_name = $this->Sections->find()
+                        ->select(['name'])
+                        ->where(['Sections.id' => $this->request->getData('Section.Selected_section_id')])
+                        ->first()
+                        ->name;
+                    $new_section_curriculum_name = $this->Sections->Students->Curriculums->find()
+                        ->select(['curriculum_detail'])
+                        ->where(['Curriculums.id' => $selected_section_curriculum])
+                        ->first()
+                        ->curriculum_detail ?? '';
+                    $student_curriculum_name = $this->Sections->Students->Curriculums->find()
+                        ->select(['curriculum_detail'])
+                        ->where(['Curriculums.id' => $previous_section_curriculum])
+                        ->first()
+                        ->curriculum_detail ?? '';
 
                     if ($this->role_id == ROLE_DEPARTMENT) {
-                        $this->Flash->error(
-                            'The selected student will not be moved to ' . $new_section_name . ' section . The target section is empty.'
-                        );
-                    } else {
-                        if ($this->role_id == ROLE_COLLEGE) {
-                            $this->Flash->error(
-                                'The selected student will not be moved to ' . $new_section_name . '. The target section academic year is different.'
-                            );
-                        }
+                        $this->Flash->error("The selected student will not be moved to $new_section_name section. The student attached curriculum \"$student_curriculum_name\" is different from $new_section_name section attached curriculum \"$new_section_curriculum_name\".");
+                    } elseif ($this->role_id == ROLE_COLLEGE) {
+                        $this->Flash->error("The selected student will not be moved to $new_section_name section. $college_selected_section sections academic year is different from $new_section_name section academic year, $college_previous_section_selected.");
                     }
-
-                    $this->redirect(
-                        array('action' => 'display_sections', $this->request->data['Section']['Selected_section_id'])
-                    );
+                    return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.Selected_section_id')]);
                 }
+            } else {
+                $new_section_name = $this->Sections->find()
+                    ->select(['name'])
+                    ->where(['Sections.id' => $this->request->getData('Section.Selected_section_id')])
+                    ->first()
+                    ->name;
+
+                if ($this->role_id == ROLE_DEPARTMENT) {
+                    $this->Flash->error("The selected student will not be moved to $new_section_name section. The target section is empty.");
+                } elseif ($this->role_id == ROLE_COLLEGE) {
+                    $this->Flash->error("The selected student will not be moved to $new_section_name. The target section academic year is different.");
+                }
+
+                return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.Selected_section_id')]);
             }
         }
     }
 
-    public function add_student_to_section($student_id)
-    {
 
-        $this->layout = 'ajax';
+    public function addStudentToSection(int $student_id)
+    {
+        $this->viewBuilder()->setLayout('ajax');
 
         $is_student_dismissed = 0;
         $is_student_readmitted = 0;
-        $sectionOrganized = array();
+        $sectionOrganized = [];
         $prefreshStudent = 0;
         $studentNeedsSectionAssignment = 0;
         $currentYearLevelID = null;
         $yearLevelQueryOperator = '>=';
-        $last_student_status = array();
+        $last_student_status = [];
         $studentMustHaveCurriculum = 1;
-        $curriculumYearLevels = array();
+        $curriculumYearLevels = [];
         $statusGeneratedForLastRegistration = 0;
 
         $lastRegisteredYearLevelID = '';
@@ -4529,764 +3020,677 @@ class SectionsController extends AppController
         $lastReadmittedAcademicYear = '';
         $lastReadmittedSemester = '';
         $lastReadmittedDate = '';
-        $possibleAcademicYears = array();
+        $possibleAcademicYears = [];
         $student_attached_curriculum_name = '';
         $student_have_invalid_grade = 0;
         $lastRegisteredYearLevelName = '';
 
         $checkOnlyRegisteredPassFailGradeType = null;
 
+        $curr_academic_year = $this->AcademicYear->currentAcademicYear();
 
-        //$this->Section->Student->bindModel(array('hasMany' => array('StudentsSection' => array('conditions' => array('StudentsSection.archive' => array(0,1))))));
+        $student_detail = $this->Sections->Students->find()
+            ->where(['Students.id' => $student_id])
+            ->contain([
+                'AcceptedStudents' => ['fields' => ['id', 'studentnumber', 'academicyear']],
+                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                'Programs' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name']],
+                'Departments' => ['fields' => ['id', 'name', 'allow_year_based_curriculums']],
+                'Sections' => [
+                    'sort' => [
+                        'Sections.academicyear' => 'DESC',
+                        'Sections.year_level_id' => 'ASC',
+                        'Sections.id' => 'ASC',
+                        'Sections.name' => 'ASC'
+                    ],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                ],
+                'CourseRegistrations' => function ($q) {
+                    return $q
+                        ->select([
+                            'id',
+                            'year_level_id',
+                            'student_id',
+                            'section_id',
+                            'semester',
+                            'academic_year',
+                            'published_course_id',
+                            'created'
+                        ])
+                        ->order([
+                            'CourseRegistrations.academic_year' => 'DESC',
+                            'CourseRegistrations.semester' => 'DESC',
+                            'CourseRegistrations.id' => 'DESC'
+                        ])
+                        ->limit(1);
+                },
+                'CourseExemptions' => function ($q) {
+                    return $q
+                        ->where(['CourseExemptions.registrar_confirm_deny' => 1])
+                        ->select(['id','student_id', 'taken_course_title', 'request_date'])
+                        ->limit(1);
+                },
+                'Readmissions' => function ($q) {
+                    return $q
+                        ->where(['Readmissions.registrar_approval' => 1,
+                            'Readmissions.academic_commision_approval' => 1,])
+                        ->select( ['student_id', 'academic_year', 'semester', 'registrar_approval_date', 'modified'])
+                        ->limit(1);
+                },
+            ])
+            ->select([
+                'Students.id',
+                'Students.studentnumber',
+                'Students.first_name', // Add for full_name
+                'Students.middle_name',
+                'Students.last_name',
+                'Students.curriculum_id',
+                'Students.department_id',
+                'Students.college_id',
+                'Students.program_id',
+                'Students.program_type_id',
+                'Students.gender',
+                'Students.graduated',
+                'Students.academicyear',
+                'Students.admissionyear',
+            ])->enableAutoFields(true) // Ensures virtual fields are included
+            ->first();
 
-        $student_detail = $this->Section->Student->find('first', array(
-            'conditions' => array(
-                'Student.id' => $student_id
-            ),
-            'contain' => array(
-                'AcceptedStudent' => array('id', 'studentnumber', 'academicyear'),
-                'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                'Program' => array('id', 'name'),
-                'ProgramType' => array('id', 'name'),
-                'Section' => array(
-                    'fields' => array(
-                        'Section.id',
-                        'Section.name',
-                        'Section.year_level_id',
-                        'Section.academicyear',
-                        'Section.college_id',
-                        'Section.department_id',
-                        'Section.curriculum_id',
-                        'Section.created',
-                        'Section.archive'
-                    ),
-                    'order' => array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.id' => 'ASC',
-                        'Section.name' => 'ASC'
-                    ),
-                    'YearLevel' => array('fields' => array('id', 'name'))
-                ),
-                'CourseRegistration' => array(
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'DESC',
-                        'CourseRegistration.semester' => 'DESC',
-                        'CourseRegistration.id' => 'DESC',
-                    ),
-                    'fields' => array(
-                        'id',
-                        'year_level_id',
-                        'student_id',
-                        'section_id',
-                        'semester',
-                        'academic_year',
-                        'published_course_id',
-                        'created'
-                    ),
-                    'limit' => 1
-                ),
-                'Readmission' => array(
-                    'conditions' => array(
-                        'Readmission.registrar_approval' => 1,
-                        'Readmission.academic_commision_approval' => 1,
-                    ),
-                    'fields' => array('student_id', 'academic_year', 'semester', 'registrar_approval_date', 'modified'),
-                    'order' => array('Readmission.modified' => 'DESC')
-                )
-            ),
-            'fields' => array(
-                'Student.studentnumber',
-                'Student.full_name',
-                'Student.curriculum_id',
-                'Student.department_id',
-                'Student.college_id',
-                'Student.program_id',
-                'Student.program_type_id',
-                'Student.gender',
-                'Student.graduated',
-                'Student.academicyear',
-                'Student.admissionyear',
-            ),
-        ));
+        // debug($student_detail);
 
-        //debug($student_detail);
+        $program_types_to_look = $this->getEquivalentProgramTypes($student_detail->program_type_id);
+        // debug($program_types_to_look);
 
-        $program_types_to_look = $this->__getEquivalentProgramTypes($student_detail['Student']['program_type_id']);
-        //debug($program_types_to_look);
-
-        if (is_null(
-                $student_detail['Student']['department_id']
-            ) && ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE || $student_detail['Student']['program_id'] == PROGRAM_REMEDIAL)) {
+        if (is_null($student_detail->department_id) && ($student_detail->program_id == PROGRAM_UNDERGRADUATE
+                || $student_detail->program_id == PROGRAM_REMEDIAL)) {
             $prefreshStudent = 1;
             $studentMustHaveCurriculum = 0;
         } else {
-            if (!is_null(
-                    $student_detail['Student']['curriculum_id']
-                ) && $student_detail['Student']['curriculum_id'] != 0) {
+            if (!is_null($student_detail->curriculum_id) && $student_detail->curriculum_id != 0) {
                 $studentMustHaveCurriculum = 0;
             }
         }
 
-        if (isset($student_detail['Readmission'][0])) {
-            $lastReadmittedAcademicYear = $student_detail['Readmission'][0]['academic_year'];
-            $lastReadmittedSemester = $student_detail['Readmission'][0]['semester'];
-            $lastReadmittedDate = $student_detail['Readmission'][0]['registrar_approval_date'];
+        if (!empty($student_detail->readmissions[0])) {
+            $lastReadmittedAcademicYear = $student_detail->readmissions[0]->academic_year;
+            $lastReadmittedSemester = $student_detail->readmissions[0]->semester;
+            $lastReadmittedDate = $student_detail->readmissions[0]->registrar_approval_date;
         }
 
+        $studentStatusPatternsTable = TableRegistry::getTableLocator()->get('StudentStatusPatterns');
+        $isLastSemesterInCurriculum = $studentStatusPatternsTable->isLastSemesterInCurriculum($student_id);
 
-        $isLastSemesterInCurriculum = ClassRegistry::init('StudentStatusPattern')->isLastSemesterInCurriculum(
-            $student_id
-        );
+        $error_message = $this->Sections->checkAllRegisteredAddedCoursesAreGraded($student_id, null, 0, '', 0,0,0);
 
-        debug($isLastSemesterInCurriculum);
-
-        $error_meaasge = $this->Section->chceck_all_registered_added_courses_are_graded(
-            $student_id,
-            $section_id = null,
-            $check_for_invalid_grades = 1,
-            $from_student = '',
-            $skip_f_grade = 1,
-            $get_error_message = 1
-        );
 
         $msg = '';
 
-        if (!empty($error_meaasge) && is_array($error_meaasge)) {
-            $error_meaasge = $error_meaasge[$student_id]['disqualification'];
+        if (!empty($error_message) && is_array($error_message) && isset($error_message['disqualification'])) {
             $msg = '<ol>';
-
-            foreach ($error_meaasge as $key => $error_msg) {
-                $msg .= '<li>' . $error_msg . '</li>';
+            foreach ($error_message['disqualification'] as $error_msg) {
+                $msg .= '<li>' . h($error_msg) . '</li>';
             }
-
             $msg .= '</ol>';
-
-            debug($msg);
-        }
-
-        if (isset($student_detail['CourseRegistration'][0]['year_level_id']) && !empty($student_detail['CourseRegistration'][0]['year_level_id'])) {
-            $lastRegisteredYearLevelName = $this->Section->YearLevel->field(
-                'name',
-                array("YearLevel.id" => $student_detail['CourseRegistration'][0]['year_level_id'])
-            );
         } else {
-            if (isset($student_detail['CourseRegistration'][0]['year_level_id']) && empty($student_detail['CourseRegistration'][0]['year_level_id'])) {
-                $lastRegisteredYearLevelName = 'Pre/1st';
-            }
+            $msg = '<p>No disqualification errors found.</p>';
         }
 
-        debug($lastRegisteredYearLevelName);
+        if (!empty($student_detail->course_registrations[0]->year_level_id)) {
+            $lastRegisteredYearLevelName = $this->Sections->YearLevels->find()
+                ->select(['name'])
+                ->where(['YearLevels.id' => $student_detail->course_registrations[0]->year_level_id])
+                ->first()
+                ->name ?? '';
+        } elseif (isset($student_detail->course_registrations[0]->year_level_id)) {
+            $lastRegisteredYearLevelName = 'Pre/1st';
+        }
 
         $statusGeneratedForLastRegistration = 1;
 
-
-        if (empty($student_detail['Section'])) {
-            //freshman without section assignment
+        if (empty($student_detail->sections)) {
             $studentNeedsSectionAssignment = 1;
             $statusGeneratedForLastRegistration = 1;
-            $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                $student_detail['AcceptedStudent']['academicyear'],
-                $this->AcademicYear->current_academicyear()
-            );
+            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+            $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange($student_detail->accepted_student->academicyear, $curr_academic_year);
+        } elseif (empty($student_detail->course_registrations)) {
+            $statusGeneratedForLastRegistration = 1;
         } else {
-            if (empty($student_detail['CourseRegistration'])) {
-                //freshman with section assignment but no registration
-                $statusGeneratedForLastRegistration = 1;
-            } else {
-                $student_section_exam_status = ClassRegistry::init('Student')->get_student_section(
-                    $student_id,
-                    null,
-                    null
-                );
-                //debug($student_section_exam_status);
+            $studentsTable = TableRegistry::getTableLocator()->get('Students');
+            $student_section_exam_status = $studentsTable->getStudentSection($student_id, null, null);
+            // debug($student_section_exam_status);
 
-                if (!empty($student_section_exam_status['StudentExamStatus'])) {
-                    $last_student_status['StudentExamStatus'] = $student_section_exam_status['StudentExamStatus'];
-                    //debug($last_student_status);
-                    // have exam status
-                    //debug($student_section_exam_status['StudentExamStatus']['academic_status_id']);
+            if (!empty($student_section_exam_status['StudentExamStatuses'])) {
+                $last_student_status['StudentExamStatus'] = $student_section_exam_status['StudentExamStatuses'];
+                // debug($last_student_status);
 
-                    if (isset($student_section_exam_status['StudentExamStatus']['academic_status_id']) && is_numeric(
-                            $student_section_exam_status['StudentExamStatus']['academic_status_id']
-                        ) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] != DISMISSED_ACADEMIC_STATUS_ID) {
-                        // not dismissed
+                if (isset($student_section_exam_status['StudentExamStatus']['academic_status_id']) && is_numeric($student_section_exam_status['StudentExamStatus']['academic_status_id']) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] != DISMISSED_ACADEMIC_STATUS_ID) {
+                    $studentNeedsSectionAssignment = 1;
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange(
+                        !empty($student_detail->course_registrations[0]->academic_year) ? $student_detail->course_registrations[0]->academic_year : $student_detail->accepted_student->academicyear,
+                        $curr_academic_year
+                    );
 
-                        $studentNeedsSectionAssignment = 1;
-                        $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                            (isset($student_detail['CourseRegistration'][0]['academic_year']) && !empty($student_detail['CourseRegistration'][0]['academic_year']) ? $student_detail['CourseRegistration'][0]['academic_year'] : $student_detail['AcceptedStudent']['academicyear']),
-                            $this->AcademicYear->current_academicyear()
-                        );
-
-                        $generalSetting = ClassRegistry::init(
-                            'GeneralSetting'
-                        )->getAllGeneralSettingsByStudentByProgramIdOrBySectionID($student_id);
-                        //debug($generalSetting['GeneralSetting']['semesterCountForAcademicYear']);
-
-                        //last registration
-                        debug($student_detail['CourseRegistration'][0]);
-                        debug($student_detail['CourseRegistration'][0]['academic_year']);
-                        debug($student_detail['CourseRegistration'][0]['year_level_id']);
-
-                        $lastRegisteredAcademicYear = $student_detail['CourseRegistration'][0]['academic_year'];
-                        $lastRegisteredSemester = $student_detail['CourseRegistration'][0]['semester'];
-
-                        if (!$prefreshStudent) {
-                            $lastRegisteredYearLevelID = $student_detail['CourseRegistration'][0]['year_level_id'];
-                        }
+                    $generalSettingTable = TableRegistry::getTableLocator()->get('GeneralSettings');
+                    $generalSetting = $generalSettingTable->getAllGeneralSettingsByStudentByProgramIdOrBySectionId($student_id);
 
 
-                        $alreadyGeneratedStatus = ClassRegistry::init('StudentExamStatus')->find('first', array(
-                            'conditions' => array(
-                                'StudentExamStatus.student_id' => $student_id,
-                                'StudentExamStatus.academic_year' => $student_detail['CourseRegistration'][0]['academic_year'],
-                                'StudentExamStatus.semester' => $student_detail['CourseRegistration'][0]['semester'],
-                            ),
-                            'contain' => array(
-                                'AcademicStatus' => array('id', 'name', 'computable'),
-                            )
-                        ));
+                    $lastRegisteredAcademicYear = $student_detail->course_registrations[0]->academic_year;
+                    $lastRegisteredSemester = $student_detail->course_registrations[0]->semester;
 
-                        if (empty($alreadyGeneratedStatus) && $student_detail['Student']['program_type_id'] == PROGRAM_TYPE_REGULAR) {
-                            $statusGeneratedForLastRegistration = 0;
-                        }
+                    if (!$prefreshStudent) {
+                        $lastRegisteredYearLevelID = $student_detail->course_registrations[0]->year_level_id;
+                    }
 
-                        ////// Tweak $check_for_invalid_grades and PROGRAM_TYPE_REGULAR to bypass system checks to change section with out stutus generation checks   ///////
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $alreadyGeneratedStatus = $studentExamStatusTable->find()
+                        ->where([
+                            'StudentExamStatus.student_id' => $student_id,
+                            'StudentExamStatus.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                            'StudentExamStatus.semester' => $student_detail->course_registrations[0]->semester,
+                        ])
+                        ->contain(['AcademicStatuses' => ['fields' => ['id', 'name', 'computable']]])
+                        ->first();
 
-                        if ($this->Section->chceck_all_registered_added_courses_are_graded(
-                            $student_id,
-                            $section_id = null,
-                            $check_for_invalid_grades = 1,
-                            $from_student = '',
-                            $skip_f_grade = 1
-                        )) {
-                            $studentNeedsSectionAssignment = 1;
-                            if ($student_detail['Student']['program_type_id'] != PROGRAM_TYPE_REGULAR) {
+                    if (empty($alreadyGeneratedStatus) && $student_detail->program_type_id == PROGRAM_TYPE_REGULAR) {
+                        $statusGeneratedForLastRegistration = 0;
+
+                        $student_course_drop_count = $this->Sections->Students->CourseDrops->find()
+                            ->where([
+                                'CourseDrops.student_id' => $student_id,
+                                'CourseDrops.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                                'CourseDrops.semester' => $student_detail->course_registrations[0]->semester,
+                                'CourseDrops.registrar_confirmation' => 1,
+                            ])
+                            ->count();
+
+                        // debug($student_course_drop_count);
+
+                        if ($student_course_drop_count) {
+                            $student_course_registration_count = $this->Sections->Students->CourseRegistrations->find()
+                                ->where([
+                                    'CourseRegistrations.student_id' => $student_id,
+                                    'CourseRegistrations.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                                    'CourseRegistrations.semester' => $student_detail->course_registrations[0]->semester,
+                                ])
+                                ->count();
+
+                            // debug($student_course_drop_count);
+
+                            if ($student_course_drop_count == $student_course_registration_count) {
                                 $statusGeneratedForLastRegistration = 1;
-                            }
-                        } else {
-                            $student_have_invalid_grade = 1;
-                        }
-
-
-                        // for students failed Exit Exam for the first time
-                        if ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE && $isLastSemesterInCurriculum && !empty($msg) && is_array(
-                                $msg
-                            ) && count($msg) == 1) {
-                            $studentNeedsSectionAssignment = 1;
-                            $student_have_invalid_grade = 0; // Exit Exam
-                        }
-
-                        // for students only registered pass or fail grade type
-                        $checkOnlyRegisteredPassFailGradeType = ClassRegistry::init(
-                            'StudentExamStatus'
-                        )->onlyRegisteredPassFailGradeType(
-                            $student_id,
-                            $student_detail['CourseRegistration'][0]['academic_year'],
-                            $student_detail['CourseRegistration'][0]['semester']
-                        );
-
-                        if ($checkOnlyRegisteredPassFailGradeType) {
-                            $studentNeedsSectionAssignment = 1;
-                            $statusGeneratedForLastRegistration = 1;
-                        }
-
-                        ////// END Tweak $check_for_invalid_grades and PROGRAM_TYPE_REGULAR to bypass system checks to change section with out stutus generation checks   ///////
-
-                        if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 3) {
-                            if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I' || $student_section_exam_status['StudentExamStatus']['semester'] == 'II') {
-                                // no need to show next year one remaining semester
-                                if (!$prefreshStudent) {
-                                    debug($student_detail['Section'][0]['year_level_id']);
-                                    $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                    $yearLevelQueryOperator = '=';
-
-                                    if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                        $currentYearLevelID = $lastRegisteredYearLevelID;
-                                    }
-                                }
-                            } else {
-                                if ($student_section_exam_status['StudentExamStatus']['semester'] == 'III') {
-                                    // show only year ahead
-                                    if (!$prefreshStudent) {
-                                        debug($student_detail['Section'][0]['year_level_id']);
-                                        $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                        $yearLevelQueryOperator = '>';
-
-                                        if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                            $currentYearLevelID = $lastRegisteredYearLevelID;
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 2) {
-                                if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I') {
-                                    // no need to show next year one remaining semester
-                                    if (!$prefreshStudent) {
-                                        debug($student_detail['Section'][0]['year_level_id']);
-                                        $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                        $yearLevelQueryOperator = '=';
-
-                                        if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                            $currentYearLevelID = $lastRegisteredYearLevelID;
-                                        }
-                                    }
-                                } else {
-                                    if ($student_detail['CourseRegistration'][0]['semester'] == 'II') {
-                                        if (!$prefreshStudent) {
-                                            debug($student_detail['Section'][0]['year_level_id']);
-                                            $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                            $yearLevelQueryOperator = '>';
-
-                                            if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                $currentYearLevelID = $lastRegisteredYearLevelID;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 1) {
-                                    if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I' || $student_detail['CourseRegistration'][0]['semester'] == 'II' || $student_detail['CourseRegistration'][0]['semester'] == 'III') {
-                                        if (!$prefreshStudent) {
-                                            debug($student_detail['Section'][0]['year_level_id']);
-                                            $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                            $yearLevelQueryOperator = '>=';
-
-                                            if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                $currentYearLevelID = $lastRegisteredYearLevelID;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        if (isset($student_section_exam_status['StudentExamStatus']['academic_year']) && !empty($student_section_exam_status['StudentExamStatus']['academic_year']) && (is_null(
-                                    $student_section_exam_status['StudentExamStatus']['academic_status_id']
-                                ) || empty($student_section_exam_status['StudentExamStatus']['academic_status_id']))) {
-                            // might not be dismissed but doesnt have status
-
-                            $studentNeedsSectionAssignment = 0;
-
-                            $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                                (isset($student_detail['CourseRegistration'][0]['academic_year']) && !empty($student_detail['CourseRegistration'][0]['academic_year']) ? $student_detail['CourseRegistration'][0]['academic_year'] : $student_detail['AcceptedStudent']['academicyear']),
-                                $this->AcademicYear->current_academicyear()
-                            );
-
-                            $generalSetting = ClassRegistry::init(
-                                'GeneralSetting'
-                            )->getAllGeneralSettingsByStudentByProgramIdOrBySectionID($student_id);
-                            //debug($generalSetting['GeneralSetting']['semesterCountForAcademicYear']);
-
-                            //debug($student_detail);
-                            //last registration
-                            debug($student_detail['CourseRegistration'][0]);
-                            debug($student_detail['CourseRegistration'][0]['academic_year']);
-                            debug($student_detail['CourseRegistration'][0]['year_level_id']);
-
-                            $lastRegisteredAcademicYear = $student_detail['CourseRegistration'][0]['academic_year'];
-                            $lastRegisteredSemester = $student_detail['CourseRegistration'][0]['semester'];
-
-                            if (!$prefreshStudent) {
-                                $lastRegisteredYearLevelID = $student_detail['CourseRegistration'][0]['year_level_id'];
-                            }
-
-                            $alreadyGeneratedStatus = ClassRegistry::init('StudentExamStatus')->find('first', array(
-                                'conditions' => array(
-                                    'StudentExamStatus.student_id' => $student_id,
-                                    'StudentExamStatus.academic_year' => $student_detail['CourseRegistration'][0]['academic_year'],
-                                    'StudentExamStatus.semester' => $student_detail['CourseRegistration'][0]['semester'],
-                                ),
-                                'contain' => array(
-                                    /* 'Student' => array(
-								'College' => array('id', 'name'),
-								'Department' => array('id', 'name'),
-								'Program' => array('id', 'name'),
-								'ProgramType' => array('id', 'name'),
-								'fields' => array('id', 'full_name', 'gender', 'studentnumber', 'curriculum_id', 'graduated', 'academicyear', 'admissionyear'),
-							), */
-                                    'AcademicStatus' => array('id', 'name', 'computable'),
-                                )
-                            ));
-
-                            if (empty($alreadyGeneratedStatus) && $student_detail['Student']['program_type_id'] == PROGRAM_TYPE_REGULAR) {
-                                $statusGeneratedForLastRegistration = 0;
-                            }
-
-
-                            ////// Tweak $check_for_invalid_grades and PROGRAM_TYPE_REGULAR to bypass system checks to change section with out stutus generation checks   ///////
-
-                            if ($this->Section->chceck_all_registered_added_courses_are_graded(
-                                $student_id,
-                                $section_id = null,
-                                $check_for_invalid_grades = 1,
-                                $from_student = '',
-                                $skip_f_grade = 1
-                            )) {
-                                $studentNeedsSectionAssignment = 1;
-                                if ($student_detail['Student']['program_type_id'] != PROGRAM_TYPE_REGULAR) {
-                                    $statusGeneratedForLastRegistration = 1;
-                                }
-                            } else {
-                                $student_have_invalid_grade = 1;
-                            }
-
-
-                            // for students failed Exit Exam for the first time
-
-                            if ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE && $isLastSemesterInCurriculum && !empty($msg) && is_array(
-                                    $msg
-                                ) && count($msg) == 1) {
-                                $studentNeedsSectionAssignment = 1;
-                                //$student_have_invalid_grade = 0; // Exit Exam
-                            }
-
-
-                            // for students only registered pass or fail grade type
-                            $checkOnlyRegisteredPassFailGradeType = ClassRegistry::init(
-                                'StudentExamStatus'
-                            )->onlyRegisteredPassFailGradeType(
-                                $student_id,
-                                $student_detail['CourseRegistration'][0]['academic_year'],
-                                $student_detail['CourseRegistration'][0]['semester']
-                            );
-
-                            if ($checkOnlyRegisteredPassFailGradeType) {
-                                $studentNeedsSectionAssignment = 1;
-                                $statusGeneratedForLastRegistration = 1;
-                            }
-
-                            ////// END Tweak $check_for_invalid_grades and PROGRAM_TYPE_REGULAR to bypass system checks to change section with out stutus generation checks   ///////
-
-
-                            if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 3) {
-                                if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I' || $student_section_exam_status['StudentExamStatus']['semester'] == 'II') {
-                                    // no need to show next year one remaining semester
-                                    if (!$prefreshStudent) {
-                                        debug($student_detail['Section'][0]['year_level_id']);
-                                        $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                        $yearLevelQueryOperator = '=';
-
-                                        if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                            $currentYearLevelID = $lastRegisteredYearLevelID;
-                                        }
-                                    }
-                                } else {
-                                    if ($student_section_exam_status['StudentExamStatus']['semester'] == 'III') {
-                                        // show only year ahead
-                                        if (!$prefreshStudent) {
-                                            debug($student_detail['Section'][0]['year_level_id']);
-                                            $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                            $yearLevelQueryOperator = '>';
-
-                                            if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                $currentYearLevelID = $lastRegisteredYearLevelID;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 2) {
-                                    if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I') {
-                                        // no need to show next year one remaining semester
-                                        if (!$prefreshStudent) {
-                                            debug($student_detail['Section'][0]['year_level_id']);
-                                            $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                            $yearLevelQueryOperator = '=';
-
-                                            if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                $currentYearLevelID = $lastRegisteredYearLevelID;
-                                            }
-                                        }
-                                    } else {
-                                        if ($student_detail['CourseRegistration'][0]['semester'] == 'II') {
-                                            if (!$prefreshStudent) {
-                                                debug($student_detail['Section'][0]['year_level_id']);
-                                                $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                                $yearLevelQueryOperator = '>';
-
-                                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                    $currentYearLevelID = $lastRegisteredYearLevelID;
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 1) {
-                                        if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I' || $student_detail['CourseRegistration'][0]['semester'] == 'II' || $student_detail['CourseRegistration'][0]['semester'] == 'III') {
-                                            if (!$prefreshStudent) {
-                                                debug($student_detail['Section'][0]['year_level_id']);
-                                                $currentYearLevelID = $student_detail['Section'][0]['year_level_id'];
-                                                $yearLevelQueryOperator = '>=';
-
-                                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
-                                                    $currentYearLevelID = $lastRegisteredYearLevelID;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            //check for readmission
-                            $is_student_dismissed = 1;
-                            $statusGeneratedForLastRegistration = 1;
-                            $studentNeedsSectionAssignment = 1;
-
-                            $possibleReadmissionYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                                $student_section_exam_status['StudentExamStatus']['academic_year'],
-                                $this->AcademicYear->current_academicyear()
-                            );
-
-
-                            $readmitted = $this->Section->Student->Readmission->find('first', array(
-                                'conditions' => array(
-                                    'Readmission.student_id' => $student_id,
-                                    'Readmission.registrar_approval' => 1,
-                                    'Readmission.academic_commision_approval' => 1,
-                                    'Readmission.academic_year' => $possibleReadmissionYears,
-                                    /* 'OR' => array(
-								'Readmission.academic_year' => $student_section_exam_status['StudentExamStatus']['academic_year'],
-								'Readmission.semester' => $student_section_exam_status['StudentExamStatus']['semester'],
-								'Readmission.registrar_approval_date' > $student_section_exam_status['StudentExamStatus']['modified'],
-								'Readmission.modified' > $student_section_exam_status['StudentExamStatus']['modified'],
-							) */
-                                ),
-                                'order' => array(
-                                    'Readmission.academic_year' => 'DESC',
-                                    'Readmission.semester' => 'DESC',
-                                    'Readmission.modified' => 'DESC'
-                                ),
-                                'recursive' => -1,
-                            ));
-
-                            debug($student_section_exam_status['StudentExamStatus']);
-
-                            if (count($readmitted)) {
-                                debug($readmitted);
-                                $lastReadmittedAcademicYear = $readmitted['Readmission']['academic_year'];
-                                $lastReadmittedSemester = $readmitted['Readmission']['semester'];
-                                $lastReadmittedDate = $readmitted['Readmission']['registrar_approval_date'];
-
-                                //debug($lastReadmittedAcademicYear);
-
-                                $is_student_readmitted = 1;
-                                $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                                    $lastReadmittedAcademicYear,
-                                    $this->AcademicYear->current_academicyear()
-                                );
                                 $studentNeedsSectionAssignment = 1;
                             }
                         }
                     }
+
+                    if (!empty($error_message) && is_numeric($error_message) && $error_message == 1) {
+                        $studentNeedsSectionAssignment = 1;
+                        if ($student_detail->program_type_id != PROGRAM_TYPE_REGULAR) {
+                            $statusGeneratedForLastRegistration = 1;
+                        }
+                    } elseif (!empty($msg) || (!empty($error_message) && is_array($error_message))) {
+                        $student_have_invalid_grade = 1;
+                    } else {
+                        $student_have_invalid_grade = 1;
+                    }
+
+                    if ($student_detail->program_id == PROGRAM_UNDERGRADUATE && $isLastSemesterInCurriculum && !empty($msg) && is_array($msg) && count($msg) == 1) {
+                        $studentNeedsSectionAssignment = 1;
+                        $student_have_invalid_grade = 0; // Exit Exam
+                    }
+
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $checkOnlyRegisteredPassFailGradeType = $studentExamStatusTable->onlyRegisteredPassFailGradeType($student_id, $student_detail->course_registrations[0]->academic_year, $student_detail->course_registrations[0]->semester);
+
+                    if ($checkOnlyRegisteredPassFailGradeType) {
+                        $studentNeedsSectionAssignment = 1;
+                        $statusGeneratedForLastRegistration = 1;
+                    }
+
+                    if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 3) {
+                        if (in_array($student_section_exam_status['StudentExamStatus']['semester'], ['I', 'II'])) {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        } elseif ($student_section_exam_status['StudentExamStatus']['semester'] == 'III') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    } elseif ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 2) {
+                        if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        } elseif ($student_detail->course_registrations[0]->semester == 'II') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    } elseif ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 1) {
+                        if (in_array($student_section_exam_status['StudentExamStatus']['semester'], ['I', 'II', 'III'])) {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    }
+                } elseif (!empty($student_section_exam_status['StudentExamStatus']['academic_year']) && (is_null($student_section_exam_status['StudentExamStatus']['academic_status_id']) || empty($student_section_exam_status['StudentExamStatus']['academic_status_id']))) {
+                    $studentNeedsSectionAssignment = 0;
+
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange(
+                        !empty($student_detail->course_registrations[0]->academic_year) ? $student_detail->course_registrations[0]->academic_year : $student_detail->accepted_student->academicyear,
+                        $curr_academic_year
+                    );
+
+                    $generalSettingTable = TableRegistry::getTableLocator()->get('GeneralSettings');
+                    $generalSetting = $generalSettingTable->getAllGeneralSettingsByStudentByProgramIdOrBySectionId($student_id);
+                    $lastRegisteredAcademicYear = $student_detail->course_registrations[0]->academic_year;
+                    $lastRegisteredSemester = $student_detail->course_registrations[0]->semester;
+
+                    if (!$prefreshStudent) {
+                        $lastRegisteredYearLevelID = $student_detail->course_registrations[0]->year_level_id;
+                    }
+
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $alreadyGeneratedStatus = $studentExamStatusTable->find()
+                        ->where([
+                            'StudentExamStatus.student_id' => $student_id,
+                            'StudentExamStatus.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                            'StudentExamStatus.semester' => $student_detail->course_registrations[0]->semester,
+                        ])
+                        ->contain(['AcademicStatuses' => ['fields' => ['id', 'name', 'computable']]])
+                        ->first();
+
+                    if (empty($alreadyGeneratedStatus) && $student_detail->program_type_id == PROGRAM_TYPE_REGULAR) {
+                        $statusGeneratedForLastRegistration = 0;
+
+                        $student_course_drop_count = $this->Sections->Students->CourseDrops->find()
+                            ->where([
+                                'CourseDrops.student_id' => $student_id,
+                                'CourseDrops.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                                'CourseDrops.semester' => $student_detail->course_registrations[0]->semester,
+                                'CourseDrops.registrar_confirmation' => 1,
+                            ])
+                            ->count();
+
+                        if ($student_course_drop_count) {
+                            $student_course_registration_count = $this->Sections->Students->CourseRegistrations->find()
+                                ->where([
+                                    'CourseRegistrations.student_id' => $student_id,
+                                    'CourseRegistrations.academic_year' => $student_detail->course_registrations[0]->academic_year,
+                                    'CourseRegistrations.semester' => $student_detail->course_registrations[0]->semester,
+                                ])
+                                ->count();
+
+                            // debug($student_course_drop_count);
+
+                            if ($student_course_drop_count == $student_course_registration_count) {
+                                $statusGeneratedForLastRegistration = 1;
+                                $studentNeedsSectionAssignment = 1;
+                            }
+                        }
+                    }
+
+                    if (!empty($error_message) && is_numeric($error_message) && $error_message == 1) {
+                        $studentNeedsSectionAssignment = 1;
+                        if ($student_detail->program_type_id != PROGRAM_TYPE_REGULAR) {
+                            $statusGeneratedForLastRegistration = 1;
+                        }
+                    } elseif (!empty($msg) || (!empty($error_message) && is_array($error_message))) {
+                        $student_have_invalid_grade = 1;
+                    } else {
+                        $student_have_invalid_grade = 1;
+                    }
+
+                    if ($student_detail->program_id == PROGRAM_UNDERGRADUATE && $isLastSemesterInCurriculum && !empty($msg) && is_array($msg) && count($msg) == 1) {
+                        $studentNeedsSectionAssignment = 1;
+                        // $student_have_invalid_grade = 0; // Exit Exam
+                    }
+
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $checkOnlyRegisteredPassFailGradeType = $studentExamStatusTable->onlyRegisteredPassFailGradeType($student_id, $student_detail->course_registrations[0]->academic_year, $student_detail->course_registrations[0]->semester);
+
+                    if ($checkOnlyRegisteredPassFailGradeType) {
+                        $studentNeedsSectionAssignment = 1;
+                        $statusGeneratedForLastRegistration = 1;
+                    }
+
+                    if ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 3) {
+                        if (in_array($student_section_exam_status['StudentExamStatus']['semester'], ['I', 'II'])) {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        } elseif ($student_section_exam_status['StudentExamStatus']['semester'] == 'III') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    } elseif ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 2) {
+                        if ($student_section_exam_status['StudentExamStatus']['semester'] == 'I') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        } elseif ($student_detail->course_registrations[0]->semester == 'II') {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    } elseif ($generalSetting['GeneralSetting']['semesterCountForAcademicYear'] == 1) {
+                        if (in_array($student_section_exam_status['StudentExamStatus']['semester'], ['I', 'II', 'III'])) {
+                            if (!$prefreshStudent) {
+                                // debug($student_detail->sections[0]->year_level_id);
+                                $currentYearLevelID = $student_detail->sections[0]->year_level_id;
+                                $yearLevelQueryOperator = '>=';
+
+                                if ($lastRegisteredYearLevelID > $currentYearLevelID) {
+                                    $currentYearLevelID = $lastRegisteredYearLevelID;
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    //have registration but doesnt have exam status
-                    //$statusGeneratedForLastRegistration = 0;
-                    //debug($student_section_exam_status);
+                    $is_student_dismissed = 1;
+                    $statusGeneratedForLastRegistration = 1;
+                    $studentNeedsSectionAssignment = 1;
+
+                    $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                    $possibleReadmissionYears = $studentExamStatusTable->getAcademicYearRange($student_section_exam_status['StudentExamStatus']['academic_year'], $curr_academic_year);
+
+                    $readmitted = $this->Sections->Students->Readmissions->find()
+                        ->where([
+                            'Readmissions.student_id' => $student_id,
+                            'Readmissions.registrar_approval' => 1,
+                            'Readmissions.academic_commision_approval' => 1,
+                            'Readmissions.academic_year IN' => $possibleReadmissionYears,
+                        ])
+                        ->order(['Readmissions.academic_year' => 'DESC', 'Readmissions.semester' => 'DESC', 'Readmissions.modified' => 'DESC'])
+                        ->first();
+
+                    // debug($student_section_exam_status['StudentExamStatus']);
+
+                    if (!empty($readmitted)) {
+                        // debug($readmitted);
+                        $lastReadmittedAcademicYear = $readmitted->academic_year;
+                        $lastReadmittedSemester = $readmitted->semester;
+                        $lastReadmittedDate = $readmitted->registrar_approval_date;
+
+                        // debug($lastReadmittedAcademicYear);
+
+                        $is_student_readmitted = 1;
+                        $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange($lastReadmittedAcademicYear, $curr_academic_year);
+                        $studentNeedsSectionAssignment = 1;
+                    }
                 }
             }
         }
 
-        $acYrStart = !empty($lastReadmittedAcademicYear) ? str_replace(
-            '-',
-            '/',
-            $lastReadmittedAcademicYear
-        ) : (!empty($lastRegisteredAcademicYear) ? $lastRegisteredAcademicYear : $student_detail['Student']['academicyear']);
+        $acYrStart = !empty($lastReadmittedAcademicYear) ? str_replace('-', '/', $lastReadmittedAcademicYear) : (!empty($lastRegisteredAcademicYear) ? $lastRegisteredAcademicYear : $student_detail->academicyear);
 
         if (!empty($acYrStart)) {
             $acYrStart = str_replace('-', '/', $acYrStart);
-            debug($acYrStart);
-            $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                $acYrStart,
-                $this->AcademicYear->current_academicyear()
-            );
+            // debug($acYrStart);
+            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+            $possibleAcademicYears = $studentExamStatusTable->getAcademicYearRange($acYrStart, $curr_academic_year);
         }
 
         if (empty($possibleAcademicYears)) {
-            $possibleAcademicYears[$this->AcademicYear->current_academicyear(
-            )] = $this->AcademicYear->current_academicyear();
+            $possibleAcademicYears[$curr_academic_year] = $curr_academic_year;
         }
 
-        debug($possibleAcademicYears);
 
         if (!$prefreshStudent || $studentMustHaveCurriculum) {
-            debug($student_detail['Student']['curriculum_id']);
 
-            if (is_numeric(
-                    $student_detail['Student']['curriculum_id']
-                ) && $student_detail['Student']['curriculum_id'] > 0) {
-                $courseYearLevels = $this->Section->Curriculum->Course->find('list', array(
-                    'conditions' => array(
-                        'Course.curriculum_id' => $student_detail['Student']['curriculum_id']
-                    ),
-                    'fields' => array('Course.year_level_id', 'Course.year_level_id'),
-                    'group' => array('Course.year_level_id', 'Course.year_level_id'),
-                    'order' => array('Course.year_level_id' => 'DESC'),
-                ));
+            if (is_numeric($student_detail->curriculum_id) && $student_detail->curriculum_id > 0) {
+                $courseYearLevels = $this->Sections->Curriculums->Courses->find('list')
+                    ->where(['Courses.curriculum_id' => $student_detail->curriculum_id])
+                    ->select(['Courses.year_level_id', 'Courses.year_level_id'])
+                    ->group(['Courses.year_level_id'])
+                    ->order(['Courses.year_level_id' => 'DESC'])
+                    ->toArray();
 
                 if (!empty($courseYearLevels)) {
                     $curriculumYearLevels = array_keys($courseYearLevels);
                 }
 
-                $student_attached_curriculum = $this->Section->Curriculum->find(
-                    'first',
-                    array(
-                        'conditions' => array('Curriculum.id' => $student_detail['Student']['curriculum_id']),
-                        'recursive' => -1
-                    )
-                );
+                $student_attached_curriculum = $this->Sections->Curriculums->find()
+                    ->where(['Curriculums.id' => $student_detail->curriculum_id])
+                    ->first();
 
                 if (!empty($student_attached_curriculum)) {
-                    debug($student_attached_curriculum['Curriculum']['curriculum_detail']);
-                    $student_attached_curriculum_name = $student_attached_curriculum['Curriculum']['curriculum_detail'];
+                    // debug($student_attached_curriculum->curriculum_detail);
+                    $student_attached_curriculum_name = $student_attached_curriculum->curriculum_detail;
                 }
             }
 
-            debug($curriculumYearLevels);
-
-            if (!empty($curriculumYearLevels) && isset($student_detail['Section'][0]) && (!is_numeric(
-                        $student_detail['Section'][0]['year_level_id']
-                    ) || empty($student_detail['Section'][0]['year_level_id']))) {
-                asort(
-                    $curriculumYearLevels
-                ); // Ascending Order (by values) (asort) // Descending Order (by values) (arsort)
+            if (!empty($curriculumYearLevels) && !empty($student_detail->sections[0]) &&
+                (!is_numeric($student_detail->sections[0]->year_level_id) ||
+                    empty($student_detail->sections[0]->year_level_id))) {
+                asort($curriculumYearLevels);
                 $curriculumYearLevelsSortedASC = array_values($curriculumYearLevels);
-                debug($curriculumYearLevelsSortedASC);
+                // debug($curriculumYearLevelsSortedASC);
 
                 if (isset($curriculumYearLevelsSortedASC[0])) {
                     $currentYearLevelID = $curriculumYearLevelsSortedASC[0];
                 }
 
-                if ($student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE) {
+                if ($student_detail->program_id == PROGRAM_UNDERGRADUATE) {
                     $all_pre_freshman_remedial_college_ids = Configure::read('all_pre_freshman_remedial_college_ids');
-                    $program_types_available_pre_freshman = Configure::read(
-                        'program_types_available_for_registrar_college_level_permissions'
-                    );
-                    debug($program_types_available_pre_freshman);
+                    $program_types_available_pre_freshman = Configure::read('program_types_available_for_registrar_college_level_permissions');
+                    // debug($program_types_available_pre_freshman);
 
-                    if (!empty($all_pre_freshman_remedial_college_ids) && isset($student_detail['Section'][0]['college_id']) && empty($student_detail['Section'][0]['department_id']) && in_array(
-                            $student_detail['Section'][0]['college_id'],
-                            $all_pre_freshman_remedial_college_ids
-                        )) {
-                        debug($all_pre_freshman_remedial_college_ids);
-                        if (isset($curriculumYearLevelsSortedASC[1]) && !empty($curriculumYearLevelsSortedASC[1])) {
+                    if (!empty($all_pre_freshman_remedial_college_ids) && !empty($student_detail->sections[0]->college_id) && empty($student_detail->sections[0]->department_id) && in_array($student_detail->sections[0]->college_id, $all_pre_freshman_remedial_college_ids)) {
+                        // debug($all_pre_freshman_remedial_college_ids);
+                        if (!empty($curriculumYearLevelsSortedASC[1])) {
+                            $yearLevelQueryOperator = '=';
+                            $currentYearLevelID = $curriculumYearLevelsSortedASC[1];
+                        }
+                    } elseif (!empty($student_detail->sections[0]->college_id) && empty($student_detail->sections[0]->department_id) && in_array($student_detail->program_type_id, $program_types_available_pre_freshman)) {
+                        if (!empty($curriculumYearLevelsSortedASC[1])) {
+                            $yearLevelQueryOperator = '=';
+                            $currentYearLevelID = $curriculumYearLevelsSortedASC[1];
+                        }
+                    } elseif (!empty($student_detail->sections[0]->college_id) && empty($student_detail->sections[0]->department_id) && $student_detail->program_type_id == PROGRAM_TYPE_REGULAR) {
+                        if (!empty($curriculumYearLevelsSortedASC[1])) {
                             $yearLevelQueryOperator = '=';
                             $currentYearLevelID = $curriculumYearLevelsSortedASC[1];
                         }
                     } else {
-                        if (isset($student_detail['Section'][0]['college_id']) && empty($student_detail['Section'][0]['department_id']) && in_array(
-                                $student_detail['Student']['program_type_id'],
-                                $program_types_available_pre_freshman
-                            )) {
-                            if (isset($curriculumYearLevelsSortedASC[1]) && !empty($curriculumYearLevelsSortedASC[1])) {
-                                $yearLevelQueryOperator = '=';
-                                $currentYearLevelID = $curriculumYearLevelsSortedASC[1];
-                            }
-                        } else {
-                            if (isset($student_detail['Section'][0]['college_id']) && empty($student_detail['Section'][0]['department_id']) && $student_detail['Student']['program_type_id'] == PROGRAM_TYPE_REGULAR) {
-                                if (isset($curriculumYearLevelsSortedASC[1]) && !empty($curriculumYearLevelsSortedASC[1])) {
-                                    $yearLevelQueryOperator = '=';
-                                    $currentYearLevelID = $curriculumYearLevelsSortedASC[1];
-                                }
-                            } else {
-                                $yearLevelQueryOperator = '=';
-                            }
-                        }
+                        $yearLevelQueryOperator = '=';
                     }
                 }
-            } else {
-                if (!empty($student_detail['CourseRegistration'][0]['year_level_id']) && !empty($student_detail['CourseRegistration'][0]['year_level_id'])) {
-                    $studentNeedsSectionAssignment = 1;
-                    $currentYearLevelID = $student_detail['CourseRegistration'][0]['year_level_id'];
-                    $yearLevelQueryOperator = '>=';
+            } elseif (!empty($student_detail->course_registrations[0]->year_level_id)) {
+                $studentNeedsSectionAssignment = 1;
+                $currentYearLevelID = $student_detail->course_registrations[0]->year_level_id;
+                $yearLevelQueryOperator = '>=';
+
+                if (!$prefreshStudent && empty($msg) && in_array($lastRegisteredSemester, ['II', 'III']) && !empty($student_section_exam_status['StudentExamStatus']['academic_status_id']) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] != DISMISSED_ACADEMIC_STATUS_ID) {
+                    $yearLevelQueryOperator = '>';
+                } elseif (!$prefreshStudent && $student_detail->program_type_id == PROGRAM_TYPE_REGULAR && $lastRegisteredSemester == 'I' && !empty($student_section_exam_status['StudentExamStatus']['academic_status_id']) && $student_section_exam_status['StudentExamStatus']['academic_status_id'] != DISMISSED_ACADEMIC_STATUS_ID) {
+                    $yearLevelQueryOperator = '=';
+
+                    if ($student_detail->college_id == HEALTH_SCIENCES_COLLEGE_ID || (!empty($student_detail->department->allow_year_based_curriculums) && $student_detail->department->allow_year_based_curriculums)) {
+                        // debug($student_detail->department);
+                        $yearLevelQueryOperator = '>';
+                    }
                 }
+
+                if ($student_detail->program_type_id == PROGRAM_TYPE_SUMMER) {
+                    $yearLevelQueryOperator = '>';
+                }
+
+                if ($isLastSemesterInCurriculum || !empty($msg)) {
+                    $yearLevelQueryOperator = '=';
+                }
+            } elseif (!empty($curriculumYearLevels) && empty($student_detail->course_registrations)) {
+                $studentNeedsSectionAssignment = 1;
+                $curriculumYearLevelsASC1 = $curriculumYearLevels;
+                asort($curriculumYearLevelsASC1);
+                $curriculumYearLevelsASC1 = array_values($curriculumYearLevelsASC1);
+                $currentYearLevelID = $curriculumYearLevelsASC1[0];
+                $yearLevelQueryOperator = '=';
+            }
+
+            if (!empty($curriculumYearLevels) && !empty($student_detail->course_exemptions[0]) && empty($student_detail->course_registrations)) {
+                $studentNeedsSectionAssignment = 1;
+                $curriculumYearLevelsASC = $curriculumYearLevels;
+                asort($curriculumYearLevelsASC);
+                $curriculumYearLevelsASC = array_values($curriculumYearLevelsASC);
+                $currentYearLevelID = $curriculumYearLevelsASC[0];
+                $yearLevelQueryOperator = '>';
             }
         }
 
-        debug($yearLevelQueryOperator);
-        debug($currentYearLevelID);
-
-        $sectionOrganized = array();
+        if (!empty($acYrStart) && count($possibleAcademicYears) > 1) {
+            if ($yearLevelQueryOperator === '>' || ($yearLevelQueryOperator === '=' && $isLastSemesterInCurriculum)) {
+                $possibleAcademicYearsASC = $possibleAcademicYears;
+                asort($possibleAcademicYearsASC);
+                array_shift($possibleAcademicYearsASC);
+                $possibleAcademicYears = $possibleAcademicYearsASC;
+                $acYrStart = array_values($possibleAcademicYears)[0];
+            }
+        }
+        $sectionOrganized = [];
         $nextYearLevelName = '';
 
-        if (!$prefreshStudent && !empty($student_detail['Student']['department_id']) && is_numeric(
-                $student_detail['Student']['department_id']
-            ) && $student_detail['Student']['department_id'] > 0) {
+        if (!$prefreshStudent && !empty($student_detail->department_id) && is_numeric($student_detail->department_id) && $student_detail->department_id > 0) {
             $nextYearLevelID = $currentYearLevelID;
 
             if ($yearLevelQueryOperator === '=') {
-                $yearLevelsProfile = $yearLevels = $this->Section->YearLevel->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            "YearLevel.id" => $currentYearLevelID,
-                            'YearLevel.department_id' => $student_detail['Student']['department_id']
-                        ),
-                        'fields' => array('YearLevel.name', 'YearLevel.name')
-                    )
-                );
-                $nextYearLevelID = $this->Section->YearLevel->field(
-                    'YearLevel.id',
-                    array(
-                        "YearLevel.id" => $currentYearLevelID,
-                        'YearLevel.department_id' => $student_detail['Student']['department_id']
-                    )
-                );
+                $yearLevelsProfile = $yearLevels = $this->Sections->YearLevels->find('list')
+                    ->where(['YearLevels.id' => $currentYearLevelID, 'YearLevels.department_id' => $student_detail->department_id])
+                    ->select(['YearLevels.name', 'YearLevels.name'])
+                    ->toArray();
+                $nextYearLevelID = $this->Sections->YearLevels->find()
+                    ->select(['YearLevels.id'])
+                    ->where(['YearLevels.id' => $currentYearLevelID, 'YearLevels.department_id' => $student_detail->department_id])
+                    ->first()
+                    ->id;
             } else {
-                if (isset($curriculumYearLevels[0])) {
-                    $yearLevelsProfile = $yearLevels = $this->Section->YearLevel->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                "YearLevel.id $yearLevelQueryOperator " => $currentYearLevelID,
-                                "YearLevel.id <= " => $curriculumYearLevels[0],
-                                'YearLevel.department_id' => $student_detail['Student']['department_id']
-                            ),
-                            'fields' => array('YearLevel.name', 'YearLevel.name'),
-                            'order' => array('YearLevel.id' => 'ASC')
-                        )
-                    );
-                    $nextYearLevelID = $this->Section->YearLevel->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                "YearLevel.id $yearLevelQueryOperator " => $currentYearLevelID,
-                                "YearLevel.id <= " => $curriculumYearLevels[0],
-                                'YearLevel.department_id' => $student_detail['Student']['department_id']
-                            ),
-                            'fields' => array('YearLevel.id', 'YearLevel.id'),
-                            'order' => array('YearLevel.id' => 'ASC')
-                        )
-                    );
+                if (!empty($curriculumYearLevels[0])) {
+                    $curriculumYearLevelsSortedASC = $curriculumYearLevels;
+                    asort($curriculumYearLevelsSortedASC);
+                    $curriculumYearLevelsSortedASC = array_values($curriculumYearLevelsSortedASC);
+                    // debug($curriculumYearLevelsSortedASC);
+                    $nextYearLevel = $this->getNextYearLevelId($curriculumYearLevelsSortedASC, $currentYearLevelID);
+
+                    if (!empty($nextYearLevel)) {
+                        $yearLevelsProfile = $yearLevels = $this->Sections->YearLevels->find('list')
+                            ->where([
+                                "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                                'YearLevels.id <=' => $nextYearLevel,
+                                'YearLevels.department_id' => $student_detail->department_id,
+                            ])
+                            ->select(['YearLevels.name', 'YearLevels.name'])
+                            ->order(['YearLevels.id' => 'ASC'])
+                            ->toArray();
+                        $nextYearLevelID = $this->Sections->YearLevels->find('list')
+                            ->where([
+                                "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                                'YearLevels.id <=' => $nextYearLevel,
+                                'YearLevels.department_id' => $student_detail->department_id,
+                            ])
+                            ->select(['YearLevels.id', 'YearLevels.id'])
+                            ->order(['YearLevels.id' => 'ASC'])
+                            ->toArray();
+                    } else {
+                        $yearLevelsProfile = $yearLevels = $this->Sections->YearLevels->find('list')
+                            ->where([
+                                "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                                'YearLevels.id <=' => $curriculumYearLevels[0],
+                                'YearLevels.department_id' => $student_detail->department_id,
+                            ])
+                            ->select(['YearLevels.name', 'YearLevels.name'])
+                            ->order(['YearLevels.id' => 'ASC'])
+                            ->toArray();
+                        $nextYearLevelID = $this->Sections->YearLevels->find('list')
+                            ->where([
+                                "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                                'YearLevels.id <=' => $curriculumYearLevels[0],
+                                'YearLevels.department_id' => $student_detail->department_id,
+                            ])
+                            ->select(['YearLevels.id', 'YearLevels.id'])
+                            ->order(['YearLevels.id' => 'ASC'])
+                            ->toArray();
+                    }
                     if (!empty($nextYearLevelID)) {
                         $nextYearLevelID = array_values($nextYearLevelID)[0];
                     } else {
                         $nextYearLevelID = $currentYearLevelID;
                     }
                 } else {
-                    $yearLevelsProfile = $yearLevels = $this->Section->YearLevel->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                "YearLevel.id $yearLevelQueryOperator " => $currentYearLevelID,
-                                'YearLevel.department_id' => $student_detail['Student']['department_id']
-                            ),
-                            'fields' => array('YearLevel.name', 'YearLevel.name'),
-                            'order' => array('YearLevel.id' => 'ASC')
-                        )
-                    );
-                    $nextYearLevelID = $this->Section->YearLevel->find(
-                        'list',
-                        array(
-                            'conditions' => array(
-                                "YearLevel.id $yearLevelQueryOperator " => $currentYearLevelID,
-                                'YearLevel.department_id' => $student_detail['Student']['department_id']
-                            ),
-                            'fields' => array('YearLevel.id', 'YearLevel.id'),
-                            'order' => array('YearLevel.id' => 'ASC')
-                        )
-                    );
+                    $yearLevelsProfile = $yearLevels = $this->Sections->YearLevels->find('list')
+                        ->where([
+                            "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                            'YearLevels.department_id' => $student_detail->department_id,
+                        ])
+                        ->select(['YearLevels.name', 'YearLevels.name'])
+                        ->order(['YearLevels.id' => 'ASC'])
+                        ->toArray();
+                    $nextYearLevelID = $this->Sections->YearLevels->find('list')
+                        ->where([
+                            "YearLevels.id $yearLevelQueryOperator" => $currentYearLevelID,
+                            'YearLevels.department_id' => $student_detail->department_id,
+                        ])
+                        ->select(['YearLevels.id', 'YearLevels.id'])
+                        ->order(['YearLevels.id' => 'ASC'])
+                        ->toArray();
                     if (!empty($nextYearLevelID)) {
                         $nextYearLevelID = array_values($nextYearLevelID)[0];
                     } else {
@@ -5295,611 +3699,557 @@ class SectionsController extends AppController
                 }
             }
 
-            debug($nextYearLevelID);
-            $nextYearLevelName = $this->Section->YearLevel->field('name', array('id' => $nextYearLevelID));
+            // debug($nextYearLevelID);
+            $nextYearLevelName = $this->Sections->YearLevels->find()
+                ->select(['name'])
+                ->where(['id' => $nextYearLevelID])
+                ->first()
+                ->name ?? '';
 
             if (count($yearLevelsProfile) == 1) {
                 $currentYearLevelIDName = array_values($yearLevelsProfile)[0] . ' year';
             } else {
-                $currentYearLevelIDName = array_values($yearLevelsProfile);
-                $currentYearLevelIDName = implode("  year, ", $currentYearLevelIDName) . ' year';
+                $currentYearLevelIDName = implode(' year, ', array_values($yearLevelsProfile)) . ' year';
             }
 
-            $sectionOrganized = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.academicyear' => $possibleAcademicYears,
-                    'Section.program_id' => $student_detail['Student']['program_id'],
-                    'Section.program_type_id' => $program_types_to_look,
-                    'Section.department_id' => $student_detail['Student']['department_id'],
-                    "Section.year_level_id" => $nextYearLevelID,
-                    'Section.curriculum_id' => $student_detail['Student']['curriculum_id'],
-                    'Section.archive' => 0
-                ),
-                'contain' => array(
-                    'YearLevel' => array('id', 'name'),
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-                'recursive' => -1
-            ));
+            $sectionOrganized = $this->Sections->find()
+                ->where([
+                    'Sections.academicyear IN' => $possibleAcademicYears,
+                    'Sections.program_id' => $student_detail->program_id,
+                    'Sections.program_type_id IN' => $program_types_to_look,
+                    'Sections.department_id' => $student_detail->department_id,
+                    'Sections.year_level_id' => $nextYearLevelID,
+                    'Sections.curriculum_id' => $student_detail->curriculum_id,
+                    'Sections.archive' => 0,
+                ])
+                ->contain([
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                ])
+                ->order(['Sections.academicyear' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         } else {
             $yearLevelsProfile[0] = $yearLevels[0] = 'Pre/Freshman/Remedial';
             $currentYearLevelIDName = 'Pre/Freshman/Remedial';
 
-            $sectionOrganized = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.academicyear' => $possibleAcademicYears,
-                    'Section.program_id' => $student_detail['Student']['program_id'],
-                    'Section.program_type_id' => $program_types_to_look,
-                    'Section.department_id is null',
-                    'Section.college_id' => $student_detail['Student']['college_id'],
-                    'Section.archive' => 0
-                ),
-                'contain' => array('YearLevel'),
-                'order' => array(
-                    'Section.academicyear' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-                'recursive' => -1
-            ));
+            $sectionOrganized = $this->Sections->find()
+                ->where([
+                    'Sections.academicyear IN' => $possibleAcademicYears,
+                    'Sections.program_id' => $student_detail->program_id,
+                    'Sections.program_type_id IN' => $program_types_to_look,
+                    'Sections.department_id IS' => null,
+                    'Sections.college_id' => $student_detail->college_id,
+                    'Sections.archive' => 0,
+                ])
+                ->contain(['YearLevels'])
+                ->order(['Sections.academicyear' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         }
 
-        debug($checkOnlyRegisteredPassFailGradeType);
-        debug($sectionOrganized);
-        debug($nextYearLevelName);
-        //$statusGeneratedForLastRegistration = 1;
 
-        // Set Display Sections Search Paramenters to session variable
+        if (empty($sectionOrganized) && ($this->role_id == ROLE_COLLEGE || $this->role_id == ROLE_DEPARTMENT)) {
+            $displaySectionsSearchFilter = [
+                'Section' => [
+                    'academicyear' => end($possibleAcademicYears),
+                    'program_id' => $student_detail->program_id,
+                    'program_type_id' => $student_detail->program_type_id,
+                ],
+            ];
 
-        if (empty($sectionOrganized) && ($this->role_id = ROLE_COLLEGE || $this->role_id = ROLE_DEPARTMENT)) {
-            $displaySectionsSearchFilter['Section']['academicyear'] = end($possibleAcademicYears);
-            $displaySectionsSearchFilter['Section']['program_id'] = $student_detail['Student']['program_id'];
-            $displaySectionsSearchFilter['Section']['program_type_id'] = $student_detail['Student']['program_type_id'];
-
-            if (isset($nextYearLevelID) && !empty($nextYearLevelID) && is_array($nextYearLevelID)) {
+            if (!empty($nextYearLevelID) && is_array($nextYearLevelID)) {
                 $nextYearLevelID = array_values($nextYearLevelID)[0];
             }
 
-            debug($nextYearLevelID);
+            // debug($nextYearLevelID);
 
-            if (isset($currentYearLevelID) && !empty($currentYearLevelID)) {
-                $displaySectionsSearchFilter['Section']['year_level_id'] = (isset($nextYearLevelID) && !empty($nextYearLevelID) ? $nextYearLevelID : $currentYearLevelID);
+            if (!empty($currentYearLevelID)) {
+                $displaySectionsSearchFilter['Section']['year_level_id'] = !empty($nextYearLevelID) ? $nextYearLevelID : $currentYearLevelID;
             }
 
-            debug($displaySectionsSearchFilter);
+            // debug($displaySectionsSearchFilter);
 
             if (!empty($displaySectionsSearchFilter['Section']['academicyear'])) {
-                $this->Session->write('search_sections', $displaySectionsSearchFilter['Section']);
+                $this->request->getSession()->write('search_sections', $displaySectionsSearchFilter['Section']);
             }
         }
 
-        $this->set(
-            compact(
-                'sectionOrganized',
-                'student_detail',
-                'yearLevels',
-                'yearLevelsProfile',
-                'is_student_dismissed',
-                'last_student_status',
-                'studentNeedsSectionAssignment',
-                'is_student_readmitted',
-                'studentMustHaveCurriculum',
-                'statusGeneratedForLastRegistration',
-                'prefreshStudent',
-                'lastRegisteredYearLevelID',
-                'lastRegisteredAcademicYear',
-                'lastRegisteredSemester',
-                'lastReadmittedAcademicYear',
-                'lastReadmittedSemester',
-                'lastReadmittedDate',
-                'possibleAcademicYears',
-                'student_attached_curriculum_name',
-                'currentYearLevelIDName',
-                'student_have_invalid_grade',
-                'msg',
-                'isLastSemesterInCurriculum',
-                'lastRegisteredYearLevelName',
-                'nextYearLevelName'
-            )
-        );
+        $this->set(compact(
+            'sectionOrganized',
+            'student_detail',
+            'yearLevels',
+            'yearLevelsProfile',
+            'is_student_dismissed',
+            'last_student_status',
+            'studentNeedsSectionAssignment',
+            'is_student_readmitted',
+            'studentMustHaveCurriculum',
+            'statusGeneratedForLastRegistration',
+            'prefreshStudent',
+            'lastRegisteredYearLevelID',
+            'lastRegisteredAcademicYear',
+            'lastRegisteredSemester',
+            'lastReadmittedAcademicYear',
+            'lastReadmittedSemester',
+            'lastReadmittedDate',
+            'possibleAcademicYears',
+            'student_attached_curriculum_name',
+            'currentYearLevelIDName',
+            'student_have_invalid_grade',
+            'msg',
+            'isLastSemesterInCurriculum',
+            'lastRegisteredYearLevelName',
+            'nextYearLevelName',
+            'acYrStart'
+        ));
     }
 
-    public function add_student_section($section_id = null)
+    private function getNextYearLevelId(array $sortedYearLevelIDs = [], string $currentYearLevelID = ''): ?string
     {
+        if (!empty($sortedYearLevelIDs) && !empty($currentYearLevelID)) {
+            $sortedYearLevelIDs = array_values($sortedYearLevelIDs);
+            $index = array_search($currentYearLevelID, $sortedYearLevelIDs);
 
-        $this->layout = 'ajax';
+            if ($index !== false && $index + 1 < count($sortedYearLevelIDs)) {
+                return $sortedYearLevelIDs[$index + 1];
+            }
+        }
 
-        $section_detail = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $section_id
-            ),
-            'contain' => array(
-                'YearLevel' => array('id', 'name'),
-                'Program' => array('id', 'name'),
-                'ProgramType' => array('id', 'name', 'equivalent_to_id'),
-                'Department' => array('id', 'name', 'college_id', 'type'),
-                'College' => array('id', 'name', 'shortname', 'campus_id', 'type', 'stream'),
-                'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                'Student' => array(
-                    'fields' => array(
-                        'Student.id',
-                        'Student.studentnumber',
-                        'Student.full_name',
-                        'curriculum_id',
-                        'Student.gender',
-                        'Student.graduated'
-                    ),
-                    'conditions' => array(
-                        'Student.graduated = 0'
-                    ),
-                    'limit' => 1,
-                ),
-            )
-        ));
+        return null;
+    }
 
-        //debug($section_detail);
+
+
+    public function addStudentSection(?int $section_id = null)
+    {
+        $this->viewBuilder()->setLayout('ajax');
+
+        $section_detail = $this->Sections->find()
+            ->where(['Sections.id' => $section_id])
+            ->contain([
+                'YearLevels' => ['fields' => ['id', 'name']],
+                'Programs' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name', 'equivalent_to_id']],
+                'Departments' => ['fields' => ['id', 'name', 'college_id', 'type']],
+                'Colleges' => ['fields' => ['id', 'name', 'shortname', 'campus_id', 'type', 'stream']],
+                'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                'Students' => [
+                    'fields' => [
+                        'Students.id',
+                        'Students.studentnumber',
+                        'Students.curriculum_id',
+                        'Students.gender',
+                        'Students.graduated',
+                        'Students.academicyear',
+                        'full_name' => 'TRIM(CONCAT(COALESCE(Students.first_name, ""), " ", COALESCE(Students.middle_name, ""), " ", COALESCE(Students.last_name, "")))'
+                    ],
+                    'conditions' => ['Students.graduated' => 0],
+                    'sort' => [
+                        'Students.academicyear' => 'DESC',
+                        'Students.studentnumber' => 'ASC',
+                        'Students.id' => 'ASC',
+                        'full_name' => 'ASC'
+                    ],
+                    'limit' => 1
+                ]
+            ])
+            ->disableHydration()
+            ->first();
+
+        if (!$section_detail) {
+            throw new NotFoundException('Section not found for ID: ' . $section_id);
+        }
 
         $isSectionEmpty = 1;
-
-        $section_program_id = $section_detail['Section']['program_id'];
-        $section_program_type_id = $section_detail['Section']['program_type_id'];
-        $section_academic_year = $section_detail['Section']['academicyear'];
+        $section_program_id = $section_detail['program_id'];
+        $section_program_type_id = $section_detail['program_type_id'];
+        $section_academic_year = $section_detail['academicyear'];
         $sectionsCurriculumID = 0;
 
-        //debug($section_academic_year);
-
-        if (isset($section_detail['Curriculum']['id']) && !empty($section_detail['Curriculum']['id']) && $section_detail['Curriculum']['id']) {
-            $sectionsCurriculumID = $section_detail['Curriculum']['id'];
-            if (!empty($section_detail['Student'])) {
+        if (!empty($section_detail['curriculum']['id'])) {
+            $sectionsCurriculumID = $section_detail['curriculum']['id'];
+            if (!empty($section_detail['students'])) {
                 $isSectionEmpty = 0;
             }
+        } elseif (empty($section_detail['students'])) {
+            // $isSectionEmpty = 1;
         } else {
-            if (empty($section_detail['Student'])) {
-                //$isSectionEmpty = 1;
-            } else {
-                $sectionsCurriculumID = $this->Section->sectionscurriculumID($section_id);
-            }
+            $sectionsCurriculumID = $this->Sections->sectionsCurriculumId($section_id);
         }
 
-        //debug($section_program_type_id);
-        $program_type_id = $this->Section->getEquivalentProgramTypes($section_program_type_id);
-        //debug($program_type_id);
+        $program_type_id = $this->Sections->getEquivalentProgramTypes($section_program_type_id);
+        $program_type_id_sql = implode(',', array_map('intval', $program_type_id)); // Sanitize for SQL
 
-        $program_type_id = "'" . implode("', '", $program_type_id) . "'";
-
-        if (!empty(explode('/', $section_detail['Section']['academicyear'])[0])) {
-            debug(explode('/', $section_detail['Section']['academicyear'])[0]);
-            $admission_years = $this->AcademicYear->academicYearInArray(
-                date('Y') - ACY_BACK_FOR_SECTION_LESS,
-                explode('/', $section_detail['Section']['academicyear'])[0]
-            );
-        } else {
-            $admission_years = $this->AcademicYear->academicYearInArray(
-                date('Y') - ACY_BACK_FOR_SECTION_LESS,
-                date('Y')
-            );
-        }
-
+        $admission_years = $this->AcademicYear->academicYearInArray(
+            date('Y') - ACY_BACK_FOR_SECTION_LESS,
+            !empty(explode('/', $section_detail['academicyear'])[0]) ? explode('/', $section_detail['academicyear'])[0] : date('Y')
+        );
         $admission_years = array_keys($admission_years);
-        debug($admission_years);
-        $admission_years_by_comma = "'" . implode("', '", $admission_years) . "'";
+        $admission_years_sql = implode(',', array_map(function ($year) {
+            return "'" . str_replace("'", "''", $year) . "'"; // Escape single quotes
+        }, $admission_years));
 
-        $student_list_ids = array();
+        $student_list_ids = [];
 
-        if ($this->role_id == ROLE_DEPARTMENT) {
-            //debug($sectionsCurriculumID);
-
-            if ((isset($sectionsCurriculumID[0]) && $sectionsCurriculumID[0] == -2) || $isSectionEmpty || $sectionsCurriculumID == 0) {
-                //debug($sectionsCurriculumID[0]);
-                //$query = "SELECT id FROM students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id) AND  program_id = " . $section_program_id . " AND  program_type_id in (" . $program_type_id . ") AND curriculum_id IS NOT NULL AND  department_id = " . $this->department_id . " AND graduated = 0";
-                $query = "SELECT id FROM students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id) AND  program_id = " . $section_program_id . " AND  program_type_id in (" . $program_type_id . ") AND curriculum_id IS NOT NULL AND academicyear in (" . $admission_years_by_comma . ") AND  department_id = " . $this->department_id . " AND graduated = 0";
+        $connection = $this->Sections->getConnection();
+        if ($this->Auth->user('role_id') == ROLE_DEPARTMENT) {
+            if ((is_array($sectionsCurriculumID) && $sectionsCurriculumID[0] == -2) || $isSectionEmpty || $sectionsCurriculumID == 0) {
+                $query = $connection->newQuery()
+                    ->select('id')
+                    ->from('students')
+                    ->where([
+                        'id NOT IN' => function ($q) use ($connection) {
+                            return $connection->newQuery()
+                                ->select('student_id')
+                                ->from('students_sections')
+                                ->where(['archive' => 0])
+                                ->group(['student_id', 'section_id']);
+                        },
+                        'program_id' => $section_program_id,
+                        'program_type_id IN' => $program_type_id,
+                        'curriculum_id IS NOT NULL',
+                        'academicyear IN' => $admission_years,
+                        'department_id' => $this->department_id,
+                        'graduated' => 0
+                    ]);
             } else {
-                if (($sectionsCurriculumID != 0 || $sectionsCurriculumID != -1)) {
-                    //$query = "SELECT  id, studentnumber FROM  students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id ) AND  program_type_id in (" . join(',', $program_type_id) . ") AND curriculum_id IS NOT NULL AND  department_id = " . $this->department_id . " AND id NOT IN (SELECT student_id FROM senate_lists)";
-                    $query = "SELECT  id  FROM  students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id) AND  program_id = " . $section_program_id . " AND  program_type_id in (" . $program_type_id . ") AND curriculum_id = " . $sectionsCurriculumID . " AND  department_id = " . $this->department_id . " AND graduated = 0";
-                }
-            } /* else if ($sectionsCurriculumID == 0 || $isSectionEmpty) {
-				$query = "SELECT id FROM students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id) AND  program_id = " . $section_program_id . " AND  program_type_id in (" . $program_type_id . ") AND  department_id = " . $this->department_id . " AND graduated = 0";
-			}  */
+                $query = $connection->newQuery()
+                    ->select('id')
+                    ->from('students')
+                    ->where([
+                        'id NOT IN' => function ($q) use ($connection) {
+                            return $connection->newQuery()
+                                ->select('student_id')
+                                ->from('students_sections')
+                                ->where(['archive' => 0])
+                                ->group(['student_id', 'section_id']);
+                        },
+                        'program_id' => $section_program_id,
+                        'program_type_id IN' => $program_type_id,
+                        'curriculum_id' => $sectionsCurriculumID,
+                        'department_id' => $this->department_id,
+                        'graduated' => 0
+                    ]);
+            }
 
-            $queryResult = $this->Section->query($query);
-            //debug($queryResult);
+            $queryResult = $query->execute()->fetchAll(\PDO::FETCH_ASSOC);
+            \Cake\Log\Log::debug('Raw Query Result: ' . var_export($queryResult, true), ['scope' => ['sections']]);
 
             if (!empty($queryResult)) {
-                foreach ($queryResult as $k => $v) {
-                    $student_list_ids[] = $v['students']['id'];
-                }
+                $student_list_ids = array_column($queryResult, 'id');
             }
-
-            //debug($student_list_ids);
 
             if (!empty($student_list_ids)) {
-                if ((isset($sectionsCurriculumID[0]) && $sectionsCurriculumID[0] == -2) || $isSectionEmpty) {
-                    $conditions = array(
-                        'Student.department_id' => $this->department_id,
-                        'Student.id' => $student_list_ids,
-                        'Student.program_id' => $section_program_id,
-                        'Student.program_type_id IN (' . $program_type_id . ')',
-                        'OR' => array(
-                            'Student.curriculum_id IS NOT NULL',
-                            'Student.curriculum_id' => $sectionsCurriculumID,
-                        ),
-                        'Student.graduated = 0'
-                    );
+                if ((is_array($sectionsCurriculumID) && $sectionsCurriculumID[0] == -2) || $isSectionEmpty) {
+                    $conditions = [
+                        'Students.department_id' => $this->department_id,
+                        'Students.id IN' => $student_list_ids,
+                        'Students.program_id' => $section_program_id,
+                        'Students.program_type_id IN' => $program_type_id,
+                        'OR' => [
+                            'Students.curriculum_id IS NOT' => null,
+                            'Students.curriculum_id' => $sectionsCurriculumID,
+                        ],
+                        'Students.graduated' => 0,
+                    ];
                 } else {
-                    $conditions = array(
-                        'Student.department_id' => $this->department_id,
-                        'Student.id' => $student_list_ids,
-                        'Student.program_id' => $section_program_id,
-                        'Student.program_type_id IN (' . $program_type_id . ')',
-                        'Student.curriculum_id' => $sectionsCurriculumID,
-                        'Student.graduated = 0'
-                    );
+                    $conditions = [
+                        'Students.department_id' => $this->department_id,
+                        'Students.id IN' => $student_list_ids,
+                        'Students.program_id' => $section_program_id,
+                        'Students.program_type_id IN' => $program_type_id,
+                        'Students.curriculum_id' => $sectionsCurriculumID,
+                        'Students.graduated' => 0,
+                    ];
                 }
             }
-
-            //debug($conditions);
 
             $this->set(compact('sectionsCurriculumID'));
         } else {
             $sectionsCurriculumID = -1;
-
             $this->set(compact('sectionsCurriculumID'));
 
-            $query = "SELECT id FROM students WHERE id NOT IN (SELECT student_id FROM students_sections WHERE archive = 0 GROUP BY student_id, section_id) AND  program_id = " . $section_program_id . " AND  program_type_id in (" . $program_type_id . ") AND  academicyear in (" . $admission_years_by_comma . ") AND college_id = " . $this->college_id . " AND department_id IS NULL AND graduated = 0";
-            $queryResult = $this->Section->query($query);
+            $query = $connection->newQuery()
+                ->select('id')
+                ->from('students')
+                ->where([
+                    'id NOT IN' => function ($q) use ($connection) {
+                        return $connection->newQuery()
+                            ->select('student_id')
+                            ->from('students_sections')
+                            ->where(['archive' => 0])
+                            ->group(['student_id', 'section_id']);
+                    },
+                    'program_id' => $section_program_id,
+                    'program_type_id IN' => $program_type_id,
+                    'academicyear IN' => $admission_years,
+                    'college_id' => $this->college_id,
+                    'department_id IS' => null,
+                    'graduated' => 0
+                ]);
 
-            //debug($queryResult);
-            $student_list_ids = array();
+            $queryResult = $query->execute()->fetchAll(\PDO::FETCH_ASSOC);
 
             if (!empty($queryResult)) {
-                foreach ($queryResult as $k => $v) {
-                    $student_list_ids[] = $v['students']['id'];
-                }
+                $student_list_ids = array_column($queryResult, 'id');
             }
 
             if (!empty($student_list_ids)) {
-                $conditions = array(
-                    'Student.college_id' => $this->college_id,
-                    'Student.department_id is null',
-                    'Student.program_id' => $section_program_id,
-                    'Student.id' => $student_list_ids,
-                    'Student.program_type_id IN (' . $program_type_id . ')',
-                );
+                $conditions = [
+                    'Students.college_id' => $this->college_id,
+                    'Students.department_id IS' => null,
+                    'Students.program_id' => $section_program_id,
+                    'Students.id IN' => $student_list_ids,
+                    'Students.program_type_id IN' => $program_type_id,
+                ];
             }
         }
 
-        if (isset($conditions) && !empty($conditions)) {
-            //$this->Section->Student->bindModel(array('hasMany' => array('StudentsSection' => array('conditions' => array('StudentsSection.archive' => 1)))));
-
-            $students = $this->Section->Student->find('all', array(
-                'conditions' => $conditions,
-                'fields' => array(
-                    'Student.id',
-                    'Student.full_name',
-                    'Student.studentnumber',
-                    'Student.gender',
-                    'Student.graduated'
-                ),
-                'contain' => array(
-                    //'StudentsSection',
-                    'Section' => array(
-                        'conditions' => array(
-                            'Section.academicyear' => $section_academic_year,
-                            'Section.archive' => 1,
-                        ),
-                        'fields' => array(
-                            'Section.id',
-                            'Section.name',
-                            'Section.academicyear',
-                            'Section.curriculum_id'
-                        ),
-                        'YearLevel' => array(
-                            'fields' => array(
-                                'YearLevel.id',
-                                'YearLevel.name',
-                            ),
-                        ),
-                        'Department' => array('id', 'name', 'college_id', 'type'),
-                        'College' => array('id', 'name', 'shortname', 'campus_id', 'type', 'stream'),
-                        'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                    ),
-                    'Department' => array('id', 'name', 'college_id', 'type'),
-                    'College' => array('id', 'name', 'shortname', 'campus_id', 'type', 'stream'),
-                ),
-                'order' => array(
-                    'Student.admissionyear' => 'ASC',
-                    'Student.first_name' => 'ASC',
-                    'Student.middle_name' => 'ASC',
-                    'Student.last_name' => 'ASC',
-                    'Student.program_type_id' => 'ASC'
-                ),
-                'revursive' => -1
-            ));
+        $students = [];
+        if (!empty($conditions)) {
+            $students = $this->Sections->Students->find()
+                ->where($conditions)
+                ->select([
+                    'Students.id',
+                    'Students.studentnumber',
+                    'Students.gender',
+                    'Students.graduated',
+                    'full_name' => 'TRIM(CONCAT(COALESCE(Students.first_name, ""), " ", COALESCE(Students.middle_name, ""), " ", COALESCE(Students.last_name, "")))'
+                ])
+                ->contain([
+                    'Sections' => [
+                        'fields' => [
+                            'Sections.id',
+                            'Sections.name',
+                            'Sections.academicyear',
+                            'Sections.curriculum_id'
+                        ],
+                        'conditions' => [
+                            'Sections.academicyear' => $section_academic_year,
+                            'Sections.archive' => 1
+                        ],
+                        'sort' => [
+                            'Sections.academicyear' => 'DESC',
+                            'Sections.name' => 'ASC'
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'Departments' => ['fields' => ['id', 'name', 'college_id', 'type']],
+                        'Colleges' => ['fields' => ['id', 'name', 'shortname', 'campus_id', 'type', 'stream']],
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']]
+                    ],
+                    'Departments' => ['fields' => ['id', 'name', 'college_id', 'type']],
+                    'Colleges' => ['fields' => ['id', 'name', 'shortname', 'campus_id', 'type', 'stream']]
+                ])
+                ->orderBy([
+                    'Students.admissionyear' => 'ASC',
+                    'full_name' => 'ASC',
+                    'Students.program_type_id' => 'ASC'
+                ])
+                ->disableHydration()
+                ->toArray();
         }
 
-        //debug($students);
-        //debug($conditions);
-
-        $this->set(
-            compact(
-                'section_id',
-                'sectionless_student',
-                'students',
-                'section_detail'
-            )
-        );
+        $this->set(compact('section_id', 'students', 'section_detail'));
+        $this->set('_serialize', ['section_id', 'students', 'section_detail']);
     }
 
-    public function add_student_section_update()
+    public function addStudentSectionUpdate()
     {
+        if (!empty($this->request->getData())) {
+            $new_section_detail = $this->Sections->find()
+                ->where(['Sections.id' => $this->request->getData('Section.section_id')])
+                ->contain(['YearLevels'])
+                ->first();
 
-        if (!empty($this->request->data)) {
-            $new_section_detail = $this->Section->find(
-                'first',
-                array(
-                    'conditions' => array('Section.id' => $this->request->data['Section']['section_id']),
-                    'contain' => array('YearLevel')
-                )
-            );
-            //Find student name,  section name for display purpose
-            $student_full_name = $this->Section->Student->field(
-                'Student.full_name',
-                array('Student.id' => $this->request->data['Section']['Selected_student_id'])
-            );
-            $section_name = $this->Section->field(
-                'Section.name',
-                array('Section.id' => $this->request->data['Section']['section_id'])
-            );
-            $studentYearLevel = ClassRegistry::init('StudentExamStatus')->studentYearAndSemesterLevel(
-                $this->request->data['Section']['Selected_student_id']
-            );
+            $student_full_name = $this->Sections->Students->find()
+                ->select(['full_name'])
+                ->where(['Students.id' => $this->request->getData('Section.Selected_student_id')])
+                ->first()
+                ->full_name;
+            $section_name = $this->Sections->find()
+                ->select(['name'])
+                ->where(['Sections.id' => $this->request->getData('Section.section_id')])
+                ->first()
+                ->name;
 
-            if (!empty($studentYearLevel) && $new_section_detail['YearLevel']['name'] != $studentYearLevel['year']) {
+            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+            $studentYearLevel = $studentExamStatusTable->studentYearAndSemesterLevel($this->request->getData('Section.Selected_student_id'));
+
+            if (!empty($studentYearLevel) && $new_section_detail->year_level->name != $studentYearLevel['year']) {
                 $this->Flash->error(
-                    '' . $student_full_name . ' is not added to ' . $section_name . ' Because the target section is ' . $new_section_detail['YearLevel']['name'] . ' year while the student is ' . $studentYearLevel['year'] . ' year.'
+                    "$student_full_name is not added to $section_name Because the target section is {$new_section_detail->year_level->name} year while the student is {$studentYearLevel['year']} year.",
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections', $this->request->getData('Section.section_id')]]]
                 );
-                $this->redirect(array('action' => 'display_sections', $this->request->data['Section']['section_id']));
+                return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.section_id')]);
             }
 
-            //Check student status whether he/she qualify to have section
-            if ($this->Section->Student->StudentExamStatus->get_student_exam_status(
-                $this->request->data['Section']['Selected_student_id']
-            )) {
-                //Find this section curriculum
-                $section_curriculum = $this->Section->get_section_curriculum(
-                    $this->request->data['Section']['section_id']
-                );
+            if ($this->Sections->Students->StudentExamStatuses->getStudentExamStatus($this->request->getData('Section.Selected_student_id'))) {
+                $section_curriculum = $this->Sections->getSectionCurriculum($this->request->getData('Section.section_id'));
 
                 if (!empty($section_curriculum)) {
-                    //find student curriculum
-                    $student_curriculum = $this->Section->Student->field(
-                        'Student.curriculum_id',
-                        array('Student.id' => $this->request->data['Section']['Selected_student_id'])
-                    );
+                    $student_curriculum = $this->Sections->Students->find()
+                        ->select(['curriculum_id'])
+                        ->where(['Students.id' => $this->request->getData('Section.Selected_student_id')])
+                        ->first()
+                        ->curriculum_id;
 
                     if ($section_curriculum == $student_curriculum) {
-                        //save student to new section to associate table
-                        $this->request->data['StudentsSection']['student_id'] = $this->request->data['Section']['Selected_student_id'];
-                        $this->request->data['StudentsSection']['section_id'] = $this->request->data['Section']['section_id'];
-
-                        //To check whether the record is already there as archive, if so just turnoff the archive is enough
-                        $already_recorded_id = $this->_check_the_record_in_archive(
-                            $this->request->data['StudentsSection']['section_id'],
-                            $this->request->data['StudentsSection']['student_id']
-                        );
+                        $already_recorded_id = $this->checkTheRecordInArchive($this->request->getData('Section.section_id'), $this->request->getData('Section.Selected_student_id'));
 
                         if (!empty($already_recorded_id)) {
-                            $this->Section->StudentsSection->id = $already_recorded_id;
-                            $this->Section->StudentsSection->saveField('archive', '0');
+                            $studentsSection = $this->Sections->StudentsSections->get($already_recorded_id);
+                            $studentsSection->archive = 0;
+                            $this->Sections->StudentsSections->save($studentsSection);
                         } else {
-                            $this->Section->StudentsSection->save($this->request->data['StudentsSection']);
+                            $studentsSection = $this->Sections->StudentsSections->newEntity([
+                                'student_id' => $this->request->getData('Section.Selected_student_id'),
+                                'section_id' => $this->request->getData('Section.section_id'),
+                            ]);
+                            $this->Sections->StudentsSections->save($studentsSection);
                         }
 
-                        $this->Flash->success('' . $student_full_name . ' is Added to Section ' . $section_name . '.');
-                        return $this->redirect(
-                            array('action' => 'display_sections', $this->request->data['Section']['section_id'])
-                        );
+                        $this->Flash->success("$student_full_name is Added to Section $section_name.");
+                        return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.section_id')]);
                     } else {
-                        //Find student name,  section name for display purpose
-                        $student_full_name = $this->Section->Student->field(
-                            'Student.full_name',
-                            array('Student.id' => $this->request->data['Section']['Selected_student_id'])
-                        );
-                        $section_name = $this->Section->field(
-                            'Section.name',
-                            array('Section.id' => $this->request->data['Section']['section_id'])
-                        );
-                        $section_curriculum_name = $this->Section->Student->Curriculum->field(
-                            'Curriculum.curriculum_detail',
-                            array('Curriculum.id' => $section_curriculum)
-                        );
-                        $student_curriculum_name = $this->Section->Student->Curriculum->field(
-                            'Curriculum.curriculum_detail',
-                            array('Curriculum.id' => $student_curriculum)
-                        );
+                        $section_curriculum_name = $this->Sections->Students->Curriculums->find()
+                            ->select(['curriculum_detail'])
+                            ->where(['Curriculums.id' => $section_curriculum])
+                            ->first()
+                            ->curriculum_detail;
+                        $student_curriculum_name = $this->Sections->Students->Curriculums->find()
+                            ->select(['curriculum_detail'])
+                            ->where(['Curriculums.id' => $student_curriculum])
+                            ->first()
+                            ->curriculum_detail;
 
                         $this->Flash->error(
-                            '' . $student_full_name . ' will not be added to Section ' . $section_name . '. That\'s because, he/she studies by ' . $student_curriculum_name . ' curriculum, which is different from Section ' . $section_name . ' curiculum ' . $section_curriculum_name . '.'
+                            "$student_full_name will not be added to Section $section_name. That's because, he/she studies by $student_curriculum_name curriculum, which is different from Section $section_name curriculum $section_curriculum_name.",
+                            ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections', $this->request->getData('Section.section_id')]]]
                         );
-                        return $this->redirect(
-                            array('action' => 'display_sections', $this->request->data['Section']['section_id'])
-                        );
+                        return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.section_id')]);
                     }
                 } else {
-                    //save student to new section to associate table
-
-                    $this->request->data['StudentsSection']['student_id'] = $this->request->data['Section']['Selected_student_id'];
-                    $this->request->data['StudentsSection']['section_id'] = $this->request->data['Section']['section_id'];
-                    //To check whether the record is already there as archive, if so just turnoff the archive is enough
-                    $already_recorded_id = $this->_check_the_record_in_archive(
-                        $this->request->data['StudentsSection']['section_id'],
-                        $this->request->data['StudentsSection']['student_id']
-                    );
+                    $already_recorded_id = $this->checkTheRecordInArchive($this->request->getData('Section.section_id'), $this->request->getData('Section.Selected_student_id'));
 
                     if (!empty($already_recorded_id)) {
-                        $this->Section->StudentsSection->id = $already_recorded_id;
-                        $this->Section->StudentsSection->saveField('archive', '0');
+                        $studentsSection = $this->Sections->StudentsSections->get($already_recorded_id);
+                        $studentsSection->archive = 0;
+                        $this->Sections->StudentsSections->save($studentsSection);
                     } else {
-                        $this->Section->StudentsSection->save($this->request->data['StudentsSection']);
+                        $studentsSection = $this->Sections->StudentsSections->newEntity([
+                            'student_id' => $this->request->getData('Section.Selected_student_id'),
+                            'section_id' => $this->request->getData('Section.section_id'),
+                        ]);
+                        $this->Sections->StudentsSections->save($studentsSection);
                     }
 
-                    $student_full_name = $this->Section->Student->field(
-                        'Student.full_name',
-                        array('Student.id' => $this->request->data['Section']['Selected_student_id'])
-                    );
-                    $section_name = $this->Section->field(
-                        'Section.name',
-                        array('Section.id' => $this->request->data['Section']['section_id'])
-                    );
-                    $this->Flash->success('' . $student_full_name . ' is Added to Section ' . $section_name . '.');
-                    return $this->redirect(
-                        array('action' => 'display_sections', $this->request->data['Section']['section_id'])
-                    );
+                    $this->Flash->success("$student_full_name is Added to Section $section_name.");
+                    return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.section_id')]);
                 }
             } else {
-                $student_full_name = $this->Section->Student->field(
-                    'Student.full_name',
-                    array('Student.id' => $this->request->data['Section']['Selected_student_id'])
+                $this->Flash->error(
+                    "$student_full_name fails to qualify to be added to a section.",
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections', $this->request->getData('Section.section_id')]]]
                 );
-                $this->Flash->error('' . $student_full_name . ' fails to qualify to be added to a section.');
-                $this->redirect(array('action' => 'display_sections', $this->request->data['Section']['section_id']));
+                return $this->redirect(['action' => 'displaySections', $this->request->getData('Section.section_id')]);
             }
         }
     }
 
-    public function mass_student_section_add()
+
+    public function massStudentSectionAdd()
     {
+        if (!empty($this->request->getData())) {
+            $new_section_detail = $this->Sections->find()
+                ->where(['Sections.id' => $this->request->getData('SectionDetail.section_id')])
+                ->contain([
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                ])
+                ->first();
 
-        if (!empty($this->request->data)) {
-            $new_section_detail = $this->Section->find('first', array(
-                'conditions' => array(
-                    'Section.id' => $this->request->data['SectionDetail']['section_id']
-                ),
-                'contain' => array(
-                    'YearLevel' => array('id', 'name'),
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                )
-            ));
-
-            if (isset($new_section_detail['Curriculum']['id']) && is_numeric(
-                    $new_section_detail['Curriculum']['id']
-                ) && $new_section_detail['Curriculum']['id']) {
-                $section_curriculum = $new_section_detail['Curriculum']['id'];
+            if (!empty($new_section_detail->curriculum->id)) {
+                $section_curriculum = $new_section_detail->curriculum->id;
             } else {
-                $section_curriculum = $this->Section->get_section_curriculum(
-                    $this->request->data['SectionDetail']['section_id']
-                );
+                $section_curriculum = $this->Sections->getSectionCurriculum($this->request->getData('SectionDetail.section_id'));
             }
 
-            $failSuccess['success'] = 0;
-            $failSuccess['error'] = 0;
+            $failSuccess = ['success' => 0, 'error' => 0];
             $fresh = false;
             $failReason = '<ul>';
 
-            //debug($this->request->data);
+            // debug($this->request->getData());
 
-            if (isset($this->request->data['Section']) && !empty($this->request->data['Section'])) {
-                foreach ($this->request->data['Section'] as $k => $v) {
-                    if (is_numeric($k)) {
-                        if ($v['selected_id'] == 1) {
-                            $studentAdds = array();
+            if (!empty($this->request->getData('Section'))) {
+                foreach ($this->request->getData('Section') as $k => $v) {
+                    if (is_numeric($k) && $v['selected_id'] == 1) {
+                        $studentAdds = [];
 
-                            $studentNameAndID = $this->Section->Student->find('first', array(
-                                'conditions' => array(
-                                    'Student.id' => $v['student_id']
-                                ),
-                                'fields' => array(
-                                    'first_name',
-                                    'middle_name',
-                                    'last_name',
-                                    'studentnumber',
-                                    'curriculum_id',
-                                    'college_id',
-                                    'department_id',
-                                    'academicyear',
-                                    'graduated'
-                                ),
-                                'recursive' => -1,
-                            ));
+                        $studentNameAndID = $this->Sections->Students->find()
+                            ->where(['Students.id' => $v['student_id']])
+                            ->select(['first_name', 'middle_name', 'last_name', 'studentnumber', 'curriculum_id', 'college_id', 'department_id', 'academicyear', 'graduated'])
+                            ->first();
 
-                            $studentnumber = $studentNameAndID['Student']['first_name'] . ' ' . $studentNameAndID['Student']['middle_name'] . ' ' . $studentNameAndID['Student']['last_name'] . ' (' . $studentNameAndID['Student']['studentnumber'] . ')';
+                        $studentnumber = "{$studentNameAndID->first_name} {$studentNameAndID->middle_name} {$studentNameAndID->last_name} ({$studentNameAndID->studentnumber})";
 
-                            if ($this->role_id == ROLE_DEPARTMENT) {
-                                $student_curriculum = $studentNameAndID['Student']['curriculum_id'];
-                                $studentYearLevel = ClassRegistry::init(
-                                    'StudentExamStatus'
-                                )->studentYearAndSemesterLevel($v['student_id']);
+                        if ($this->role_id == ROLE_DEPARTMENT) {
+                            $student_curriculum = $studentNameAndID->curriculum_id;
+                            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+                            $studentYearLevel = $studentExamStatusTable->studentYearAndSemesterLevel($v['student_id']);
+                        } else {
+                            $studentYearLevel = 'Pre/1st';
+                            $section_curriculum = -1;
+                            $student_curriculum = -1;
+                            $fresh = true;
+                        }
+
+                        // debug($fresh);
+
+                        if (($new_section_detail->year_level->name == $studentYearLevel['year'] && $this->Sections->Students->StudentExamStatuses->getStudentExamStatus($v['student_id']) && ($student_curriculum == $section_curriculum || $section_curriculum == "nostudentinsection")) || $fresh) {
+                            $already_recorded_id = $this->checkTheRecordInArchive($v['section_id'], $v['student_id']);
+
+                            if ($already_recorded_id) {
+                                $studentsSection = $this->Sections->StudentsSections->get($already_recorded_id);
+                                $studentsSection->archive = 0;
+                                $this->Sections->StudentsSections->save($studentsSection);
+                                $failSuccess['success']++;
                             } else {
-                                $studentYearLevel = 'Pre/1st';
-                                $section_curriculum = -1;
-                                $student_curriculum = -1;
-                                $fresh = true;
+                                $studentAdds = $this->Sections->StudentsSections->newEntity([
+                                    'student_id' => $v['student_id'],
+                                    'section_id' => $v['section_id'],
+                                ]);
+                                $this->Sections->StudentsSections->save($studentAdds);
+                                $failSuccess['success']++;
                             }
-                            //debug($fresh);
 
-                            if ((isset($new_section_detail['YearLevel']['name']) && $new_section_detail['YearLevel']['name'] == $studentYearLevel['year'] && $this->Section->Student->StudentExamStatus->get_student_exam_status(
-                                        $v['student_id']
-                                    ) && ($student_curriculum == $section_curriculum || $section_curriculum == "nostudentinsection")) || $fresh) {
-                                //To check whether the record is already there as archive, if so just turnoff the archive is enough
-                                $already_recorded_id = $this->_check_the_record_in_archive(
-                                    $v['section_id'],
-                                    $v['student_id']
-                                );
-
-                                if ($already_recorded_id) {
-                                    $this->Section->StudentsSection->id = $already_recorded_id;
-                                    $this->Section->StudentsSection->saveField('archive', '0');
-                                    $failSuccess['success'] = $failSuccess['success'] + 1;
-                                } else {
-                                    $studentAdds['StudentsSection']['student_id'] = $v['student_id'];
-                                    $studentAdds['StudentsSection']['section_id'] = $v['section_id'];
-                                    $this->Section->StudentsSection->create();
-                                    $this->Section->StudentsSection->save($studentAdds['StudentsSection']);
-                                    $failSuccess['success'] = $failSuccess['success'] + 1;
+                            if ((is_null($new_section_detail->curriculum->id) || empty($new_section_detail->curriculum->id)) && !$fresh) {
+                                if (is_numeric($section_curriculum) && $section_curriculum > 3) {
+                                    $section = $this->Sections->get($v['section_id']);
+                                    $section->curriculum_id = $section_curriculum;
+                                    $this->Sections->save($section);
+                                } elseif (is_numeric($student_curriculum) && $student_curriculum > 3) {
+                                    $section = $this->Sections->get($v['section_id']);
+                                    $section->curriculum_id = $student_curriculum;
+                                    $this->Sections->save($section);
                                 }
-
-                                if ((is_null(
-                                            $new_section_detail['Curriculum']['id']
-                                        ) || empty($new_section_detail['Curriculum']['id'])) && !$fresh) {
-                                    if (isset($section_curriculum) && is_numeric(
-                                            $section_curriculum
-                                        ) && $section_curriculum > 3) {
-                                        $this->Section->id = $v['section_id'];
-                                        $this->Section->saveField('curriculum_id', $section_curriculum);
-                                    } else {
-                                        if (isset($student_curriculum) && is_numeric(
-                                                $student_curriculum
-                                            ) && $student_curriculum > 3) {
-                                            $this->Section->id = $v['section_id'];
-                                            $this->Section->saveField('curriculum_id', $student_curriculum);
-                                        }
-                                    }
-                                }
-                            } else {
-                                $failSuccess['error'] = $failSuccess['error'] + 1;
-                                $failReason = '<br>';
-                                if ($new_section_detail['YearLevel']['name'] != $studentYearLevel['year']) {
-                                    $failReason .= '<li> ' . $new_section_detail['Section']['name'] . ' section\'s year level is  ' . $new_section_detail['YearLevel']['name'] . ' but,  ' . $studentnumber . ' is in ' . $studentYearLevel['year'] . ' year. </li>';
-                                }
-                                if (($student_curriculum != $section_curriculum)) {
-                                    $student_curriculum_name = $this->Section->Curriculum->field(
-                                        'Curriculum.name',
-                                        array('Curriculum.id' => $student_curriculum)
-                                    );
-                                    $section_curriculum_name = $this->Section->Curriculum->field(
-                                        'Curriculum.name',
-                                        array('Curriculum.id' => $section_curriculum)
-                                    );
-                                    $failReason .= '<li> ' . $new_section_detail['Section']['name'] . ' section\'s  curriculum is "' . $section_curriculum_name . '" but, ' . $studentnumber . ' is attached to "' . $student_curriculum_name . '" Curriculum.</li>';
-                                }
+                            }
+                        } else {
+                            $failSuccess['error']++;
+                            $failReason .= '<br>';
+                            if ($new_section_detail->year_level->name != $studentYearLevel['year']) {
+                                $failReason .= "<li> {$new_section_detail->name} section's year level is {$new_section_detail->year_level->name} but, $studentnumber is in {$studentYearLevel['year']} year. </li>";
+                            }
+                            if ($student_curriculum != $section_curriculum) {
+                                $student_curriculum_name = $this->Sections->Curriculums->find()
+                                    ->select(['name'])
+                                    ->where(['Curriculums.id' => $student_curriculum])
+                                    ->first()
+                                    ->name;
+                                $section_curriculum_name = $this->Sections->Curriculums->find()
+                                    ->select(['name'])
+                                    ->where(['Curriculums.id' => $section_curriculum])
+                                    ->first()
+                                    ->name;
+                                $failReason .= "<li> {$new_section_detail->name} section's curriculum is \"$section_curriculum_name\" but, $studentnumber is attached to \"$student_curriculum_name\" Curriculum.</li>";
                             }
                         }
                     }
@@ -5909,599 +4259,132 @@ class SectionsController extends AppController
             $failReason .= '</ul>';
 
             if ($failSuccess['success']) {
-                $this->Flash->success(
-                    ($failSuccess['success'] == 1 ? $studentnumber . ' has been' : $failSuccess['success'] . ' Students have been') . ' added to ' . $new_section_detail['Section']['name'] . ' Section Successfully.'
+                $this->Flash->success(($failSuccess['success'] == 1 ? "$studentnumber has been" : "{$failSuccess['success']} Students have been") . " added to {$new_section_detail->name} Section Successfully.");
+                return $this->redirect(['action' => 'displaySections', $new_section_detail->id]);
+            } elseif ($failSuccess['error']) {
+                $this->Flash->error(
+                    "Not able to add to the section with the following reason $failReason",
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections', $this->request->getData('SectionDetail.section_id')]]]
                 );
-                return $this->redirect(array('action' => 'display_sections', $new_section_detail['Section']['id']));
-            } else {
-                if ($failSuccess['error']) {
-                    $this->Session->setFlash(
-                        __(
-                            '<span style="margin-right: 15px;"></span> Not able to add to the section with the following reason ' . $failReason . '',
-                            true
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                    return $this->redirect(
-                        array('action' => 'display_sections', $this->request->data['SectionDetail']['section_id'])
-                    );
-                }
+                return $this->redirect(['action' => 'displaySections', $this->request->getData('SectionDetail.section_id')]);
             }
-            return $this->redirect(
-                array('action' => 'display_sections', $this->request->data['SectionDetail']['section_id'])
-            );
+            return $this->redirect(['action' => 'displaySections', $this->request->getData('SectionDetail.section_id')]);
         }
     }
 
-    public function add_student_prev_section()
+    public function upgradeSections()
     {
-
-        if (!empty($this->request->data)) {
-            // Update is needed here!
-            /* $selectedStudentDetail = ClassRegistry::init('Student')->find('first', array('conditions' => array('Student.id' => $this->request->data['Section']['Selected_student_id']), 'recursive' => -1));
-			$selectedSectionForAdd = array();
-			$updateStudentsCurriculumBasedOnCurrentSection = array();
-			$updateAcceptedStudentsCurriculumBasedOnCurrentSection = array();
-			$count = 0;
-
-			$studID = '';
-			$sectionID = '';
-
-			$sectionCurriculumAttachedToSudentWhenAdding = 0;
-
-			debug($this->request->data);
-
-			$selected_student_attached_curriculum = $selectedStudentDetail['Student']['curriculum_id'];
-
-			//$this->Section->Student->bindModel(array('hasMany' => array('StudentsSection' => array('conditions' => array('StudentsSection.student_id' => $this->request->data['Section']['Selected_student_id']), 'group' => array('StudentsSection.student_id', 'StudentsSection.section_id')))));
-
-			$selected_student_sections = $this->Section->Student->find('all', array(
-				'conditions' => array(
-					'Student.id' => $this->request->data['Section']['Selected_student_id'],
-				),
-				'fields' => array(
-					'Student.id',
-					'Student.studentnumber',
-					'Student.academicyear',
-					'Student.graduated',
-				),
-				'contain' => array(
-					'Section' => array(
-						'fields' => array(
-							'Section.id',
-							'Section.name',
-							'Section.academicyear',
-							'Section.curriculum_id',
-							'Section.created',
-							'Section.modified',
-						),
-						'StudentsSection' => array(
-							'fields' => array(
-								'StudentsSection.id',
-								'StudentsSection.student_id',
-								'StudentsSection.section_id',
-								'StudentsSection.archive',
-								'StudentsSection.created',
-								'StudentsSection.modified',
-							),
-							'order' => array('StudentsSection.modified DESC'),
-						),
-						'YearLevel' => array(
-							'fields' => array(
-								'YearLevel.id',
-								'YearLevel.name',
-							),
-						),
-						'order' => array('Section.created DESC'),
-					)
-				),
-				'revursive' => -1,
-			));
-
-			debug($selected_student_sections);
-
-			debug($selected_student_sections[0]['Section'][0]['StudentsSection']['archive']);
-
-			if (!empty($selected_student_sections[0]['Section'][0])) {
-				$students_last_section_acy = $selected_student_sections[0]['Section'][0]['academicyear'];
-			} else {
-				$students_last_section_acy = $this->AcademicYear->current_academicyear();
-			}
-
-			debug($students_last_section_acy);
-
-			$previousStudentsSection = $this->Section->StudentsSection->find('list', array(
-				'conditions' => array(
-					'StudentsSection.student_id' => $this->request->data['Section']['Selected_student_id'],
-					'StudentsSection.archive' => 1
-				),
-				'group' => array(
-					'StudentsSection.student_id',
-					'StudentsSection.section_id'
-				),
-				'fields' => array(
-					'StudentsSection.section_id',
-					'StudentsSection.section_id'
-				)
-			)); */
-
-            if (!empty($this->request->data['Section']['assigned_section'])) {
-                debug(count($this->request->data['Section']['assigned_section']));
-
-                if (count($this->request->data['Section']['assigned_section']) == 1) {
-                    debug($this->request->data['Section']['assigned_section']);
-
-                    $student_detail = $this->Section->Student->find('first', array(
-                        'conditions' => array(
-                            'Student.id' => $this->request->data['Section']['Selected_student_id']
-                        ),
-                        'contain' => array(
-                            'AcceptedStudent' => array('id', 'studentnumber', 'academicyear'),
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                            'Section' => array(
-                                'fields' => array(
-                                    'Section.id',
-                                    'Section.name',
-                                    'Section.year_level_id',
-                                    'Section.academicyear',
-                                    'Section.college_id',
-                                    'Section.department_id',
-                                    'Section.curriculum_id',
-                                    'Section.created',
-                                    'Section.archive'
-                                ),
-                                'order' => array(
-                                    'Section.year_level_id' => 'DESC',
-                                    'Section.id DESC',
-                                ),
-                                'YearLevel' => array(
-                                    'fields' => array('id', 'name')
-                                )
-                            ),
-                            /* 'CourseRegistration' => array(
-								'order' => array(
-									'CourseRegistration.academic_year DESC',
-									'CourseRegistration.semester DESC',
-									'CourseRegistration.id DESC',
-								),
-								'fields' => array('id', 'year_level_id',  'student_id', 'section_id', 'year_level_id', 'semester', 'academic_year', 'published_course_id', 'created')
-							), */
-                        ),
-                        'fields' => array(
-                            'Student.studentnumber',
-                            'Student.full_name',
-                            'Student.curriculum_id',
-                            'Student.department_id',
-                            'Student.college_id',
-                            'Student.program_id',
-                            'Student.program_type_id',
-                            'Student.gender',
-                            'Student.graduated',
-                            'Student.academicyear',
-                            'Student.admissionyear',
-                        ),
-                    ));
-
-                    //debug($student_detail);
-
-                    $freshmanStudent = 0;
-
-                    if (is_null(
-                            $student_detail['Student']['department_id']
-                        ) && $student_detail['Student']['program_id'] == PROGRAM_UNDEGRADUATE) {
-                        $freshmanStudent = 1;
-                    }
-
-                    $sectionDetail = $this->Section->find('first', array(
-                        'conditions' => array(
-                            'Section.id' => $this->request->data['Section']['assigned_section']
-                        ),
-                        'contain' => array(
-                            'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active')
-                        ),
-                        'recursive' => -1
-                    ));
-
-                    $studentsCountInSelectedSection = ClassRegistry::init('StudentsSection')->find(
-                        'count',
-                        array('conditions' => array('StudentsSection.section_id' => $this->request->data['Section']['assigned_section']))
-                    );
-
-                    debug($studentsCountInSelectedSection);
-
-                    if (!$freshmanStudent && (is_null($student_detail['Student']['curriculum_id']))) {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                            $this->Flash->error(
-                                $student_detail['Student']['full_name'] . ' (' . $student_detail['Student']['studentnumber'] . ') is not attached to a curriculum, Please attach the student to a curriculum before trying to add the student to a section.'
-                            );
-                        } else {
-                            $this->Flash->error(
-                                $student_detail['Student']['full_name'] . ' (' . $student_detail['Student']['studentnumber'] . ') is not attached to a curriculum, Communicate his/her department to attach a curriculum to the student before trying to add him/her to a section.'
-                            );
-                        }
-                        $this->redirect(
-                            array(
-                                'controller' => 'students',
-                                'action' => 'student_academic_profile',
-                                $student_detail['Student']['id']
-                            )
-                        );
-                    } else {
-                        if (!$freshmanStudent && isset($student_detail['Student']['Curriculum']['name']) && isset($this->request->data['Section']['assigned_section']) && is_numeric(
-                                $this->request->data['Section']['assigned_section']
-                            )) {
-                            if (!empty($sectionDetail) && isset($sectionDetail['Section']['curriculum_id']) && is_numeric(
-                                    $sectionDetail['Section']['curriculum_id']
-                                ) && $sectionDetail['Section']['curriculum_id'] != 0) {
-                                $section_curriculum = $sectionDetail['Section']['curriculum_id'];
-                                $section_curriculumName = $sectionDetail['Section']['Curriculum']['name'];
-                            } else {
-                                $section_curriculum = $this->Section->getSectionCurriculum(
-                                    $this->request->data['Section']['assigned_section']
-                                );
-                                if ($section_curriculum) {
-                                    $section_curriculumName = $this->Section->Curriculum->field(
-                                        'Curriculum.name',
-                                        array('Curriculum.id' => $section_curriculum)
-                                    );
-                                }
-                            }
-
-                            if ($student_detail['Student']['curriculum_id'] != $section_curriculum) {
-                                $this->Flash->error(
-                                    $student_detail['Student']['full_name'] . ' (' . $student_detail['Student']['studentnumber'] . ') is attached to ' . $student_detail['Student']['Curriculum']['name'] . '  curriculum, But students in ' . $sectionDetail['Section']['name'] . ' section are attached to ' . $section_curriculumName . ' curriculum.'
-                                );
-                                $this->redirect(
-                                    array(
-                                        'controller' => 'students',
-                                        'action' => 'student_academic_profile',
-                                        $this->request->data['Section']['Selected_student_id']
-                                    )
-                                );
-                            }
-                        }
-                    }
-
-                    $already_recorded = ClassRegistry::init('StudentsSection')->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'StudentsSection.section_id' => $this->request->data['Section']['assigned_section'],
-                                'StudentsSection.student_id' => $student_detail['Student']['id']
-                            )
-                        )
-                    );
-
-                    if (!$already_recorded) {
-                        if (!empty($student_detail['Section'])) {
-                            $this->Section->StudentsSection->updateAll(array('archive' => 1),
-                                array('student_id' => $student_detail['Student']['id']));
-                        }
-
-                        $sectionAdd['StudentsSection']['student_id'] = $student_detail['Student']['id'];
-                        $sectionAdd['StudentsSection']['section_id'] = $this->request->data['Section']['assigned_section'];
-
-                        $this->Section->StudentsSection->create();
-
-                        if ($this->Section->StudentsSection->save($sectionAdd['StudentsSection'])) {
-                            $this->Flash->success(
-                                $student_detail['Student']['full_name'] . ' (' . $student_detail['Student']['studentnumber'] . ') is added to ' . $sectionDetail['Section']['name'] . ' section Successfully.'
-                            );
-                            //$this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $this->request->data['Section']['Selected_student_id']));
-                        } else {
-                            $this->Flash->error(
-                                $student_detail['Student']['full_name'] . ' (' . $student_detail['Student']['studentnumber'] . ') could not be added to ' . $sectionDetail['Section']['name'] . ' section. Please, try again.'
-                            );
-                        }
-                    }
-
-                    if ($studentsCountInSelectedSection == 0 && (!isset($sectionDetail['Section']['curriculum_id']) || empty($sectionDetail['Section']['curriculum_id']))) {
-                        $this->Section->id = $sectionDetail['Section']['id'];
-                        $this->Section->saveField('curriculum_id', $student_detail['Student']['curriculum_id']);
-                    }
-
-                    $this->redirect(
-                        array(
-                            'controller' => 'students',
-                            'action' => 'student_academic_profile',
-                            $student_detail['Student']['id']
-                        )
-                    );
-                } else {
-                    /* foreach ($this->request->data['Section']['assigned_section'] as $k => $v) {
-						if ($v != 0 && !in_array($v, $previousStudentsSection)) {
-							debug($v);
-							//$section = $this->Section->find('first', array('conditions' => array('Section.id' => $k), 'recursive' => -1));
-							$section = $this->Section->find('first', array('conditions' => array('Section.id' => $v), 'recursive' => -1));
-							$studID = $selectedSectionForAdd['StudentsSection'][$count]['student_id'] = $this->request->data['Section']['Selected_student_id'];
-							$sectionID = $selectedSectionForAdd['StudentsSection'][$count]['section_id'] = $v;
-
-							$section_curriculum_id = $this->Section->getSectionCurriculum($v);
-
-							debug($section_curriculum_id);
-
-							debug($selected_student_attached_curriculum);
-
-							if ($section['Section']['academicyear'] >= $this->AcademicYear->current_academicyear()) {
-								$selectedSectionForAdd['StudentsSection'][$count]['archive'] = 0;
-								debug($selectedSectionForAdd);
-								$this->Section->StudentsSection->updateAll(array('archive' => 1), array('student_id' => $this->request->data['Section']['Selected_student_id']));
-							} else {
-								$selectedSectionForAdd['StudentsSection'][$count]['archive'] = 1;
-							}
-
-							//debug(ClassRegistry::init('Student')->field('Student.curriculum_id', array('Student.id' => $this->request->data['Section']['Selected_student_id'])));
-							$selected_student_attached_curriculum = ClassRegistry::init('Student')->field('Student.curriculum_id', array('Student.id' => $this->request->data['Section']['Selected_student_id']));
-
-							if (empty($selected_student_attached_curriculum) || is_null($selected_student_attached_curriculum)) {
-
-								if ($this->role_id == ROLE_DEPARTMENT && $this->department_id == $selectedStudentDetail['Student']['department_id']) {
-									$updateStudentsCurriculumBasedOnCurrentSection['Student']['id'] = $this->request->data['Section']['Selected_student_id'];
-									$updateStudentsCurriculumBasedOnCurrentSection['Student']['curriculum_id'] = $section_curriculum_id;
-
-									$updateAcceptedStudentsCurriculumBasedOnCurrentSection['AcceptedStudent']['id'] = $selectedStudentDetail['Student']['accepted_student_id'];
-									$updateAcceptedStudentsCurriculumBasedOnCurrentSection['AcceptedStudent']['curriculum_id'] = $section_curriculum_id;
-									$updateAcceptedStudentsCurriculumBasedOnCurrentSection['AcceptedStudent']['Placement_Approved_By_Department'] = 1;
-
-									$addCurriculumAttachmentsEntry['CurriculumAttachment']['student_id'] = $this->request->data['Section']['Selected_student_id'];
-									$addCurriculumAttachmentsEntry['CurriculumAttachment']['curriculum_id'] = $section_curriculum_id;
-									$addCurriculumAttachmentsEntry['CurriculumAttachment']['created'] = date('Y-m-d H:i:s');
-									$addCurriculumAttachmentsEntry['CurriculumAttachment']['modified'] = date('Y-m-d H:i:s');
-
-									//ClassRegistry::init('User')->saveAll($deactivateAccount['User'], array('validate' => false))
-									debug($updateStudentsCurriculumBasedOnCurrentSection['Student']);
-									debug($updateAcceptedStudentsCurriculumBasedOnCurrentSection['AcceptedStudent']);
-									debug($addCurriculumAttachmentsEntry['CurriculumAttachment']);
-
-
-									$this->Section->Student->id = $this->request->data['Section']['Selected_student_id'];
-
-									if ($this->Section->Student->saveField('curriculum_id', $section_curriculum_id)) {
-										$sectionCurriculumAttachedToSudentWhenAdding = $section_curriculum_id;
-									}
-
-									//$this->Section->Student->AcceptedStudent->id = $selectedStudentDetail['Student']['accepted_student_id'];
-									//$this->Section->Student->AcceptedStudent->saveField('curriculum_id', $section_curriculum_id);
-
-									$this->Section->Student->AcceptedStudent->updateAll(array('AcceptedStudent.curriculum_id' => $section_curriculum_id, 'AcceptedStudent.Placement_Approved_By_Department' => 1), array('AcceptedStudent.id' => $selectedStudentDetail['Student']['accepted_student_id']));
-
-									//$this->Section->Student->CurriculumAttachment->create();
-									//$this->Section->Student->CurriculumAttachment->save($addCurriculumAttachmentsEntry['CurriculumAttachment']);
-
-								} else if ($this->role_id == ROLE_REGISTRAR && in_array($selectedStudentDetail['Student']['department_id'], $this->department_ids)) {
-									$this->Flash->error('The selected student is not attached to a curriculum, Communicate his/her department before trying to add the student to a section.');
-									$this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $this->request->data['Section']['Selected_student_id']));
-								}
-							}
-						}
-						$count++;
-					} */
-                }
-            } else {
-                $this->Flash->error('You need to select a section to add for the selected student.');
-                $this->redirect(
-                    array(
-                        'controller' => 'students',
-                        'action' => 'student_academic_profile',
-                        $this->request->data['Section']['Selected_student_id']
-                    )
-                );
-            }
-            /* if (!empty($selectedSectionForAdd)) {
-				debug($selectedSectionForAdd);
-				$successAdd = 0;
-				$successUpdate = 0;
-				$archieve = 0;
-				$already_recorded_id = ClassRegistry::init('StudentsSection')->find('first', array('conditions' => array('StudentsSection.section_id' => $sectionID, 'StudentsSection.student_id' => $studID), 'recursive' => -1));
-
-				if ($already_recorded_id) {
-					$section = $this->Section->find('first', array('conditions' => array('Section.id' => $sectionID), 'recursive' => -1));
-					$this->Section->StudentsSection->id = $already_recorded_id;
-
-					if ($section['Section']['academicyear'] >= $this->AcademicYear->current_academicyear()) {
-						$this->Section->StudentsSection->saveField('archive', '0');
-						$successUpdate =  1;
-					} else {
-						$this->Section->StudentsSection->saveField('archive', '1');
-						$archieve =  $successUpdate =  1;
-					}
-				} else {
-					$sectionAdd['StudentsSection']['student_id'] = $studID;
-					$sectionAdd['StudentsSection']['section_id'] = $sectionID;
-					$this->Section->StudentsSection->create();
-					$this->Section->StudentsSection->save($sectionAdd['StudentsSection']);
-					$successAdd = 1;
-				}
-
-				if ($successAdd) {
-					if ($sectionCurriculumAttachedToSudentWhenAdding) {
-						$this->Flash->success('Student Section Added Successfully and Section Curriculum is also attached to his profile.');
-					} else {
-						$this->Flash->success('Student Section Added Successfully.');
-					}
-
-					$this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $this->request->data['Section']['Selected_student_id']));
-				} else if ($successUpdate) {
-					$this->Flash->success('Student Section ' . $archieve == 0 ? 'updated sucessfully' : 'updated and archieved' . '.');
-					$this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $this->request->data['Section']['Selected_student_id']));
-				}
-			} else {
-				$this->Flash->error('The student could not be added to selected section. Please, try again.');
-				$this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $this->request->data['Section']['Selected_student_id']));
-			} */
+        if ($this->auth_user['role_id'] != ROLE_DEPARTMENT) {
+            $this->Flash->warning('You need to have department role to upgrade section year levels!');
+            return $this->redirect('/');
         }
 
-        $this->redirect(
-            array(
-                'controller' => 'students',
-                'action' => 'student_academic_profile',
-                $this->request->data['Section']['Selected_student_id']
-            )
-        );
-    }
-
-    public function upgrade_sections()
-    {
-
-        if ($this->Session->read('Auth.User')['role_id'] != ROLE_DEPARTMENT) {
-            $this->Flash->warning('You need to have department role to updrade section year levels!');
-            $this->redirect('/');
-        }
-
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
+        $programs = $this->Sections->Programs->find('list')->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')->toArray();
+        $yearLevels = $this->Sections->YearLevels->find('list')
+            ->where(['YearLevels.department_id' => $this->department_id])
+            ->toArray();
 
         $isbeforesearch = 1;
 
         $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels'));
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
             $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            $selected_academicyear = (!empty($this->request->data['Section']['academicyear']) ? $this->request->data['Section']['academicyear'] : $this->AcademicYear->current_academicyear(
-            ));
-            $selected_year_level = $this->request->data['Section']['year_level_id'];
+            $selected_program = $this->request->getData('Section.program_id');
+            $selected_program_type = $this->request->getData('Section.program_type_id');
+            $selected_academicyear = !empty($this->request->getData('Section.academicyear')) ? $this->request->getData('Section.academicyear') : $this->AcademicYear->currentAcademicYear();
+            $selected_year_level = $this->request->getData('Section.year_level_id');
 
             if (empty($selected_year_level)) {
-                //$selected_year_level = '%';
                 $selected_year_level = array_keys($yearLevels);
             }
 
-            $sections = $this->Section->find('all', array(
-                //'fields' => array('Section.id', 'Section.name'),
-                'conditions' => array(
-                    'Section.department_id' => $this->department_id,
-                    'Section.program_id' => (!empty($selected_program) ? $selected_program : $this->program_ids),
-                    'Section.program_type_id' => (!empty($selected_program_type) ? $selected_program_type : $this->program_type_ids),
-                    'Section.academicyear' => $selected_academicyear,
-                    //'Section.year_level_id LIKE ' => $selected_year_level,
-                    'Section.year_level_id' => $selected_year_level,
-                    'Section.archive' => 0
-                ),
-                'contain' => array(
-                    'YearLevel' => array(
-                        'fields' => array(
-                            'YearLevel.name'
-                        )
-                    ),
-                    'PublishedCourse' => array(
-                        'fields' => array('PublishedCourse.id', 'PublishedCourse.section_id'),
-                        'CourseRegistration' => array(
-                            'fields' => array('id', 'published_course_id', 'section_id', 'student_id'),
-                            'limit' => 1
-                        ),
-                        'limit' => 1
-                    )
-                ),
-                'order' => array(
-                    'Section.year_level_id' => 'ASC',
-                    'Section.program_id' => 'ASC',
-                    'Section.program_type_id' => 'ASC',
-                    'Section.name' => 'ASC'
-                )
-            ));
+            $sections = $this->Sections->find()
+                ->where([
+                    'Sections.department_id' => $this->department_id,
+                    'Sections.program_id' => !empty($selected_program) ? $selected_program : $this->program_ids,
+                    'Sections.program_type_id' => !empty($selected_program_type) ? $selected_program_type : $this->program_type_ids,
+                    'Sections.academicyear' => $selected_academicyear,
+                    'Sections.year_level_id IN' => $selected_year_level,
+                    'Sections.archive' => 0,
+                ])
+                ->contain([
+                    'YearLevels' => ['fields' => ['name']],
+                    'PublishedCourses' => [
+                        'fields' => ['id', 'section_id'],
+                        'CourseRegistrations' => ['fields' => ['id', 'published_course_id', 'section_id', 'student_id'], 'limit' => 1],
+                        'limit' => 1,
+                    ],
+                ])
+                ->order(['Sections.year_level_id' => 'ASC', 'Sections.program_id' => 'ASC', 'Sections.program_type_id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
 
-            $sections_lastpublishedcourses_list = array();
+            $sections_lastpublishedcourses_list = [];
             $last_year_level_sections_count = 0;
-
-            /* if (!empty($sections)) {
-				foreach ($sections as $section) {
-					$sections_lastpublishedcourses_list[$section['Section']['id']] = $this->Section->PublishedCourse->lastPublishedCoursesForSection($section['Section']['id']);
-				}
-			} */
 
             if (!empty($sections)) {
                 foreach ($sections as $sKey => &$section) {
-                    if (!empty($section['Section']['department_id']) && $section['Section']['department_id'] > 0 && $section['Section']['department_id'] == $this->department_id) {
-                        //isset($section['PublishedCourse'][0]['CourseRegistration'][0]) ? debug($section['PublishedCourse'][0]['CourseRegistration'][0]) : '';
+                    if (!empty($section->department_id) && $section->department_id == $this->department_id) {
+                        // debug($section->published_courses[0]->course_registrations[0] ?? '');
 
-                        if (empty($section['PublishedCourse']) || (isset($section['PublishedCourse'][0]) && !isset($section['PublishedCourse'][0]['CourseRegistration'][0]))) {
+                        if (empty($section->published_courses) || (isset($section->published_courses[0]) && !isset($section->published_courses[0]->course_registrations[0]))) {
                             unset($sections[$sKey]);
                             continue;
                         }
 
-                        if (!empty($section['Section']['curriculum_id']) && $section['Section']['curriculum_id'] > 0 && !empty($section['Section']['year_level_id']) && $section['Section']['year_level_id'] > 0) {
-                            $curriculum_year_levels = $this->Section->Curriculum->Course->find(
-                                'list',
-                                array(
-                                    'conditions' => array(
-                                        'Course.curriculum_id' => $section['Section']['curriculum_id'],
-                                        'Course.active' => 1
-                                    ),
-                                    'fields' => array('Course.year_level_id', 'Course.year_level_id'),
-                                    'group' => array('Course.year_level_id'),
-                                    'order' => array('Course.year_level_id' => 'DESC')
-                                )
-                            );
-                            //debug($curriculum_year_levels);
+                        if (!empty($section->curriculum_id) && $section->curriculum_id > 0 && !empty($section->year_level_id) && $section->year_level_id > 0) {
+                            $curriculum_year_levels = $this->Sections->Curriculums->Courses->find('list')
+                                ->where(['Courses.curriculum_id' => $section->curriculum_id, 'Courses.active' => 1])
+                                ->select(['Courses.year_level_id', 'Courses.year_level_id'])
+                                ->group(['Courses.year_level_id'])
+                                ->order(['Courses.year_level_id' => 'DESC'])
+                                ->toArray();
+                            // debug($curriculum_year_levels);
+
                             if (!empty($curriculum_year_levels)) {
                                 $curriculum_year_levels = array_values($curriculum_year_levels);
-                                //debug($curriculum_year_levels);
+                                // debug($curriculum_year_levels);
 
-                                if (!empty($selected_year_level) && !is_array($selected_year_level) && is_numeric(
-                                        $selected_year_level
-                                    ) && $curriculum_year_levels[0] <= $selected_year_level) {
-                                    $section['Section']['last_year_level_section'] = true;
+                                if (!empty($selected_year_level) && !is_array($selected_year_level) && is_numeric($selected_year_level) && $curriculum_year_levels[0] <= $selected_year_level) {
+                                    $section->last_year_level_section = true;
+                                    $last_year_level_sections_count++;
+                                } elseif (!empty($selected_year_level) && is_array($selected_year_level) && ($curriculum_year_levels[0] <= $section->year_level_id)) {
+                                    $section->last_year_level_section = true;
+                                    $last_year_level_sections_count++;
+                                } elseif ($curriculum_year_levels[0] == $section->year_level_id) {
+                                    $section->last_year_level_section = true;
                                     $last_year_level_sections_count++;
                                 } else {
-                                    if (!empty($selected_year_level) && is_array(
-                                            $selected_year_level
-                                        ) && ($curriculum_year_levels[0] <= $section['Section']['year_level_id'])) {
-                                        $section['Section']['last_year_level_section'] = true;
-                                        $last_year_level_sections_count++;
-                                    } else {
-                                        if ($curriculum_year_levels[0] == $section['Section']['year_level_id']) {
-                                            $section['Section']['last_year_level_section'] = true;
-                                            $last_year_level_sections_count++;
-                                        } else {
-                                            $section['Section']['last_year_level_section'] = false;
-                                        }
-                                    }
+                                    $section->last_year_level_section = false;
                                 }
                             } else {
                                 unset($sections[$sKey]);
                                 continue;
                             }
                         } else {
-                            $department_year_levels = $this->Section->YearLevel->find(
-                                'list',
-                                array(
-                                    'conditions' => array('YearLevel.department_id' => $this->department_id),
-                                    'fields' => array('YearLevel.id', 'YearLevel.id'),
-                                    'group' => array('YearLevel.department_id', 'YearLevel.id'),
-                                    'order' => array('YearLevel.id' => 'DESC')
-                                )
-                            );
+                            $department_year_levels = $this->Sections->YearLevels->find('list')
+                                ->where(['YearLevels.department_id' => $this->department_id])
+                                ->select(['YearLevels.id', 'YearLevels.id'])
+                                ->group(['YearLevels.department_id', 'YearLevels.id'])
+                                ->order(['YearLevels.id' => 'DESC'])
+                                ->toArray();
 
                             if (!empty($department_year_levels)) {
                                 $department_year_levels = array_values($department_year_levels);
-                                //debug($department_year_levels);
+                                // debug($department_year_levels);
 
-                                if (!empty($selected_year_level) && !is_array($selected_year_level) && is_numeric(
-                                        $selected_year_level
-                                    ) && $department_year_levels[0] == $selected_year_level) {
-                                    $section['Section']['last_year_level_section'] = true;
+                                if (!empty($selected_year_level) && !is_array($selected_year_level) && is_numeric($selected_year_level) && $department_year_levels[0] == $selected_year_level) {
+                                    $section->last_year_level_section = true;
+                                    $last_year_level_sections_count++;
+                                } elseif (!empty($selected_year_level) && is_array($selected_year_level) && $department_year_levels[0] == $section->year_level_id) {
+                                    $section->last_year_level_section = true;
+                                    $last_year_level_sections_count++;
+                                } elseif ($department_year_levels[0] == $section->year_level_id) {
+                                    $section->last_year_level_section = true;
                                     $last_year_level_sections_count++;
                                 } else {
-                                    if (!empty($selected_year_level) && is_array(
-                                            $selected_year_level
-                                        ) && $department_year_levels[0] == $section['Section']['year_level_id']) {
-                                        $section['Section']['last_year_level_section'] = true;
-                                        $last_year_level_sections_count++;
-                                    } else {
-                                        if ($department_year_levels[0] == $section['Section']['year_level_id']) {
-                                            $section['Section']['last_year_level_section'] = true;
-                                            $last_year_level_sections_count++;
-                                        } else {
-                                            $section['Section']['last_year_level_section'] = false;
-                                        }
-                                    }
+                                    $section->last_year_level_section = false;
                                 }
                             } else {
                                 unset($sections[$sKey]);
@@ -6509,10 +4392,8 @@ class SectionsController extends AppController
                             }
                         }
 
-                        $sections_lastpublishedcourses_list[$section['Section']['id']] = $this->Section->PublishedCourse->lastPublishedCoursesForSection(
-                            $section['Section']['id']
-                        );
-                        $sections_lastpublishedcourses_list[$section['Section']['id']]['last_year_level_section'] = (isset($section['Section']['last_year_level_section']) && $section['Section']['last_year_level_section'] ? true : false);
+                        $sections_lastpublishedcourses_list[$section->id] = $this->Sections->PublishedCourses->lastPublishedCoursesForSection($section->id);
+                        $sections_lastpublishedcourses_list[$section->id]['last_year_level_section'] = !empty($section->last_year_level_section);
                     } else {
                         unset($sections[$sKey]);
                         continue;
@@ -6520,26 +4401,23 @@ class SectionsController extends AppController
                 }
             }
 
-            //debug($sections);
-            //debug($sections_lastpublishedcourses_list);
+            // debug($sections);
+            // debug($sections_lastpublishedcourses_list);
 
-            $upgradable_sections = array();
-            $unupgradable_sections = array();
-
+            $upgradable_sections = [];
+            $unupgradable_sections = [];
 
             if (!empty($sections_lastpublishedcourses_list)) {
                 foreach ($sections_lastpublishedcourses_list as $sk => $sv) {
                     $is_submited_grade = 1;
-                    //debug($sv);
-                    //debug($sv['last_year_level_section']);
+                    // debug($sv);
+                    // debug($sv['last_year_level_section']);
 
                     if (!$sv['last_year_level_section']) {
                         foreach ($sv as $pk => $vk) {
                             if (is_numeric($pk)) {
-                                $is_submited_grade = $is_submited_grade * $this->Section->PublishedCourse->CourseRegistration->ExamGrade->is_grade_submitted(
-                                        $pk
-                                    );
-                                debug($is_submited_grade);
+                                $is_submited_grade *= $this->Sections->PublishedCourses->CourseRegistrations->ExamGrades->isGradeSubmitted($pk);
+                                // debug($is_submited_grade);
                             }
                         }
                     }
@@ -6552,62 +4430,52 @@ class SectionsController extends AppController
                 }
             }
 
-            debug($upgradable_sections);
-            debug($unupgradable_sections);
+            // debug($upgradable_sections);
+            // debug($unupgradable_sections);
 
-            $formatedSections = array();
-            $unqualified_students_count = array();
+            $formatedSections = [];
+            $unqualified_students_count = [];
 
             if (!empty($sections)) {
                 foreach ($sections as $usk => $usv) {
-                    if (in_array(
-                            $usv['Section']['id'],
-                            $upgradable_sections
-                        ) && (!isset($usv['Section']['last_year_level_section']) || (isset($usv['Section']['last_year_level_section']) && !$usv['Section']['last_year_level_section']))) {
-                        $formatedSections[$usv['YearLevel']['name']]['Upgradable'][$usv['Section']['id']] = $usv['Section']['name'] . ' (' . (isset($usv['YearLevel']['name']) && !empty($usv['YearLevel']['name']) ? $usv['YearLevel']['name'] : 'Pre/1st') . ', ' . $usv['Section']['academicyear'] . ')';
+                    if (in_array($usv->id, $upgradable_sections) && (empty($usv->last_year_level_section))) {
+                        $formatedSections[$usv->year_level->name]['Upgradable'][$usv->id] = $usv->name . ' (' . ($usv->year_level->name ?? 'Pre/1st') . ', ' . $usv->academicyear . ')';
                     } else {
-                        $formatedSections[$usv['YearLevel']['name']]['Unupgradable'][$usv['Section']['id']] = $usv['Section']['name'] . ' (' . (isset($usv['YearLevel']['name']) && !empty($usv['YearLevel']['name']) ? $usv['YearLevel']['name'] : 'Pre/1st') . ', ' . $usv['Section']['academicyear'] . ')' . (isset($usv['Section']['last_year_level_section']) && $usv['Section']['last_year_level_section'] ? ' <span class="on-process">(Final Year)</span>' : ' <span class="rejected">   Grade not fully submitted</span>');
+                        $formatedSections[$usv->year_level->name]['Unupgradable'][$usv->id] = $usv->name . ' (' . ($usv->year_level->name ?? 'Pre/1st') . ', ' . $usv->academicyear . ')' . (!empty($usv->last_year_level_section) ? ' <span class="on-process">(Final Year)</span>' : ' <span class="rejected"> Grade not fully submitted</span>');
                     }
                 }
             }
 
             if (!empty($upgradable_sections)) {
-                $unqualified_students = $this->_get_unqualified_students_count(
-                    $upgradable_sections,
-                    $this->request->data['Section']['academicyear']
-                );
+                $unqualified_students = $this->getUnqualifiedStudentsCount($upgradable_sections, $this->request->getData('Section.academicyear'));
             }
 
-
-            if (isset($unqualified_students) && !empty($unqualified_students)) {
+            if (!empty($unqualified_students)) {
                 $unqualified_students_count = $unqualified_students;
             }
 
-            $this->Session->write('unqualified_students_count', $unqualified_students_count);
-            $this->Session->write('formatedSections', $formatedSections);
-            debug($unqualified_students_count);
+            $session = $this->request->getSession();
+            $session->write('unqualified_students_count', $unqualified_students_count);
+            $session->write('formatedSections', $formatedSections);
+            // debug($unqualified_students_count);
 
-            $this->set(
-                compact(
-                    'formatedSections',
-                    'unqualified_students_count',
-                    'isbeforesearch',
-                    'selected_program',
-                    'selected_program_type',
-                    'selected_academicyear',
-                    'selected_year_level',
-                    'last_year_level_sections_count'
-                )
-            );
+            $this->set(compact(
+                'formatedSections',
+                'unqualified_students_count',
+                'isbeforesearch',
+                'selected_program',
+                'selected_program_type',
+                'selected_academicyear',
+                'selected_year_level',
+                'last_year_level_sections_count'
+            ));
         }
 
-        //After Upgrade button is clicked
-        if (isset($this->request->data['upgrade']) && !empty($this->request->data['upgrade'])) {
-            //get selected sections for upgrade
-            $selected_sections = array();
+        if (!empty($this->request->getData('upgrade'))) {
+            $selected_sections = [];
 
-            if (isset($this->request->data['Section']['Upgradbale_Selected']) && !empty($this->request->data['Section']['Upgradbale_Selected'])) {
-                foreach ($this->request->data['Section']['Upgradbale_Selected'] as $susk => $susv) {
+            if (!empty($this->request->getData('Section.Upgradbale_Selected'))) {
+                foreach ($this->request->getData('Section.Upgradbale_Selected') as $susk => $susv) {
                     if ($susv != 0) {
                         $selected_sections[] = $susv;
                     }
@@ -6617,194 +4485,111 @@ class SectionsController extends AppController
             $selected_section_count = count($selected_sections);
 
             if (!empty($selected_section_count)) {
-                $upgradeStatus = $this->Section->upgradeSelectedSection($selected_sections);
-                //debug($upgradeStatus);
+                $upgradeStatus = $this->Sections->upgradeSelectedSection($selected_sections);
+                // debug($upgradeStatus);
 
                 if (!empty($upgradeStatus)) {
+                    $session = $this->request->getSession();
                     $this->Flash->success(implode(" ", $upgradeStatus) . ' section have been upgraded successfully.');
-                    // clearing session here will be helpfull to  prevent form resubmission and  not require user logout for some reason
-                    if ($this->Session->check('formatedSections')) {
-                        $this->Session->delete('formatedSections');
-                        if ($this->Session->check('unqualified_students_count')) {
-                            $this->Session->delete('unqualified_students_count');
+                    if ($session->check('formatedSections')) {
+                        $session->delete('formatedSections');
+                        if ($session->check('unqualified_students_count')) {
+                            $session->delete('unqualified_students_count');
                         }
                     }
-                    return $this->redirect(array('action' => 'display_sections'));
+                    return $this->redirect(['action' => 'displaySections']);
                 } else {
                     $this->Flash->error(
-                        'Unable to upgrde the selected section(s), all section students fail to qualify for year level upgrade, leaving the section(s) un-upgraded.'
+                        'Unable to upgrade the selected section(s), all section students fail to qualify for year level upgrade, leaving the section(s) un-upgraded.',
+                        ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections']]]
                     );
                 }
             } else {
-                $this->Flash->error('Please select at least one section.');
+                $this->Flash->error(
+                    'Please select at least one section.',
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections']]]
+                );
             }
 
-            $this->request->data['search'] = true;
+            $this->request = $this->request->withData('search', true);
             $formatedSections = null;
             $unqualified_students_count = null;
             $isbeforesearch = 0;
 
-            if ($this->Session->check('formatedSections')) {
-                $formatedSections = $this->Session->read('formatedSections');
+            $session = $this->request->getSession();
+            if ($session->check('formatedSections')) {
+                $formatedSections = $session->read('formatedSections');
             }
 
-            if ($this->Session->check('unqualified_students_count')) {
-                $unqualified_students_count = $this->Session->read('unqualified_students_count');
+            if ($session->check('unqualified_students_count')) {
+                $unqualified_students_count = $session->read('unqualified_students_count');
             }
 
-            $this->set(
-                compact(
-                    'formatedSections',
-                    'unqualified_students_count',
-                    'isbeforesearch',
-                    'last_year_level_sections_count'
-                )
-            );
+            $this->set(compact('formatedSections', 'unqualified_students_count', 'isbeforesearch', 'last_year_level_sections_count'));
         }
     }
 
-    public function upgrade_selected_student_section($section_id, $student_id)
+    public function upgradeSelectedStudentSection(int $section_id, int $student_id)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
+        $student_detail = $this->Sections->Students->find()
+            ->where(['Students.id' => $student_id])
+            ->contain(['AcceptedStudents'])
+            ->first();
 
-        $student_detail = $this->Section->Student->find('first', array(
-            'conditions' => array(
-                'Student.id' => $student_id
-            ),
-            'contain' => array(
-                'AcceptedStudent'
-            )
-        ));
+        $section = $this->Sections->find()
+            ->where(['Sections.id' => $section_id])
+            ->first();
 
-        $section = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.id' => $section_id
-            ),
-            'recursive' => -1
-        ));
-
-        $nextSection = $this->Section->find('first', array(
-            'conditions' => array(
-                'Section.year_level_id' => $section['Section']['year_level_id'] + 1,
-                'Section.department_id' => $student_detail['Student']['department_id'],
-                'Section.program_id' => $student_detail['Student']['program_id'],
-                'Section.program_type_id' => $student_detail['Student']['program_type_id']
-            ),
-            'recursive' => -1
-        ));
+        $nextSection = $this->Sections->find()
+            ->where([
+                'Sections.year_level_id' => $section->year_level_id + 1,
+                'Sections.department_id' => $student_detail->department_id,
+                'Sections.program_id' => $student_detail->program_id,
+                'Sections.program_type_id' => $student_detail->program_type_id,
+            ])
+            ->first();
 
         $this->set(compact('student_detail', 'nextSection'));
-        /*
-		$student_detail = $this->Section->Student->find('first', array(
-			'conditions' => array(
-				'Student.id' => $student_id
-			),
-			'contain' => array(
-				'AcceptedStudent'
-			)
-		));
-
-		$possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange($student_detail['AcceptedStudent']['academicyear'], $this->AcademicYear->current_academicyear());
-
-		$previousSectionAttended = $this->Section->StudentsSection->find('list', array(
-			'conditions' => array(
-				'StudentsSection.student_id' => $student_id
-			),
-			'fields' => array(
-				'StudentsSection.section_id',
-				'StudentsSection.section_id'
-			)
-		));
-
-		if (!empty($previousSectionAttended)) {
-			$lastYearLevel = null;
-			foreach ($previousSectionAttended as $ac => $se) {
-				$section = $this->Section->find('first', array('conditions' => array('Section.id' => $se)));
-				if (in_array($section['Section']['academicyear'], $possibleAcademicYears)) {
-					unset($possibleAcademicYears[$section['Section']['academicyear']]);
-					$lastYearLevel = $section['Section']['year_level_id'];
-				}
-			}
-
-			// do upgrade for the first academic year
-			if ($this->StudentsSection->updateAll(array('StudentsSection.archive' => 1), array('StudentsSection.student_id' => $student_id))) {
-				// find section for next academic year
-				$nextAc = reset($possibleAcademicYears);
-
-				$section = $this->Section->find('first', array(
-					'conditions' => array(
-						'Section.academicyear' => $nextAc,
-						'Section.program_id' => $student_detail['Student']['program_id'],
-						'Section.program_type_id' => $student_detail['Student']['program_type_id'],
-						'Section.department_id' => $student_detail['Student']['department_id'],
-						'Section.year_level_id' => $lastYearLevel + 1
-					)
-				));
-
-				$createSection['student_id'] = $student_id;
-				$createSection['section_id'] = $section['Section']['id'];
-				$this->StudentsSection->create();
-				$this->StudentsSection->save($createSection);
-			}
-		} else {
-			// not possible to do upgrade
-		}
-		*/
     }
 
-    public function get_sections_by_program($program_id = "")
+    public function getSectionsByProgram(string $program_id = "")
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
+        $student_sections = [];
 
-        $this->layout = 'ajax';
-        $sections = array();
-        $student_sections = array();
-
-        $departement = 0;
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-            $departement = 1;
-        }
+        $department = $this->auth_user['role_id'] == ROLE_DEPARTMENT ? 1 : 0;
 
         if (empty($program_id)) {
-            $program_id = array_values($this->program_ids)[0];
-            if (empty($program_id)) {
-                $program_id = 1;
-            }
+            $program_id = !empty($this->program_ids) ? array_values($this->program_ids)[0] : 1;
         }
 
-        $student_sections = $this->Section->allDepartmentSectionsOrganizedByProgramType(
-            ($departement == 1 ? $this->department_id : $this->college_id),
-            $departement,
+        $student_sections = $this->Sections->allDepartmentSectionsOrganizedByProgramType(
+            $department == 1 ? $this->department_id : $this->college_id,
+            $department,
             $program_id
         );
 
         $this->set(compact('student_sections'));
     }
 
-    public function get_sections_by_program_supp_exam($program_id = "")
+    public function getSectionsByProgramSuppExam(string $program_id = "")
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
+        $student_sections = [];
 
-        $this->layout = 'ajax';
-        $sections = array();
-        $student_sections = array();
-
-        $departement = 0;
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-            $departement = 1;
-        }
+        $department = $this->auth_user['role_id'] == ROLE_DEPARTMENT ? 1 : 0;
 
         if (empty($program_id)) {
-            $program_id = array_values($this->program_ids)[0];
-            if (empty($program_id)) {
-                $program_id = 1;
-            }
+            $program_id = !empty($this->program_ids) ? array_values($this->program_ids)[0] : 1;
         }
 
-        $student_sections = $this->Section->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
-            ($departement == 1 ? $this->department_id : $this->college_id),
-            $departement,
+        $student_sections = $this->Sections->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
+            $department == 1 ? $this->department_id : $this->college_id,
+            $department,
             $program_id,
             3
         );
@@ -6812,66 +4597,53 @@ class SectionsController extends AppController
         $this->set(compact('student_sections'));
     }
 
-    public function get_section_students($section_id = "")
+    public function getSectionStudents(string $section_id = "")
     {
-
-        $this->layout = 'ajax';
-        $students = array();
+        $this->viewBuilder()->setLayout('ajax');
+        $students = [];
 
         if (!empty($section_id)) {
-            $students = $this->Section->allStudents($section_id);
-            // do we really need this?? I mean, if we are using this function in other places other than supp exam, it will hide all students except those who have supp in the section.
-            //$students = ClassRegistry::init('ExamGradeChange')->possibleStudentsForSup($section_id);
+            $students = $this->Sections->allStudents($section_id);
+            // $students = TableRegistry::getTableLocator()->get('ExamGradeChanges')->possibleStudentsForSup($section_id);
         }
 
         $this->set(compact('students'));
     }
 
-    public function get_sup_students($section_id = "")
+    public function getSupStudents(string $section_id = "")
     {
-
-        $this->layout = 'ajax';
-        $students = array();
+        $this->viewBuilder()->setLayout('ajax');
+        $students = [];
 
         if (!empty($section_id)) {
-            $students = ClassRegistry::init('ExamGradeChange')->possibleStudentsForSup($section_id);
+            $students = TableRegistry::getTableLocator()->get('ExamGradeChanges')->possibleStudentsForSup($section_id);
         }
 
         $this->set(compact('students'));
     }
 
-    public function get_sections_by_program_and_dept($department_id = "", $program_id = "")
+    public function getSectionsByProgramAndDept(string $department_id = "", string $program_id = "")
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $student_sections = [];
 
-        $this->layout = 'ajax';
-        $student_sections = array();
+        $department_role = 0;
 
-        $departement_role = 0;
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-            $departement_role = 1;
-            if (empty($department_id)) {
-                $department_id = $this->department_id;
-            }
-        } else {
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                if (empty($department_id)) {
-                    $department_id = $this->college_id;
-                }
-            }
+        if ($this->auth_user['role_id'] == ROLE_DEPARTMENT) {
+            $department_role = 1;
+            $department_id = empty($department_id) ? $this->department_id : $department_id;
+        } elseif ($this->auth_user['role_id'] == ROLE_COLLEGE) {
+            $department_id = empty($department_id) ? $this->college_id : $department_id;
         }
 
         if (empty($program_id)) {
-            $program_id = array_values($this->program_ids)[0];
-            if (empty($program_id)) {
-                $program_id = 1;
-            }
+            $program_id = !empty($this->program_ids) ? array_values($this->program_ids)[0] : 1;
         }
 
         if (!empty($department_id) && !empty($program_id)) {
-            $student_sections = $this->Section->allDepartmentSectionsOrganizedByProgramType(
+            $student_sections = $this->Sections->allDepartmentSectionsOrganizedByProgramType(
                 $department_id,
-                $departement_role,
+                $department_role,
                 $program_id
             );
         }
@@ -6879,38 +4651,28 @@ class SectionsController extends AppController
         $this->set(compact('student_sections'));
     }
 
-    public function get_sections_by_program_and_dept_supp_exam($department_id = "", $program_id = "")
+    public function getSectionsByProgramAndDeptSuppExam(string $department_id = "", string $program_id = "")
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $student_sections = [];
 
-        $this->layout = 'ajax';
-        $student_sections = array();
+        $department_role = 0;
 
-        $departement_role = 0;
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-            $departement_role = 1;
-            if (empty($department_id)) {
-                $department_id = $this->department_id;
-            }
-        } else {
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                if (empty($department_id)) {
-                    $department_id = $this->college_id;
-                }
-            }
+        if ($this->auth_user['role_id'] == ROLE_DEPARTMENT) {
+            $department_role = 1;
+            $department_id = empty($department_id) ? $this->department_id : $department_id;
+        } elseif ($this->auth_user['role_id'] == ROLE_COLLEGE) {
+            $department_id = empty($department_id) ? $this->college_id : $department_id;
         }
 
         if (empty($program_id)) {
-            $program_id = array_values($this->program_ids)[0];
-            if (empty($program_id)) {
-                $program_id = 1;
-            }
+            $program_id = !empty($this->program_ids) ? array_values($this->program_ids)[0] : 1;
         }
 
         if (!empty($department_id) && !empty($program_id)) {
-            $student_sections = $this->Section->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
+            $student_sections = $this->Sections->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
                 $department_id,
-                $departement_role,
+                $department_role,
                 $program_id,
                 3
             );
@@ -6919,100 +4681,76 @@ class SectionsController extends AppController
         $this->set(compact('student_sections'));
     }
 
-    public function get_year_level($department_id = null)
+    public function getYearLevel(?int $department_id = null)
     {
-
-        $yearLevels = array();
+        $yearLevels = [];
 
         if (!empty($department_id)) {
-            $this->layout = 'ajax';
-            $yearLevels = $this->Section->YearLevel->find(
-                'list',
-                array('conditions' => array('YearLevel.department_id' => $department_id))
-            );
+            $this->viewBuilder()->setLayout('ajax');
+            $yearLevels = $this->Sections->YearLevels->find('list')
+                ->where(['YearLevels.department_id' => $department_id])
+                ->toArray();
         }
 
         $this->set(compact('yearLevels'));
     }
 
-    public function get_sections_of_college($college_id = null)
+    public function getSectionsOfCollege(?int $college_id = null)
     {
-
-        $this->layout = 'ajax';
-        $sections = array();
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
 
         if (!empty($this->student_id)) {
-            $student_program_id = $this->Section->Student->field('program_id', array('Student.id' => $this->student_id)
-            );
-            $student_section_id = $this->Section->StudentsSection->field(
-                'section_id',
-                array('StudentsSection.student_id' => $this->student_id, 'StudentsSection.archive' => 0)
-            );
+            $student_program_id = $this->Sections->Students->find()
+                ->select(['program_id'])
+                ->where(['Students.id' => $this->student_id])
+                ->first()
+                ->program_id;
 
-            $sections_detail = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.department_id is null',
-                    'Section.college_id' => $college_id,
-                    'Section.program_id' => $student_program_id,
-                    'Section.archive' => 0,
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name')
-                ),
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.program_id',
-                    'Section.year_level_id',
-                    'Section.academicyear',
-                    'Section.curriculum_id'
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'DESC',
-                    'Section.program_id' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-            ));
+            $student_section_id = $this->Sections->StudentsSections->find()
+                ->select(['section_id'])
+                ->where(['StudentsSections.student_id' => $this->student_id, 'StudentsSections.archive' => 0])
+                ->first()
+                ->section_id;
+
+            $sections_detail = $this->Sections->find()
+                ->where([
+                    'Sections.department_id IS' => null,
+                    'Sections.college_id' => $college_id,
+                    'Sections.program_id' => $student_program_id,
+                    'Sections.archive' => 0,
+                ])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+                ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         } else {
-            $sections_detail = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.college_id' => $college_id,
-                    'Section.archive' => 0,
-                    'Section.department_id is null'
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name')
-                ),
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.program_id',
-                    'Section.year_level_id',
-                    'Section.academicyear',
-                    'Section.curriculum_id'
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'DESC',
-                    'Section.program_id' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-            ));
+            $sections_detail = $this->Sections->find()
+                ->where([
+                    'Sections.college_id' => $college_id,
+                    'Sections.archive' => 0,
+                    'Sections.department_id IS' => null,
+                ])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+                ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         }
 
         if (!empty($sections_detail)) {
-            foreach ($sections_detail as $seindex => $secvalue) {
-                if (empty($secvalue['YearLevel']['id'])) {
-                    $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . $secvalue['Section']['academicyear'] . ', ' . ($secvalue['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/Fresh') . ')';
+            foreach ($sections_detail as $secvalue) {
+                if (empty($secvalue->year_level->id)) {
+                    $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . $secvalue->academicyear . ', ' . ($secvalue->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/Fresh') . ')';
                 } else {
-                    $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . $secvalue['Section']['academicyear'] . ', ' . $secvalue['YearLevel']['name'] . ')';
+                    $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . $secvalue->academicyear . ', ' . $secvalue->year_level->name . ')';
                 }
             }
         }
@@ -7020,785 +4758,581 @@ class SectionsController extends AppController
         $this->set(compact('sections'));
     }
 
-    public function get_sections_by_dept($department_id = "", $student_id = '', $acYear, $year_level_name = '')
+    public function getSectionsByDept(string $department_id = "", string $student_id = '', string $acYear = '', string $year_level_name = '')
     {
-
-        $this->layout = 'ajax';
-        $sections = array();
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
 
         if (!empty($this->student_id)) {
-            $student_program_id = $this->Section->Student->field('program_id', array('Student.id' => $this->student_id)
-            );
-            $student_section_id = $this->Section->StudentsSection->field(
-                'section_id',
-                array('StudentsSection.student_id' => $this->student_id, 'StudentsSection.archive' => 0)
-            );
+            $student_program_id = $this->Sections->Students->find()
+                ->select(['program_id'])
+                ->where(['Students.id' => $this->student_id])
+                ->first()
+                ->program_id;
 
-            if (isset($this->request->data['Student']['college_id']) && !empty($this->request->data['Student']['college_id']) && $this->request->data['Student']['department_id'] == -1) {
-                debug($this->request->data);
-                $conditions = array(
-                    'Section.college_id' => $this->request->data['Student']['college_id'],
-                    'Section.archive' => 0,
-                    'Section.department_id is null',
-                    'Section.program_id' => $student_program_id,
-                    'OR' => array(
-                        'Section.academicyear LIKE ' => $acYear,
-                        'Section.created >= ' => date('Y-m-d H:i:s', strtotime('-1 year'))
-                    )
-                );
-                debug($conditions);
-            } else {
-                if (isset($this->request->data['Student']['college_id']) && !empty($this->request->data['Student']['college_id']) && empty($this->request->data['Student']['department_id'])) {
-                    $conditions = array(
-                        'Section.college_id' => $this->request->data['Student']['college_id'],
-                        'Section.archive' => 0,
-                        'Section.department_id is null',
-                        'Section.program_id' => $student_program_id,
-                        'OR' => array(
-                            'Section.academicyear LIKE ' => $acYear,
-                            'Section.created >= ' => date('Y-m-d H:i:s', strtotime('-1 year'))
-                        )
-                    );
-                    debug($conditions);
-                } else {
-                    if (isset($department_id) && !empty($department_id)) {
-                        $conditions = array(
-                            'Section.department_id' => $department_id,
-                            'Section.archive' => 0,
-                            'Section.program_id' => $student_program_id,
-                            'OR' => array(
-                                'Section.academicyear LIKE ' => $acYear,
-                                'Section.created >= ' => date('Y-m-d H:i:s', strtotime('-1 year'))
-                            )
-                        );
-                        debug($conditions);
-                    }
-                }
+            $student_section_id = $this->Sections->StudentsSections->find()
+                ->select(['section_id'])
+                ->where(['StudentsSections.student_id' => $this->student_id, 'StudentsSections.archive' => 0])
+                ->first()
+                ->section_id;
+
+            $conditions = [];
+
+            if (!empty($this->request->getData('Student.college_id')) && $this->request->getData('Student.department_id') == -1) {
+                // debug($this->request->getData());
+                $conditions = [
+                    'Sections.college_id' => $this->request->getData('Student.college_id'),
+                    'Sections.archive' => 0,
+                    'Sections.department_id IS' => null,
+                    'Sections.program_id' => $student_program_id,
+                    'OR' => [
+                        'Sections.academicyear LIKE' => $acYear,
+                        'Sections.created >=' => date('Y-m-d H:i:s', strtotime('-1 year')),
+                    ],
+                ];
+                // debug($conditions);
+            } elseif (!empty($this->request->getData('Student.college_id')) && empty($this->request->getData('Student.department_id'))) {
+                $conditions = [
+                    'Sections.college_id' => $this->request->getData('Student.college_id'),
+                    'Sections.archive' => 0,
+                    'Sections.department_id IS' => null,
+                    'Sections.program_id' => $student_program_id,
+                    'OR' => [
+                        'Sections.academicyear LIKE' => $acYear,
+                        'Sections.created >=' => date('Y-m-d H:i:s', strtotime('-1 year')),
+                    ],
+                ];
+                // debug($conditions);
+            } elseif (!empty($department_id)) {
+                $conditions = [
+                    'Sections.department_id' => $department_id,
+                    'Sections.archive' => 0,
+                    'Sections.program_id' => $student_program_id,
+                    'OR' => [
+                        'Sections.academicyear LIKE' => $acYear,
+                        'Sections.created >=' => date('Y-m-d H:i:s', strtotime('-1 year')),
+                    ],
+                ];
+                // debug($conditions);
             }
 
-            $sections_detail = $this->Section->find('all', array(
-                'conditions' => $conditions,
-                'order' => array('Section.year_level_id'),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name')
-                ),
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.program_id',
-                    'Section.year_level_id',
-                    'Section.academicyear',
-                    'Section.curriculum_id'
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'DESC',
-                    'Section.program_id' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-            ));
+            $sections_detail = $this->Sections->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+                ->order(['Sections.year_level_id' => 'ASC', 'Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         } else {
-            if (!empty($student_id) && $student_id != 0) {
-                $student_program_id = $this->Section->Student->field('program_id', array('Student.id' => $student_id));
-            } else {
-                $student_program_id = $this->program_id;
-            }
+            $student_program_id = !empty($student_id) && $student_id != 0
+                ? $this->Sections->Students->find()->select(['program_id'])->where(['Students.id' => $student_id])->first()->program_id
+                : $this->program_id;
 
-            if (!$year_level_name) {
-                $sections_detail = $this->Section->find('all', array(
-                    'conditions' => array(
-                        'Section.department_id' => $department_id,
-                        'Section.department_id is not null',
-                        'Section.program_id' => $student_program_id,
-                        'Section.archive' => 0,
-                        'OR' => array(
-                            'Section.academicyear LIKE ' => $acYear,
-                            'Section.created >= ' => date('Y-m-d H:i:s', strtotime('-1 year'))
-                        )
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name')
-                    ),
-                    'fields' => array(
-                        'Section.id',
-                        'Section.name',
-                        'Section.program_id',
-                        'Section.year_level_id',
-                        'Section.academicyear',
-                        'Section.curriculum_id'
-                    ),
-                    'order' => array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.program_id' => 'ASC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.id' => 'ASC',
-                        'Section.name' => 'ASC'
-                    ),
-                ));
-            } else {
-                $sections_detail = $this->Section->find('all', array(
-                    'conditions' => array(
-                        //'Section.college_id' => $department_id,
-                        'Section.department_id is null',
-                        'Section.program_id' => $student_program_id,
-                        'Section.archive' => 0,
-                        'OR' => array(
-                            'Section.academicyear LIKE ' => $acYear,
-                            'Section.created >= ' => date('Y-m-d H:i:s', strtotime('-1 year'))
-                        )
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name')
-                    ),
-                    'fields' => array(
-                        'Section.id',
-                        'Section.name',
-                        'Section.program_id',
-                        'Section.year_level_id',
-                        'Section.academicyear',
-                        'Section.curriculum_id'
-                    ),
-                    'order' => array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.program_id' => 'ASC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.id' => 'ASC',
-                        'Section.name' => 'ASC'
-                    ),
-                ));
-            }
+            $conditions = !$year_level_name
+                ? [
+                    'Sections.department_id' => $department_id,
+                    'Sections.department_id IS NOT' => null,
+                    'Sections.program_id' => $student_program_id,
+                    'Sections.archive' => 0,
+                    'OR' => [
+                        'Sections.academicyear LIKE' => $acYear,
+                        'Sections.created >=' => date('Y-m-d H:i:s', strtotime('-1 year')),
+                    ],
+                ]
+                : [
+                    'Sections.department_id IS' => null,
+                    'Sections.program_id' => $student_program_id,
+                    'Sections.archive' => 0,
+                    'OR' => [
+                        'Sections.academicyear LIKE' => $acYear,
+                        'Sections.created >=' => date('Y-m-d H:i:s', strtotime('-1 year')),
+                    ],
+                ];
+
+            $sections_detail = $this->Sections->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+                ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         }
 
         if (!empty($sections_detail)) {
-            foreach ($sections_detail as $seindex => $secvalue) {
-                $dataids = ClassRegistry::init('StudentsSection')->find(
-                    'list',
-                    array(
-                        'conditions' => array('StudentsSection.section_id' => $secvalue['Section']['id']),
-                        'fields' => array('student_id', 'student_id'),
-                        'group' => array('student_id', 'section_id')
-                    )
-                );
-                $gradutingStudent = ClassRegistry::init('GraduateList')->find(
-                    'count',
-                    array('conditions' => array('GraduateList.student_id' => $dataids))
-                );
+            foreach ($sections_detail as $secvalue) {
+                $dataids = TableRegistry::getTableLocator()->get('StudentsSections')->find('list')
+                    ->where(['StudentsSections.section_id' => $secvalue->id])
+                    ->select(['student_id', 'student_id'])
+                    ->group(['student_id', 'section_id'])
+                    ->toArray();
+                $graduatingStudent = TableRegistry::getTableLocator()->get('GraduateLists')->find()
+                    ->where(['GraduateLists.student_id IN' => $dataids])
+                    ->count();
 
-                if ($gradutingStudent > count($dataids) / 3) {
-                    $isGraduate = true;
-                } else {
-                    $isGraduate = false;
-                }
+                $isGraduate = $graduatingStudent > count($dataids) / 3;
 
                 if (!$isGraduate) {
-                    if (isset($secvalue['YearLevel']['name']) && !empty($secvalue['YearLevel']['name'])) {
-                        $yn = $secvalue['YearLevel']['name'];
-                    } else {
-                        $yn = '1st';
-                    }
-                    $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . $secvalue['Section']['academicyear'] . ', ' . $yn . ')';
+                    $yn = !empty($secvalue->year_level->name) ? $secvalue->year_level->name : '1st';
+                    $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . $secvalue->academicyear . ', ' . $yn . ')';
                 }
-                //}
             }
         }
+
         $this->set(compact('sections'));
     }
 
-    public function get_sections_by_dept_add_drop(
-        $department_id = "",
-        $student_id = '',
-        $year_level_name = '',
-        $college_id = ''
-    ) {
-
-        $this->layout = 'ajax';
-        $sections = array();
+    public function getSectionsByDeptAddDrop(string $department_id = "", string $student_id = '', string $year_level_name = '', string $college_id = '')
+    {
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
 
         if ((!empty($student_id) && $student_id != 0) || !empty($this->student_id)) {
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && !empty($this->student_id)) {
-                $student_id = $this->student_id;
-            }
+            $student_id = $this->auth_user['role_id'] == ROLE_STUDENT && !empty($this->student_id) ? $this->student_id : $student_id;
 
-            $student_detail = $this->Section->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => $student_id
-                ),
-                'contain' => array(
-                    'AcceptedStudent' => array('id', 'studentnumber', 'academicyear'),
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name'),
-                    'College' => array('id', 'name', 'campus_id', 'stream'),
-                    'Section' => array(
-                        'fields' => array(
-                            'Section.id',
-                            'Section.name',
-                            'Section.year_level_id',
-                            'Section.academicyear',
-                            'Section.college_id',
-                            'Section.department_id',
-                            'Section.curriculum_id',
-                            'Section.created',
-                            'Section.archive'
-                        ),
-                        'order' => array(
-                            'Section.academicyear' => 'DESC',
-                            'Section.program_id' => 'ASC',
-                            'Section.year_level_id' => 'ASC',
-                            'Section.id' => 'ASC',
-                            'Section.name' => 'ASC'
-                        ),
-                        'YearLevel' => array('id', 'name')
-                    ),
-                    'CourseRegistration' => array(
-                        'order' => array(
-                            'CourseRegistration.academic_year' => 'DESC',
-                            'CourseRegistration.semester' => 'DESC',
-                            'CourseRegistration.id' => 'DESC'
-                        ),
-                        //'fields' => array('id', 'year_level_id',  'student_id', 'section_id', 'year_level_id', 'semester', 'academic_year', 'published_course_id', 'created'),
+            $student_detail = $this->Sections->Students->find()
+                ->where(['Students.id' => $student_id])
+                ->contain([
+                    'AcceptedStudents' => ['fields' => ['id', 'studentnumber', 'academicyear']],
+                    'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Colleges' => ['fields' => ['id', 'name', 'campus_id', 'stream']],
+                    'Sections' => [
+                        'fields' => [
+                            'Sections.id',
+                            'Sections.name',
+                            'Sections.year_level_id',
+                            'Sections.academicyear',
+                            'Sections.college_id',
+                            'Sections.department_id',
+                            'Sections.curriculum_id',
+                            'Sections.created',
+                            'Sections.archive'
+                        ],
+                        'order' => [
+                            'Sections.academicyear' => 'DESC',
+                            'Sections.program_id' => 'ASC',
+                            'Sections.year_level_id' => 'ASC',
+                            'Sections.id' => 'ASC',
+                            'Sections.name' => 'ASC'
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                    ],
+                    'CourseRegistrations' => [
+                        'order' => [
+                            'CourseRegistrations.academic_year' => 'DESC',
+                            'CourseRegistrations.semester' => 'DESC',
+                            'CourseRegistrations.id' => 'DESC'
+                        ],
                         'limit' => 1,
-                    ),
-                    'Readmission' => array(
-                        'conditions' => array(
-                            'Readmission.registrar_approval' => 1,
-                            'Readmission.academic_commision_approval' => 1,
-                        ),
-                        'fields' => array(
-                            'student_id',
-                            'academic_year',
-                            'semester',
-                            'registrar_approval_date',
-                            'modified'
-                        ),
-                        'order' => array('Readmission.modified' => 'DESC')
-                    )
-                ),
-                'fields' => array(
-                    'Student.studentnumber',
-                    'Student.full_name',
-                    'Student.curriculum_id',
-                    'Student.department_id',
-                    'Student.college_id',
-                    'Student.program_id',
-                    'Student.program_type_id',
-                    'Student.gender',
-                    'Student.graduated',
-                    'Student.academicyear',
-                    'Student.admissionyear',
-                ),
-            ));
+                    ],
+                    'Readmissions' => [
+                        'where' => [
+                            'Readmissions.registrar_approval' => 1,
+                            'Readmissions.academic_commision_approval' => 1
+                        ],
+                        'fields' => ['student_id', 'academic_year', 'semester', 'registrar_approval_date', 'modified'],
+                        'order' => ['Readmissions.modified' => 'DESC'],
+                    ],
+                ])
+                ->select([
+                    'Students.studentnumber',
+                    'Students.full_name',
+                    'Students.curriculum_id',
+                    'Students.department_id',
+                    'Students.college_id',
+                    'Students.program_id',
+                    'Students.program_type_id',
+                    'Students.gender',
+                    'Students.graduated',
+                    'Students.academicyear',
+                    'Students.admissionyear',
+                ])
+                ->first();
 
-            $student_program_id = $student_detail['Student']['program_id'];
-            $program_types_to_look = $this->__getEquivalentProgramTypes($student_detail['Student']['program_type_id']);
+            $student_program_id = $student_detail->program_id;
+            $program_types_to_look = $this->getEquivalentProgramTypes($student_detail->program_type_id);
 
-            $lastRegisteredAcademicYear = $student_detail['CourseRegistration'][0]['academic_year'];
-            $lastRegisteredSemester = $student_detail['CourseRegistration'][0]['semester'];
-            $lastRegisteredYearLevelID = (isset($student_detail['CourseRegistration'][0]['year_level_id']) && $student_detail['CourseRegistration'][0]['year_level_id'] != 0 ? $student_detail['CourseRegistration'][0]['year_level_id'] : 0);
-            $lastRegisteredSectionID = (isset($student_detail['CourseRegistration'][0]['year_level_id']) && $student_detail['CourseRegistration'][0]['year_level_id'] != 0 ? $student_detail['CourseRegistration'][0]['year_level_id'] : 0);
+            $lastRegisteredAcademicYear = $student_detail->course_registrations[0]->academic_year ?? '';
+            $lastRegisteredSemester = $student_detail->course_registrations[0]->semester ?? '';
+            $lastRegisteredYearLevelID = !empty($student_detail->course_registrations[0]->year_level_id) ? $student_detail->course_registrations[0]->year_level_id : 0;
+            $lastRegisteredSectionID = !empty($student_detail->course_registrations[0]->section_id) ? $student_detail->course_registrations[0]->section_id : 0;
 
-            if ($lastRegisteredYearLevelID) {
-                $lastRegisteredYearLevelName = $this->Section->YearLevel->field(
-                    'YearLevel.name',
-                    array('YearLevel.id' => $lastRegisteredYearLevelID)
-                );
-            }
+            $lastRegisteredYearLevelName = $lastRegisteredYearLevelID
+                ? $this->Sections->YearLevels->find()->select(['name'])->where(
+                    ['YearLevels.id' => $lastRegisteredYearLevelID]
+                )->first()->name
+                : '';
 
-            $student_section_exam_status = $this->Section->Student->get_student_section($student_id);
+            $student_section_exam_status = $this->Sections->Students->getStudentSection($student_id);
 
-            if (!empty($student_section_exam_status)) {
-                $collegess = $this->Section->College->find('list', array(
-                    'conditions' => array(
-                        'OR' => array(
-                            'College.campus_id' => $student_section_exam_status['College']['campus_id'],
-                            'College.stream' => $student_section_exam_status['College']['stream'],
-                        ),
-                        'College.active' => 1
-                    ),
-                    'order' => array('College.campus_id ASC', 'College.name ASC')
-                ));
-            } else {
-                $collegess = $this->Section->College->find('list', array(
-                    'conditions' => array(
-                        'OR' => array(
-                            'College.campus_id' => $student_detail['College']['campus_id'],
-                            'College.stream' => $student_detail['College']['stream'],
-                        ),
-                        'College.active' => 1
-                    ),
-                    'order' => array('College.campus_id ASC', 'College.name ASC')
-                ));
-            }
+            $colleges = !empty($student_section_exam_status)
+                ? $this->Sections->Colleges->find('list')
+                    ->where([
+                        'OR' => [
+                            'Colleges.campus_id' => $student_section_exam_status['College']['campus_id'],
+                            'Colleges.stream' => $student_section_exam_status['College']['stream'],
+                        ],
+                        'Colleges.active' => 1,
+                    ])
+                    ->order(['Colleges.campus_id' => 'ASC', 'Colleges.name' => 'ASC'])
+                    ->toArray()
+                : $this->Sections->Colleges->find('list')
+                    ->where([
+                        'OR' => [
+                            'Colleges.campus_id' => $student_detail->college->campus_id,
+                            'Colleges.stream' => $student_detail->college->stream,
+                        ],
+                        'Colleges.active' => 1,
+                    ])
+                    ->order(['Colleges.campus_id' => 'ASC', 'Colleges.name' => 'ASC'])
+                    ->toArray();
 
-            $collIdsToLook = array_keys($collegess);
+            $collIdsToLook = array_keys($colleges);
 
-            $departmentss = $this->Section->Department->find('list', array(
-                'conditions' => array(
-                    'Department.college_id' => $collIdsToLook,
-                    'Department.active' => 1
-                ),
-            ));
+            $departments = $this->Sections->Departments->find('list')
+                ->where(['Departments.college_id IN' => $collIdsToLook, 'Departments.active' => 1])
+                ->toArray();
 
+            $deptIdsToLook = array_keys($departments);
 
-            $deptIdsToLook = array_keys($departmentss);
+            $conditions = [];
 
-            $conditions = array();
-            $sections_detail = array();
+            if (!empty($college_id) && !is_null($student_detail->department_id)) {
+                $conditions = [
+                    'Sections.college_id IN' => $collIdsToLook,
+                    'Sections.program_id' => $student_program_id,
+                    'Sections.program_type_id IN' => $program_types_to_look,
+                    'Sections.archive' => 0,
+                    'Sections.academicyear LIKE' => $lastRegisteredAcademicYear,
+                ];
 
-            if (!empty($college_id) && !is_null($student_detail['Student']['department_id'])) {
-                $conditions[] = array(
-                    'Section.college_id' => $collIdsToLook,
-                    'Section.program_id' => $student_program_id,
-                    'Section.program_type_id' => $program_types_to_look,
-                    'Section.archive' => 0,
-                    'Section.academicyear LIKE ' => $lastRegisteredAcademicYear,
-                );
+                $conditions[] = ['Sections.college_id' => $college_id];
 
-                $conditions[] = array('Section.college_id' => $college_id);
-
-                if (!empty($lastRegisteredSectionID) && $lastRegisteredSectionID) {
-                    $conditions[] = array('Section.id <>' => $lastRegisteredSectionID);
+                if (!empty($lastRegisteredSectionID)) {
+                    $conditions[] = ['Sections.id <>' => $lastRegisteredSectionID];
                 }
 
-                if ($department_id == -1) {
-                    $conditions[] = array('Section.department_id is null');
-                } else {
-                    if ($department_id == 0) {
-                        // No department selected
-                        $conditions[] = array('Section.department_id is null');
-                    } else {
-                        if (!empty($department_id) && $department_id > 0) {
-                            $conditions[] = array('Section.department_id' => $department_id);
-                        } else {
-                            if (empty($department_id) && empty($lastRegisteredYearLevelName) || empty($year_level_name)) {
-                                $conditions[] = array('Section.department_id is null');
-                            }
-                        }
-                    }
+                if ($department_id == -1 || $department_id == 0) {
+                    $conditions[] = ['Sections.department_id IS' => null];
+                } elseif (!empty($department_id) && $department_id > 0) {
+                    $conditions[] = ['Sections.department_id' => $department_id];
+                } elseif (empty($department_id) && (empty($lastRegisteredYearLevelName) || empty($year_level_name))) {
+                    $conditions[] = ['Sections.department_id IS' => null];
                 }
 
                 if ((!empty($lastRegisteredYearLevelName) || !empty($year_level_name)) && !empty($department_id) && $department_id > 0) {
-                    $year_levels_applicable = array();
+                    $year_levels_applicable = [];
 
-                    $allYearLevels = ClassRegistry::init('YearLevel')->distinct_year_level();
+                    $allYearLevels = TableRegistry::getTableLocator()->get('YearLevels')->distinctYearLevel();
 
-                    $yl_name = (isset($year_level_name) && !empty($year_level_name) ? $year_level_name : $lastRegisteredYearLevelName);
+                    $yl_name = !empty($year_level_name) ? $year_level_name : $lastRegisteredYearLevelName;
 
-                    if (!empty($allYearLevels)) {
-                        if (in_array($yl_name, $allYearLevels)) {
-                            foreach ($allYearLevels as $year_level) {
-                                $year_levels_applicable[] = $year_level;
-                                if (strcasecmp($yl_name, $year_level) == 0) {
-                                    break;
-                                }
+                    if (!empty($allYearLevels) && in_array($yl_name, $allYearLevels)) {
+                        foreach ($allYearLevels as $year_level) {
+                            $year_levels_applicable[] = $year_level;
+                            if (strcasecmp($yl_name, $year_level) == 0) {
+                                break;
                             }
                         }
                     }
 
-                    debug($year_levels_applicable);
+                    // debug($year_levels_applicable);
 
                     if (!empty($department_id) && $department_id > 0) {
-                        if (!empty($year_levels_applicable)) {
-                            $yearLevelIDs = $this->Section->YearLevel->find('list', array(
-                                'conditions' => array(
-                                    'YearLevel.department_id' => $department_id,
-                                    'YearLevel.name' => $year_levels_applicable
-                                ),
-                                'fields' => array('YearLevel.id', 'YearLevel.id')
-                            ));
-                        } else {
-                            $yearLevelIDs = $this->Section->YearLevel->find('list', array(
-                                'conditions' => array(
-                                    'YearLevel.department_id' => $department_id,
-                                    'YearLevel.name LIKE ' => (isset($year_level_name) && !empty($year_level_name) ? $year_level_name : $lastRegisteredYearLevelName)
-                                ),
-                                'fields' => array('YearLevel.id', 'YearLevel.id')
-                            ));
-                        }
-                    } else {
-                        if (!empty($lastRegisteredYearLevelName) || !empty($year_level_name)) {
-                            if (!empty($year_levels_applicable)) {
-                                $yearLevelIDs = $this->Section->YearLevel->find('list', array(
-                                    'conditions' => array(
-                                        'YearLevel.department_id' => $deptIdsToLook,
-                                        'YearLevel.name' => $year_levels_applicable
-                                    ),
-                                    'fields' => array('YearLevel.id', 'YearLevel.id')
-                                ));
-                            } else {
-                                $yearLevelIDs = $this->Section->YearLevel->find('list', array(
-                                    'conditions' => array(
-                                        'YearLevel.department_id' => $deptIdsToLook,
-                                        'YearLevel.name LIKE ' => (isset($year_level_name) && !empty($year_level_name) ? $year_level_name : $lastRegisteredYearLevelName)
-                                    ),
-                                    'fields' => array('YearLevel.id', 'YearLevel.id')
-                                ));
-                            }
-                        }
+                        $yearLevelIDs = !empty($year_levels_applicable)
+                            ? $this->Sections->YearLevels->find('list')
+                                ->where(
+                                    [
+                                        'YearLevels.department_id' => $department_id,
+                                        'YearLevels.name IN' => $year_levels_applicable
+                                    ]
+                                )
+                                ->select(['YearLevels.id', 'YearLevels.id'])
+                                ->toArray()
+                            : $this->Sections->YearLevels->find('list')
+                                ->where(
+                                    ['YearLevels.department_id' => $department_id, 'YearLevels.name LIKE' => $yl_name]
+                                )
+                                ->select(['YearLevels.id', 'YearLevels.id'])
+                                ->toArray();
+                    } elseif (!empty($lastRegisteredYearLevelName) || !empty($year_level_name)) {
+                        $yearLevelIDs = !empty($year_levels_applicable)
+                            ? $this->Sections->YearLevels->find('list')
+                                ->where(
+                                    [
+                                        'YearLevels.department_id IN' => $deptIdsToLook,
+                                        'YearLevels.name IN' => $year_levels_applicable
+                                    ]
+                                )
+                                ->select(['YearLevels.id', 'YearLevels.id'])
+                                ->toArray()
+                            : $this->Sections->YearLevels->find('list')
+                                ->where(
+                                    [
+                                        'YearLevels.department_id IN' => $deptIdsToLook,
+                                        'YearLevels.name LIKE' => $yl_name
+                                    ]
+                                )
+                                ->select(['YearLevels.id', 'YearLevels.id'])
+                                ->toArray();
                     }
 
                     if (!empty($yearLevelIDs)) {
-                        $conditions[] = array('Section.year_level_id' => $yearLevelIDs);
+                        $conditions[] = ['Sections.year_level_id IN' => $yearLevelIDs];
                     }
-                } else {
-                    if (is_null(
-                            $student_detail['Student']['department_id']
-                        ) && (empty($year_level_name) || $department_id == -1 || $department_id == 0)) {
-                        $conditions[] = array(
-                            'Section.college_id' => (!empty($collIdsToLook) ? $collIdsToLook : $college_id),
-                            'Section.department_id IS NULL',
-                            'Section.academicyear' => (!empty($student_detail['CourseRegistration'][0]['academic_year']) ? $student_detail['CourseRegistration'][0]['academic_year'] : $student_detail['Student']['academicyear']),
-                            'Section.archive' => 0,
-                            /* 'OR' => array(
-							'Section.year_level_id IS NULL',
-							'Section.year_level_id = ""',
-							'Section.year_level_id = 0'
-						) */
-                        );
-                    }
+                } elseif (is_null(
+                        $student_detail->department_id
+                    ) && (empty($year_level_name) || $department_id == -1 || $department_id == 0)) {
+                    $conditions = [
+                        'Sections.college_id IN' => (!empty($collIdsToLook) ? $collIdsToLook : $college_id),
+                        'Sections.department_id IS' => null,
+                        'Sections.academicyear' => !empty($student_detail->course_registrations[0]->academic_year) ? $student_detail->course_registrations[0]->academic_year : $student_detail->academicyear,
+                        'Sections.archive' => 0,
+                    ];
                 }
 
-                //debug($conditions);
-
-                //$sections_detail = array();
+                // debug($conditions);
 
                 if (!empty($conditions)) {
-                    $sections_detail = $this->Section->find('all', array(
-                        'conditions' => $conditions,
-                        'contain' => array(
-                            'Program' => array('id', 'name'),
-                            'ProgramType' => array('id', 'name'),
-                            'YearLevel' => array('id', 'name'),
-                        ),
-                        'fields' => array(
-                            'Section.id',
-                            'Section.name',
-                            'Section.program_id',
-                            'Section.year_level_id',
-                            'Section.academicyear',
-                            'Section.curriculum_id'
-                        ),
-                        'order' => array(
-                            'Section.academicyear' => 'DESC',
-                            'Section.program_id' => 'ASC',
-                            'Section.year_level_id' => 'ASC',
-                            'Section.id' => 'ASC',
-                            'Section.name' => 'ASC'
-                        ),
-                    ));
+                    $sections_detail = $this->Sections->find()
+                        ->where($conditions)
+                        ->contain([
+                            'Programs' => ['fields' => ['id', 'name']],
+                            'ProgramTypes' => ['fields' => ['id', 'name']],
+                            'YearLevels' => ['fields' => ['id', 'name']],
+                        ])
+                        ->select(
+                            [
+                                'Sections.id',
+                                'Sections.name',
+                                'Sections.program_id',
+                                'Sections.year_level_id',
+                                'Sections.academicyear',
+                                'Sections.curriculum_id'
+                            ]
+                        )
+                        ->order(
+                            [
+                                'Sections.academicyear' => 'DESC',
+                                'Sections.program_id' => 'ASC',
+                                'Sections.year_level_id' => 'ASC',
+                                'Sections.id' => 'ASC',
+                                'Sections.name' => 'ASC'
+                            ]
+                        )
+                        ->toArray();
                 }
             }
         }
 
         if (!empty($sections_detail)) {
-            foreach ($sections_detail as $seindex => $secvalue) {
-                if (isset($secvalue['YearLevel']['name']) && !empty($secvalue['YearLevel']['name'])) {
-                    $yn = $secvalue['YearLevel']['name'];
-                } else {
-                    if ($secvalue['Section']['program_id'] == PROGRAM_REMEDIAL) {
-                        $yn = 'Remedial';
-                    } else {
-                        $yn = 'Pre/1st';
-                    }
-                }
-                $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . $yn . ', ' . $secvalue['Section']['academicyear'] . ')';
+            foreach ($sections_detail as $secvalue) {
+                $yn = !empty($secvalue->year_level->name)
+                    ? $secvalue->year_level->name
+                    : ($secvalue->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st');
+                $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . $yn . ', ' . $secvalue->academicyear . ')';
             }
         }
 
-        $this->set(compact('sections'));
-
-        $this->set('college_id', $college_id);
-        $this->set('department_id', $department_id);
-        $this->set('year_level_name', $year_level_name);
+        $this->set(compact('sections', 'college_id', 'department_id', 'year_level_name'));
     }
-
-    public function get_sections_by_dept_data_entry($department_id = "")
+    public function getSectionsByDeptDataEntry(string $department_id = "", string $student_id = '', string $academic_year = '', string $program_id = '', string $program_type_id = '')
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
-        $sections = array();
+        $sections = [];
+        $options = [];
+        $student_sections = [];
+        $department_id_selected = '';
 
-        if (!empty($this->student_id)) {
-            $student_program_id = $this->Section->Student->field('program_id', array('Student.id' => $this->student_id)
-            );
-            $student_section_id = $this->Section->StudentsSection->field(
-                'section_id',
-                array('StudentsSection.student_id' => $this->student_id, 'StudentsSection.archive' => 0)
-            );
+        if (!empty($this->student_id) && empty($student_id)) {
+            $student_id = $this->student_id;
+        }
 
-            $sections_detail = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.department_id' => $department_id,
-                    'Section.program_id' => $student_program_id
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name')
-                ),
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.program_id',
-                    'Section.year_level_id',
-                    'Section.academicyear',
-                    'Section.curriculum_id'
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'DESC',
-                    'Section.program_id' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-            ));
+        if (!empty($student_id)) {
+            $student = $this->Sections->Students->find()
+                ->where(['Students.id' => $student_id])
+                ->select(['program_id', 'program_type_id', 'department_id'])
+                ->first();
+            if (!empty($student)) {
+                $program_id = $student->program_id;
+                $program_type_id = $student->program_type_id;
+                $student_sections = $this->Sections->StudentsSections->find('list')
+                    ->where(['StudentsSections.student_id' => $student_id])
+                    ->select(['StudentsSections.section_id', 'StudentsSections.section_id'])
+                    ->toArray();
+            }
+        }
+
+        if (!empty($student_sections)) {
+            $options['conditions']['NOT']['Sections.id IN'] = $student_sections;
+        }
+
+        if (!empty($department_id)) {
+            $options['conditions']['Sections.department_id'] = $department_id_selected = $department_id;
         } else {
-            $sections_detail = $this->Section->find('all', array(
-                'conditions' => array(
-                    'Section.department_id' => $department_id
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name')
-                ),
-                'fields' => array(
-                    'Section.id',
-                    'Section.name',
-                    'Section.program_id',
-                    'Section.year_level_id',
-                    'Section.academicyear',
-                    'Section.curriculum_id'
-                ),
-                'order' => array(
-                    'Section.academicyear' => 'DESC',
-                    'Section.program_id' => 'ASC',
-                    'Section.year_level_id' => 'ASC',
-                    'Section.id' => 'ASC',
-                    'Section.name' => 'ASC'
-                ),
-            ));
+            $options['conditions']['Sections.department_id'] = 0;
+        }
+
+        if (!empty($program_id)) {
+            $options['conditions']['Sections.program_id'] = $program_id;
+        }
+
+        if (!empty($program_type_id)) {
+            $program_types_to_look = $this->getEquivalentProgramTypes($program_type_id);
+            $options['conditions']['Sections.program_type_id IN'] = $program_types_to_look;
+        }
+
+        if (!empty($academic_year)) {
+            $academic_year = str_replace('-', '/', $academic_year);
+            $options['conditions']['Sections.academicyear'] = $academic_year;
+        }
+
+        if (!empty($options['conditions'])) {
+            $sections_detail = $this->Sections->find()
+                ->where($options['conditions'])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+                ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
         }
 
         if (!empty($sections_detail)) {
-            foreach ($sections_detail as $seindex => $secvalue) {
-                $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . (isset($secvalue['YearLevel']['name']) && !empty($secvalue['YearLevel']['name']) ? $secvalue['YearLevel']['name'] : ($secvalue['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $secvalue['Section']['academicyear'] . ')';
+            foreach ($sections_detail as $secvalue) {
+                $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . (!empty($secvalue->year_level->name) ? $secvalue->year_level->name : ($secvalue->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $secvalue->academicyear . ')';
             }
         }
-        $this->set(compact('sections'));
+
+        $this->set(compact('sections', 'department_id_selected'));
     }
 
 
-    public function get_sections_by_academic_year($year = null, $ac = null, $department_id = null)
+    public function getSectionsByAcademicYear(?string $year = null, ?string $ac = null, ?int $department_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $sections = [];
 
-        $this->layout = 'ajax';
-        $sections = array();
-
-        $sections_detail = $this->Section->find('all', array(
-            'conditions' => array(
-                'Section.department_id' => $department_id,
-                'Section.academicyear like ' => $year . '/' . $ac,
-            ),
-            'contain' => array(
-                'Program' => array('id', 'name'),
-                'YearLevel' => array('id', 'name'),
-                'ProgramType' => array('id', 'name')
-            ),
-            'fields' => array(
-                'Section.id',
-                'Section.name',
-                'Section.program_id',
-                'Section.year_level_id',
-                'Section.academicyear',
-                'Section.curriculum_id'
-            ),
-            'order' => array(
-                'Section.academicyear' => 'DESC',
-                'Section.program_id' => 'ASC',
-                'Section.year_level_id' => 'ASC',
-                'Section.id' => 'ASC',
-                'Section.name' => 'ASC'
-            ),
-        ));
+        $sections_detail = $this->Sections->find()
+            ->where([
+                'Sections.department_id' => $department_id,
+                'Sections.academicyear LIKE' => $year . '/' . $ac,
+            ])
+            ->contain([
+                'Programs' => ['fields' => ['id', 'name']],
+                'YearLevels' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name']],
+            ])
+            ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear', 'Sections.curriculum_id'])
+            ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+            ->toArray();
 
         if (!empty($sections_detail)) {
-            foreach ($sections_detail as $seindex => $secvalue) {
-                $sections[$secvalue['Program']['name']][$secvalue['Section']['id']] = $secvalue['Section']['name'] . ' (' . (isset($secvalue['YearLevel']['name']) && !empty($secvalue['YearLevel']['name']) ? $secvalue['YearLevel']['name'] : ($secvalue['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $secvalue['Section']['academicyear'] . ')';
+            foreach ($sections_detail as $secvalue) {
+                $sections[$secvalue->program->name][$secvalue->id] = $secvalue->name . ' (' . (!empty($secvalue->year_level->name) ? $secvalue->year_level->name : ($secvalue->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $secvalue->academicyear . ')';
             }
         }
+
         $this->set(compact('sections'));
     }
 
-    public function get_sections_by_year_level($yearLevel = null, $student_id = null, $acYrStart = null)
+    public function getSectionsByYearLevel(?string $yearLevel = null, ?int $student_id = null, ?string $acYrStart = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
-        $sections = array();
-        $sections_organized_by_acy = array();
+        $sections = [];
+        $sections_organized_by_acy = [];
 
+        if (!empty($student_id)) {
+            $student_detail = $this->Sections->Students->find()
+                ->where(['Students.id' => $student_id])
+                ->contain([
+                    'AcceptedStudents' => ['fields' => ['id', 'academicyear']],
+                    'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']],
+                ])
+                ->first();
 
-        if (isset($yearLevel) && isset($student_id) && !empty($student_id)) {
-            $student_detail = $this->Section->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => $student_id
-                ),
-                'contain' => array(
-                    'AcceptedStudent',
-                    'Curriculum' => array('id', 'name', 'year_introduced', 'type_credit', 'active'),
-                )
-            ));
+            $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatus');
+            $possibleAcademicYears = !empty($acYrStart)
+                ? $studentExamStatusTable->getAcademicYearRange(str_replace('-', '/', $acYrStart), $this->AcademicYear->currentAcademicYear())
+                : $studentExamStatusTable->getAcademicYearRange($student_detail->accepted_student->academicyear, $this->AcademicYear->currentAcademicYear());
 
-            //$next_ay_and_s = ClassRegistry::init('StudentExamStatus')->getNextSemster($this->AcademicYear->current_academicyear(), null);
-            //$possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange($student_detail['AcceptedStudent']['academicyear'], $next_ay_and_s['academic_year']);
+            // debug($acYrStart);
 
-            if (isset($acYrStart) && !empty($acYrStart)) {
-                $acYrStart = str_replace('-', '/', $acYrStart);
-                debug($acYrStart);
-                $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                    $acYrStart,
-                    $this->AcademicYear->current_academicyear()
-                );
-            } else {
-                $possibleAcademicYears = ClassRegistry::init('StudentExamStatus')->getAcademicYearRange(
-                    $student_detail['AcceptedStudent']['academicyear'],
-                    $this->AcademicYear->current_academicyear()
-                );
-            }
+            $currentStudentsSection = $this->Sections->StudentsSections->find()
+                ->select(['section_id'])
+                ->where(['StudentsSections.student_id' => $student_id, 'StudentsSections.archive' => 0])
+                ->first()
+                ->section_id ?? null;
 
-            $currentStudentsSection = $this->Section->StudentsSection->field('StudentsSection.section_id', array(
-                'StudentsSection.student_id' => $student_id,
-                'StudentsSection.archive' => 0
-            ));
+            $previousStudentsSection = $this->Sections->StudentsSections->find('list')
+                ->where(['StudentsSections.student_id' => $student_id, 'StudentsSections.archive' => 1])
+                ->group(['StudentsSections.student_id', 'StudentsSections.section_id'])
+                ->select(['StudentsSections.section_id', 'StudentsSections.section_id'])
+                ->order(['StudentsSections.id' => 'DESC'])
+                ->toArray();
 
-            $previousStudentsSection = $this->Section->StudentsSection->find('list', array(
-                'conditions' => array(
-                    'StudentsSection.student_id' => $student_id,
-                    'StudentsSection.archive' => 1
-                ),
-                'group' => array(
-                    'StudentsSection.student_id',
-                    'StudentsSection.section_id'
-                ),
-                'fields' => array(
-                    'StudentsSection.section_id',
-                    'StudentsSection.section_id'
-                ),
-                'order' => 'StudentsSection.id DESC',
-            ));
-
-            $excludeSections = array();
-
-            if (!empty($previousStudentsSection) || !empty($currentStudentsSection)) {
-                if (!empty($previousStudentsSection) && !empty($currentStudentsSection)) {
-                    $excludeSections = $previousStudentsSection;
-                    array_push($excludeSections, $currentStudentsSection);
-                } else {
-                    if (!empty($previousStudentsSection)) {
-                        $excludeSections = $previousStudentsSection;
-                    } else {
-                        array_push($excludeSections, $currentStudentsSection);
-                    }
-                }
-            } else {
-                array_push($excludeSections, 0);
-            }
+            $excludeSections = !empty($previousStudentsSection) || !empty($currentStudentsSection)
+                ? array_merge($previousStudentsSection, !empty($currentStudentsSection) ? [$currentStudentsSection] : [])
+                : [0];
 
             $excludeSections = array_values($excludeSections);
-            debug($excludeSections);
+            // debug($excludeSections);
 
-            $program_types_to_look = $this->__getEquivalentProgramTypes($student_detail['Student']['program_type_id']);
-            debug($program_types_to_look);
+            $program_types_to_look = $this->getEquivalentProgramTypes($student_detail->program_type_id);
+            // debug($program_types_to_look);
 
-            if (!is_null($yearLevel) && $yearLevel != 0 && ($this->Session->read(
-                        'Auth.User'
-                    )['role_id'] != ROLE_DEPARTMENT || !is_numeric($yearLevel))) {
-                $yearLevel = $this->Section->YearLevel->field(
-                    'id',
-                    array(
-                        'YearLevel.department_id' => $student_detail['Student']['department_id'],
-                        'YearLevel.name' => $yearLevel
-                    )
-                );
+            if (!is_null($yearLevel) && $yearLevel != 0 && ($this->auth_user['role_id'] != ROLE_DEPARTMENT || !is_numeric($yearLevel))) {
+                $yearLevel = $this->Sections->YearLevels->find()
+                    ->select(['id'])
+                    ->where(['YearLevels.department_id' => $student_detail->department_id, 'YearLevels.name' => $yearLevel])
+                    ->first()
+                    ->id ?? null;
             }
 
-            debug($yearLevel);
+            // debug($yearLevel);
+
+            $conditions = [
+                'NOT' => ['Sections.id IN' => $excludeSections],
+                'Sections.academicyear IN' => $possibleAcademicYears,
+                'Sections.program_id' => $student_detail->program_id,
+                'Sections.program_type_id IN' => $program_types_to_look,
+                'Sections.archive' => 0,
+            ];
 
             if (!is_null($yearLevel) && !empty($yearLevel) && $yearLevel != 0) {
-                $sections = $this->Section->find('all', array(
-                    'conditions' => array(
-                        'NOT' => array(
-                            'Section.id' => $excludeSections,
-                        ),
-                        'Section.year_level_id' => $yearLevel,
-                        'Section.academicyear' => $possibleAcademicYears,
-                        'Section.program_id' => $student_detail['Student']['program_id'],
-                        'Section.program_type_id' => $program_types_to_look,
-                        'Section.department_id' => $student_detail['Student']['department_id'],
-                        'Section.curriculum_id' => $student_detail['Student']['curriculum_id'],
-                        /* 'OR' => array(
-							'Section.curriculum_id IS NULL',
-							'Section.curriculum_id' => $student_detail['Student']['curriculum_id'] ,
-						), */
-                        'Section.archive' => 0
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name')
-                    ),
-                    'fields' => array('id', 'name', 'program_id', 'year_level_id', 'academicyear'),
-                    'order' => array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.program_id' => 'ASC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.id' => 'ASC',
-                        'Section.name' => 'ASC'
-                    ),
-                ));
+                $conditions['Sections.year_level_id'] = $yearLevel;
+                $conditions['Sections.department_id'] = $student_detail->department_id;
+                $conditions['Sections.curriculum_id'] = $student_detail->curriculum_id;
             } else {
-                $sections = $this->Section->find('all', array(
-                    'conditions' => array(
-                        'NOT' => array(
-                            'Section.id' => $excludeSections,
-                        ),
-                        'Section.college_id' => $student_detail['Student']['college_id'],
-                        'Section.academicyear' => $possibleAcademicYears,
-                        'Section.program_id' => $student_detail['Student']['program_id'],
-                        'Section.program_type_id' => $program_types_to_look,
-                        'Section.department_id is null',
-                        'Section.archive' => 0
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name')
-                    ),
-                    'fields' => array('id', 'name', 'program_id', 'year_level_id', 'academicyear'),
-                    'order' => array(
-                        'Section.academicyear' => 'DESC',
-                        'Section.program_id' => 'ASC',
-                        'Section.year_level_id' => 'ASC',
-                        'Section.id' => 'ASC',
-                        'Section.name' => 'ASC'
-                    ),
-                ));
+                $conditions['Sections.college_id'] = $student_detail->college_id;
+                $conditions['Sections.department_id IS'] = null;
             }
 
+            $sections = $this->Sections->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                ])
+                ->select(['Sections.id', 'Sections.name', 'Sections.program_id', 'Sections.year_level_id', 'Sections.academicyear'])
+                ->order(['Sections.academicyear' => 'DESC', 'Sections.program_id' => 'ASC', 'Sections.year_level_id' => 'ASC', 'Sections.id' => 'ASC', 'Sections.name' => 'ASC'])
+                ->toArray();
+
             if (!empty($sections)) {
-                foreach ($sections as $k => $v) {
-                    if (!empty($v['YearLevel']['name'])) {
-                        $sections_organized_by_acy[$v['Section']['academicyear']][$v['Section']['id']] = $v['Section']['name'] . ' (' . $v['YearLevel']['name'] . ', ' . $v['Section']['academicyear'] . ')';
-                    } else {
-                        $sections_organized_by_acy[$v['Section']['academicyear']][$v['Section']['id']] = $v['Section']['name'] . '(' . ($v['Section']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial, ' : 'Pre/1st, ') . $v['Section']['academicyear'] . ')';
-                    }
+                foreach ($sections as $v) {
+                    $sections_organized_by_acy[$v->academicyear][$v->id] = trim($v->name) . ' (' . (!empty($v->year_level->name) ? $v->year_level->name : ($v->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' . $v->academicyear . ')';
                 }
             }
         }
@@ -7806,35 +5340,28 @@ class SectionsController extends AppController
         $this->set(compact('sections', 'sections_organized_by_acy'));
     }
 
-    public function get_modal_box($section_id = null)
+    public function getModalBox(?int $section_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
 
-        $this->layout = 'ajax';
         if (!empty($section_id)) {
-            //debug($section_id);
+            // debug($section_id);
 
-            $selected_sections_students = array();
-            $unupgradable_selected_sections_students = array();
+            $selected_sections_students = [];
+            $unupgradable_selected_sections_students = [];
 
-            //get section active students
-            //$selected_sections_students = $this->Section->getSectionActiveStudents($section_id);
-            $selected_sections_students = $this->Section->getSectionActiveStudentsRegistered($section_id);
+            $selected_sections_students = $this->Sections->getSectionActiveStudentsRegistered($section_id);
 
-            //get unupgradable students among section all active students
-            $academicyear = $this->Section->field('Section.academicyear', array('Section.id' => $section_id));
+            $academicyear = $this->Sections->find()
+                ->select(['academicyear'])
+                ->where(['Sections.id' => $section_id])
+                ->first()
+                ->academicyear;
 
             if (!empty($selected_sections_students)) {
-                foreach ($selected_sections_students as $sssk => $sssv) {
-                    $student_status = $this->Section->Student->StudentExamStatus->isStudentPassed(
-                        $sssv['StudentsSection']['student_id'],
-                        $academicyear
-                    );
-                    $all_valid_grades = $this->Section->chceck_all_registered_added_courses_are_graded(
-                        $sssv['StudentsSection']['student_id'],
-                        $section_id,
-                        1,
-                        ''
-                    );
+                foreach ($selected_sections_students as $sssv) {
+                    $student_status = $this->Sections->Students->StudentExamStatuses->isStudentPassed($sssv['StudentsSection']['student_id'], $academicyear);
+                    $all_valid_grades = $this->Sections->checkAllRegisteredAddedCoursesAreGraded($sssv['StudentsSection']['student_id'], $section_id, 1, '');
 
                     if ($student_status == 4 || $student_status == 2 || !$all_valid_grades) {
                         $unupgradable_selected_sections_students[] = $sssv['StudentsSection']['student_id'];
@@ -7842,157 +5369,138 @@ class SectionsController extends AppController
                 }
             }
 
-            debug($unupgradable_selected_sections_students);
+            // debug($unupgradable_selected_sections_students);
 
-            //find the dessmisal status name
-            $status_name = ClassRegistry::init('AcademicStatus')->field(
-                'AcademicStatus.name',
-                array('AcademicStatus.id' => DISMISSED_ACADEMIC_STATUS_ID)
-            );
+            $status_name = TableRegistry::getTableLocator()->get('AcademicStatuses')->find()
+                ->select(['name'])
+                ->where(['AcademicStatuses.id' => DISMISSED_ACADEMIC_STATUS_ID])
+                ->first()
+                ->name;
 
-            $students_details = array();
+            $students_details = [];
 
             if (!empty($unupgradable_selected_sections_students)) {
                 foreach ($unupgradable_selected_sections_students as $student_id) {
-                    $students_details[$student_id] = $this->Section->Student->get_student_details($student_id);
+                    $students_details[$student_id] = $this->Sections->Students->getStudentDetails($student_id);
                 }
             }
-            //debug($students_details);
+
+            // debug($students_details);
+
             $this->set(compact('students_details', 'status_name'));
         }
     }
 
-    public function _get_unqualified_students_count($selected_sections = null, $academicYear = null)
+    protected function getUnqualifiedStudentsCount(?array $selected_sections = null, ?string $academicYear = null): array
     {
+        $selected_sections_students = [];
+        $categorize_selected_sections_students = [];
+        $sectionunupgradablestudentscount = [];
 
-        $selected_sections_students = array();
-        $categorize_selected_sections_students = array();
-        $sectionunupgradablestudentscount = array();
-
-        if (isset($selected_sections) && !empty($selected_sections)) {
-            foreach ($selected_sections as $ssk => $ssv) {
-                //get section active students
-                //$selected_sections_students[$ssv] = $this->Section->getSectionActiveStudents($ssv);
-                $selected_sections_students[$ssv] = $this->Section->getSectionActiveStudentsRegistered($ssv);
+        if (!empty($selected_sections)) {
+            foreach ($selected_sections as $ssv) {
+                $selected_sections_students[$ssv] = $this->Sections->getSectionActiveStudentsRegistered($ssv);
 
                 if (empty($academicYear)) {
-                    $academicYear = $this->Section->field('Section.academicyear', array('Section.id' => $ssv));
+                    $academicYear = $this->Sections->find()
+                        ->select(['academicyear'])
+                        ->where(['Sections.id' => $ssv])
+                        ->first()
+                        ->academicyear;
                 }
 
-                //categorize section active students as upgradable and unupgradable students
-
-                if (isset($selected_sections_students[$ssv]) && !empty($selected_sections_students[$ssv])) {
-                    //debug($ssv);
-                    //debug($selected_sections_students[$ssv]);
+                if (!empty($selected_sections_students[$ssv])) {
+                    // debug($ssv);
+                    // debug($selected_sections_students[$ssv]);
                     $start = microtime(true);
-                    foreach ($selected_sections_students[$ssv] as $sssk => $sssv) {
-                        if (isset($sssv['StudentsSection']['student_id']) && !empty($sssv['StudentsSection']['student_id'])) {
-                            /* if ($sssv['StudentsSection']['student_id'] == 81595) {
-								debug($sssv['StudentsSection']['student_id']);
-							} */
-                            $student_status = $this->Section->Student->StudentExamStatus->isStudentPassed(
-                                $sssv['StudentsSection']['student_id'],
-                                $academicYear
-                            );
-                            $all_valid_grades = $this->Section->chceck_all_registered_added_courses_are_graded(
-                                $sssv['StudentsSection']['student_id'],
-                                $ssv,
-                                1,
-                                ''
-                            );
-                            //debug($student_status);
+
+                    foreach ($selected_sections_students[$ssv] as $sssv) {
+                        if (!empty($sssv['StudentsSection']['student_id'])) {
+                            $student_status = $this->Sections->Students->StudentExamStatuses->isStudentPassed($sssv['StudentsSection']['student_id'], $academicYear);
+                            $all_valid_grades = $this->Sections->checkAllRegisteredAddedCoursesAreGraded($sssv['StudentsSection']['student_id'], $ssv, 1, '');
+                            // debug($student_status);
 
                             if ($student_status == 4 || $student_status == 2 || !$all_valid_grades) {
                                 $categorize_selected_sections_students[$ssv]['unupgradable'][] = $sssv['StudentsSection']['student_id'];
                             } else {
                                 $categorize_selected_sections_students[$ssv]['upgradable'][] = $sssv['StudentsSection']['student_id'];
-                                debug($sssv['StudentsSection']['student_id']);
+                                // debug($sssv['StudentsSection']['student_id']);
                             }
                         }
                     }
 
-                    //debug($start);
-                    $time_elapsed_secs = microtime(true) - $start;
-                    echo "Time elapsed = " . $time_elapsed_secs;
+                    // debug($start);
+                    // $time_elapsed_secs = microtime(true) - $start;
+                    // echo "Time elapsed = " . $time_elapsed_secs;
 
-                    //Set unupgradable section number
-                    if (isset($categorize_selected_sections_students[$ssv]['unupgradable']) && !empty($categorize_selected_sections_students[$ssv]['unupgradable'])) {
-                        //$sectionName = $this->Section->field('Section.name',array('Section.id'=>$ssv));
-                        $sectionunupgradablestudentscount[$ssv] = count(
-                            $categorize_selected_sections_students[$ssv]['unupgradable']
-                        );
+                    if (!empty($categorize_selected_sections_students[$ssv]['unupgradable'])) {
+                        $sectionunupgradablestudentscount[$ssv] = count($categorize_selected_sections_students[$ssv]['unupgradable']);
                     }
 
-                    $time_elapsed_secs = microtime(true) - $start;
-                    echo "Time elapsed = " . $time_elapsed_secs;
-                    //debug($ssv);
+                    // $time_elapsed_secs = microtime(true) - $start;
+                    // echo "Time elapsed = " . $time_elapsed_secs;
+                    // debug($ssv);
                 }
-                //debug($ssv);
+                // debug($ssv);
             }
         }
 
-        if (isset($sectionunupgradablestudentscount) && !empty($sectionunupgradablestudentscount)) {
-            return $sectionunupgradablestudentscount;
-        }
-        return array();
+        return $sectionunupgradablestudentscount;
     }
 
-    public function downgrade_sections()
+    public function downgradeSections()
     {
-
-        if ($this->Session->read('Auth.User')['role_id'] != ROLE_DEPARTMENT) {
+        if ($this->auth_user['role_id'] != ROLE_DEPARTMENT) {
             $this->Flash->warning('You need to have department role to downgrade section year levels!');
-            $this->redirect('/');
+            return $this->redirect('/');
         }
 
-        $programs = $this->Section->Program->find('list');
-        $programTypes = $this->Section->ProgramType->find('list');
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
+        $programs = $this->Sections->Programs->find('list')->toArray();
+        $programTypes = $this->Sections->ProgramTypes->find('list')->toArray();
+        $yearLevels = $this->Sections->YearLevels->find('list')
+            ->where(['YearLevels.department_id' => $this->department_id])
+            ->toArray();
         $isbeforesearch = 1;
 
         $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels'));
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
             $isbeforesearch = 0;
-            $selected_program = $this->request->data['Section']['program_id'];
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            $selected_academicyear = $this->request->data['Section']['academicyear'];
-            $selected_year_level = $this->request->data['Section']['year_level_id'];
+            $selected_program = $this->request->getData('Section.program_id');
+            $selected_program_type = $this->request->getData('Section.program_type_id');
+            $selected_academicyear = $this->request->getData('Section.academicyear');
+            $selected_year_level = $this->request->getData('Section.year_level_id');
 
-            $sections = $this->Section->find('all', array(
-                'fields' => array('Section.id', 'Section.name'),
-                'conditions' => array(
-                    'Section.department_id' => $this->department_id,
-                    'Section.program_id' => $selected_program,
-                    'Section.program_type_id' => $selected_program_type,
-                    'Section.academicyear' => $selected_academicyear,
-                    'Section.year_level_id LIKE' => $selected_year_level,
-                    'Section.archive' => 0,
-                    'Section.id NOT IN (select section_id from published_courses)'
-                ),
-                'recursive' => -1
-            ));
+            $sections = $this->Sections->find()
+                ->select(['Sections.id', 'Sections.name'])
+                ->where([
+                    'Sections.department_id' => $this->department_id,
+                    'Sections.program_id' => $selected_program,
+                    'Sections.program_type_id' => $selected_program_type,
+                    'Sections.academicyear' => $selected_academicyear,
+                    'Sections.year_level_id LIKE' => $selected_year_level,
+                    'Sections.archive' => 0,
+                    'Sections.id NOT IN' => $this->Sections->PublishedCourses->find()->select(['section_id']),
+                ])
+                ->toArray();
 
-            $formateddowngradableSections = array();
+            $formateddowngradableSections = [];
 
             if (!empty($sections)) {
-                foreach ($sections as $usk => $usv) {
-                    $formateddowngradableSections[$usv['Section']['id']] = $usv['Section']['name'];
+                foreach ($sections as $usv) {
+                    $formateddowngradableSections[$usv->id] = $usv->name;
                 }
             }
 
-            $this->Session->write('formateddowngradableSections', $formateddowngradableSections);
+            $this->request->getSession()->write('formateddowngradableSections', $formateddowngradableSections);
             $this->set(compact('formateddowngradableSections', 'isbeforesearch'));
         }
 
-        if (!empty($this->request->data) && isset($this->request->data['downgrade'])) {
-            $selectedSection = array();
+        if (!empty($this->request->getData()) && $this->request->getData('downgrade')) {
+            $selectedSection = [];
 
-            if (!empty($this->request->data['Section']['Downgradable_Selected'])) {
-                foreach ($this->request->data['Section']['Downgradable_Selected'] as $k => $v) {
+            if (!empty($this->request->getData('Section.Downgradable_Selected'))) {
+                foreach ($this->request->getData('Section.Downgradable_Selected') as $k => $v) {
                     if ($v != 0) {
                         $selectedSection[$k] = $k;
                     }
@@ -8000,404 +5508,280 @@ class SectionsController extends AppController
             }
 
             if (!empty($selectedSection)) {
-                $downgradeSection = $this->Section->downgradeSelectedSection($selectedSection);
+                $downgradeSection = $this->Sections->downgradeSelectedSection($selectedSection);
                 if (!empty($downgradeSection['success']) && empty($downgradeSection['unsuccess'])) {
-                    $this->Flash->success(
-                        'Section ' . count($downgradeSection['success']) . ' have been downgraded successfully.'
-                    );
-                } else {
-                    if (!empty($downgradeSection['success']) && !empty($downgradeSection['unsuccess'])) {
-                        $this->Flash->success(
-                            'Section ' . count(
-                                $downgradeSection['success']
-                            ) . ' have been downgraded successfully but ' . count($downgradeSection['unsuccess']) . '.'
-                        );
-                    }
+                    $this->Flash->success('Section ' . count($downgradeSection['success']) . ' have been downgraded successfully.');
+                } elseif (!empty($downgradeSection['success']) && !empty($downgradeSection['unsuccess'])) {
+                    $this->Flash->success('Section ' . count($downgradeSection['success']) . ' have been downgraded successfully but ' . count($downgradeSection['unsuccess']) . '.');
                 }
-                return $this->redirect(array('action' => 'display_sections'));
+                return $this->redirect(['action' => 'displaySections']);
             } else {
-                $this->Flash->error('Please select Section.');
+                $this->Flash->error(
+                    'Please select Section.',
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'this page', 'link_url' => ['action' => 'displaySections']]]
+                );
             }
 
-            $this->request->data['search'] = true;
-
+            $this->request = $this->request->withData('search', true);
             $formateddowngradableSections = null;
             $isbeforesearch = 0;
 
-            if ($this->Session->read('formateddowngradableSections')) {
-                $formateddowngradableSections = $this->Session->read('formateddowngradableSections');
+            if ($this->request->getSession()->check('formateddowngradableSections')) {
+                $formateddowngradableSections = $this->request->getSession()->read('formateddowngradableSections');
             }
+
             $this->set(compact('formateddowngradableSections', 'isbeforesearch'));
         }
     }
 
-    public function dispaly_section_less_students()
+    public function displaySectionLessStudents()
     {
-
-        // $programs = $this->Section->Program->find('list');
-        // $programTypes = $this->Section->ProgramType->find('list');
-        $this->__init_search_sections();
+        $this->initSearchSections();
         $isbeforesearch = 1;
 
-        /* if ($this->role_id == ROLE_DEPARTMENT) {
-			$yearLevels = $this->Section->YearLevel->find('list', array('conditions' => array('YearLevel.department_id' => $this->department_id)));
-		} else  {
-			$yearLevels = $this->Section->YearLevel->distinct_year_level();
-		} */
+        $selected_program = $this->request->getData('Section.program_id') ?? array_values($this->program_ids)[0];
+        $selected_program_type = $this->request->getData('Section.program_type_id') ?? array_values($this->program_type_ids)[0];
+        $program_types_to_look = $this->Sections->getEquivalentProgramTypes($selected_program_type);
+        $academicyear = $this->request->getData('Section.academicyear') ?? $this->AcademicYear->currentAcademicYear();
 
-        if (isset($this->request->data['Section']['program_id'])) {
-            $selected_program = $this->request->data['Section']['program_id'];
-        } else {
-            $selected_program = array_values($this->program_ids)[0];
-        }
+        $this->set(compact('isbeforesearch'));
 
-        if (isset($this->request->data['Section']['program_type_id'])) {
-            $selected_program_type = $this->request->data['Section']['program_type_id'];
-            $program_types_to_look = $this->Section->getEquivalentProgramTypes($selected_program_type);
-        } else {
-            $selected_program_type = array_values($this->program_type_ids)[0];
-            $program_types_to_look = $this->Section->getEquivalentProgramTypes($selected_program_type);
-        }
-
-        if (isset($this->request->data['Section']['academicyear'])) {
-            $academicyear = $this->request->data['Section']['academicyear'];
-        } else {
-            $academicyear = $this->AcademicYear->current_academicyear();
-        }
-
-        debug($academicyear);
-        debug($selected_program);
-        debug($selected_program_type);
-        debug($program_types_to_look);
-
-        $this->set(compact('programs', 'programTypes', 'isbeforesearch', 'yearLevels'));
-
-
-        $sectionlessStudents_ids = array();
+        $sectionlessStudents_ids = [];
 
         $selected_acy_exploded = explode('/', $academicyear);
         $previous_academic_year = ($selected_acy_exploded[0] - 1) . '/' . ($selected_acy_exploded[1] - 1);
 
-        $all_departments_sections_created_after_previous_acy_sections = array();
-        $all_freshman_sections_created_after_previous_acy_sections = array();
+        $all_departments_sections_created_after_previous_acy_sections = [];
+        $all_freshman_sections_created_after_previous_acy_sections = [];
 
-        debug($previous_academic_year);
+        // debug($previous_academic_year);
 
-        if (!empty($this->request->data) && isset($this->request->data['search'])) {
-            $this->__init_clear_session_filters();
-            $this->__init_search_sections();
+        if (!empty($this->request->getData()) && $this->request->getData('search')) {
+            $this->initClearSessionFilters();
+            $this->initSearchSections();
 
             $isbeforesearch = 0;
-            // $selected_program = $this->request->data['Section']['program_id'];
-            // $selected_program_type = $this->request->data['Section']['program_type_id'];
 
             $program_type_ids = "'" . implode("', '", $program_types_to_look) . "'";
+            $department_ids = !empty($this->department_ids) ? "'" . implode("', '", $this->department_ids) . "'" : 0;
+            $college_ids = !empty($this->college_ids) ? "'" . implode("', '", $this->college_ids) . "'" : 0;
 
-            if (!empty($this->department_ids)) {
-                $department_ids = "'" . implode("', '", $this->department_ids) . "'";
-            } else {
-                $department_ids = 0;
-            }
-
-            if (!empty($this->college_ids)) {
-                $college_ids = "'" . implode("', '", $this->college_ids) . "'";
-            } else {
-                $college_ids = 0;
-            }
-
-            debug($college_ids);
-            debug($department_ids);
-            debug($program_type_ids);
-
+            // debug($college_ids);
+            // debug($department_ids);
+            // debug($program_type_ids);
 
             if ($this->role_id == ROLE_DEPARTMENT) {
-                /* $sections = $this->Section->find('list', array(
-					'fields' => array('Section.id'),
-					'conditions' => array(
-						'Section.department_id' => $this->department_id,
-						'Section.program_id' => $selected_program,
-						'Section.program_type_id' => $program_types_to_look,
-						'Section.academicyear LIKE ' => $academicyear . '%',
-					),
-					'recursive' => -1
-				));
+                $previous_ac_year_sections = $this->Sections->find('list')
+                    ->where([
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                        'Sections.academicyear LIKE' => $previous_academic_year . '%',
+                    ])
+                    ->select(['Sections.id', 'Sections.id'])
+                    ->toArray();
 
-				$sectionlessStudents_ids = $this->Section->StudentsSection->find('all', array(
-					'fields' => array('DISTINCT StudentsSection.student_id'),
-					'conditions' => array(
-						'StudentsSection.archive' => 1,
-						'StudentsSection.section_id' => $sections,
-						//'StudentsSection.student_id NOT IN (select student_id from graduate_lists)'
-						"StudentsSection.student_id IN (select id from students where graduated = 0 AND department_id IN ($department_ids) AND program_id = $selected_program AND program_type_id in ($program_type_ids))"
-					),
-					'recursive' => -1
-				)); */
+                // debug($previous_ac_year_sections);
 
-                $previous_ac_year_sections = $this->Section->find('list', array(
-                    'fields' => array('Section.id', 'Section.id'),
-                    'conditions' => array(
-                        'Section.department_id' => $this->department_id,
-                        'Section.program_id' => $selected_program,
-                        'Section.program_type_id' => $program_types_to_look,
-                        'Section.academicyear LIKE ' => $previous_academic_year . '%',
-                    ),
-                    'recursive' => -1
-                ));
+                $selected_ac_year_sections = $this->Sections->find('list')
+                    ->where([
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                        'Sections.academicyear LIKE' => $academicyear . '%',
+                    ])
+                    ->select(['Sections.id', 'Sections.id'])
+                    ->toArray();
 
-                debug($previous_ac_year_sections);
+                $last_section_of_selected_ac_year_sections = $this->Sections->find()
+                    ->where([
+                        'Sections.department_id' => $this->department_id,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                        'Sections.academicyear LIKE' => $previous_academic_year . '%',
+                    ])
+                    ->select(['Sections.id', 'Sections.created'])
+                    ->order(['Sections.created' => 'DESC'])
+                    ->first();
 
-                $selected_ac_year_sections = $this->Section->find('list', array(
-                    'fields' => array('Section.id', 'Section.id'),
-                    'conditions' => array(
-                        'Section.department_id' => $this->department_id,
-                        'Section.program_id' => $selected_program,
-                        'Section.program_type_id' => $program_types_to_look,
-                        'Section.academicyear LIKE ' => $academicyear . '%',
-                    ),
-                    'recursive' => -1
-                ));
+                // debug($last_section_of_selected_ac_year_sections);
 
-                $last_section_of_selected_ac_year_sections = $this->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.department_id' => $this->department_id,
-                        'Section.program_id' => $selected_program,
-                        'Section.program_type_id' => $program_types_to_look,
-                        'Section.academicyear LIKE ' => (isset($previous_academic_year) ? $previous_academic_year : $academicyear) . '%',
-                    ),
-                    'fields' => array('Section.id', 'Section.created'),
-                    'order' => array('Section.created' => (isset($previous_academic_year) ? 'DESC' : 'ASC')),
-                    'recursive' => -1
-                ));
-
-                debug($last_section_of_selected_ac_year_sections);
-
-                if (!empty($last_section_of_selected_ac_year_sections)) {
-                    $all_departments_sections_created_after_previous_acy_sections = $this->Section->find('list', array(
-                        'conditions' => array(
-                            'Section.department_id' => $this->department_id,
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_types_to_look,
-                            'OR' => array(
-                                'Section.academicyear LIKE ' => $academicyear . '%',
-                                'Section.id >=' => $last_section_of_selected_ac_year_sections['Section']['id'],
-                                'Section.created >= ' => $last_section_of_selected_ac_year_sections['Section']['created'],
-                            )
-                        ),
-                        'fields' => array('Section.id', 'Section.id'),
-                        'recursive' => -1
-                    ));
-                } else {
-                    $all_departments_sections_created_after_previous_acy_sections = $this->Section->find('list', array(
-                        'conditions' => array(
-                            'Section.department_id' => $this->department_id,
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_types_to_look,
-                            'Section.academicyear LIKE ' => $academicyear . '%',
-                        ),
-                        'fields' => array('Section.id', 'Section.id'),
-                        'recursive' => -1
-                    ));
-                }
+                $all_departments_sections_created_after_previous_acy_sections = !empty($last_section_of_selected_ac_year_sections)
+                    ? $this->Sections->find('list')
+                        ->where([
+                            'Sections.department_id' => $this->department_id,
+                            'Sections.program_id' => $selected_program,
+                            'Sections.program_type_id IN' => $program_types_to_look,
+                            'OR' => [
+                                'Sections.academicyear LIKE' => $academicyear . '%',
+                                'Sections.id >=' => $last_section_of_selected_ac_year_sections->id,
+                                'Sections.created >=' => $last_section_of_selected_ac_year_sections->created,
+                            ],
+                        ])
+                        ->select(['Sections.id', 'Sections.id'])
+                        ->toArray()
+                    : $this->Sections->find('list')
+                        ->where([
+                            'Sections.department_id' => $this->department_id,
+                            'Sections.program_id' => $selected_program,
+                            'Sections.program_type_id IN' => $program_types_to_look,
+                            'Sections.academicyear LIKE' => $academicyear . '%',
+                        ])
+                        ->select(['Sections.id', 'Sections.id'])
+                        ->toArray();
 
                 if (!empty($previous_ac_year_sections)) {
-                    $sectionlessStudents_ids = $this->Section->StudentsSection->find('all', array(
-                        'fields' => array('DISTINCT StudentsSection.student_id'),
-                        'conditions' => array(
-                            'StudentsSection.archive' => 1,
-                            'StudentsSection.section_id' => $previous_ac_year_sections,
-                            //"StudentsSection.student_id IN (select id from students where graduated = 0 AND department_id IN ($department_ids) AND program_id = $selected_program AND program_type_id in ($program_type_ids))",
-                            "StudentsSection.student_id IN (select st.id from students st JOIN course_registrations creg ON creg.student_id = st.id where st.graduated = 0 AND st.department_id IN ($department_ids) AND st.program_id = $selected_program AND st.program_type_id in ($program_type_ids) AND creg.academic_year = '$previous_academic_year' GROUP BY creg.academic_year, creg.student_id, creg.semester)",
-                        ),
-                        'recursive' => -1
-                    ));
+                    $sectionlessStudents_ids = $this->Sections->StudentsSections->find()
+                        ->distinct(['StudentsSections.student_id'])
+                        ->where([
+                            'StudentsSections.archive' => 1,
+                            'StudentsSections.section_id IN' => $previous_ac_year_sections,
+                            'StudentsSections.student_id IN' => $this->Sections->Students->find()
+                                ->join([
+                                    'creg' => [
+                                        'table' => 'course_registrations',
+                                        'type' => 'INNER',
+                                        'conditions' => ['creg.student_id = Students.id'],
+                                    ],
+                                ])
+                                ->where([
+                                    'Students.graduated' => 0,
+                                    'Students.department_id IN' => $this->department_ids,
+                                    'Students.program_id' => $selected_program,
+                                    'Students.program_type_id IN' => $program_types_to_look,
+                                    'creg.academic_year' => $previous_academic_year,
+                                ])
+                                ->group(['creg.academic_year', 'creg.student_id', 'creg.semester'])
+                                ->select(['Students.id']),
+                        ])
+                        ->toArray();
                 }
-            } else {
-                if ($this->role_id == ROLE_COLLEGE) {
-                    /* $college = $this->Section->College->find('first', array('conditions' => array('College.id' => $this->college_id), 'recursive' => -1));
-				$campuses = $this->Section->College->Campus->find('first', array('conditions' => array('Campus.id' => $college['College']['campus_id']), 'recursive' => -1));
-				debug($campuses);
+            } elseif ($this->role_id == ROLE_COLLEGE) {
+                $previous_ac_year_sections = $this->Sections->find('list')
+                    ->where([
+                        'Sections.college_id' => $this->college_id,
+                        'Sections.department_id IS' => null,
+                        'Sections.academicyear LIKE' => $previous_academic_year . '%',
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                    ])
+                    ->select(['Sections.id', 'Sections.id'])
+                    ->toArray();
 
-				$collegesBelongs = $this->Section->College->Campus->find('list', array('conditions' => array('Campus.available_for_college' => $campuses['Campus']['available_for_college']), 'fields' => array('Campus.id', 'Campus.id')));
-				$collegeLists = $this->Section->College->find('list', array('conditions' => array('College.campus_id' => $collegesBelongs), 'fields' => array('College.id', 'College.id')));
-				debug($collegeLists); */
+                $selected_ac_year_sections = $this->Sections->find('list')
+                    ->where([
+                        'Sections.college_id' => $this->college_id,
+                        'Sections.department_id IS' => null,
+                        'Sections.academicyear LIKE' => $academicyear . '%',
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                    ])
+                    ->select(['Sections.id', 'Sections.id'])
+                    ->toArray();
 
-                    /* $sections = $this->Section->find('list', array(
-					'fields' => array('Section.id'),
-					'conditions' => array(
-						//'Section.college_id' => $collegeLists,
-						'Section.college_id' => $this->college_ids,
-						'Section.department_id is null',
-						'Section.academicyear LIKE ' => $academicyear . '%',
-						'Section.program_id' => $selected_program,
-						'Section.program_type_id' => $program_types_to_look
-					),
-					'recursive' => -1
-				));
+                $last_section_of_selected_ac_year_sections = $this->Sections->find()
+                    ->where([
+                        'Sections.college_id' => $this->college_id,
+                        'Sections.department_id IS' => null,
+                        'Sections.program_id' => $selected_program,
+                        'Sections.program_type_id IN' => $program_types_to_look,
+                        'Sections.academicyear LIKE' => $previous_academic_year . '%',
+                    ])
+                    ->select(['Sections.id', 'Sections.created'])
+                    ->order(['Sections.created' => 'DESC'])
+                    ->first();
 
-				$sectionlessStudents_ids = $this->Section->StudentsSection->find('all', array(
-					'fields' => array('DISTINCT StudentsSection.student_id'),
-					'conditions' => array(
-						'StudentsSection.archive' => 1,
-						'StudentsSection.section_id ' => $sections,
-						"StudentsSection.student_id IN (select id from students where college_id IN ($college_ids) and department_id is null and graduated = 0 AND program_id = $selected_program AND program_type_id in ($program_type_ids))",
-						'StudentsSection.student_id IN (select student_id from course_registrations where year_level_id is null OR year_level_id = 0 or year_level_id = "")',
-						//'StudentsSection.student_id NOT IN (select student_id from graduate_lists)'
-					),
-					'recursive' => -1
-				)); */
+                // debug($last_section_of_selected_ac_year_sections);
 
+                $all_freshman_sections_created_after_previous_acy_sections = !empty($last_section_of_selected_ac_year_sections)
+                    ? $this->Sections->find('list')
+                        ->where([
+                            'Sections.college_id' => $this->college_id,
+                            'Sections.department_id IS' => null,
+                            'Sections.program_id' => $selected_program,
+                            'Sections.program_type_id IN' => $program_types_to_look,
+                            'OR' => [
+                                'Sections.academicyear LIKE' => $academicyear . '%',
+                                'Sections.id >=' => $last_section_of_selected_ac_year_sections->id,
+                                'Sections.created >=' => $last_section_of_selected_ac_year_sections->created,
+                            ],
+                        ])
+                        ->select(['Sections.id', 'Sections.id'])
+                        ->toArray()
+                    : $this->Sections->find('list')
+                        ->where([
+                            'Sections.college_id' => $this->college_id,
+                            'Sections.department_id IS' => null,
+                            'Sections.program_id' => $selected_program,
+                            'Sections.program_type_id IN' => $program_types_to_look,
+                            'Sections.academicyear LIKE' => $academicyear . '%',
+                        ])
+                        ->select(['Sections.id', 'Sections.id'])
+                        ->toArray();
 
-                    $previous_ac_year_sections = $this->Section->find('list', array(
-                        'fields' => array('Section.id', 'Section.id',),
-                        'conditions' => array(
-                            'Section.college_id' => $this->college_id,
-                            'Section.department_id is null',
-                            'Section.academicyear LIKE ' => $previous_academic_year . '%',
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_types_to_look
-                        ),
-                        'recursive' => -1
-                    ));
-
-                    $selected_ac_year_sections = $this->Section->find('list', array(
-                        'fields' => array('Section.id', 'Section.id'),
-                        'conditions' => array(
-                            'Section.college_id' => $this->college_id,
-                            'Section.department_id is null',
-                            'Section.academicyear LIKE ' => $academicyear . '%',
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_types_to_look
-                        ),
-                        'recursive' => -1
-                    ));
-
-
-                    $last_section_of_selected_ac_year_sections = $this->Section->find('first', array(
-                        'conditions' => array(
-                            'Section.college_id' => $this->college_id,
-                            'Section.department_id is null',
-                            'Section.program_id' => $selected_program,
-                            'Section.program_type_id' => $program_types_to_look,
-                            'Section.academicyear LIKE ' => (isset($previous_academic_year) ? $previous_academic_year : $academicyear) . '%',
-                        ),
-                        'fields' => array('Section.id', 'Section.created'),
-                        'order' => array('Section.created' => (isset($previous_academic_year) ? 'DESC' : 'ASC')),
-                        'recursive' => -1
-                    ));
-
-                    debug($last_section_of_selected_ac_year_sections);
-
-                    if (!empty($last_section_of_selected_ac_year_sections)) {
-                        $all_freshman_sections_created_after_previous_acy_sections = $this->Section->find('list', array(
-                            'conditions' => array(
-                                'Section.college_id' => $this->college_id,
-                                'Section.department_id is null',
-                                'Section.program_id' => $selected_program,
-                                'Section.program_type_id' => $program_types_to_look,
-                                'OR' => array(
-                                    'Section.academicyear LIKE ' => $academicyear . '%',
-                                    'Section.id >=' => $last_section_of_selected_ac_year_sections['Section']['id'],
-                                    'Section.created >= ' => $last_section_of_selected_ac_year_sections['Section']['created'],
-                                )
-                            ),
-                            'fields' => array('Section.id', 'Section.id'),
-                            'recursive' => -1
-                        ));
-                    } else {
-                        $all_freshman_sections_created_after_previous_acy_sections = $this->Section->find('list', array(
-                            'conditions' => array(
-                                'Section.college_id' => $this->college_id,
-                                'Section.department_id is null',
-                                'Section.program_id' => $selected_program,
-                                'Section.program_type_id' => $program_types_to_look,
-                                'Section.academicyear LIKE ' => $academicyear . '%',
-                            ),
-                            'fields' => array('Section.id', 'Section.id'),
-                            'recursive' => -1
-                        ));
-                    }
-
-                    if (!empty($previous_ac_year_sections)) {
-                        $sectionlessStudents_ids = $this->Section->StudentsSection->find('all', array(
-                            'fields' => array('DISTINCT StudentsSection.student_id'),
-                            'conditions' => array(
-                                'StudentsSection.archive' => 1,
-                                'StudentsSection.section_id' => $previous_ac_year_sections,
-                                //"StudentsSection.student_id IN (select id from students where college_id IN ($college_ids) and department_id is null and graduated = 0 AND program_id = $selected_program AND program_type_id in ($program_type_ids))",
-                                "StudentsSection.student_id IN (select st.id from students st JOIN course_registrations creg ON creg.student_id = st.id where st.college_id IN ($college_ids) and st.department_id is null and st.graduated = 0 AND st.program_id = $selected_program AND st.program_type_id in ($program_type_ids) AND (creg.year_level_id is null OR creg.year_level_id = 0 or creg.year_level_id = '') AND creg.academic_year = '$previous_academic_year' GROUP BY creg.academic_year, creg.student_id, creg.semester)",
-                            ),
-                            'recursive' => -1
-                        ));
-                    }
+                if (!empty($previous_ac_year_sections)) {
+                    $sectionlessStudents_ids = $this->Sections->StudentsSections->find()
+                        ->distinct(['StudentsSections.student_id'])
+                        ->where([
+                            'StudentsSections.archive' => 1,
+                            'StudentsSections.section_id IN' => $previous_ac_year_sections,
+                            'StudentsSections.student_id IN' => $this->Sections->Students->find()
+                                ->join([
+                                    'creg' => [
+                                        'table' => 'course_registrations',
+                                        'type' => 'INNER',
+                                        'conditions' => ['creg.student_id = Students.id'],
+                                    ],
+                                ])
+                                ->where([
+                                    'Students.college_id IN' => $this->college_ids,
+                                    'Students.department_id IS' => null,
+                                    'Students.graduated' => 0,
+                                    'Students.program_id' => $selected_program,
+                                    'Students.program_type_id IN' => $program_types_to_look,
+                                    'OR' => [
+                                        'creg.year_level_id IS' => null,
+                                        'creg.year_level_id' => 0,
+                                        'creg.year_level_id' => '',
+                                    ],
+                                    'creg.academic_year' => $previous_academic_year,
+                                ])
+                                ->group(['creg.academic_year', 'creg.student_id', 'creg.semester'])
+                                ->select(['Students.id']),
+                        ])
+                        ->toArray();
                 }
             }
 
-            $sectionless_students_last_sections_details = array();
+            $sectionless_students_last_sections_details = [];
 
             if (!empty($sectionlessStudents_ids)) {
                 foreach ($sectionlessStudents_ids as $in => &$v) {
-                    if (isset($all_freshman_sections_created_after_previous_acy_sections) && !empty($all_freshman_sections_created_after_previous_acy_sections)) {
-                        $is_section_less = $this->Section->StudentsSection->find(
-                            'count',
-                            array(
-                                'conditions' => array(
-                                    'StudentsSection.archive' => 0,
-                                    'StudentsSection.student_id' => $v['StudentsSection']['student_id'],
-                                    'StudentsSection.section_id' => $all_freshman_sections_created_after_previous_acy_sections
-                                )
-                            )
-                        );
-                    } else {
-                        if (isset($all_departments_sections_created_after_previous_acy_sections) && !empty($all_departments_sections_created_after_previous_acy_sections)) {
-                            $is_section_less = $this->Section->StudentsSection->find(
-                                'count',
-                                array(
-                                    'conditions' => array(
-                                        'StudentsSection.archive' => 0,
-                                        'StudentsSection.student_id' => $v['StudentsSection']['student_id'],
-                                        'StudentsSection.section_id' => $all_departments_sections_created_after_previous_acy_sections
-                                    )
-                                )
-                            );
-                        } else {
-                            $is_section_less = $this->Section->StudentsSection->find(
-                                'count',
-                                array(
-                                    'conditions' => array(
-                                        'StudentsSection.archive' => 0,
-                                        'StudentsSection.student_id' => $v['StudentsSection']['student_id']
-                                    )
-                                )
-                            );
-                        }
-                    }
+                    $is_section_less = !empty($all_freshman_sections_created_after_previous_acy_sections)
+                        ? $this->Sections->StudentsSections->find()
+                            ->where(['StudentsSections.archive' => 0, 'StudentsSections.student_id' => $v->student_id, 'StudentsSections.section_id IN' => $all_freshman_sections_created_after_previous_acy_sections])
+                            ->count()
+                        : (!empty($all_departments_sections_created_after_previous_acy_sections)
+                            ? $this->Sections->StudentsSections->find()
+                                ->where(['StudentsSections.archive' => 0, 'StudentsSections.student_id' => $v->student_id, 'StudentsSections.section_id IN' => $all_departments_sections_created_after_previous_acy_sections])
+                                ->count()
+                            : $this->Sections->StudentsSections->find()
+                                ->where(['StudentsSections.archive' => 0, 'StudentsSections.student_id' => $v->student_id])
+                                ->count());
 
                     if ($is_section_less > 0) {
                         unset($sectionlessStudents_ids[$in]);
                     } else {
-                        $have_any_section_assignments_in_later_acys = 0;
-
-                        if (!empty($all_departments_sections_created_after_previous_acy_sections) || !empty($all_freshman_sections_created_after_previous_acy_sections)) {
-                            $have_any_section_assignments_in_later_acys = $this->Section->StudentsSection->find(
-                                'count',
-                                array(
-                                    'conditions' => array(
-                                        'StudentsSection.section_id' => (!empty($all_departments_sections_created_after_previous_acy_sections) ? $all_departments_sections_created_after_previous_acy_sections : $all_freshman_sections_created_after_previous_acy_sections),
-                                        'StudentsSection.student_id' => $v['StudentsSection']['student_id']
-                                    )
-                                )
-                            );
-                        }
+                        $have_any_section_assignments_in_later_acys = (!empty($all_departments_sections_created_after_previous_acy_sections) || !empty($all_freshman_sections_created_after_previous_acy_sections))
+                            ? $this->Sections->StudentsSections->find()
+                                ->where(['StudentsSections.section_id IN' => (!empty($all_departments_sections_created_after_previous_acy_sections) ? $all_departments_sections_created_after_previous_acy_sections : $all_freshman_sections_created_after_previous_acy_sections), 'StudentsSections.student_id' => $v->student_id])
+                                ->count()
+                            : 0;
 
                         if ($have_any_section_assignments_in_later_acys > 0) {
                             unset($sectionlessStudents_ids[$in]);
                         } else {
-                            //check
-                            //$exclude = $this->Section->dropOutWithDrawAfterLastRegistrationNotReadmittedExcludeFromSectionless($v['StudentsSection']['student_id'], $this->AcademicYear->current_academicyear());
-                            $exclude = $this->Section->dropOutWithDrawAfterLastRegistrationNotReadmittedExcludeFromSectionless(
-                                $v['StudentsSection']['student_id'],
-                                $academicyear
-                            );
+                            $exclude = $this->Sections->dropOutWithDrawAfterLastRegistrationNotReadmittedExcludeFromSectionless($v->student_id, $academicyear);
                             if ($exclude == 1) {
                                 unset($sectionlessStudents_ids[$in]);
                             }
@@ -8405,107 +5789,67 @@ class SectionsController extends AppController
                     }
                 }
 
-                $sectionless_students_last_sections_details = $this->Section->get_sectionless_students_last_sections(
-                    $sectionlessStudents_ids
-                );
+                $sectionless_students_last_sections_details = $this->Sections->getSectionlessStudentsLastSections($sectionlessStudents_ids);
             }
 
             $this->set(compact('sectionless_students_last_sections_details', 'isbeforesearch'));
         }
     }
 
-    public function _check_the_record_in_archive($section_id = null, $student_id = null)
+    protected function checkTheRecordInArchive(?int $section_id = null, ?int $student_id = null): ?int
     {
+        $studentSection_id = $this->Sections->StudentsSections->find()
+            ->select(['StudentsSections.id'])
+            ->where([
+                'StudentsSections.student_id' => $student_id,
+                'StudentsSections.section_id' => $section_id,
+                'StudentsSections.archive' => 1,
+            ])
+            ->first()
+            ->id ?? null;
 
-        $studentSection_id = $this->Section->StudentsSection->field('StudentsSection.id', array(
-            'StudentsSection.student_id' => $student_id,
-            'StudentsSection.section_id' => $section_id,
-            'StudentsSection.archive' => 1
-        ));
         return $studentSection_id;
     }
 
-
-    public function un_assigned_summeries($selectedAcademicYear)
+    public function unAssignedSummeries(string $selectedAcademicYear)
     {
+        $this->viewBuilder()->setLayout('ajax');
+        // debug($this->request->data);
 
-        $this->layout = 'ajax';
-        //debug($this->request->data);
+        $academicYear = !empty($selectedAcademicYear) ? str_replace("-", "/", $selectedAcademicYear) : $this->AcademicYear->currentAcademicYear();
+        $sselectedAcademicYear = $academicYear;
 
-        if (!empty($selectedAcademicYear)) {
-            $academicYear = str_replace("-", "/", $selectedAcademicYear);
-            $sselectedAcademicYear = $academicYear;
-        } else {
-            $academicYear = $sselectedAcademicYear = $this->AcademicYear->current_academicyear();
-        }
+        $selectedProgram = array_values($this->program_ids)[0] ?? null;
+        $selectedProgramType = array_values($this->program_type_ids)[0] ?? null;
 
-        if (!isset($selectedProgram)) {
-            $selectedProgram = array_values($this->program_ids)[0];
-        }
-
-        if (!isset($selectedProgramType)) {
-            $selectedProgramType = array_values($this->program_type_ids)[0];
-        }
-
-        $curriculums = array();
+        $curriculums = [];
 
         if ($this->role_id == ROLE_DEPARTMENT) {
-            $curriculums = ClassRegistry::init('Curriculum')->find('list', array(
-                'conditions' => array(
-                    'Curriculum.department_id' => $this->department_ids,
-                    'Curriculum.program_id' => $selectedProgram,
-                    'Curriculum.registrar_approved' => 1,
-                    'Curriculum.active' => 1
-                ),
-                'fields' => array('Curriculum.id', 'Curriculum.curriculum_detail'),
-                'order' => array('Curriculum.program_id' => 'ASC', 'Curriculum.created' => 'DESC'),
-            ));
+            $curriculums = TableRegistry::getTableLocator()->get('Curriculums')->find('list')
+                ->where([
+                    'Curriculums.department_id IN' => $this->department_ids,
+                    'Curriculums.program_id' => $selectedProgram,
+                    'Curriculums.registrar_approved' => 1,
+                    'Curriculums.active' => 1,
+                ])
+                ->select(['Curriculums.id', 'Curriculums.curriculum_detail'])
+                ->order(['Curriculums.program_id' => 'ASC', 'Curriculums.created' => 'DESC'])
+                ->toArray();
 
-            if (empty($selectedYearLevelId)) {
-                $yearLevelsss = $this->Section->YearLevel->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'YearLevel.department_id' => $this->department_ids,
-                            'YearLevel.name' => $this->year_levels
-                        )
-                    )
-                );
+            $yearLevelsss = $this->Sections->YearLevels->find('list')
+                ->where(['YearLevels.department_id IN' => $this->department_ids, 'YearLevels.name IN' => $this->year_levels])
+                ->toArray();
 
-                if (!empty($yearLevelsss)) {
-                    $selectedYearLevelId = array_keys($yearLevelsss)[0];
-                    $selectedYearLevelName = array_values($yearLevelsss)[0];
-                } else {
-                    $selectedYearLevelId = null;
-                    $selectedYearLevelName = null;
-                }
+            if (!empty($yearLevelsss)) {
+                $selectedYearLevelId = array_keys($yearLevelsss)[0];
+                $selectedYearLevelName = array_values($yearLevelsss)[0];
             } else {
-                $yearLevelsss = $this->Section->YearLevel->find(
-                    'list',
-                    array(
-                        'conditions' => array(
-                            'YearLevel.department_id' => $this->department_ids,
-                            'YearLevel.id' => $selectedYearLevelId
-                        )
-                    )
-                );
-
-                if (!empty($yearLevelsss)) {
-                    $selectedYearLevelId = array_keys($yearLevelsss)[0];
-                    $selectedYearLevelName = array_values($yearLevelsss)[0];
-                } else {
-                    $selectedYearLevelId = null;
-                    $selectedYearLevelName = null;
-                }
+                $selectedYearLevelId = null;
+                $selectedYearLevelName = null;
             }
 
-            if (!isset($selectedCurriculumID) && !empty($curriculums)) {
-                $selectedCurriculumID = array_keys($curriculums)[0];
-                $selectedCurriculumName = array_values($curriculums)[0];
-            } else {
-                $selectedCurriculumID = '%';
-                $selectedCurriculumName = null;
-            }
+            $selectedCurriculumID = !empty($curriculums) ? array_keys($curriculums)[0] : '%';
+            $selectedCurriculumName = !empty($curriculums) ? array_values($curriculums)[0] : null;
         } else {
             $selectedYearLevelId = null;
             $selectedYearLevelName = null;
@@ -8513,48 +5857,42 @@ class SectionsController extends AppController
             $selectedCurriculumName = null;
         }
 
-        $summary_data = $this->Section->getsectionlessstudentsummary(
-            $academicYear,
-            $this->college_id,
-            $this->department_id,
-            $this->role_id
-        );
+        $summary_data = $this->Sections->getSectionlessStudentSummary($academicYear, $this->college_id, $this->department_id, $this->role_id);
+        $curriculum_unattached_student_count = $this->Sections->getCurriculumUnattachedStudentSummary($academicYear, $this->college_id, $this->department_id, $this->role_id);
 
-        $curriculum_unattached_student_count = $this->Section->getcurriculumunattachedstudentsummary(
-            $academicYear,
-            $this->college_id,
-            $this->department_id,
-            $this->role_id
-        );
-        $collegename = $this->Section->College->field('College.name', array('College.id' => $this->college_id));
-        $departmentname = $this->Section->Department->field(
-            'Department.name',
-            array('Department.id' => $this->department_id)
-        );
-        $departmentshortname = $this->Section->Department->field(
-            'Department.shortname',
-            array('Department.id' => $this->department_id)
-        );
+        $collegename = $this->Sections->Colleges->find()
+            ->select(['name'])
+            ->where(['Colleges.id' => $this->college_id])
+            ->first()
+            ->name;
 
-        $yearLevels = $this->Section->YearLevel->find(
-            'list',
-            array('conditions' => array('YearLevel.department_id' => $this->department_id))
-        );
-        // $programs = $this->Section->Program->find('list');
-        // $programTypes = $this->Section->ProgramType->find('list');
+        $departmentname = $this->Sections->Departments->find()
+            ->select(['name'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->name;
 
-        $programss = $this->Section->Program->find(
-            'list',
-            array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-        );
-        $program_typess = $programTypess = $this->Section->ProgramType->find(
-            'list',
-            array('conditions' => array('ProgramType.id' => $this->program_type_ids, 'ProgramType.active' => 1))
-        );
+        $departmentshortname = $this->Sections->Departments->find()
+            ->select(['shortname'])
+            ->where(['Departments.id' => $this->department_id])
+            ->first()
+            ->shortname;
+
+        $yearLevels = $this->Sections->YearLevels->find('list')
+            ->where(['YearLevels.department_id' => $this->department_id])
+            ->toArray();
+
+        $programss = $this->Sections->Programs->find('list')
+            ->where(['Programs.id IN' => $this->program_ids, 'Programs.active' => 1])
+            ->toArray();
+
+        $program_typess = $this->Sections->ProgramTypes->find('list')
+            ->where(['ProgramTypes.id IN' => $this->program_type_ids, 'ProgramTypes.active' => 1])
+            ->toArray();
 
         $thisacademicyear = $academicYear;
 
-        $GCyear = substr(($academicYear), 0, 4);
+        $GCyear = substr($academicYear, 0, 4);
         $GCmonth = date('n');
         $GCday = date('j');
 
@@ -8565,99 +5903,95 @@ class SectionsController extends AppController
         }
 
         $ETY = $this->EthiopicDateTime->GetEthiopicYear($GCday, $GCmonth, $GCyear);
-        if ($GCmonth == 9) {
-            //$ETY+=1;
-        }
 
         $FixedSectionName = $departmentshortname . $ETY;
-        //echo $FixedSectionName;
 
-        $this->set(
-            compact(
-                'departmentname',
-                'yearLevels',
-                'variable_section_name_array',
-                'collegename',
-                'programss',
-                'programTypess',
-                'summary_data',
-                'FixedSectionName',
-                'thisacademicyear',
-                'sselectedAcademicYear',
-                'curriculum_unattached_student_count',
-                'selectedProgramName',
-                'selectedProgramTypeName',
-                'selectedYearLevelName',
-                'selectedCurriculumName'
-            )
-        );
+        $this->set(compact(
+            'departmentname',
+            'yearLevels',
+            'collegename',
+            'programss',
+            'program_typess',
+            'summary_data',
+            'FixedSectionName',
+            'thisacademicyear',
+            'sselectedAcademicYear',
+            'curriculum_unattached_student_count',
+            'selectedYearLevelName',
+            'selectedCurriculumName'
+        ));
     }
 
-    public function restore_student_section($section_id = null, $student_id = null, $archieve_status = 1)
+    public function restoreStudentSection(?int $section_id = null, ?int $student_id = null, int $archive_status = 1)
     {
-
         if (!empty($student_id)) {
-            $student_number = $this->Section->Student->field('Student.studentnumber', array('Student.id' => $student_id)
-            );
+            $student_number = $this->Sections->Students->find()
+                ->select(['studentnumber'])
+                ->where(['Students.id' => $student_id])
+                ->first()
+                ->studentnumber;
 
-            /* debug($student_number);
-			debug($section_id);
-			debug($archieve_status); */
-
-
-            if ((!$section_id || empty($section_id)) && !empty($student_number)) {
-                $this->Flash->error('Invalid id for section or/and student.');
-                $this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $student_id));
+            if (empty($section_id) || empty($student_number)) {
+                $this->Flash->error(
+                    'Invalid id for section or/and student.',
+                    ['element' => 'error_with_link', 'params' => ['link_text' => 'student academic profile',
+                        'link_url' => ['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]]]
+                );
+                return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
             }
 
-            $section_name = $this->Section->field('Section.name', array('Section.id' => $section_id));
-            //now delete this student from this section from associate table .  check student deletion from section is possible ?
-
-            if (!$archieve_status) {
-                $activeStudentSections = ClassRegistry::init('StudentsSection')->find('list', array(
-                    'conditions' => array(
-                        'StudentsSection.student_id' => $student_id,
-                        'StudentsSection.archive' => 0
-                    ),
-                    'fields' => array('StudentsSection.id', 'StudentsSection.id')
-                ));
-
-
-                if (!empty($activeStudentSections)) {
-                    ClassRegistry::init('StudentsSection')->updateAll(array('StudentsSection.archive' => 1),
-                        array('StudentsSection.id' => $activeStudentSections));
-                }
-            }
+            $section_name = $this->Sections->find()
+                ->select(['name'])
+                ->where(['Sections.id' => $section_id])
+                ->first()
+                ->name;
 
             if (!empty($section_name)) {
-                // section exists
+                if (!$archive_status) {
+                    $activeStudentSections = TableRegistry::getTableLocator()->get('StudentsSections')->find('list')
+                        ->where(['StudentsSections.student_id' => $student_id, 'StudentsSections.archive' => 0])
+                        ->select(['StudentsSections.id', 'StudentsSections.id'])
+                        ->toArray();
 
-                $updateStudentSectionIfExists = ClassRegistry::init('StudentsSection')->field(
-                    'StudentsSection.id',
-                    array(
-                        'StudentsSection.student_id' => $student_id,
-                        'StudentsSection.section_id' => $section_id,
-                    )
-                );
-
-                if ($updateStudentSectionIfExists) {
-                    $restoreSection['StudentsSection']['id'] = $updateStudentSectionIfExists;
+                    if (!empty($activeStudentSections)) {
+                        /*
+                        TableRegistry::getTableLocator()->get('StudentsSections')->updateAll(
+                            ['StudentsSections.archive' => 1],
+                            ['StudentsSections.id IN' => $activeStudentSections]
+                        );*/
+                        TableRegistry::getTableLocator()->get('StudentsSections')->updateAll(
+                            ['archive' => 1],
+                            ['id IN' => $activeStudentSections]
+                        );
+                    }
                 }
 
-                $restoreSection['StudentsSection']['section_id'] = $section_id;
-                $restoreSection['StudentsSection']['student_id'] = $student_id;
-                $restoreSection['StudentsSection']['archive'] = $archieve_status;
+                $updateStudentSectionIfExists = TableRegistry::getTableLocator()->get('StudentsSections')->find()
+                    ->select(['StudentsSections.id'])
+                    ->where(['StudentsSections.student_id' => $student_id, 'StudentsSections.section_id' => $section_id])
+                    ->first()
+                    ->id ?? null;
 
-                // TO DO:  check and maintain, distorted section ordering by yearlevel and registration data available, if any, Neway
+                $restoreSection = $this->Sections->StudentsSections->newEntity([
+                    'id' => $updateStudentSectionIfExists,
+                    'section_id' => $section_id,
+                    'student_id' => $student_id,
+                    'archive' => $archive_status,
+                ]);
 
-                if (ClassRegistry::init('StudentsSection')->save($restoreSection, false)) {
-                    $this->Flash->success($student_number . ' restored to ' . $section_name . ' section.');
+                if ($this->Sections->StudentsSections->save($restoreSection, ['validate' => false])) {
+                    $this->Flash->success("$student_number restored to $section_name section.");
                 } else {
-                    $this->Flash->error($student_number . ' can not be restored to ' . $section_name . ' section.');
+                    $this->Flash->error(
+                        "$student_number can not be restored to $section_name section.",
+                        ['element' => 'error_with_link', 'params' => ['link_text' => 'student academic profile',
+                            'link_url' => ['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]]]
+                    );
                 }
 
-                $this->redirect(array('controller' => 'students', 'action' => 'student_academic_profile', $student_id));
+                return $this->redirect(['controller' => 'Students', 'action' => 'studentAcademicProfile', $student_id]);
             }
         }
     }
 }
+?>

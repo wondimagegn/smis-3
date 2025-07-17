@@ -38,8 +38,8 @@ class AcademicCalendarsController extends AppController
         parent::beforeFilter($event);
         $this->Auth->allow([
             'autoSaveExtension',
-            'extending_calendar',
-            'get_departments_that_have_the_selected_program'
+            'extendingCalendar',
+            'getDepartmentsThatHaveTheSelectedProgram'
         ]);
 
     }

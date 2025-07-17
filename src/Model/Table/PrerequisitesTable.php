@@ -31,8 +31,14 @@ class PrerequisitesTable extends Table
             'joinType' => 'INNER',
         ]);
         $this->belongsTo('PrerequisiteCourses', [
+            'className' => 'Courses',
             'foreignKey' => 'prerequisite_course_id',
+            'conditions' => '',
+            'fields' => array('PrerequisiteCourse.credit', 'PrerequisiteCourse.course_code', 'PrerequisiteCourse.course_title'),
+            'order' => '',
         ]);
+
+
     }
 
     /**

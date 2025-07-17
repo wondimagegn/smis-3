@@ -1,14 +1,15 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
 
+/**
+ * CertificateVerificationCodes Table
+ */
 class CertificateVerificationCodesTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -17,105 +18,56 @@ class CertificateVerificationCodesTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('certificate_verification_codes');
-        $this->setDisplayField('id');
+        $this->setDisplayField('code');
         $this->setPrimaryKey('id');
-
-        $this->addBehavior('Timestamp');
 
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'Student',
+            'joinType' => 'LEFT',
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
             ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('type')
-            ->maxLength('type', 100)
-            ->requirePresence('type', 'create')
-            ->notEmptyString('type');
-
-        $validator
-            ->scalar('code')
-            ->maxLength('code', 10)
-            ->requirePresence('code', 'create')
-            ->notEmptyString('code');
-
-        $validator
-            ->scalar('user')
-            ->maxLength('user', 36)
-            ->requirePresence('user', 'create')
-            ->notEmptyString('user');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Generates a unique verification code
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param string $prefix Code prefix
+     * @return string Generated code
      */
-    public function buildRules(RulesChecker $rules)
+    public function generateCode(string $prefix = ''): string
     {
-
-        $rules->add($rules->existsIn(['student_id'], 'Students'));
-
-        return $rules;
-    }
-
-
-    public function generateCode($prefix = '')
-    {
-
-        debug($prefix);
-        $number = ClassRegistry::init('GraduateList')->find('count');
         $length = 8;
-        $initialValue = substr(str_repeat(0, $length) . $number, -$length);
+        $graduateListsTable = TableRegistry::getTableLocator()->get('GraduateLists');
+        $number = $graduateListsTable->find()->count();
+        $initialValue = str_pad($number, $length, '0', STR_PAD_LEFT);
 
-        $code = $this->find(
-            'first',
-            array('order' => array('CertificateVerificationCode.id DESC'))
-        );
-        if (isset($code) && !empty($code)) {
-            // check if the code is string then extract string
-            if (is_string($code['CertificateVerificationCode']["code"])) {
-                $extractedNumber = substr(
-                        $code['CertificateVerificationCode']["code"],
-                        2,
-                        strlen($code['CertificateVerificationCode']["code"])
-                    ) + 1;
+        $lastCode = $this->find()
+            ->select(['code'])
+            ->order(['CertificateVerificationCodes.id' => 'DESC'])
+            ->first();
 
-
-                $filledExtractedNumber = substr(str_repeat(0, $length) . $extractedNumber, -$length);
-            } else {
-                $extractedNumber = $code['CertificateVerificationCode']["code"] + 1;
-                $filledExtractedNumber = substr(str_repeat(0, $length) . $extractedNumber, -$length);
-            }
-
-            return $prefix . '' . $filledExtractedNumber;
-        } else {
-            debug($initialValue);
+        if ($lastCode && !empty($lastCode->code)) {
+            $extractedNumber = (int)substr($lastCode->code, strlen($prefix)) + 1;
+            $filledNumber = str_pad($extractedNumber, $length, '0', STR_PAD_LEFT);
+            return $prefix . $filledNumber;
         }
 
-        return $prefix . '' . $initialValue;
+        return $prefix . $initialValue;
     }
 }

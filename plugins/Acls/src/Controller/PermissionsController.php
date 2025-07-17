@@ -109,16 +109,33 @@ class PermissionsController extends AppController
 
     public function add($acoId = null, $roleId = null)
     {
+        if (empty($acoId) || !is_numeric($acoId)) {
+            $this->Flash->error(__('Invalid ACO ID.'));
+            return $this->redirect(['controller' => 'Acos', 'action' => 'index']);
+        }
+
         $this->_validateIfControllerPermissionCanBeManagedByTheUser($acoId);
 
         $session = $this->request->getSession();
         $userId = $session->read('Auth.User.id');
         $userRoleId = $session->read('Auth.User.role_id');
 
+        if (empty($userId) || empty($userRoleId)) {
+            $this->Flash->error(__('User session invalid. Please log in again.'));
+            return $this->redirect(['controller' => 'Users', 'action' => 'login']);
+        }
+
         $adminDetail = $this->Users->find()
             ->contain(['Staffs'])
             ->where(['Users.id' => $userId])
             ->first();
+
+        if (empty($adminDetail)) {
+            $this->Flash->error(__('User not found.'));
+            return $this->redirect(['controller' => 'Acos', 'action' => 'index']);
+        }
+
+
 
         if ($this->request->getData('Permission.role_id')) {
             $roleId = $this->request->getData('Permission.role_id');
@@ -126,15 +143,21 @@ class PermissionsController extends AppController
 
         $acoIdForCheck = $this->request->getData('Permission.aco_id') ?? $acoId;
         $aco = $this->Acos->get($acoIdForCheck);
-        $acoAdmins = explode(',', $aco->admin);
+        if (empty($aco)) {
+            $this->Flash->error(__('ACO not found for ID: ' . $acoIdForCheck));
+            return $this->redirect(['controller' => 'Acos', 'action' => 'index']);
+        }
+        $acoAdmins = explode(',', $aco->admin ?? '');
 
         if ($userRoleId != ROLE_SYSADMIN && $aco->parent_id != 1 && !in_array($userRoleId, $acoAdmins)) {
             $this->Flash->error(__('You are trying to break system security.'));
             return $this->redirect(['controller' => 'Acos', 'action' => 'index']);
         }
 
+
         $permission = $this->Permissions->newEntity();
         $requestData = $this->request->getData();
+
 
         if (!empty($requestData) && $this->request->is(['post', 'put'])) {
 
@@ -237,6 +260,7 @@ class PermissionsController extends AppController
         } else {
             $users = [0 => '[ Select Role First ]'];
         }
+
 
         $this->set(compact('aros', 'path', 'aco', 'roles', 'users', 'roleId', 'permission'));
     }

@@ -1,530 +1,382 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
-use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
+use Cake\I18n\Time;
 
 class StudentStatusPatternsTable extends Table
 {
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
         $this->setTable('student_status_patterns');
         $this->setPrimaryKey('id');
 
-        // BelongsTo Associations
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT'
         ]);
 
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT'
         ]);
     }
 
-    public function validationDefault(Validator $validator)
-    {
-        $validator
-            ->integer('program_id')
-            ->requirePresence('program_id', 'create')
-            ->notEmptyString('program_id', 'Program ID is required');
-
-        $validator
-            ->integer('program_type_id')
-            ->requirePresence('program_type_id', 'create')
-            ->notEmptyString('program_type_id', 'Program Type ID is required');
-
-        return $validator;
-    }
-
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
-    {
-        $rules->add($rules->existsIn(['program_id'], 'Programs'));
-        $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
-
-        return $rules;
-    }
-
-    use Cake\ORM\TableRegistry;
-
     public function getProgramTypePattern($programId = null, $programTypeId = null, $academicYear = null)
     {
-        $patternsTable = TableRegistry::getTableLocator()->get('StudentStatusPatterns');
+        if (!$programId || !$programTypeId || !$academicYear) {
+            return 1;
+        }
 
-        $statusPatterns = $patternsTable->find()
-            ->select(['program_id', 'program_type_id', 'pattern', 'acadamic_year', 'application_date'])
+        $statusPatterns = $this->find()
+            ->select(['pattern', 'acadamic_year'])
             ->where([
-                'StudentStatusPatterns.program_id' => $programId,
-                'StudentStatusPatterns.program_type_id' => $programTypeId
+                'program_id' => $programId,
+                'program_type_id' => $programTypeId
             ])
-            ->orderAsc('StudentStatusPatterns.application_date')
-            ->enableHydration(false)
+            ->order(['application_date' => 'ASC'])
             ->toArray();
 
         if (empty($statusPatterns)) {
             return 1;
         }
 
-        $firstPattern = $statusPatterns[0]['pattern'];
-        $sysAcademicYear = $statusPatterns[0]['acadamic_year'];
+        $pattern = $statusPatterns[0]->pattern;
+        $sysAcademicYear = $statusPatterns[0]->acadamic_year;
 
+        // Check if pattern was introduced after the given academic year
         if (substr($sysAcademicYear, 0, 4) > substr($academicYear, 0, 4)) {
             return 1;
         }
 
-        $pattern = $firstPattern;
-        do {
+        while ($sysAcademicYear !== '3000/01') {
             foreach ($statusPatterns as $statusPattern) {
-                if ($statusPattern['acadamic_year'] === $sysAcademicYear) {
-                    $pattern = $statusPattern['pattern'];
+                if ($sysAcademicYear === $statusPattern->acadamic_year) {
+                    $pattern = $statusPattern->pattern;
                 }
             }
 
-            if (strcasecmp($academicYear, $sysAcademicYear) !== 0) {
-                $startYear = (int)substr($sysAcademicYear, 0, 4) + 1;
-                $endYear = substr((string)($startYear + 1), 2, 2);
-                $sysAcademicYear = $startYear . '/' . $endYear;
-            } else {
+            if ($academicYear === $sysAcademicYear) {
                 return $pattern;
             }
-        } while ($sysAcademicYear !== '3000/01');
+
+            $year = (int)substr($sysAcademicYear, 0, 4) + 1;
+            $sysAcademicYear = sprintf('%d/%02d', $year, ($year + 1) % 100);
+        }
 
         return $pattern;
     }
 
-
-    public function isLastSemesterInCurriculum($studentId): bool
+    public function isLastSemesterInCurriculum($studentId)
     {
+        if (!$studentId) {
+            return false;
+        }
+
         $studentsTable = TableRegistry::getTableLocator()->get('Students');
         $coursesTable = TableRegistry::getTableLocator()->get('Courses');
-        $addsTable = TableRegistry::getTableLocator()->get('CourseAdds');
-        $regsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
-
-        $student = $studentsTable->find()
-            ->contain(['Curriculums'])
-            ->where(['Students.id' => $studentId])
-            ->enableHydration(false)
-            ->first();
-
-        if (empty($student) || empty($student['Students']['curriculum_id'])) {
-            return false;
-        }
-
-        $curriculumId = $student['Students']['curriculum_id'];
-
-        $lastYearLevelRow = $coursesTable->find()
-            ->select(['year_level_id'])
-            ->where(['Courses.curriculum_id' => $curriculumId])
-            ->group(['Courses.year_level_id', 'Courses.semester'])
-            ->order(['Courses.year_level_id' => 'DESC', 'Courses.semester' => 'DESC'])
-            ->enableHydration(false)
-            ->first();
-
-        if (empty($lastYearLevelRow)) {
-            return false;
-        }
-
-        $lastYearLevelId = $lastYearLevelRow['year_level_id'];
-
-        $hasLastLevelCourses = $regsTable->find()
-            ->where([
-                'CourseRegistrations.student_id' => $studentId,
-                'CourseRegistrations.year_level_id' => $lastYearLevelId
-            ])
-            ->count();
-
-        if (!$hasLastLevelCourses) {
-            return false;
-        }
-
-        $addedCourses = $addsTable->find()
-            ->contain([
-                'PublishedCourses' => [
-                    'Courses' => ['CourseCategories', 'Curriculums']
-                ]
-            ])
-            ->where([
-                'CourseAdds.student_id' => $studentId,
-                'CourseAdds.department_approval' => 1,
-                'CourseAdds.registrar_confirmation' => 1
-            ])
-            ->enableHydration(false)
-            ->toArray();
-
-        $registeredCourses = $regsTable->find()
-            ->contain([
-                'PublishedCourses' => [
-                    'Courses' => ['CourseCategories', 'Curriculums']
-                ]
-            ])
-            ->where([
-                'CourseRegistrations.student_id' => $studentId
-            ])
-            ->enableHydration(false)
-            ->toArray();
-
-        $lastCreditSum = 0;
-
-        foreach ($registeredCourses as $reg) {
-            $credit = $reg['PublishedCourses']['Courses']['credit'] ?? 0;
-            $lastCreditSum += (float)$credit;
-        }
-
-        foreach ($addedCourses as $add) {
-            $credit = $add['PublishedCourses']['Courses']['credit'] ?? 0;
-            $lastCreditSum += (float)$credit;
-        }
-
-        $requiredCredits = (float) $student['Curriculums']['minimum_credit_points'];
-        return $lastCreditSum >= $requiredCredits;
-    }
-
-
-    public function isEligibleForExitExam($studentId)
-    {
-        $studentsTable = TableRegistry::getTableLocator()->get('Students');
-        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
-        $courseRegsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
         $courseAddsTable = TableRegistry::getTableLocator()->get('CourseAdds');
-        $courseDropsTable = TableRegistry::getTableLocator()->get('CourseDrops');
-        $courseExemptionsTable = TableRegistry::getTableLocator()->get('CourseExemptions');
 
         $student = $studentsTable->find()
-            ->contain(['Curriculums'])
+            ->select(['id', 'curriculum_id'])
             ->where(['Students.id' => $studentId])
+            ->contain(['Curriculums' => ['fields' => ['id', 'minimum_credit_points']]])
             ->first();
 
-        if (empty($student) || empty($student->curriculum_id)) {
+        if (!$student || !$student->curriculum_id) {
             return false;
         }
 
-        $curriculumId = $student->curriculum_id;
-
-        $lastYearLevel = $coursesTable->find()
+        $lastYearLevelId = $coursesTable->find()
             ->select(['year_level_id'])
-            ->where(['curriculum_id' => $curriculumId])
+            ->where(['curriculum_id' => $student->curriculum_id])
+            ->group(['year_level_id', 'semester'])
             ->order(['year_level_id' => 'DESC', 'semester' => 'DESC'])
-            ->group(['year_level_id', 'semester'])
             ->limit(1)
+            ->extract('year_level_id')
             ->first();
-
-        $semesterCount = $coursesTable->find()
-            ->where(['curriculum_id' => $curriculumId])
-            ->group(['year_level_id', 'semester'])
-            ->count();
-
-        $lastYearLevelId = $lastYearLevel ? $lastYearLevel->year_level_id : null;
 
         if (!$lastYearLevelId) {
             return false;
         }
 
-        $registeredLastYear = $courseRegsTable->find()
+        $hasRegisteredLastYear = $courseRegistrationsTable->find()
             ->where([
                 'student_id' => $studentId,
                 'year_level_id' => $lastYearLevelId
             ])
             ->count();
 
-        if (!$registeredLastYear) {
+        if (!$hasRegisteredLastYear) {
             return false;
         }
 
-        $registeredCredits = $courseRegsTable->find()
-            ->select(['total' => 'SUM(Course.credit)'])
-            ->join([
-                'Courses' => [
-                    'table' => 'courses',
-                    'type' => 'INNER',
-                    'conditions' => ['Courses.id = PublishedCourses.course_id']
-                ],
-                'PublishedCourses' => [
-                    'table' => 'published_courses',
-                    'type' => 'INNER',
-                    'conditions' => ['PublishedCourses.id = CourseRegistrations.published_course_id']
-                ]
-            ])
+        $totalCredits = 0;
+
+        $registeredCredits = $courseRegistrationsTable->find()
+            ->select(['credit' => 'Courses.credit'])
             ->where(['CourseRegistrations.student_id' => $studentId])
-            ->enableHydration(false)
-            ->first()['total'] ?? 0;
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->sumOf('Courses.credit') ?? 0;
 
         $addedCredits = $courseAddsTable->find()
-            ->select(['total' => 'SUM(Course.credit)'])
-            ->join([
-                'Courses' => [
-                    'table' => 'courses',
-                    'type' => 'INNER',
-                    'conditions' => ['Courses.id = PublishedCourses.course_id']
-                ],
-                'PublishedCourses' => [
-                    'table' => 'published_courses',
-                    'type' => 'INNER',
-                    'conditions' => ['PublishedCourses.id = CourseAdds.published_course_id']
-                ]
+            ->select(['credit' => 'Courses.credit'])
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
             ])
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->sumOf('Courses.credit') ?? 0;
+
+        $totalCredits = $registeredCredits + $addedCredits;
+
+        return $totalCredits >= $student->curriculum->minimum_credit_points;
+    }
+
+    public function isEligibleForExitExam($studentId)
+    {
+        if (!$studentId) {
+            return false;
+        }
+
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+        $courseAddsTable = TableRegistry::getTableLocator()->get('CourseAdds');
+        $courseDropsTable = TableRegistry::getTableLocator()->get('CourseDrops');
+        $courseExemptionsTable = TableRegistry::getTableLocator()->get('CourseExemptions');
+
+        $student = $studentsTable->find()
+            ->select(['id', 'curriculum_id'])
+            ->where(['id' => $studentId])
+            ->contain(['Curriculums' => ['fields' => ['id', 'minimum_credit_points']]])
+            ->first();
+
+        if (!$student || !$student->curriculum_id) {
+            return false;
+        }
+
+        $lastYearLevelId = $coursesTable->find()
+            ->select(['year_level_id'])
+            ->where(['curriculum_id' => $student->curriculum_id])
+            ->group(['year_level_id', 'semester'])
+            ->order(['year_level_id' => 'DESC', 'semester' => 'DESC'])
+            ->limit(1)
+            ->extract('year_level_id')
+            ->first();
+
+        if (!$lastYearLevelId) {
+            return false;
+        }
+
+        $semesterCount = $coursesTable->find()
+            ->where(['curriculum_id' => $student->curriculum_id])
+            ->group(['year_level_id', 'semester'])
+            ->count();
+
+        $hasRegisteredLastYear = $courseRegistrationsTable->find()
+            ->where([
+                'student_id' => $studentId,
+                'year_level_id' => $lastYearLevelId
+            ])
+            ->count();
+
+        if (!$hasRegisteredLastYear) {
+            return false;
+        }
+
+        $totalRegisteredCredits = $courseRegistrationsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
+
+        $totalAddedCredits = $courseAddsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
             ->where([
                 'CourseAdds.student_id' => $studentId,
                 'CourseAdds.registrar_confirmation' => 1
             ])
-            ->enableHydration(false)
-            ->first()['total'] ?? 0;
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
 
-        $droppedCredits = $courseDropsTable->find()
-            ->select(['total' => 'SUM(Course.credit)'])
-            ->join([
-                'CourseRegistrations' => [
-                    'table' => 'course_registrations',
-                    'type' => 'INNER',
-                    'conditions' => ['CourseRegistrations.id = CourseDrops.course_registration_id']
-                ],
-                'PublishedCourses' => [
-                    'table' => 'published_courses',
-                    'type' => 'INNER',
-                    'conditions' => ['PublishedCourses.id = CourseRegistrations.published_course_id']
-                ],
-                'Courses' => [
-                    'table' => 'courses',
-                    'type' => 'INNER',
-                    'conditions' => ['Courses.id = PublishedCourses.course_id']
-                ]
-            ])
+        $totalDroppedCredits = $courseDropsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
             ->where([
                 'CourseDrops.student_id' => $studentId,
                 'CourseDrops.registrar_confirmation' => 1
             ])
-            ->enableHydration(false)
-            ->first()['total'] ?? 0;
-
-        $exemptedCredits = $courseExemptionsTable->find()
-            ->select(['total' => 'SUM(Course.credit)'])
-            ->join([
-                'Courses' => [
-                    'table' => 'courses',
-                    'alias' => 'Course',
-                    'type' => 'INNER',
-                    'conditions' => ['Course.id = CourseExemptions.course_id']
-                ]
+            ->contain([
+                'CourseRegistrations.PublishedCourses.Courses' => ['fields' => ['credit']]
             ])
+            ->first()->total_credits ?? 0;
+
+        $totalExemptedCredits = $courseExemptionsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
             ->where([
                 'CourseExemptions.student_id' => $studentId,
                 'CourseExemptions.department_accept_reject' => 1,
                 'CourseExemptions.registrar_confirm_deny' => 1
             ])
-            ->enableHydration(false)
-            ->first()['total'] ?? 0;
+            ->contain(['Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
 
-        $totalCredits = (int) (($registeredCredits + $addedCredits + $exemptedCredits) - $droppedCredits);
+        $totalCredits = (int)(($totalRegisteredCredits + $totalAddedCredits + $totalExemptedCredits) - $totalDroppedCredits);
 
-        $minRequired = (int) $student->curriculum->minimum_credit_points;
-        $expectedPerSemester = $minRequired / $semesterCount;
-        $threshold = (int) ceil(($semesterCount - 2) * $expectedPerSemester);
+        $minimumRequiredCredits = (int)$student->curriculum->minimum_credit_points;
+        $creditsPerSemester = $minimumRequiredCredits / $semesterCount;
+        $creditThreshold = (int)ceil(($semesterCount - 2) * $creditsPerSemester);
 
-        return $totalCredits >= $threshold;
+        return $totalCredits >= $creditThreshold;
     }
 
-    public function completedFillingProfileInfomation($studentId): bool
+    public function isGraduatingClassStudent($studentId)
     {
+        if (!$studentId) {
+            return false;
+        }
+
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+        $courseAddsTable = TableRegistry::getTableLocator()->get('CourseAdds');
+        $courseDropsTable = TableRegistry::getTableLocator()->get('CourseDrops');
+        $courseExemptionsTable = TableRegistry::getTableLocator()->get('CourseExemptions');
+
+        $student = $studentsTable->find()
+            ->select(['id', 'curriculum_id'])
+            ->where(['id' => $studentId])
+            ->contain(['Curriculums' => ['fields' => ['id', 'minimum_credit_points']]])
+            ->first();
+
+        if (!$student || !$student->curriculum_id) {
+            return false;
+        }
+
+        $lastYearLevelId = $coursesTable->find()
+            ->select(['year_level_id'])
+            ->where(['curriculum_id' => $student->curriculum_id])
+            ->group(['year_level_id', 'semester'])
+            ->order(['year_level_id' => 'DESC', 'semester' => 'DESC'])
+            ->limit(1)
+            ->extract('year_level_id')
+            ->first();
+
+        if (!$lastYearLevelId) {
+            return false;
+        }
+
+        $semesterCount = $coursesTable->find()
+            ->where(['curriculum_id' => $student->curriculum_id])
+            ->group(['year_level_id', 'semester'])
+            ->count();
+
+        $hasRegisteredLastYear = $courseRegistrationsTable->find()
+            ->where([
+                'student_id' => $studentId,
+                'year_level_id' => $lastYearLevelId
+            ])
+            ->count();
+
+        if (!$hasRegisteredLastYear) {
+            return false;
+        }
+
+        $totalRegisteredCredits = $courseRegistrationsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
+
+        $totalAddedCredits = $courseAddsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->contain(['PublishedCourses.Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
+
+        $totalDroppedCredits = $courseDropsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
+            ->where([
+                'CourseDrops.student_id' => $studentId,
+                'CourseDrops.registrar_confirmation' => 1
+            ])
+            ->contain([
+                'CourseRegistrations.PublishedCourses.Courses' => ['fields' => ['credit']]
+            ])
+            ->first()->total_credits ?? 0;
+
+        $totalExemptedCredits = $courseExemptionsTable->find()
+            ->select(['total_credits' => 'SUM(Courses.credit)'])
+            ->where([
+                'CourseExemptions.student_id' => $studentId,
+                'CourseExemptions.department_accept_reject' => 1,
+                'CourseExemptions.registrar_confirm_deny' => 1
+            ])
+            ->contain(['Courses' => ['fields' => ['credit']]])
+            ->first()->total_credits ?? 0;
+
+        $totalCredits = (int)(($totalRegisteredCredits + $totalAddedCredits + $totalExemptedCredits) - $totalDroppedCredits);
+
+        $minimumRequiredCredits = (int)$student->curriculum->minimum_credit_points;
+        $creditsPerSemester = $minimumRequiredCredits / $semesterCount;
+        $creditThreshold = (int)ceil(($semesterCount - 1) * $creditsPerSemester);
+
+        return $totalCredits >= $creditThreshold;
+    }
+
+    public function completedFillingProfileInformation($studentId)
+    {
+        if (!$studentId) {
+            return false;
+        }
+
         $studentsTable = TableRegistry::getTableLocator()->get('Students');
 
         $studentDetails = $studentsTable->find()
-            ->contain(['Contacts', 'HigherEducationBackgrounds', 'EheeceResults'])
-            ->where(['Students.id' => $studentId])
-            ->enableHydration(false)
+            ->select(['id', 'program_id', 'phone_mobile', 'email'])
+            ->where(['id' => $studentId])
+            ->contain([
+                'Contacts' => ['fields' => ['id']],
+                'HigherEducationBackgrounds' => ['fields' => ['id']],
+                'EheeceResults' => ['fields' => ['id']]
+            ])
             ->first();
 
         if (!$studentDetails) {
             return false;
         }
 
-        $student = $studentDetails['Students'];
-        $contact = $studentDetails['Contacts'] ?? null;
-        $eheece = $studentDetails['EheeceResults'] ?? null;
-        $higherEd = $studentDetails['HigherEducationBackgrounds'] ?? null;
-
-        if (
-            in_array($student['program_id'], [PROGRAM_REMEDIAL, PROGRAM_PGDT])
-        ) {
+        if (in_array($studentDetails->program_id, [PROGRAM_REMEDIAL, PROGRAM_PGDT])) {
             return true;
         }
 
-        if (empty($contact)) {
+        if (empty($studentDetails->contacts)) {
             return false;
         }
 
-        if ($student['program_id'] === PROGRAM_UNDEGRADUATE && empty($eheece)) {
+        if ($studentDetails->program_id == PROGRAM_UNDEGRADUATE && empty($studentDetails->eheece_results)) {
             return false;
         }
 
         if (
-            $student['program_id'] !== PROGRAM_UNDEGRADUATE &&
-            in_array($student['program_id'], [PROGRAM_POST_GRADUATE, PROGRAM_PhD]) &&
-            empty($higherEd)
+            in_array($studentDetails->program_id, [PROGRAM_POST_GRADUATE, PROGRAM_PhD]) &&
+            empty($studentDetails->higher_education_backgrounds)
         ) {
             return false;
         }
 
-        if (empty($student['phone_mobile']) || empty($student['email'])) {
+        if (empty($studentDetails->phone_mobile) || empty($studentDetails->email)) {
             return false;
         }
 
         return true;
     }
-
-    public function isGraduatingClassStudent($studentId): bool
-    {
-        $studentsTable = TableRegistry::getTableLocator()->get('Students');
-        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
-        $registrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
-        $addsTable = TableRegistry::getTableLocator()->get('CourseAdds');
-        $dropsTable = TableRegistry::getTableLocator()->get('CourseDrops');
-        $exemptionsTable = TableRegistry::getTableLocator()->get('CourseExemptions');
-
-        $student = $studentsTable->find()
-            ->contain(['Curriculums'])
-            ->where(['Students.id' => $studentId])
-            ->enableHydration(false)
-            ->first();
-
-        if (empty($student) || empty($student['Students']['curriculum_id'])) {
-            return false;
-        }
-
-        $curriculumId = $student['Students']['curriculum_id'];
-
-        $lastYearLevel = $coursesTable->find()
-            ->select(['year_level_id'])
-            ->where(['Courses.curriculum_id' => $curriculumId])
-            ->group(['Courses.year_level_id', 'Courses.semester'])
-            ->order(['Courses.year_level_id' => 'DESC', 'Courses.semester' => 'DESC'])
-            ->enableHydration(false)
-            ->first();
-
-        $semesterCount = $coursesTable->find()
-            ->where(['Courses.curriculum_id' => $curriculumId])
-            ->group(['Courses.year_level_id', 'Courses.semester'])
-            ->count();
-
-        if (empty($lastYearLevel)) {
-            return false;
-        }
-
-        $lastYearLevelId = $lastYearLevel['year_level_id'];
-
-        $hasLastLevelCourses = $registrationsTable->find()
-            ->where([
-                'CourseRegistrations.student_id' => $studentId,
-                'CourseRegistrations.year_level_id' => $lastYearLevelId
-            ])
-            ->count();
-
-        if (!$hasLastLevelCourses) {
-            return false;
-        }
-
-        $totalRegisteredCredits = $registrationsTable->find()
-            ->select(['total_credits' => 'SUM(Course.credit)'])
-            ->join([
-                'table' => 'published_courses',
-                'alias' => 'PublishedCourse1',
-                'type' => 'INNER',
-                'conditions' => 'PublishedCourse1.id = CourseRegistrations.published_course_id'
-            ])
-            ->join([
-                'table' => 'courses',
-                'alias' => 'Course',
-                'type' => 'INNER',
-                'conditions' => 'Course.id = PublishedCourse1.course_id'
-            ])
-            ->where(['CourseRegistrations.student_id' => $studentId])
-            ->enableHydration(false)
-            ->first()['total_credits'] ?? 0;
-
-        $totalAddedCredits = $addsTable->find()
-            ->select(['total_credits' => 'SUM(Course.credit)'])
-            ->join([
-                'table' => 'published_courses',
-                'alias' => 'PublishedCourse1',
-                'type' => 'INNER',
-                'conditions' => 'PublishedCourse1.id = CourseAdds.published_course_id'
-            ])
-            ->join([
-                'table' => 'courses',
-                'alias' => 'Course',
-                'type' => 'INNER',
-                'conditions' => 'Course.id = PublishedCourse1.course_id'
-            ])
-            ->where([
-                'CourseAdds.student_id' => $studentId,
-                'CourseAdds.registrar_confirmation' => 1
-            ])
-            ->enableHydration(false)
-            ->first()['total_credits'] ?? 0;
-
-        $totalDroppedCredits = $dropsTable->find()
-            ->select(['total_credits' => 'SUM(Course.credit)'])
-            ->join([
-                'table' => 'course_registrations',
-                'alias' => 'CourseRegistration1',
-                'type' => 'INNER',
-                'conditions' => 'CourseRegistration1.id = CourseDrops.course_registration_id'
-            ])
-            ->join([
-                'table' => 'published_courses',
-                'alias' => 'PublishedCourse1',
-                'type' => 'INNER',
-                'conditions' => 'PublishedCourse1.id = CourseRegistration1.published_course_id'
-            ])
-            ->join([
-                'table' => 'courses',
-                'alias' => 'Course',
-                'type' => 'INNER',
-                'conditions' => 'Course.id = PublishedCourse1.course_id'
-            ])
-            ->where([
-                'CourseDrops.student_id' => $studentId,
-                'CourseDrops.registrar_confirmation' => 1
-            ])
-            ->enableHydration(false)
-            ->first()['total_credits'] ?? 0;
-
-        $totalExemptedCredits = $exemptionsTable->find()
-            ->select(['total_credits' => 'SUM(CourseAlias.credit)'])
-            ->join([
-                'table' => 'courses',
-                'alias' => 'CourseAlias',
-                'type' => 'INNER',
-                'conditions' => 'CourseAlias.id = CourseExemptions.course_id'
-            ])
-            ->where([
-                'CourseExemptions.student_id' => $studentId,
-                'CourseExemptions.department_accept_reject' => 1,
-                'CourseExemptions.registrar_confirm_deny' => 1
-            ])
-            ->enableHydration(false)
-            ->first()['total_credits'] ?? 0;
-
-        $totalCredits = (int) (($totalRegisteredCredits + $totalAddedCredits + $totalExemptedCredits) - $totalDroppedCredits);
-
-        $minimumRequiredCredits = (int) $student['Curriculums']['minimum_credit_points'];
-        $creditsPerSemester = $minimumRequiredCredits / $semesterCount;
-        $creditThreshold = (int) ceil(($semesterCount - 1) * $creditsPerSemester);
-
-        return $totalCredits >= $creditThreshold;
-    }
-
-
-
 }

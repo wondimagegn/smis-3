@@ -1,15 +1,15 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
 
+/**
+ * ClassRooms Table
+ */
 class ClassRoomsTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -18,389 +18,295 @@ class ClassRoomsTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('class_rooms');
-        $this->setDisplayField('id');
+        $this->setDisplayField('room_code');
         $this->setPrimaryKey('id');
 
         $this->belongsTo('ClassRoomBlocks', [
             'foreignKey' => 'class_room_block_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'ClassRoomBlock',
+            'joinType' => 'LEFT'
         ]);
-        $this->hasMany('ClassRoomClassPeriodConstraints', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ClassRoomClassPeriodConstraint',
-        ]);
-        $this->hasMany('ClassRoomCourseConstraints', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ClassRoomCourseConstraint',
-        ]);
-        $this->hasMany('CourseSchedules', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'CourseSchedule',
-        ]);
-        $this->hasMany('ExamRoomConstraints', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ExamRoomConstraint',
-        ]);
-        $this->hasMany('ExamRoomCourseConstraints', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ExamRoomCourseConstraint',
-        ]);
-        $this->hasMany('ExamRoomNumberOfInvigilators', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ExamRoomNumberOfInvigilator',
-        ]);
-        $this->hasMany('ExamSchedules', [
-            'foreignKey' => 'class_room_id',
-            'propertyName' => 'ExamSchedule',
-        ]);
+
         $this->hasMany('ProgramProgramTypeClassRooms', [
             'foreignKey' => 'class_room_id',
-            'propertyName' => 'ProgramProgramTypeClassRoom',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ExamSchedules', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ClassRoomClassPeriodConstraints', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ClassRoomCourseConstraints', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ExamRoomConstraints', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ExamRoomCourseConstraints', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('ExamRoomNumberOfInvigilators', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
+        ]);
+
+        $this->hasMany('CourseSchedules', [
+            'foreignKey' => 'class_room_id',
+            'dependent' => false
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('room_code')
-            ->maxLength('room_code', 10)
             ->requirePresence('room_code', 'create')
-            ->notEmptyString('room_code');
+            ->notEmptyString('room_code', 'Room code should not be empty, Please provide valid room code.')
+            ->add('room_code', 'unique', [
+                'rule' => function ($value, $context) {
+                    $classRoomBlocksTable = TableRegistry::getTableLocator()->get('ClassRoomBlocks');
+                    $classRoomBlockData = $classRoomBlocksTable->sendClassRoomBlockData();
+                    $classRoomBlock = $classRoomBlocksTable->find()
+                        ->where([
+                            'ClassRoomBlocks.campus_id' => $classRoomBlockData['ClassRoomBlock']['campus_id'] ?? null,
+                            'ClassRoomBlocks.college_id' => $classRoomBlockData['ClassRoomBlock']['college_id'] ?? null,
+                            'ClassRoomBlocks.block_code' => $classRoomBlockData['ClassRoomBlock']['block_code'] ?? null
+                        ])
+                        ->first();
 
-        $validator
-            ->boolean('available_for_lecture')
-            ->notEmptyString('available_for_lecture');
+                    if (empty($classRoomBlock)) {
+                        return true;
+                    }
 
-        $validator
-            ->boolean('available_for_exam')
-            ->notEmptyString('available_for_exam');
+                    $count = $this->find()
+                        ->where([
+                            'ClassRooms.class_room_block_id' => $classRoomBlock->id,
+                            'ClassRooms.room_code' => $value
+                        ])
+                        ->count();
 
-        $validator
-            ->allowEmptyString('lecture_capacity');
-
-        $validator
-            ->allowEmptyString('exam_capacity');
+                    return $count === 0;
+                },
+                'message' => 'You have already entered room code. Please provide unique name.'
+            ])
+            ->numeric('lecture_capacity')
+            ->allowEmptyNumber('lecture_capacity')
+            ->add('lecture_capacity', 'numeric', [
+                'rule' => 'numeric',
+                'message' => 'Lecture capacity should only numeric. Please Provide class room lecture capacity in number.'
+            ])
+            ->numeric('exam_capacity')
+            ->allowEmptyNumber('exam_capacity')
+            ->add('exam_capacity', 'numeric', [
+                'rule' => 'numeric',
+                'message' => 'Exam capacity should only numeric. Please Provide class room Exam capacity in number.'
+            ]);
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Checks if a class room is used in related tables
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $id Class room ID
+     * @return array Result with usage status and error message
      */
-    public function buildRules(RulesChecker $rules)
+    public function isClassRoomUsedInOtherTables($id = null): array
     {
+        if (!$id) {
+            return ['used' => false, 'error' => null];
+        }
 
-        $rules->add($rules->existsIn(['class_room_block_id'], 'ClassRoomBlocks'));
+        $tables = [
+            'ClassRoomClassPeriodConstraints' => 'class room class period constraints',
+            'ClassRoomCourseConstraints' => 'class room course constraints',
+            'ExamRoomCourseConstraints' => 'exam room course constraints',
+            'ExamRoomConstraints' => 'exam room session constraints',
+            'ExamRoomNumberOfInvigilators' => 'exam room number of invigilator',
+            'CourseSchedules' => 'course schedule'
+        ];
 
-        return $rules;
+        foreach ($tables as $tableName => $errorMessage) {
+            $table = TableRegistry::getTableLocator()->get($tableName);
+            $count = $table->isClassRoomUsed($id);
+            if ($count > 0) {
+                return ['used' => true, 'error' => "The class room is used in {$errorMessage}."];
+            }
+        }
+
+        return ['used' => false, 'error' => null];
     }
 
-    public function checkUnique($data, $fieldName)
+    /**
+     * Retrieves class rooms available for an exam
+     *
+     * @param int|null $collegeId College ID
+     * @param array|null $publishedCourseIds Published course IDs
+     * @param int|null $sectionId Section ID
+     * @param string|null $examDate Exam date (Y-m-d)
+     * @param string|null $session Exam session
+     * @param string|null $academicYear Academic year
+     * @param string|null $semester Semester
+     * @return array Available exam rooms
+     */
+    public function getClassRoomsForExam($collegeId = null, $publishedCourseIds = null, $sectionId = null, $examDate = null, $session = null, $academicYear = null, $semester = null): array
     {
+        if (!$collegeId || empty($publishedCourseIds) || !$examDate || !$session || !$academicYear || !$semester) {
+            return [];
+        }
 
-        $valid = true;
-        //debug($this);
-        if (!isset($this->data['ClassRoom']['id'])) {
-            if (isset($fieldName) && $this->hasField($fieldName)) {
-                $class_room_block_data = $this->ClassRoomBlock->send_class_room_block_data();
-                $class_room_block_id = $this->ClassRoomBlock->find('first', array(
-                    'conditions' => array(
-                        'ClassRoomBlock.campus_id' => $class_room_block_data['ClassRoomBlock']['campus_id'],
-                        'ClassRoomBlock.college_id' => $class_room_block_data['ClassRoomBlock']['college_id'],
-                        'ClassRoomBlock.block_code' => $class_room_block_data['ClassRoomBlock']['block_code']
-                    ),
-                    'recursive' => -1
-                ));
-                if (!empty($class_room_block_id['ClassRoomBlock']['id'])) {
-                    $check = $this->find(
-                        'count',
-                        array(
-                            'conditions' => array(
-                                'ClassRoom.class_room_block_id' => $class_room_block_id['ClassRoomBlock']['id'],
-                                'ClassRoom.room_code' => $data['room_code']
-                            )
-                        )
-                    );
+        $examRoomsAll = [];
+        $sectionIds = [];
+
+        $sectionSplitForExamsTable = TableRegistry::getTableLocator()->get('SectionSplitForExams');
+        $studentsSectionsTable = TableRegistry::getTableLocator()->get('StudentsSections');
+        $studentsExamSplitSectionsTable = TableRegistry::getTableLocator()->get('StudentsExamSplitSections');
+        $publishedCoursesTable = TableRegistry::getTableLocator()->get('PublishedCourses');
+        $examRoomCourseConstraintsTable = TableRegistry::getTableLocator()->get('ExamRoomCourseConstraints');
+
+        if (count($publishedCourseIds) <= 1) {
+            $checkSplit = $sectionSplitForExamsTable->find()
+                ->where(['SectionSplitForExams.published_course_id' => $publishedCourseIds[0]])
+                ->contain(['ExamSplitSections' => ['StudentsExamSplitSections']])
+                ->first();
+
+            if (!empty($checkSplit)) {
+                foreach ($checkSplit->exam_split_sections as $splitSection) {
+                    $sectionIds[] = ['id' => $splitSection->id, 'type' => 2];
                 }
-
-                if ($check > 0) {
-                    $valid = false;
-                }
+            } else {
+                $sectionIds[] = ['id' => $sectionId, 'type' => 1];
             }
-        }
-        return $valid;
-    }
+        } else {
+            $sectionIdsTmp = $publishedCoursesTable->find()
+                ->select(['section_id'])
+                ->where(['PublishedCourses.id IN' => $publishedCourseIds])
+                ->toArray();
 
-    public function is_this_class_room_used_in_others_related_table($id = null)
-    {
-
-        $count_from_class_room_class_period = $this->ClassRoomClassPeriodConstraint->is_class_room_used($id);
-        if ($count_from_class_room_class_period > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in class room class period constraints.');
-            return true;
-        }
-
-        $count_from_class_room_course = $this->ClassRoomCourseConstraint->is_class_room_used($id);
-        if ($count_from_class_room_course > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in class room course constraints.');
-            return true;
-        }
-        $count_from_exam_room_course = $this->ExamRoomCourseConstraint->is_class_room_used($id);
-        if ($count_from_exam_room_course > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in exam room course constraints.');
-            return true;
-        }
-        $count_from_exam_room_session = $this->ExamRoomConstraint->is_class_room_used($id);
-        if ($count_from_exam_room_session > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in exam room session constraints.');
-            return true;
-        }
-        $count_from_exam_room_number_of_invigilator = $this->ExamRoomNumberOfInvigilator->is_class_room_used($id);
-        if ($count_from_exam_room_number_of_invigilator > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in exam room number of invigilator.');
-            return true;
-        }
-        $count_from_course_schedule = $this->CourseSchedule->is_class_room_used($id);
-        if ($count_from_course_schedule > 0) {
-            $this->invalidate('delete_class_rom', 'the class room is used in course schedule.');
-            return true;
-        }
-        //TODO : for exam schedule as well when the exam schedule model bake
-
-        return false;
-    }
-
-    public function getClassRoomsForExam(
-        $college_id = null,
-        $published_course_ids = null,
-        $section_id = null,
-        $exam_date = null,
-        $session = null,
-        $acadamic_year = null,
-        $semester = null
-    ) {
-
-        $examRooms = array();
-        $examRoomsAll = array();
-        $section_ids = array();
-        //Check if it is splitted
-        $check_split = ClassRegistry::init('SectionSplitForExam')->find(
-            'first',
-            array(
-                'conditions' =>
-                    array(
-                        'SectionSplitForExam.published_course_id' => $published_course_ids[0]
-                    ),
-                'contain' =>
-                    array(
-                        'ExamSplitSection' =>
-                            array(
-                                'StudentsExamSplitSection'
-                            )
-                    )
-            )
-        );
-        if (count($published_course_ids) <= 1 && !empty($check_split)) {
-            foreach ($check_split['ExamSplitSection'] as $k => $v) {
-                $index = count($section_ids);
-                $section_ids[$index]['id'] = $v['id'];
-                $section_ids[$index]['type'] = 2;
-            }
-            //debug($check_split);
-        } elseif (count($published_course_ids) <= 1) {
-            $section_ids[0]['id'] = $section_id;
-            $section_ids[0]['type'] = 1;
-        } //If it is merge
-        else {
-            $section_ids_tmp = ClassRegistry::init('PublishedCourse')->find(
-                'all',
-                array(
-                    'conditions' =>
-                        array(
-                            'PublishedCourse.id' => $published_course_ids
-                        ),
-                    'recursive' => -1
-                )
-            );
-            $section_ids[0]['id'] = array();
-            $section_ids[0]['type'] = 1;
-            foreach ($section_ids_tmp as $k => $v) {
-                $section_ids[0]['id'][] = $v['PublishedCourse']['section_id'];
-            }
+            $sectionIds[] = [
+                'id' => array_column($sectionIdsTmp, 'section_id'),
+                'type' => 1
+            ];
         }
 
-        foreach ($section_ids as $section_id) {
-            $examRooms = array();
-            if ($section_id['type'] == 1) {
-                $number_of_students = ClassRegistry::init('StudentsSection')->find(
-                    'count',
-                    array(
-                        'conditions' =>
-                            array(
-                                'StudentsSection.section_id' => $section_id['id']
-                            )
-                    )
-                );
-            } elseif ($section_id['type'] == 2) {
-                $number_of_students = ClassRegistry::init('StudentsExamSplitSection')->find(
-                    'count',
-                    array(
-                        'conditions' =>
-                            array(
-                                'StudentsExamSplitSection.exam_split_section_id' => $section_id['id']
-                            )
-                    )
-                );
-            }
-            $examRoomCourseConstraints = $this->ExamRoomCourseConstraint->find(
-                'all',
-                array(
-                    'conditions' =>
-                        array(
-                            //$published_course_ids[0] is with the assumption that on the merge all published courses will have the same defined or inforced constraint
-                            'ExamRoomCourseConstraint.published_course_id' => $published_course_ids[0]
-                        ),
-                    'contain' =>
-                        array(
-                            'ClassRoom' =>
-                                array(
-                                    'ExamRoomNumberOfInvigilator' =>
-                                        array(
-                                            'conditions' =>
-                                                array(
-                                                    'ExamRoomNumberOfInvigilator.academic_year' => $acadamic_year,
-                                                    'ExamRoomNumberOfInvigilator.semester' => $semester,
-                                                )
-                                        )
-                                )
-                        )
-                )
-            );
+        foreach ($sectionIds as $sectionIdData) {
+            $examRooms = [];
+            $sectionId = $sectionIdData['id'];
+            $sectionType = $sectionIdData['type'];
 
-            //1. Determine avtive is 1 or 0
-            $exam_room_course_constraint_active = 0;
-            foreach ($examRoomCourseConstraints as $examRoomCourseConstraint) {
-                if ($examRoomCourseConstraint['ExamRoomCourseConstraint']['active'] == 1) {
-                    $exam_room_course_constraint_active = 1;
+            $numberOfStudents = $sectionType == 1
+                ? $studentsSectionsTable->find()->where(['StudentsSections.section_id' => $sectionId])->count()
+                : $studentsExamSplitSectionsTable->find()->where(['StudentsExamSplitSections.exam_split_section_id' => $sectionId])->count();
+
+            $examRoomCourseConstraints = $examRoomCourseConstraintsTable->find()
+                ->where(['ExamRoomCourseConstraints.published_course_id' => $publishedCourseIds[0]])
+                ->contain([
+                    'ClassRooms' => [
+                        'ExamRoomNumberOfInvigilators' => [
+                            'conditions' => [
+                                'ExamRoomNumberOfInvigilators.academic_year' => $academicYear,
+                                'ExamRoomNumberOfInvigilators.semester' => $semester
+                            ]
+                        ]
+                    ]
+                ])
+                ->toArray();
+
+            $examRoomCourseConstraintActive = false;
+            foreach ($examRoomCourseConstraints as $constraint) {
+                if ($constraint->active == 1) {
+                    $examRoomCourseConstraintActive = true;
                     break;
                 }
             }
-            //2. If active is 1, use only the specified rooms
-            if ($exam_room_course_constraint_active == 1) {
-                $examRooms = array();
-                foreach ($examRoomCourseConstraints as $examRoomCourseConstraint) {
-                    if ($examRoomCourseConstraint['ExamRoomCourseConstraint']['active'] == 1) {
-                        $search_key = array_search(
-                            $examRoomCourseConstraint['ExamRoomCourseConstraint']['class_room_id'],
-                            $examRooms
-                        );
-                        if ($search_key === false) {
-                            $index = count($examRooms);
-                            $examRooms[$index]['id'] = $examRoomCourseConstraint['ExamRoomCourseConstraint']['class_room_id'];
-                            $examRooms[$index]['capacity'] = $examRoomCourseConstraint['ClassRoom']['exam_capacity'];
-                            if (!empty($examRoomCourseConstraint['ClassRoom']['ExamRoomNumberOfInvigilator'])) {
-                                $examRooms[$index]['number_of_invigilator'] = $examRoomCourseConstraint['ClassRoom']['ExamRoomNumberOfInvigilator'][0]['number_of_invigilator'];
-                            } else {
-                                $examRooms[$index]['number_of_invigilator'] = 0;
-                            }
-                        }
+
+            if ($examRoomCourseConstraintActive) {
+                foreach ($examRoomCourseConstraints as $constraint) {
+                    if ($constraint->active == 1 && !in_array($constraint->class_room_id, array_column($examRooms, 'id'))) {
+                        $examRooms[] = [
+                            'id' => $constraint->class_room_id,
+                            'capacity' => $constraint->class_room->exam_capacity,
+                            'number_of_invigilator' => !empty($constraint->class_room->exam_room_number_of_invigilators)
+                                ? $constraint->class_room->exam_room_number_of_invigilators[0]->number_of_invigilator
+                                : 0
+                        ];
                     }
                 }
-            } //3. If active is 0, remove the specified rooms from examRooms
-            else {
-                /*
-                1. Retrive class rooms
-                2. Exclude rooms based on exam_room_constraints
-                */
-                //debug($number_of_students);
-                $classRooms = $this->find(
-                    'all',
-                    array(
-                        'conditions' =>
-                            array(
-                                'ClassRoom.exam_capacity IS NOT NULL',
-                                'ClassRoom.exam_capacity >= ' => $number_of_students,
-                                'ClassRoomBlock.college_id' => $college_id,
-                                'ClassRoom.available_for_exam' => 1,
-                                'ClassRoom.id NOT IN (SELECT class_room_id FROM exam_schedules WHERE exam_date = \'' . $exam_date . '\' AND session = \'' . $session . '\')',
-                            ),
-                        'order' =>
-                            array(
-                                'ClassRoom.exam_capacity ASC'
-                            ),
-                        'contain' =>
-                            array(
-                                'ClassRoomBlock',
-                                'ExamRoomNumberOfInvigilator' =>
-                                    array(
-                                        'conditions' =>
-                                            array(
-                                                'ExamRoomNumberOfInvigilator.academic_year' => $acadamic_year,
-                                                'ExamRoomNumberOfInvigilator.semester' => $semester,
-                                            )
-                                    )
-                            )
-                    )
-                );
+            } else {
+                $classRooms = $this->find()
+                    ->where([
+                        'ClassRooms.exam_capacity IS NOT NULL',
+                        'ClassRooms.exam_capacity >=' => $numberOfStudents,
+                        'ClassRoomBlocks.college_id' => $collegeId,
+                        'ClassRooms.available_for_exam' => 1,
+                        'ClassRooms.id NOT IN' => $this->ExamSchedules->find()
+                            ->select(['class_room_id'])
+                            ->where(['exam_date' => $examDate, 'session' => $session])
+                    ])
+                    ->order(['ClassRooms.exam_capacity' => 'ASC'])
+                    ->contain([
+                        'ClassRoomBlocks',
+                        'ExamRoomNumberOfInvigilators' => [
+                            'conditions' => [
+                                'ExamRoomNumberOfInvigilators.academic_year' => $academicYear,
+                                'ExamRoomNumberOfInvigilators.semester' => $semester
+                            ]
+                        ]
+                    ])
+                    ->toArray();
 
                 foreach ($classRooms as $classRoom) {
-                    $index = count($examRooms);
-                    $examRooms[$index]['id'] = $classRoom['ClassRoom']['id'];
-                    $examRooms[$index]['capacity'] = $classRoom['ClassRoom']['exam_capacity'];
-                    if (!empty($classRoom['ExamRoomNumberOfInvigilator'])) {
-                        $examRooms[$index]['number_of_invigilator'] = $classRoom['ExamRoomNumberOfInvigilator'][0]['number_of_invigilator'];
-                    } else {
-                        $examRooms[$index]['number_of_invigilator'] = 0;
-                    }
+                    $examRooms[] = [
+                        'id' => $classRoom->id,
+                        'capacity' => $classRoom->exam_capacity,
+                        'number_of_invigilator' => !empty($classRoom->exam_room_number_of_invigilators)
+                            ? $classRoom->exam_room_number_of_invigilators[0]->number_of_invigilator
+                            : 0
+                    ];
                 }
 
-                foreach ($examRoomCourseConstraints as $examRoomCourseConstraint) {
-                    if ($examRoomCourseConstraint['ExamRoomCourseConstraint']['active'] == 0) {
-                        $search_key = array_search(
-                            $examRoomCourseConstraint['ExamRoomCourseConstraint']['class_room_id'],
-                            $examRooms
-                        );
-                        if ($search_key !== false) {
-                            unset($examRooms[$search_key]);
+                foreach ($examRoomCourseConstraints as $constraint) {
+                    if ($constraint->active == 0) {
+                        $searchKey = array_search($constraint->class_room_id, array_column($examRooms, 'id'));
+                        if ($searchKey !== false) {
+                            unset($examRooms[$searchKey]);
                         }
                     }
                 }
+                $examRooms = array_values($examRooms);
             }
 
-            //Descending sorting
-            for ($i = 0; $i < count($examRooms); $i++) {
-                for ($j = $i + 1; $j < count($examRooms); $j++) {
-                    if ($examRooms[$i]['capacity'] > $examRooms[$j]['capacity']) {
-                        $tmp = $examRooms[$i];
-                        $examRooms[$i] = $examRooms[$j];
-                        $examRooms[$j] = $tmp;
-                    }
-                }
-            }
-            $index = count($examRoomsAll);
-            $examRoomsAll[$index]['section_id'] = $section_id['id'];
-            $examRoomsAll[$index]['exam_rooms'] = $examRooms;
+            usort($examRooms, function ($a, $b) {
+                return $a['capacity'] <=> $b['capacity'];
+            });
+
+            $examRoomsAll[] = [
+                'section_id' => $sectionId,
+                'exam_rooms' => $examRooms
+            ];
         }
+
         return $examRoomsAll;
     }
 }

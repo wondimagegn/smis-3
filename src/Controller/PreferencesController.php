@@ -1,1206 +1,713 @@
 <?php
-
 namespace App\Controller;
 
 use App\Controller\AppController;
-
-use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
-use Cake\Core\Configure;
+use Cake\Http\Exception\BadRequestException;
+use Cake\Http\Exception\NotFoundException;
+use Cake\Datasource\Exception\RecordNotFoundException;
+use Cake\Utility\Hash;
+use Cake\Collection\Collection;
 
 class PreferencesController extends AppController
 {
-
-    public $name = 'Preferences';
-    public $menuOptions = array(
-        'parent' => 'placement',
-        'exclude' => array('edit_preference'),
-        'alias' => array(
-            'index' => 'List Preference',
-            'add' => 'Add Preference',
-            // 'add_student_preference'=>'Record Preference',
-            'student_record_preference' => 'Record Preference'
-        )
-    );
-    public $paginate = [];
-
-    public function initialize()
+    public function initialize(): void
     {
-
         parent::initialize();
+        $this->loadComponent('Flash');
         $this->loadComponent('AcademicYear');
-        $this->loadComponent('RequestHandler');
-        $this->loadComponent('Paginator'); // Ensure Paginator is loaded
-
+        // Configure pagination
+        $this->paginate = [
+            'Preferences' => [
+                'limit' => 20,
+                'order' => ['Preferences.id' => 'ASC']
+            ]
+        ];
     }
 
-    public function beforeFilter(Event $event)
+    public function beforeRender(\Cake\Event\EventInterface $event): void
     {
-
-        parent::beforeFilter($event);
-        $this->Auth->allow('get_preference', 'getStudentPreference');
-    }
-
-    public function beforeRender(Event $event)
-    {
-
         parent::beforeRender($event);
         $acyear_array_data = $this->AcademicYear->academicYearInArray(date('Y') - 12, date('Y'));
-
-        $this->set(compact('acyear_array_data', 'selected'));
+        $this->set(compact('acyear_array_data'));
     }
 
-    /**********************************************************************/
-    public function __init_search()
+    public function beforeFilter(\Cake\Event\EventInterface $event)
     {
+        parent::beforeFilter($event);
+        // Allow public actions
+        $this->Auth->allow(['get_preference', 'getStudentPreference']);
+    }
 
-        // We create a search_data session variable when we fill any criteria
-        // in the search form.
-        if (!empty($this->request->data['Preference'])) {
-            $search_session = $this->request->data['Preference'];
-            // Session variable 'search_data'
-            $this->Session->write('search_data', $search_session);
+    protected function __init_search()
+    {
+        $session = $this->request->getSession();
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('Preference'))) {
+            $searchSession = $this->request->getData('Preference');
+            $session->write('search_data', $searchSession);
         } else {
-            $search_session = $this->Session->read('search_data');
-            $this->request->data['Preference'] = $search_session;
+            $searchSession = $session->read('search_data');
+            $this->request = $this->request->withData('Preference', $searchSession);
         }
     }
 
-    public function __init_search_feed()
+    protected function __init_search_feed()
     {
-
-        if (!empty($this->request->data['Search'])) {
-            $search_session = $this->request->data['Search'];
-            // Session variable 'search_data'
-            $this->Session->write('search_data_feed', $search_session);
+        $session = $this->request->getSession();
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('Search'))) {
+            $searchSession = $this->request->getData('Search');
+            $session->write('search_data_feed', $searchSession);
         } else {
-            $search_session = $this->Session->read('search_data_feed');
-            $this->request->data['Search'] = $search_session;
+            $searchSession = $session->read('search_data_feed');
+            $this->request = $this->request->withData('Search', $searchSession);
         }
     }
-
-    /***************************************************************************/
-
 
     public function index($academic_year = null, $suffix = null)
     {
+        $session = $this->request->getSession();
+        $conditions = [];
 
-        if ((isset($this->request->data['Preference']) && isset($this->request->data['viewPDF']))) {
-            $search_session = $this->Session->read('search_data');
-            $this->request->data['Preference'] = $search_session;
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('Preference.viewPDF'))) {
+            $searchSession = $session->read('search_data');
+            $this->request = $this->request->withData('Preference', $searchSession);
         }
 
-        if (isset($this->passedArgs)) {
-            if (isset($this->passedArgs['page'])) {
-                $this->__init_search();
-                $this->request->data['Preference']['page'] = $this->passedArgs['page'];
-                $this->__init_search();
-            }
-        }
-
-        if ((isset($this->request->data['Preference']) && isset($this->request->data['listStudentsPreference']))) {
+        if ($this->request->getQuery('page')) {
+            $this->__init_search();
+            $this->request = $this->request->withData('Preference.page', $this->request->getQuery('page'));
             $this->__init_search();
         }
 
-        // academicYear
-        if (isset($this->request->data['Preference']['academicyear']) && !empty($this->request->data['Preference']['academicyear'])) {
-            $this->paginate['conditions'][]['Preference.academicyear'] = $this->request->data['Preference']['academicyear'];
-        }
-
-
-        // limit
-        if (isset($this->request->data['Preference']['limit']) && !empty($this->request->data['Preference']['limit'])) {
-            $this->paginate['limit'] = $this->request->data['Preference']['limit'];
-        }
-
-        // filter by department or college
-        if (isset($this->request->data['Preference']['preferences_order'])
-            && !empty($this->request->data['Preference']['preferences_order'])) {
-            $this->paginate['conditions'][]['Preference.preferences_order'] = $this->request->data['Preference']['preferences_order'];
-        }
-
-        // filter by department or college
-        if (isset($this->request->data['Preference']['department_id'])
-            && !empty($this->request->data['Preference']['department_id'])) {
-            debug($this->request->data['Preference']['department_id']);
-            $this->paginate['conditions'][]['Preference.department_id'] = $this->request->data['Preference']['department_id'];
-        }
-
-        // filter by program
-
-        if (isset($this->request->data['Preference']['program_id']) && !empty($this->request->data['Preference']['program_id'])) {
-            //$this->paginate['conditions'][]['Student.program_id'] = $this->request->data['Preference']['program_id'];
-        }
-
-        // filter by program type
-        if (isset($this->request->data['Preference']['program_type_id']) && !empty($this->request->data['Preference']['program_type_id'])) {
-            //$this->paginate['conditions'][]['Student.program_type_id'] = $this->request->data['Preference']['program_type_id'];
-        }
-
-
-        /*
-
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('Preference.listStudentsPreference'))) {
             $this->__init_search();
-            $this->Preference->recursive = 0;
-            $this->paginate=array('limit'=>3000);
-            if ( $this->role_id == ROLE_COLLEGE ) {
-                  $conditions=null;
-                  $selected_academic_year=$this->request->data['Preference']['academicyear'];
-                  if($selected_academic_year) {
-                         $conditions = array('Preference.academicyear LIKE'=>
-                         $selected_academic_year.'%',
-                        'Preference.college_id'=>$this->college_id);
-
-                   } else {
-                       $conditions = array('Preference.academicyear LIKE'=>$this->AcademicYear->current_academicyear().'%',
-                            'Preference.college_id'=>$this->college_id);
-
-                   }
-             //$no_sort
-                $preferences=$this->paginate($conditions);
-                if(!empty($preferences)){
-                    $this->set('preferences',$preferences);
-                 } else {
-                      $this->Session->setFlash('<span></span>'.__('There is no result found within the selected academic year.'),'default',array('class'=>'info-box info-message'));
-                 }
-
-            }
-            if($this->role_id == ROLE_STUDENT) {
-
-                             $acceptedStudentdetail= $this->Preference->AcceptedStudent->find('first',
-              array('conditions'=>array('AcceptedStudent.user_id'=>$this->Auth->user('id'))));
-debug($this->Auth->user('id'));
-                            $conditions=array("OR"=>array(
-                            'Preference.accepted_student_id'=>$acceptedStudentdetail['AcceptedStudent']['id'],'Preference.user_id'=>$this->Auth->user('id')));
-                         $this->loadModel('PreferenceDeadline');
-
-                         $preference_deadline=$this->PreferenceDeadline->find('first',
-                                 array('conditions'=>array('PreferenceDeadline.college_id'=>$acceptedStudentdetail['College']['id'],
-                                 'PreferenceDeadline.academicyear LIKE'=>$this->AcademicYear->current_academicyear().'%')));
-                        $this->set(compact('preference_deadline'));
-                        $this->set('preferences', $this->paginate($conditions));
-                        return;
-            }
-
-
-            if(!empty($this->request->data)){
-
-                  $conditions=null;
-                  $selected_academic_year=$this->request->data['Preference']['academicyear'];
-                  if($selected_academic_year) {
-                         $conditions = array('Preference.academicyear LIKE'=>
-                         $selected_academic_year.'%',
-                        'Preference.college_id'=>$this->college_id);
-
-                   } else {
-                       $conditions = array('Preference.academicyear LIKE'=>$this->AcademicYear->current_academicyear().'%',
-                            'Preference.college_id'=>$this->college_id);
-
-                   }
-
-
-                $preferences=$this->paginate($conditions);
-                if(!empty($preferences)){
-                    $this->set('preferences',$preferences);
-                 } else {
-                      $this->Session->setFlash('<span></span>'.__('There is no result found within the selected academic year.'),'default',array('class'=>'info-box info-message'));
-                      unset($preferences);
-                 }
-            }
-
-            if($academic_year){
-                   $academic_year=$academic_year.'/'.$suffix;
-                   $conditions=null;
-                   if($this->role_id == ROLE_COLLEGE) {
-
-                 $acceptedStudents=$this->Preference->AcceptedStudent->find('all',array('conditions'=>array(
-                'AcceptedStudent.academicyear'=>$academic_year,'AcceptedStudent.college_id'=>$this->college_id,array("OR"=>array("AcceptedStudent.placementtype is null",
-                "AcceptedStudent.placementtype"=>CANCELLED_PLACEMENT)))));
-
-                $preference_not_completed=array();
-                foreach($acceptedStudents as $k=>$value){
-                    $count=count($value['Preference']);
-                    if(!$count){
-                      $preference_not_completed[]=$value;
-                    }
-                }
-                unset($acceptedStudents);
-                $acceptedStudents=$preference_not_completed;
-                $this->set('selectedAcademicYear',$academic_year);
-                $this->set('acceptedStudents',$acceptedStudents);
-                $this->render('add');
-
-               }
-            }
-      */
-
-        if ($this->role_id == ROLE_STUDENT) {
-            $acceptedStudentdetail = $this->Preference->AcceptedStudent->find(
-                'first',
-                array(
-                    'conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')),
-                    'contain' => array('Student')
-                )
-            );
-            $this->paginate['conditions'][]['Preference.accepted_student_id'] = $acceptedStudentdetail['AcceptedStudent']['id'];
-
-            $preference_deadline = ClassRegistry::init('PreferenceDeadline')->find(
-                'first',
-                array(
-                    'conditions' => array(
-                        'PreferenceDeadline.college_id' => $acceptedStudentdetail['AcceptedStudent']['college_id'],
-                        'PreferenceDeadline.academicyear LIKE' => $acceptedStudentdetail['AcceptedStudent']['academicyear'] . '%'
-                    )
-                )
-            );
-            $pref = $this->Preference->find(
-                'count',
-                array('conditions' => array('Preference.user_id' => $acceptedStudentdetail['AcceptedStudent']['user_id']))
-            );
-
-
-            $this->set(compact('preference_deadline'));
-        }
-        $this->Paginator->settings = $this->paginate;
-        debug($this->Paginator->settings);
-
-        if (isset($this->Paginator->settings['conditions'])) {
-            $preferences = $this->Paginator->paginate('Preference');
-            debug($preferences);
-        } else {
-            $preferences = array();
         }
 
-        if (empty($preferences) && isset($this->request->data) && !empty($this->request->data)) {
-            $this->Session->setFlash(
-                '<span></span>' . __('No result found in a given criteria.'),
-                'default',
-                array('class' => 'info-box info-message')
-            );
-        }
-        debug($this->request->data);
-        $programs = $this->Preference->AcceptedStudent->Program->find('list');
-
-        $program_types = $this->Preference->AcceptedStudent->ProgramType->find('list');
-        if (isset($this->request->data['Preference']['academicyear']) && !empty($this->request->data['Preference']['academicyear'])) {
-            $departments = $this->_getParticipatingDepartment(
-                $this->college_id,
-                $this->request->data['Preference']['academicyear']
-            );
-            debug($departments);
-        } else {
-            $departments = $this->_getParticipatingDepartment(
-                $this->college_id,
-                $this->AcademicYear->current_academicyear()
-            );
+        // Build conditions
+        if (!empty($this->request->getData('Preference.academicyear'))) {
+            $conditions['Preferences.academicyear'] = $this->request->getData('Preference.academicyear');
         }
 
+        if (!empty($this->request->getData('Preference.limit'))) {
+            $this->paginate['Preferences']['limit'] = $this->request->getData('Preference.limit');
+        }
 
-        $this->set(compact('programs', 'program_types', 'departments', 'preferences'));
+        if (!empty($this->request->getData('Preference.preferences_order'))) {
+            $conditions['Preferences.preferences_order'] = $this->request->getData('Preference.preferences_order');
+        }
+
+        if (!empty($this->request->getData('Preference.department_id'))) {
+            $conditions['Preferences.department_id'] = $this->request->getData('Preference.department_id');
+        }
+
+        // Student-specific logic
+        if ($this->Auth->user('role_id') === ROLE_STUDENT) {
+            $acceptedStudent = $this->Preferences->AcceptedStudents->find()
+                ->where(['AcceptedStudents.user_id' => $this->Auth->user('id')])
+                ->contain(['Students'])
+                ->first();
+
+            if ($acceptedStudent) {
+                $conditions['Preferences.accepted_student_id'] = $acceptedStudent->id;
+                $preferenceDeadline = TableRegistry::getTableLocator()->get('PreferenceDeadlines')->find()
+                    ->where([
+                        'PreferenceDeadlines.college_id' => $acceptedStudent->college_id,
+                        'PreferenceDeadlines.academicyear LIKE' => $acceptedStudent->academicyear . '%'
+                    ])
+                    ->first();
+                $prefCount = $this->Preferences->find()
+                    ->where(['Preferences.user_id' => $acceptedStudent->user_id])
+                    ->count();
+                $this->set(compact('preferenceDeadline', 'prefCount'));
+            }
+        }
+
+        $this->paginate['Preferences']['conditions'] = $conditions;
+        $preferences = $conditions ? $this->paginate('Preferences') : [];
+
+        if (empty($preferences) && $this->request->is(['post', 'put']) && !empty($this->request->getData())) {
+            $this->Flash->info(__('No result found in the given criteria.'), ['element' => 'info']);
+        }
+
+        $programs = $this->Preferences->AcceptedStudents->Programs->find('list')->toArray();
+        $programTypes = $this->Preferences->AcceptedStudents->ProgramTypes->find('list')->toArray();
+        $departments = !empty($this->request->getData('Preference.academicyear'))
+            ? $this->_getParticipatingDepartment($this->college_id, $this->request->getData('Preference.academicyear'))
+            : $this->_getParticipatingDepartment($this->college_id, $this->AcademicYear->currentAademicYear());
+
+        $this->set(compact('programs', 'programTypes', 'departments', 'preferences'));
     }
-
 
     public function view($id = null)
     {
-
         if (!$id) {
-            $this->Session->setFlash(
-                '<span></span>' . __('Invalid preference'),
-                'default',
-                array('class' => 'error-box error-message')
-            );
-            $this->Session->setFlash(
-                '<span></span>' . __('Invalid preference.'),
-                'default',
-                array('class' => 'error-box error-message')
-            );
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Invalid preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
         }
-        $this->set('preference', $this->Preference->read(null, $id));
+
+        $preference = $this->Preferences->findById($id)->first();
+        if (!$preference) {
+            $this->Flash->error(__('Invalid preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
+        }
+
+        $this->set(compact('preference'));
     }
 
     public function add($accepted_student_id = null)
     {
+        $session = $this->request->getSession();
+        $user = $this->Auth->user();
+        $logged_user_detail = TableRegistry::getTableLocator()->get('Users')->find()
+            ->where(['Users.id' => $user['id']])
+            ->contain(['Staffs', 'Students'])
+            ->first();
 
-        // Function to load/save search criteria.
-        $logged_user_detail = ClassRegistry::init('User')->find(
-            'first',
-            array('conditions' => array('User.id' => $this->Auth->user('id')), 'contain' => array('Staff', 'Student'))
-        );
-
-        if ($this->Session->read('search_data')) {
-            $this->request->data['searchacademicyear'] = true;
-            $this->request->data['Search'] = $this->Session->read('search_data');
+        if ($session->check('search_data')) {
+            $this->request = $this->request->withData('searchacademicyear', true);
+            $this->request = $this->request->withData('Search', $session->read('search_data'));
         }
 
-        if (isset($this->request->data['searchacademicyear']) && !empty($this->request->data['searchacademicyear'])) {
-            if (!empty($this->request->data['Search']['academicyear'])) {
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('searchacademicyear'))) {
+            if (!empty($this->request->getData('Search.academicyear'))) {
                 $this->__init_search_feed();
+                $selectedAcademicYear = $this->request->getData('Search.academicyear');
+                $conditions = [
+                    'AcceptedStudents.academicyear' => $selectedAcademicYear,
+                    'AcceptedStudents.college_id' => $this->college_id,
+                    'AcceptedStudents.department_id IS' => null,
+                    'AcceptedStudents.program_type_id' => PROGRAM_TYPE_REGULAR,
+                    'AcceptedStudents.program_id' => PROGRAM_UNDEGRADUATE,
+                    'OR' => [
+                        'AcceptedStudents.placementtype IS' => null,
+                        'AcceptedStudents.placementtype' => CANCELLED_PLACEMENT
+                    ]
+                ];
 
-                $selectedAcademicYear = $this->request->data['Search']['academicyear'];
                 if (!empty($accepted_student_id)) {
-                    $acceptedStudents = $this->Preference->AcceptedStudent->find('all', array(
-                        'conditions' => array(
-                            'AcceptedStudent.id !=' => $accepted_student_id,
-                            'AcceptedStudent.academicyear' => $selectedAcademicYear,
-                            'AcceptedStudent.college_id' => $this->college_id,
-                            'AcceptedStudent.department_id is null',
-                            'AcceptedStudent.program_type_id' => PROGRAM_TYPE_REGULAR,
-                            'AcceptedStudent.program_id' => PROGRAM_UNDEGRADUATE,
-                            array(
-                                "OR" => array(
-                                    "AcceptedStudent.placementtype is null",
-
-                                    "AcceptedStudent.placementtype" => CANCELLED_PLACEMENT
-                                )
-                            )
-                        ),
-                        'order' => 'AcceptedStudent.full_name asc',
-                        'contain' => array('College', 'Program', 'ProgramType', 'Preference')
-                    ));
-                } else {
-                    $acceptedStudents = $this->Preference->AcceptedStudent->find('all', array(
-                        'conditions' => array(
-                            'AcceptedStudent.academicyear' => $selectedAcademicYear,
-                            'AcceptedStudent.college_id' => $this->college_id,
-                            'AcceptedStudent.department_id is null',
-                            'AcceptedStudent.program_type_id' => PROGRAM_TYPE_REGULAR,
-                            'AcceptedStudent.program_id' => PROGRAM_UNDEGRADUATE,
-                            array(
-                                "OR" => array(
-                                    "AcceptedStudent.placementtype is null",
-
-                                    "AcceptedStudent.placementtype" => CANCELLED_PLACEMENT
-                                )
-                            )
-                        ),
-                        'order' => 'AcceptedStudent.full_name asc',
-                        'contain' => array('College', 'Program', 'ProgramType', 'Preference')
-                    ));
-
-                    debug($acceptedStudents);
+                    $conditions['AcceptedStudents.id !='] = $accepted_student_id;
                 }
 
+                $acceptedStudents = $this->Preferences->AcceptedStudents->find()
+                    ->where($conditions)
+                    ->order(['AcceptedStudents.full_name' => 'ASC'])
+                    ->contain(['Colleges', 'Programs', 'ProgramTypes', 'Preferences'])
+                    ->all()
+                    ->toArray();
 
-                if (empty($acceptedStudents) && empty($accepted_student_id)) {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            'There is no student in the selected academic year that needs preference feeding to the system.',
-                            true
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
+                $preference_not_completed = array_filter($acceptedStudents, function ($student) {
+                    return empty($student->preferences);
+                });
+
+                if (empty($preference_not_completed) && empty($accepted_student_id)) {
+                    $this->Flash->error(__('No student in the selected academic year needs preference feeding.'), ['element' => 'error']);
                 }
-                debug($acceptedStudents);
-                $preference_not_completed = array();
-                foreach ($acceptedStudents as $k => $value) {
-                    $count = count($value['Preference']);
-                    if ($count == 0) {
-                        $preference_not_completed[] = $value;
-                    }
-                }
-                unset($acceptedStudents);
-                $acceptedStudents =
-                    $preference_not_completed;
-                if (empty($acceptedStudents)) {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            'There is no student in the selected academic year that needs preference feeding to the system.',
-                            true
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                }
-                $this->set(compact('selectedAcademicYear', 'acceptedStudents'));
+
+                $this->set(compact('selectedAcademicYear', 'preference_not_completed'));
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'Please select academic year to add department preference to accepted students'
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('Please select academic year to add department preference.'), ['element' => 'error']);
             }
         }
 
         if (!empty($accepted_student_id)) {
-            if ($this->role_id != ROLE_STUDENT) {
-                $valid = $this->Preference->AcceptedStudent->find(
-                    'count',
-                    array('conditions' => array('AcceptedStudent.id' => $accepted_student_id))
-                );
-                $field_academic_year = $this->Preference->AcceptedStudent->field(
-                    'academicyear',
-                    array('AcceptedStudent.id' => $accepted_student_id)
-                );
-                if (!empty($accepted_student_id) && $valid) {
-                    $elegible_user = 0;
-                    $elegible_user = $this->Preference->AcceptedStudent->find('count', array(
-                        'conditions' => array(
-                            'AcceptedStudent.id' => $accepted_student_id,
-                            'AcceptedStudent.college_id' => $this->college_id,
-                            'AcceptedStudent.department_id is null'
-                        )
-                    ));
-                    if ($elegible_user == 0) {
-                        $this->Session->setFlash(
-                            '<span></span> You do not have the privilage to feed the selected student preference. Your action is loggged and reported to the system administrators.',
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                        $details = null;
-                        if (isset ($logged_user_detail['Staff']) && !empty($logged_user_detail['Staff'])) {
-                            $details .= $logged_user_detail['Staff'][0]['first_name'] . ' ' .
-                                $logged_user_detail['Staff'][0]['middle_name'] . ' ' .
-                                $logged_user_detail['Staff'][0]['last_name'] . ' (' .
-                                $logged_user_detail['User']['username'] . ')';
-                        } else {
-                            if (isset ($logged_user_detail['Student']) && !empty($logged_user_detail['Student'])) {
-                                $details .= $logged_user_detail['Student'][0]['first_name'] . ' ' .
-                                    $logged_user_detail['Student'][0]['middle_name'] . ' ' .
-                                    $logged_user_detail['Student'][0]['last_name'] . ' (' .
-                                    $logged_user_detail['User']['username'] . ')';
-                            }
-                        }
-                        ClassRegistry::init('AutoMessage')->sendPermissionManagementBreakAttempt(
-                            Configure::read('User.user'),
-                            '<u>' . $details . '</u> is trying to feed student placement preference without assigned privilage. Please give appropriate warning.'
-                        );
-                        //$this->redirect('add');
+            if ($user['role_id'] !== ROLE_STUDENT) {
+                $valid = $this->Preferences->AcceptedStudents->find()
+                    ->where(['AcceptedStudents.id' => $accepted_student_id])
+                    ->count();
 
-                    } else {
-                        $accepted_student_detail = $this->Preference->AcceptedStudent->find(
-                            'first',
-                            array('conditions' => array('AcceptedStudent.id' => $accepted_student_id))
+                $field_academic_year = $this->Preferences->AcceptedStudents->field('academicyear', ['AcceptedStudents.id' => $accepted_student_id]);
+
+                if ($valid) {
+                    $eligible_user = $this->Preferences->AcceptedStudents->find()
+                        ->where([
+                            'AcceptedStudents.id' => $accepted_student_id,
+                            'AcceptedStudents.college_id' => $this->college_id,
+                            'AcceptedStudents.department_id IS' => null
+                        ])
+                        ->count();
+
+                    if ($eligible_user === 0) {
+                        $details = '';
+                        if (!empty($logged_user_detail->staffs)) {
+                            $details .= $logged_user_detail->staffs[0]->first_name . ' ' .
+                                $logged_user_detail->staffs[0]->middle_name . ' ' .
+                                $logged_user_detail->staffs[0]->last_name . ' (' .
+                                $logged_user_detail->username . ')';
+                        } elseif (!empty($logged_user_detail->students)) {
+                            $details .= $logged_user_detail->students[0]->first_name . ' ' .
+                                $logged_user_detail->students[0]->middle_name . ' ' .
+                                $logged_user_detail->students[0]->last_name . ' (' .
+                                $logged_user_detail->username . ')';
+                        }
+
+                        $autoMessageTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                        $autoMessageTable->sendPermissionManagementBreakAttempt(
+                            Configure::read('User.user'),
+                            '<u>' . $details . '</u> is trying to feed student placement preference without assigned privilege.'
                         );
-                        $this->set('accepted_student_id', $accepted_student_id);
-                        $this->set(compact('accepted_student_detail'));
+
+                        $this->Flash->error(__('You do not have the privilege to feed the selected student preference.'), ['element' => 'error']);
+                        return $this->redirect(['action' => 'add']);
+                    } else {
+                        $accepted_student_detail = $this->Preferences->AcceptedStudents->find()
+                            ->where(['AcceptedStudents.id' => $accepted_student_id])
+                            ->first();
+                        $this->set(compact('accepted_student_detail', 'accepted_student_id'));
                     }
                 }
             }
+
             $departments = $this->_getParticipatingDepartment($this->college_id, $field_academic_year);
             if ($departments) {
                 $departmentcount = count($departments);
-                $this->set('departments', $departments);
-                $this->set('departmentcount', $departmentcount);
+                $this->set(compact('departments', 'departmentcount'));
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __('Please first add placement participating departments'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('controller' => 'participatingDepartments', 'action' => 'add'));
+                $this->Flash->error(__('Please first add placement participating departments.'), ['element' => 'error']);
+                return $this->redirect(['controller' => 'ParticipatingDepartments', 'action' => 'add']);
             }
         }
-        if (isset($this->request->data['submitpreference'])
-            && !empty($this->request->data['submitpreference'])) {
-            /// reformat this->data to make it suitable for saveAll
-            $academicyear = $this->request->data['Preference']['academicyear'];
-            $accepted_student_id = $this->request->data['Preference']['accepted_student_id'];
-            //check auto has already run
-            $this->loadModel('PlacementLock');
-            $auto_run = $this->PlacementLock->find(
-                'count',
-                array(
-                    'conditions' => array(
-                        'PlacementLock.college_id' => $this->college_id,
-                        'PlacementLock.academic_year' => $academicyear,
-                        'PlacementLock.process_start' => 1
-                    )
-                )
-            );
+
+        if ($this->request->is(['post', 'put']) && !empty($this->request->getData('submitpreference'))) {
+            $academicyear = $this->request->getData('Preference.academicyear');
+            $accepted_student_id = $this->request->getData('Preference.accepted_student_id');
+
+            // Check if auto placement is running
+            $placementLockTable = TableRegistry::getTableLocator()->get('PlacementLocks');
+            $auto_run = $placementLockTable->find()
+                ->where([
+                    'PlacementLocks.college_id' => $this->college_id,
+                    'PlacementLocks.academic_year' => $academicyear,
+                    'PlacementLocks.process_start' => 1
+                ])
+                ->count();
+
             if ($auto_run) {
-                $this->Session->setFlash(
-                    __(
-                        'The auto placement is up and running you can not modify the preferences for students right now, please come back after you cancelled the auto placement.'
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('action' => 'add'));
+                $this->Flash->error(__('The auto placement is running. You cannot modify preferences now.'), ['element' => 'error']);
+                return $this->redirect(['action' => 'add']);
             }
-            foreach ($this->request->data['Preference'] as &$value) {
-                debug($value);
-                if (isset($academicyear) && isset($value['academicyear'])) {
-                    $value['academicyear'] = $academicyear;
-                } else {
-                    $value['academicyear'] = $this->AcademicYear->current_academicyear();
+
+            // Reformat data
+            $preferencesData = $this->request->getData('Preference');
+            foreach ($preferencesData as &$value) {
+                if (!isset($value['academicyear'])) {
+                    $value['academicyear'] = $academicyear ?: $this->AcademicYear->current_academicyear();
                 }
-                debug($this->college_id);
-                if (isset($this->college_id)) {
-                    $value['college_id'] = $this->college_id;
-                } else {
-                    //find college
-                    $value['college_id'] = ClassRegistry::init('ParticipatingDepartment')->field(
-                        'ParticipatingDepartment.college_id',
-                        array('ParticipatingDepartment.department_id' => $value['department_id'])
-                    );
+                if (!isset($value['college_id'])) {
+                    $value['college_id'] = $this->college_id ?: TableRegistry::getTableLocator()->get('ParticipatingDepartments')
+                        ->field('college_id', ['department_id' => $value['department_id']]);
                 }
-                if ($this->Auth->user('id') != null && isset($value['user_id'])) {
-                    $value['user_id'] = $this->Auth->user('id');
+                if (!isset($value['user_id'])) {
+                    $value['user_id'] = $user['id'];
                 }
             }
 
+            // Remove unnecessary data
+            $this->request = $this->request->withData('Preference.accepted_student_id', null);
+            $this->request = $this->request->withData('Preference.academicyear', null);
+            $this->request = $this->request->withData('Preference.college_id', null);
 
-            unset($this->request->data['Preference']['accepted_student_id']);
-            unset($this->request->data['Preference']['academicyear']);
-            unset($this->request->data['Preference']['college_id']);
+            // Check preference deadline
+            $preferenceDeadlineTable = TableRegistry::getTableLocator()->get('PreferenceDeadlines');
+            $isPreferenceDeadlineRecorded = $preferenceDeadlineTable->find()
+                ->where([
+                    'PreferenceDeadlines.college_id' => $this->college_id,
+                    'PreferenceDeadlines.academicyear LIKE' => $academicyear . '%'
+                ])
+                ->count();
 
-            $this->set($this->request->data);
-            //check preference deadline
-            $this->loadModel('PreferenceDeadline');
-            $isPreferenceDeadlineRecorded = $this->PreferenceDeadline->find(
-                'count',
-                array(
-                    'conditions' => array(
-                        'PreferenceDeadline.college_id' => $this->college_id,
-                        'PreferenceDeadline.academicyear LIKE' => $academicyear . '%'
-                    )
-                )
-            );
             if ($isPreferenceDeadlineRecorded) {
-                // check preference recording deadline is not passed.
-                $is_deadline_passed = $this->PreferenceDeadline->find(
-                    'count',
-                    array(
-                        'conditions' => array(
-                            'PreferenceDeadline.college_id' => $this->college_id,
-                            'PreferenceDeadline.academicyear LIKE' => $academicyear . '%',
-                            'PreferenceDeadline.deadline <' => date("Y-m-d H:i:s")
-                        )
-                    )
-                );
+                $is_deadline_passed = $preferenceDeadlineTable->find()
+                    ->where([
+                        'PreferenceDeadlines.college_id' => $this->college_id,
+                        'PreferenceDeadlines.academicyear LIKE' => $academicyear . '%',
+                        'PreferenceDeadlines.deadline <' => date('Y-m-d H:i:s')
+                    ])
+                    ->count();
+
                 if (!$is_deadline_passed) {
-                    if (!$this->Preference->isAlreadyEnteredPreference(
-                            $accepted_student_id
-                        ) && $this->Preference->isAllPreferenceDepartmentSelectedDifferent(
-                            $this->request->data['Preference']
-                        )) {
-                        if (!empty($this->request->data['Preference'])) {
-                            if ($this->Preference->saveAll(
-                                $this->request->data['Preference'],
-                                array('validate' => 'first')
-                            )) {
-                                $this->Session->setFlash(
-                                    __('<span></span>The preference has been saved.'),
-                                    'default',
-                                    array('class' => 'success-box success-message')
-                                );
+                    if (!$this->Preferences->isAlreadyEnteredPreference($accepted_student_id) &&
+                        $this->Preferences->isAllPreferenceDepartmentSelectedDifferent($preferencesData)) {
+                        if (!empty($preferencesData)) {
+                            if ($this->Preferences->saveMany($this->Preferences->newEntities($preferencesData), ['validate' => true])) {
+                                $this->Flash->success(__('The preference has been saved.'), ['element' => 'success']);
                             } else {
-                                $this->Session->setFlash(
-                                    __('<span></span>The preference could not be saved.Please, try again.', true),
-                                    'default',
-                                    array('class' => 'error-box error-message')
-                                );
+                                $this->Flash->error(__('The preference could not be saved. Please try again.'), ['element' => 'error']);
                             }
                         }
                     } else {
-                        $error = $this->Preference->invalidFields();
-                        if (isset($error['preference']) &&
-                            !empty($error['preference'])) {
-                            $this->Session->setFlash(
-                                __('<span></span>' . $error['preference'][0]),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
-                        } elseif (isset($error['alreadypreferencerecorded']) &&
-                            !empty($error['alreadypreferencerecorded'])) {
-                            $this->Session->setFlash(
-                                __('<span></span>' . $error['alreadypreferencerecorded'][0]),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
-                        } elseif (isset($error['department']) && !empty($error['department'])) {
-                            $this->Session->setFlash(
-                                __('<span></span>' . $error['department'][0]),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
+                        $errors = $this->Preferences->getErrors();
+                        if (!empty($errors['preference'])) {
+                            $this->Flash->error($errors['preference'][0], ['element' => 'error']);
+                        } elseif (!empty($errors['alreadypreferencerecorded'])) {
+                            $this->Flash->error($errors['alreadypreferencerecorded'][0], ['element' => 'error']);
+                        } elseif (!empty($errors['department'])) {
+                            $this->Flash->error($errors['department'][0], ['element' => 'error']);
                         } else {
-                            $this->Session->setFlash(
-                                __('<span></span>Please fill the input fields', true),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
+                            $this->Flash->error(__('Please fill the input fields.'), ['element' => 'error']);
                         }
-                        /*
-                       $this->redirect(array('controller'=>'preferences','action' => 'add',$accepted_student_id));
-                   */
                     }
                 } else {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            'Preference Deadline is passed. You can not recorded the selected student preference.Please ask the college admin for more information.',
-                            true
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
+                    $this->Flash->error(__('Preference deadline has passed. You cannot record preferences.'), ['element' => 'error']);
                 }
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'Please set  preference deadline  first before recording students preferences',
-                        true
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('controller' => 'preferenceDeadlines', 'action' => 'add'));
+                $this->Flash->error(__('Please set preference deadline first.'), ['element' => 'error']);
+                return $this->redirect(['controller' => 'PreferenceDeadlines', 'action' => 'add']);
             }
         }
-        $user_id = $this->Auth->user('id');
-        $this->set(compact('user_id'));
+
+        $this->set(['user_id' => $user['id']]);
     }
 
-//allow students to fill their own preference
     public function student_record_preference()
     {
+        $user = $this->Auth->user();
+        $acceptedStudent = $this->Preferences->AcceptedStudents->find()
+            ->where(['AcceptedStudents.user_id' => $user['id']])
+            ->contain(['Colleges'])
+            ->first();
 
-        if (!empty($this->request->data)) {
-            $this->loadModel('PreferenceDeadline');
-            $acceptedStudentdetail = $this->Preference->AcceptedStudent->find(
-                'first',
-                array('conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')))
-            );
-//check preference recording deadline is not passed.
-            $is_preference_deadline = $this->PreferenceDeadline->find(
-                'count',
-                array(
-                    'conditions' => array(
-                        'PreferenceDeadline.college_id' => $acceptedStudentdetail['College']['id'],
-                        'PreferenceDeadline.academicyear LIKE' => $this->AcademicYear->current_academicyear() . '%',
-                        'PreferenceDeadline.deadline > ' => date("Y-m-d H:i:s")
-                    )
-                )
-            );
+        if (!$acceptedStudent) {
+            $this->Flash->error(__('Student record not found.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
+        }
+
+        if ($this->request->is(['post', 'put'])) {
+            $preferenceDeadlineTable = TableRegistry::getTableLocator()->get('PreferenceDeadlines');
+            $is_preference_deadline = $preferenceDeadlineTable->find()
+                ->where([
+                    'PreferenceDeadlines.college_id' => $acceptedStudent->college_id,
+                    'PreferenceDeadlines.academicyear LIKE' => $this->AcademicYear->current_academicyear() . '%',
+                    'PreferenceDeadlines.deadline >' => date('Y-m-d H:i:s')
+                ])
+                ->count();
+
             if ($is_preference_deadline) {
-                $this->set($this->request->data);
-                if ($this->Preference->validates($this->request->data)) {
-                    if (!$this->Preference->isAlreadyEnteredPreference(
-                        $this->request->data['Preference'][1]['accepted_student_id']
-                    )) {
-                        if ($this->Preference->isAllPreferenceDepartmentSelectedDifferent(
-                            $this->request->data['Preference']
-                        )) {
-                            if ($this->Preference->saveAll(
-                                $this->request->data['Preference'],
-                                array('validate' => 'first')
-                            )) {
-                                $this->Session->setFlash(
-                                    '<span></span>' . __('The preference has been saved'),
-                                    'default',
-                                    array('class' => 'success-box success-message')
-                                );
-                                $this->redirect(array('action' => 'index'));
+                $preferencesData = $this->request->getData('Preference');
+                $this->set($this->request->getData());
+
+                if ($this->Preferences->validate($preferencesData)) {
+                    if (!$this->Preferences->isAlreadyEnteredPreference($preferencesData[1]['accepted_student_id'])) {
+                        if ($this->Preferences->isAllPreferenceDepartmentSelectedDifferent($preferencesData)) {
+                            if ($this->Preferences->saveMany($this->Preferences->newEntities($preferencesData), ['validate' => true])) {
+                                $this->Flash->success(__('The preference has been saved.'), ['element' => 'success']);
+                                return $this->redirect(['action' => 'index']);
                             } else {
-                                $this->Session->setFlash(
-                                    '<span></span>' . __('The preference could not be saved. Please, try again.', true),
-                                    'default',
-                                    array('class' => 'error-box error-message')
-                                );
+                                $this->Flash->error(__('The preference could not be saved. Please try again.'), ['element' => 'error']);
                             }
                         } else {
-                            $this->Session->setFlash(
-                                '<span></span>' . __(
-                                    'Input Error.Please select different department preference for each preference order.',
-                                    true
-                                ),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
+                            $this->Flash->error(__('Please select different department preferences for each order.'), ['element' => 'error']);
                         }
                     } else {
-                        $this->Session->setFlash(
-                            '<span></span>' . __(
-                                'You have already entered your preference. Please edit your preference before the deadline',
-                                true
-                            ),
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                        $this->redirect(array('controller' => 'preferences', 'action' => 'index'));
+                        $this->Flash->error(__('You have already entered your preference. Please edit before the deadline.'), ['element' => 'error']);
+                        return $this->redirect(['action' => 'index']);
                     }
                 } else {
-                    $this->Session->setFlash(
-                        '<span></span>' . __('Please enter the input correctly', true),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
+                    $this->Flash->error(__('Please enter the input correctly.'), ['element' => 'error']);
                 }
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'Preference Deadline is passed.You can not recorded your preference. Please ask the college dean for more information',
-                        true
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('action' => 'index'));
+                $this->Flash->error(__('Preference deadline has passed. Contact the college dean.'), ['element' => 'error']);
+                return $this->redirect(['action' => 'index']);
             }
         }
-        if (empty($this->request->data)) {
-            $isAlreadyAdd = $this->Preference->isAlreadyEnteredPreference($this->Auth->user('id'));
-            if ($isAlreadyAdd) {
-                echo '<div class="error-box error-message"><span></span>' . __(
-                        'You have already entered your preference.',
-                        true
-                    ) . '</div>';
-                $this->redirect(array('action' => 'index'));
-            }
-        }
-        $acceptedStudentdetail = $this->Preference->AcceptedStudent->find(
-            'first',
-            array('conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')))
-        );
-        $departments = $this->_participating_department_name($acceptedStudentdetail['College']['id'], null);
 
+        if ($this->Preferences->isAlreadyEnteredPreference($user['id'])) {
+            $this->Flash->error(__('You have already entered your preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
+        }
+
+        $departments = $this->_participating_department_name($acceptedStudent->college_id, null);
         if ($departments) {
             $departmentcount = count($departments);
-            $this->set('departments', $departments);
-            $this->set('departmentcount', $departmentcount);
+            $this->set(compact('departments', 'departmentcount'));
         } else {
-            $this->Session->setFlash(
-                '<span></span>' . __('Please come back when college announces to fill your preferences.', true),
-                'default',
-                array('class' => 'info-box info-message')
-            );
-            $this->redirect(array('controller' => 'preferences', 'action' => 'index'));
+            $this->Flash->info(__('Please come back when the college announces preference filling.'), ['element' => 'info']);
+            return $this->redirect(['action' => 'index']);
         }
-        $acceptedStudents = $this->Preference->AcceptedStudent->find(
-            'first',
-            array('conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')))
-        );
-        if (!empty($acceptedStudents)) {
-            // foreach($acceptedStudents as $k=>$v){
-            $studentname = $acceptedStudents['AcceptedStudent']['full_name'];
-            $studentnumber = $acceptedStudents['AcceptedStudent']['studentnumber'];
-            $acyear = $acceptedStudents['AcceptedStudent']['academicyear'];
-            $collegename = $acceptedStudents['College']['name'];
-            $college_id = $acceptedStudents['College']['id'];
-            $accepted_student_id = $acceptedStudents['AcceptedStudent']['id'];
-            $this->set(
-                compact(
-                    'studentname',
-                    'studentnumber',
-                    'collegename',
-                    'college_id',
-                    'accepted_student_id',
-                    'acyear'
-                )
-            );
-            //  break;
-            //}
-        }
+
+        $studentData = [
+            'studentname' => $acceptedStudent->full_name,
+            'studentnumber' => $acceptedStudent->studentnumber,
+            'acyear' => $acceptedStudent->academicyear,
+            'collegename' => $acceptedStudent->college->name,
+            'college_id' => $acceptedStudent->college_id,
+            'accepted_student_id' => $acceptedStudent->id
+        ];
+        $this->set($studentData);
     }
 
     public function edit($id = null)
     {
+        $user = $this->Auth->user();
 
-        if (!$id && empty($this->request->data)) {
-            $this->Session->setFlash(
-                '<span></span>' . __('Invalid preference'),
-                'default',
-                array('class' => 'error-box error-message')
-            );
-            return $this->redirect(array('action' => 'index'));
+        if (!$id && !$this->request->is(['post', 'put'])) {
+            $this->Flash->error(__('Invalid preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
         }
 
-        if (empty($this->request->data)) {
-            $this->request->data = $this->Preference->find(
-                'all',
-                array('conditions' => array('Preference.user_id' => $this->Auth->user('id')))
-            );
+        if (!$this->request->is(['post', 'put'])) {
+            $preferences = $this->Preferences->find()
+                ->where(['Preferences.user_id' => $user['id']])
+                ->all()
+                ->toArray();
+            $this->request = $this->request->withData('Preference', $preferences);
         }
 
         $departments = $this->_participating_department_name($this->college_id, null);
         if ($departments) {
             $departmentcount = count($departments);
-            $this->set('departments', $departments);
-            $this->set('departmentcount', $departmentcount);
+            $this->set(compact('departments', 'departmentcount'));
         } else {
-            $this->Session->setFlash(
-                '<span></span>' . __('Please first add placement participating departments'),
-                'default',
-                array('class' => 'info-box info-message')
-            );
-            $this->redirect(array('controller' => 'participatingDepartments', 'action' => 'add'));
+            $this->Flash->info(__('Please first add placement participating departments.'), ['element' => 'info']);
+            return $this->redirect(['controller' => 'ParticipatingDepartments', 'action' => 'add']);
         }
 
-        $user_id = $this->Auth->user('id');
-        $this->set(compact('user_id'));
-        $this->set(compact('departments'));
+        $this->set(['user_id' => $user['id']]);
     }
 
     public function delete($id = null)
     {
-
         if (!$id) {
-            $this->Session->setFlash(
-                '<span></span>' . __('Invalid id for preference'),
-                'default',
-                array('class' => 'error-box error-message')
-            );
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Invalid id for preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
         }
-        $check_auto_placement_runs = $this->Preference->AcceptedStudent->find(
-            'count',
-            array(
-                'conditions' => array(
-                    'AcceptedStudent.placementtype' => AUTO_PLACEMENT,
-                    'AcceptedStudent.id IN ( SELECT accepted_student_id from preferences
-		where id=' . $id . ')'
-                )
-            )
-        );
 
-        //debug($check_auto_placement_runs);
-        if ($check_auto_placement_runs > 0) {
-            $this->Session->setFlash(
-                '<span></span>' . __(
-                    'Preference can not be deleted. The student has been placed based on this preference.'
-                ),
-                'default',
-                array('class' => 'error-box error-message')
-            );
+        $preference = $this->Preferences->findById($id)->first();
+        if (!$preference) {
+            $this->Flash->error(__('Invalid preference.'), ['element' => 'error']);
+            return $this->redirect(['action' => 'index']);
+        }
+
+        $autoPlacementCount = $this->Preferences->AcceptedStudents->find()
+            ->where([
+                'AcceptedStudents.placementtype' => AUTO_PLACEMENT,
+                'AcceptedStudents.id' => $preference->accepted_student_id
+            ])
+            ->count();
+
+        if ($autoPlacementCount > 0) {
+            $this->Flash->error(__('Preference cannot be deleted. The student has been placed based on this preference.'), ['element' => 'error']);
         } else {
-            $accepted_student_id = $this->Preference->field(
-                'accepted_student_id',
-                array('Preference.id' => $id)
-            );
-            $preference_ids = $this->Preference->find(
-                'list',
-                array(
-                    'conditions' => array('Preference.accepted_student_id' => $accepted_student_id),
-                    'fields' => array('Preference.id', 'Preference.id')
-                )
-            );
+            $preferenceIds = $this->Preferences->find()
+                ->where(['Preferences.accepted_student_id' => $preference->accepted_student_id])
+                ->extract('id')
+                ->toArray();
 
-            if ($this->Preference->deleteAll(array('Preference.id' => $preference_ids), false)) {
-                $this->Session->setFlash(
-                    '<span></span>' . __('Preferences deleted'),
-                    'default',
-                    array('class' => 'success-box success-message')
-                );
+            if ($this->Preferences->deleteAll(['Preferences.id IN' => $preferenceIds])) {
+                $this->Flash->success(__('Preferences deleted.'), ['element' => 'success']);
+            } else {
+                $this->Flash->error(__('Preferences could not be deleted.'), ['element' => 'error']);
             }
         }
-        $this->redirect(array('action' => 'index'));
+
+        return $this->redirect(['action' => 'index']);
     }
 
-    /**
-     *Method to get the department of the participating department
-     *
-     * @return array
-     */
-    public function _participating_department_name($college_id = null, $department_id = null)
+    public function get_preference($participationg_department_id = null)
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $remaining_departments = $this->_participating_department_name($this->college_id, $participationg_department_id);
+        $this->set(compact('remaining_departments'));
+        $this->set('_serialize', ['remaining_departments']);
+    }
 
-        $this->loadModel('ParticipatingDepartment');
-        if ($department_id) {
-            $departments = $this->ParticipatingDepartment->find(
-                'all',
-                array(
-                    'conditions' => array(
-                        'ParticipatingDepartment.college_id' => $college_id,
-                        'ParticipatingDepartment.academic_year LIKE' => $this->AcademicYear->current_academicyear(
-                            ) . '%'
-                    ,
-                        'ParticipatingDepartment.department_id' => $department_id
-                    )
-                )
-            );
-        } else {
-            $departments = $this->ParticipatingDepartment->find(
-                'all',
-                array(
-                    'conditions' => array(
-                        'ParticipatingDepartment.college_id' => $college_id,
-                        'ParticipatingDepartment.academic_year LIKE' => $this->AcademicYear->current_academicyear(
-                            ) . '%'
-                    )
-                )
-            );
+    public function getStudentPreference($acceptedStudentId = null)
+    {
+        if (!$acceptedStudentId || !is_numeric($acceptedStudentId)) {
+            throw new BadRequestException('Invalid student ID');
         }
+
+        $this->viewBuilder()->setLayout('ajax');
+
+        $studentBasic = $this->Preferences->AcceptedStudents->find()
+            ->where(['AcceptedStudents.id' => $acceptedStudentId])
+            ->first()
+            ->toArray();
+
+
+        debug($studentBasic);
+
+        $studentsPreference = $this->Preferences->find()
+            ->where(['Preferences.accepted_student_id' => $acceptedStudentId])
+            ->contain(['AcceptedStudents', 'Departments'])
+            ->all()
+            ->toArray();
+
+
+        debug($studentsPreference);
+
+        if (!$studentBasic && empty($studentsPreference)) {
+            throw new NotFoundException('No data found for student ID: ' . $acceptedStudentId);
+        }
+
+        $this->set(compact('studentsPreference', 'studentBasic'));
+        $this->set('_serialize', ['studentsPreference', 'studentBasic']);
+    }
+
+    protected function _participating_department_name($college_id = null, $department_id = null)
+    {
+        $participatingDepartmentTable = TableRegistry::getTableLocator()->get('ParticipatingDepartments');
+        $conditions = [
+            'ParticipatingDepartments.college_id' => $college_id,
+            'ParticipatingDepartments.academic_year LIKE' => $this->AcademicYear->current_academicyear() . '%'
+        ];
+
+        if ($department_id) {
+            $conditions['ParticipatingDepartments.department_id'] = $department_id;
+        }
+
+        $departments = $participatingDepartmentTable->find()
+            ->where($conditions)
+            ->contain(['Departments'])
+            ->all()
+            ->toArray();
+
         if (!empty($departments)) {
-            $participatingdepartmentname = array();
-            foreach ($departments as $k => $v) {
-                if (!empty($v['Department'])) {
-                    $participatingdepartmentname[$v['Department']['id']] = $v['Department']['name'];
+            $participatingdepartmentname = [];
+            foreach ($departments as $department) {
+                if (!empty($department['department'])) {
+                    $participatingdepartmentname[$department['department']['id']] = $department['department']['name'];
                 }
             }
             return $participatingdepartmentname;
         }
+
         return false;
     }
 
-    /**
-     *Method to edit the preference of the students
-     *
-     * @save
-     */
+    protected function _getParticipatingDepartment($college_id = null, $academic_year = null)
+    {
+        $participatingDepartmentTable = TableRegistry::getTableLocator()->get('ParticipatingDepartments');
+        $departments = $participatingDepartmentTable->find()
+            ->where([
+                'ParticipatingDepartments.college_id' => $college_id,
+                'ParticipatingDepartments.academic_year LIKE' => $academic_year . '%'
+            ])
+            ->contain(['Colleges', 'Departments'])
+            ->all()
+            ->toArray();
+
+        $department_lists = [];
+        foreach ($departments as $department) {
+            $department_lists[$department['department']['id']] = $department['department']['name'];
+        }
+
+        return $department_lists;
+    }
+
     public function edit_preference($accepted_student_id = null)
     {
+        $user = $this->Auth->user();
 
-        if (!empty($this->request->data)) {
-            $this->set($this->request->data);
-            //input validation
-            if ($this->Preference->validates()) {
+        if ($this->request->is(['post', 'put'])) {
+            $this->set($this->request->getData());
+            if ($this->Preferences->validate($this->request->getData())) {
                 $userCanEdit = null;
                 $college_id = null;
-                $preferenceDetails = $this->Preference->find(
-                    'first',
-                    array(
-                        'conditions' => array(
-                            'Preference.user_id' => $this->Auth->user('id')
-                        ),
-                        'recursive' => -1
-                    )
-                );
-                if ($this->role_id != ROLE_STUDENT) {
-                    $userCanEdit = $this->Preference->find('first', array(
-                        'conditions'
-                        => array(
-                            "OR" => array(
-                                'Preference.college_id' => $this->college_id,
-                                'Preference.user_id' => $this->Auth->user('id')
-                            )
-                        )
-                    ));
+                $preferenceDetails = $this->Preferences->find()
+                    ->where(['Preferences.user_id' => $user['id']])
+                    ->first();
+
+                if ($user['role_id'] != ROLE_STUDENT) {
+                    $userCanEdit = $this->Preferences->find()
+                        ->where([
+                            'OR' => [
+                                'Preferences.college_id' => $this->college_id,
+                                'Preferences.user_id' => $user['id']
+                            ]
+                        ])
+                        ->first();
                     $college_id = $this->college_id;
                 } else {
-                    /*$userCanEdit=$this->Preference->find('first',array('conditions'
-                    =>array(
-                       "OR"=>array('Preference.user_id'=>$this->Auth->user('id'),
-                       'Preference.accepted_student_id'=>$this->student_id))));
-                       */
-                    $accepted_student_college_id = $this->Preference->AcceptedStudent->find(
-                        'first',
-                        array('conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')))
-                    );
-                    $college_id = $accepted_student_college_id['College']['id'];
-                    $userCanEdit = $this->Preference->find(
-                        'first',
-                        array(
-                            'conditions' => array(
-                                'Preference.user_id' => $this->Auth->user('id')
-                            )
-                        )
-                    );
+                    $accepted_student_college = $this->Preferences->AcceptedStudents->find()
+                        ->where(['AcceptedStudents.user_id' => $user['id']])
+                        ->contain(['Colleges'])
+                        ->first();
+                    $college_id = $accepted_student_college->college->id;
+                    $userCanEdit = $this->Preferences->find()
+                        ->where(['Preferences.user_id' => $user['id']])
+                        ->first();
                 }
 
-                // debug($userCanEdit);
-                $accepted_student_id = !empty($userCanEdit) ? $userCanEdit['AcceptedStudent']['id'] : '';
+                $accepted_student_id = !empty($userCanEdit) ? $userCanEdit->accepted_student_id : '';
 
-                //block user from selecting the same department for each preference
-                if ($this->Preference->isAllPreferenceDepartmentSelectedDifferent(
-                    $this->request->data['Preference']
-                )) {
+                if ($this->Preferences->isAllPreferenceDepartmentSelectedDifferent($this->request->getData('Preference'))) {
                     if ($userCanEdit) {
-                        //check preference recording deadline is not passed.
-                        //check preference deadline
-                        $this->loadModel('PreferenceDeadline');
-
-                        $is_preference_deadline = $this->PreferenceDeadline->find(
-                            'count',
-                            array(
-                                'conditions' => array(
-                                    'PreferenceDeadline.college_id' => $college_id,
-                                    'PreferenceDeadline.academicyear LIKE' => $this->AcademicYear->current_academicyear(
-                                        ) . '%',
-                                    'PreferenceDeadline.deadline > ' => date("Y-m-d H:i:s")
-                                )
-                            )
-                        );
-
+                        $preferenceDeadlineTable = TableRegistry::getTableLocator()->get('PreferenceDeadlines');
+                        $is_preference_deadline = $preferenceDeadlineTable->find()
+                            ->where([
+                                'PreferenceDeadlines.college_id' => $college_id,
+                                'PreferenceDeadlines.academicyear LIKE' => $this->AcademicYear->current_academicyear() . '%',
+                                'PreferenceDeadlines.deadline >' => date('Y-m-d H:i:s')
+                            ])
+                            ->count();
 
                         if ($is_preference_deadline) {
-                            if ($this->Preference->saveAll($this->request->data['Preference'])) {
-                                $this->Session->setFlash(
-                                    '<span></span>' . __('The preference has been updated'),
-                                    'default',
-                                    array('class' => 'success-box success-message')
-                                );
+                            if ($this->Preferences->saveMany($this->Preferences->newEntities($this->request->getData('Preference')))) {
+                                $this->Flash->success(__('The preference has been updated.'), ['element' => 'success']);
                             } else {
-                                $this->Session->setFlash(
-                                    '<span></span>' . __('The preference could not be updated. Please, try again.'),
-                                    'default',
-                                    array('class' => 'error-box error-message')
-                                );
-                                $this->redirect(array('action' => 'edit_preference', $accepted_student_id));
+                                $this->Flash->error(__('The preference could not be updated. Please try again.'), ['element' => 'error']);
+                                return $this->redirect(['action' => 'edit_preference', $accepted_student_id]);
                             }
                         } else {
-                            $this->Session->setFlash(
-                                '<span></span>' . __(
-                                    'Preference Deadline is passed.
-				     You can not edit your preference. Please ask the college
-
-				     dean for more information',
-                                    true
-                                ),
-                                'default',
-                                array('class' => 'error-box error-message')
-                            );
+                            $this->Flash->error(__('Preference deadline has passed. Contact the college dean.'), ['element' => 'error']);
                         }
                     } else {
-                        $this->Session->setFlash(
-                            "<span></span>" . __(
-                                'You are not allowed to
-	                         edit someone preference. This action will be reported.',
-                                true
-                            ),
-                            'default',
-                            array('class' => 'warning-box warning-message')
-                        );
+                        $this->Flash->warning(__('You are not allowed to edit someone\'s preference. This action will be reported.'), ['element' => 'warning']);
                     }
                 } else {
-                    $this->Session->setFlash(
-                        "<span></span>" . __(
-                            'Please select different department preference for each preference order.'
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                    $this->redirect(array('action' => 'edit_preference', $accepted_student_id));
+                    $this->Flash->error(__('Please select different department preferences for each order.'), ['element' => 'error']);
+                    return $this->redirect(['action' => 'edit_preference', $accepted_student_id]);
                 }
-                //$this->redirect(array('action' => 'index'));
             } else {
-                $this->Session->setFlash(
-                    "<span></span>" . __('Please select department'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                $this->redirect(array('action' => 'edit_preference', $accepted_student_id));
+                $this->Flash->error(__('Please select department.'), ['element' => 'error']);
+                return $this->redirect(['action' => 'edit_preference', $accepted_student_id]);
             }
-            $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         } else {
-            $college_id = null;
-            if ($this->role_id != ROLE_STUDENT) {
-                $college_id = $this->college_id;
-            } else {
-                $accepted_student_college_id = $this->Preference->AcceptedStudent->find(
-                    'first',
-                    array('conditions' => array('AcceptedStudent.user_id' => $this->Auth->user('id')))
-                );
-                $college_id = $accepted_student_college_id['College']['id'];
-            }
-            $preferences = $this->Preference->find('all', array(
-                'conditions' => array(
-                    'Preference.accepted_student_id' => $accepted_student_id,
-                    'Preference.college_id' => $college_id
-                )
-            ));
+            $college_id = $user['role_id'] != ROLE_STUDENT
+                ? $this->college_id
+                : ($this->Preferences->AcceptedStudents->find()
+                    ->where(['AcceptedStudents.user_id' => $user['id']])
+                    ->contain(['Colleges'])
+                    ->first()->college->id ?? null);
 
-            $this->request->data['Preference'] = Set::combine(
-                $this->Preference->find(
-                    'all',
-                    array(
-                        'conditions' => array('Preference.accepted_student_id' => $accepted_student_id),
-                        'order' => array('Preference.preferences_order' => 'ASC')
-                    )
-                ),
-                '{n}.Preference.id',
-                '{n}.Preference'
-            );
-            // debug($preferences);
+            $preferences = $this->Preferences->find()
+                ->where([
+                    'Preferences.accepted_student_id' => $accepted_student_id,
+                    'Preferences.college_id' => $college_id
+                ])
+                ->contain(['Colleges', 'AcceptedStudents', 'Departments'])
+                ->all()
+                ->toArray();
+
+            $this->request = $this->request->withData('Preference', (new Collection($this->Preferences->find()
+                ->where(['Preferences.accepted_student_id' => $accepted_student_id])
+                ->order(['Preferences.preferences_order' => 'ASC'])
+                ->all()))->combine('{n}.id', '{n}')->toArray());
+
             foreach ($preferences as $value) {
-                foreach ($this->request->data['Preference'] as &$data) {
-                    if ($data['department_id'] == $value['Preference']['department_id']) {
-                        $data['department_name'] = $value['Department']['name'];
+                foreach ($this->request->getData('Preference') as &$data) {
+                    if ($data['department_id'] == $value['department_id']) {
+                        $data['department_name'] = $value['department']['name'];
                         break;
                     }
                 }
-                if (!empty($value['College']['name'])) {
-                    $this->set('college_name', $value['College']['name']);
+                if (!empty($value['college']['name'])) {
+                    $this->set('college_name', $value['college']['name']);
                 }
-                if (!empty($value['AcceptedStudent']['full_name'])) {
-                    $this->set('student_full_name', $value['AcceptedStudent']['full_name']);
+                if (!empty($value['accepted_student']['full_name'])) {
+                    $this->set('student_full_name', $value['accepted_student']['full_name']);
                 }
             }
 
             $departments = $this->_participating_department_name($college_id, null);
             if ($departments) {
                 $departmentcount = count($departments);
-                $this->set('departments', $departments);
-                $this->set('departmentcount', $departmentcount);
+                $this->set(compact('departments', 'departmentcount'));
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __('Please first add placement participating departments'),
-                    'default',
-                    array('class' => 'info-box info-message')
-                );
-                $this->redirect(array('controller' => 'participatingDepartments', 'action' => 'add'));
+                $this->Flash->info(__('Please first add placement participating departments.'), ['element' => 'info']);
+                return $this->redirect(['controller' => 'ParticipatingDepartments', 'action' => 'add']);
             }
         }
     }
-
-    /**
-     *Get remaining participating department for user choice
-     *set variable
-     */
-    public function get_preference($participationg_department_id = null)
-    {
-
-        $this->layout = 'ajax';
-
-        $this->set(
-            'remaining_departments',
-            $this->_participating_department_name($this->college_id, $participationg_department_id)
-        );
-    }
-
-
-    public function _getParticipatingDepartment($college_id = null, $academic_year = null)
-    {
-
-        $this->loadModel('ParticipatingDepartment');
-        $departments = $this->ParticipatingDepartment->find(
-            'all',
-            array(
-                'conditions' => array(
-                    'ParticipatingDepartment.college_id' => $college_id,
-                    'ParticipatingDepartment.academic_year LIKE' => $academic_year . '%'
-                ),
-                'contain' => array('College', 'Department')
-            )
-        );
-        $department_lists = array();
-        foreach ($departments as $in => $value) {
-            $department_lists[$value['ParticipatingDepartment']['department_id']] = $value['Department']['name'];
-        }
-        return $department_lists;
-    }
-    /**
-     * Import student preferences from excel
-     */
-    /*
-    function import_preference () {
-         if (!empty($this->request->data)
-            && is_uploaded_file($this->request->data['AcceptedStudent']['File']['tmp_name'])){
-
-          }
-
-    }
-    */
-
-    public function getStudentPreference($acceptedStudentId)
-    {
-
-        $this->layout = 'ajax';
-        $studentBasic = $this->Preference->AcceptedStudent->find(
-            'first',
-            array('conditions' => array('AcceptedStudent.id' => $acceptedStudentId), 'recursive' => -1)
-        );
-        $studentsPreference = $this->Preference->find(
-            'all',
-            array(
-                'conditions' => array('Preference.accepted_student_id' => $acceptedStudentId),
-                'contain' => array('AcceptedStudent', 'Department')
-            )
-        );
-        $this->set(compact('studentsPreference', 'studentBasic'));
-    }
 }
-?>

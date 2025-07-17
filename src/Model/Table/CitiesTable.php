@@ -1,12 +1,12 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
+/**
+ * Cities Table
+ */
 class CitiesTable extends Table
 {
     /**
@@ -23,147 +23,124 @@ class CitiesTable extends Table
         $this->setDisplayField('name');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Regions', [
             'foreignKey' => 'region_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'Region',
+            'joinType' => 'LEFT',
         ]);
+
         $this->belongsTo('Zones', [
             'foreignKey' => 'zone_id',
-            'propertyName' => 'Zone',
+            'joinType' => 'LEFT',
         ]);
+
         $this->hasMany('Contacts', [
-            'foreignKey' => 'contact_id',
-            'propertyName' => 'Contact',
+            'foreignKey' => 'city_id',
+            'dependent' => false,
         ]);
+
         $this->hasMany('Staffs', [
             'foreignKey' => 'city_id',
-            'propertyName' => 'Staff',
+            'dependent' => false,
         ]);
+
         $this->hasMany('Students', [
             'foreignKey' => 'city_id',
-            'propertyName' => 'Student',
+            'dependent' => false,
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('name')
-            ->maxLength('name', 64)
             ->requirePresence('name', 'create')
-            ->notEmptyString('name');
-
-        $validator
-            ->scalar('city')
-            ->maxLength('city', 200)
-            ->allowEmptyString('city');
-
-        $validator
+            ->notEmptyString('name', 'Provide City name.')
+            ->add('name', 'isUniqueCityInRegion', [
+                'rule' => function ($value, $context) {
+                    $conditions = [
+                        'Cities.region_id' => $context['data']['region_id'] ?? null,
+                        'Cities.name' => trim($value)
+                    ];
+                    if (!empty($context['data']['id'])) {
+                        $conditions['Cities.id !='] = $context['data']['id'];
+                    }
+                    $count = $this->find()
+                        ->where($conditions)
+                        ->count();
+                    return $count === 0;
+                },
+                'message' => 'The city name should be unique in the selected region. The name is already taken. Use another one.'
+            ])
+            ->add('name', 'isUniqueCityInZone', [
+                'rule' => function ($value, $context) {
+                    $conditions = [
+                        'Cities.zone_id' => $context['data']['zone_id'] ?? null,
+                        'Cities.name' => trim($value)
+                    ];
+                    if (!empty($context['data']['id'])) {
+                        $conditions['Cities.id !='] = $context['data']['id'];
+                    }
+                    $count = $this->find()
+                        ->where($conditions)
+                        ->count();
+                    return $count === 0;
+                },
+                'message' => 'The city name should be unique in the selected zone. The name is already taken. Use another one.'
+            ])
             ->scalar('short')
-            ->maxLength('short', 10)
-            ->allowEmptyString('short');
-
-        $validator
-            ->scalar('city_2nd_language')
-            ->maxLength('city_2nd_language', 200)
-            ->allowEmptyString('city_2nd_language');
-
-        $validator
-            ->integer('priority_order')
-            ->allowEmptyString('priority_order');
-
-        $validator
-            ->notEmptyString('active');
+            ->requirePresence('short', 'create')
+            ->notEmptyString('short', 'Provide city short name.')
+            ->add('short', 'isUniqueCityCode', [
+                'rule' => function ($value, $context) {
+                    $conditions = [
+                        'Cities.short IS NOT NULL',
+                        'Cities.short' => $value
+                    ];
+                    if (!empty($context['data']['id'])) {
+                        $conditions['Cities.id !='] = $context['data']['id'];
+                    }
+                    $count = $this->find()
+                        ->where($conditions)
+                        ->count();
+                    return $count === 0;
+                },
+                'message' => 'The city short name must be unique. The short name is already taken. Use another one.'
+            ]);
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Checks if a city can be deleted based on associated records
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $cityId City ID
+     * @return bool True if can be deleted, false otherwise
      */
-    public function buildRules(RulesChecker $rules)
+    public function canItBeDeleted($cityId = null)
     {
-        $rules->add($rules->existsIn(['region_id'], 'Regions'));
-        $rules->add($rules->existsIn(['zone_id'], 'Zones'));
-
-        return $rules;
-    }
-
-    function isUniqueCityInRegion()
-    {
-        $count = 0;
-
-        if (!empty($this->data['City']['id'])) {
-            $count = $this->find('count', array('conditions' => array('City.region_id' => $this->data['City']['region_id'], 'City.name' => $this->data['City']['name'], 'City.id <>' => $this->data['City']['id'])));
-        } else {
-            $count = $this->find('count', array('conditions' => array('City.region_id' => $this->data['City']['region_id'], 'City.name' => $this->data['City']['name'])));
-        }
-
-        if ($count > 0) {
+        if (!$cityId) {
             return false;
         }
+
+        if ($this->Students->find()->where(['Students.city_id' => $cityId])->count() > 0) {
+            return false;
+        }
+
+        if ($this->Contacts->find()->where(['Contacts.city_id' => $cityId])->count() > 0) {
+            return false;
+        }
+
+        if ($this->Staffs->find()->where(['Staffs.city_id' => $cityId])->count() > 0) {
+            return false;
+        }
+
         return true;
-    }
-
-    function isUniqueCityInZone()
-    {
-        $count = 0;
-
-        if (!empty($this->data['City']['id'])) {
-            $count = $this->find('count', array('conditions' => array('City.zone_id' => $this->data['City']['zone_id'], 'City.name' => $this->data['City']['name'], 'City.id <>' => $this->data['City']['id'])));
-        } else {
-            $count = $this->find('count', array('conditions' => array('City.zone_id' => $this->data['City']['zone_id'], 'City.name' => $this->data['City']['name'])));
-        }
-
-        if ($count > 0) {
-            return false;
-        }
-        return true;
-    }
-
-    function isUniqueCityCode()
-    {
-        $count = 0;
-
-        if (!empty($this->data['Zone']['id'])) {
-            $count = $this->find('count', array('conditions' => array('City.short IS NOT NULL', 'City.short' => $this->data['City']['short'], 'City.id <> ' => $this->data['City']['id'])));
-        } else {
-            $count = $this->find('count', array('conditions' => array('City.short IS NOT NULL', 'City.short' => $this->data['City']['short'])));
-        }
-
-        if ($count > 0) {
-            return false;
-        }
-        return true;
-    }
-
-    function canItBeDeleted($city = null)
-    {
-        if ($this->Student->find('count', array('conditions' => array('Student.city_id' => $city))) > 0) {
-            return false;
-        } elseif ($this->Contact->find('count', array('conditions' => array('Contact.city_id' => $city))) > 0) {
-            return false;
-        } elseif ($this->Staff->find('count', array('conditions' => array('Staff.city_id' => $city))) > 0) {
-            return false;
-        } else {
-            return true;
-        }
     }
 }

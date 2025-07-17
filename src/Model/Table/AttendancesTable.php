@@ -1,14 +1,15 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\I18n\Time;
 
+/**
+ * Attendances Table
+ */
 class AttendancesTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -17,183 +18,157 @@ class AttendancesTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('attendances');
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'Student',
+            'joinType' => 'LEFT',
         ]);
+
         $this->belongsTo('PublishedCourses', [
             'foreignKey' => 'published_course_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'PublishedCourse',
+            'joinType' => 'LEFT',
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('attendace_type')
-            ->maxLength('attendace_type', 10)
-            ->requirePresence('attendace_type', 'create')
-            ->notEmptyString('attendace_type');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
+            ->numeric('student_id')
+            ->requirePresence('student_id', 'create')
+            ->notEmptyString('student_id', 'Please provide a valid student ID.')
+            ->numeric('published_course_id')
+            ->requirePresence('published_course_id', 'create')
+            ->notEmptyString('published_course_id', 'Please provide a valid published course ID.')
+            ->numeric('attendance_type')
+            ->requirePresence('attendance_type', 'create')
+            ->notEmptyString('attendance_type', 'Please provide a valid attendance type.')
             ->date('attendance_date')
             ->requirePresence('attendance_date', 'create')
-            ->notEmptyDate('attendance_date');
-
-        $validator
+            ->notEmptyDate('attendance_date', 'Please provide a valid attendance date.')
             ->boolean('attendance')
-            ->notEmptyString('attendance');
-
-        $validator
-            ->scalar('remark')
-            ->allowEmptyString('remark');
+            ->requirePresence('attendance', 'create')
+            ->notEmptyString('attendance', 'Please provide a valid attendance status.');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Retrieves a list of unique attendance dates for a published course
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $publishedCourseId Published course ID
+     * @return array Formatted attendance dates
      */
-    public function buildRules(RulesChecker $rules)
+    public function getListOfDateAttendanceTaken($publishedCourseId = null)
     {
-
-        $rules->add($rules->existsIn(['student_id'], 'Students'));
-        $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
-
-        return $rules;
-    }
-
-    public function getListOfDateAttendanceTaken($published_course_id = null)
-    {
-
-        $attendance_dates = $this->find(
-            'list',
-            array(
-                'conditions' =>
-                    array(
-                        'Attendance.published_course_id' => $published_course_id
-                    ),
-                'fields' => array('attendance_date'),
-                'recursive' => -1,
-                'order' => array('Attendance.attendance_date ASC')
-            )
-        );
-        $attendance_dates = array_unique($attendance_dates);
-        $attendance_dates_formatted = array();
-        foreach ($attendance_dates as $key => $value) {
-            $attendance_dates_formatted[$value] = date(
-                'D M d, Y',
-                mktime(
-                    substr($value, 11, 2),
-                    substr($value, 14, 2),
-                    substr($value, 17, 2),
-                    substr($value, 5, 2),
-                    substr($value, 8, 2),
-                    substr($value, 0, 4)
-                )
-            );
+        if (!$publishedCourseId) {
+            return [];
         }
-        return $attendance_dates_formatted;
+
+        $attendanceDates = $this->find()
+            ->select(['attendance_date'])
+            ->where(['Attendances.published_course_id' => $publishedCourseId])
+            ->distinct(['attendance_date'])
+            ->order(['Attendances.attendance_date' => 'ASC'])
+            ->toArray();
+
+        $formattedDates = [];
+        foreach ($attendanceDates as $date) {
+            $time = new Time($date->attendance_date);
+            $formattedDates[$time->format('Y-m-d')] = $time->format('D M d, Y');
+        }
+
+        return $formattedDates;
     }
 
-    public function getCourseAttendanceDetail(
-        $published_course_id = null,
-        $attendance_start_date = null,
-        $attendance_end_date = null,
-        $student_registers,
-        $student_adds
-    ) {
+    /**
+     * Retrieves attendance details for students in a course within a date range
+     *
+     * @param int|null $publishedCourseId Published course ID
+     * @param string|null $attendanceStartDate Start date (Y-m-d)
+     * @param string|null $attendanceEndDate End date (Y-m-d)
+     * @param array $studentRegisters Registered students
+     * @param array $studentAdds Added students
+     * @return array Attendance details for registered and added students
+     */
+    public function getCourseAttendanceDetail($publishedCourseId = null, $attendanceStartDate = null, $attendanceEndDate = null, array $studentRegisters = [], array $studentAdds = [])
+    {
+        if (!$publishedCourseId || !$attendanceStartDate || !$attendanceEndDate) {
+            return ['register' => $studentRegisters, 'add' => $studentAdds];
+        }
 
-        foreach ($student_registers as $key => $student_register) {
-            $attendance_detail = $this->find(
-                'all',
-                array(
-                    'conditions' =>
-                        array(
-                            'Attendance.published_course_id' => $published_course_id,
-                            'Attendance.attendance_date >=' => $attendance_start_date,
-                            'Attendance.attendance_date <=' => $attendance_end_date,
-                            'Attendance.student_id' => $student_register['Student']['id']
-                        ),
-                    'order' => array('Attendance.attendance_date ASC'),
-                    'recursive' => -1
-                )
-            );
-            if (!empty($attendance_detail)) {
-                $student_registers[$key]['Attendance'] = $attendance_detail;
-            } else {
-                $student_registers[$key]['Attendance'] = array();
+        foreach ($studentRegisters as $key => $studentRegister) {
+            if (empty($studentRegister['Student']['id'])) {
+                $studentRegisters[$key]['Attendance'] = [];
+                continue;
             }
+
+            $attendanceDetail = $this->find()
+                ->where([
+                    'Attendances.published_course_id' => $publishedCourseId,
+                    'Attendances.attendance_date >=' => $attendanceStartDate,
+                    'Attendances.attendance_date <=' => $attendanceEndDate,
+                    'Attendances.student_id' => $studentRegister['Student']['id']
+                ])
+                ->order(['Attendances.attendance_date' => 'ASC'])
+                ->toArray();
+
+            $studentRegisters[$key]['Attendance'] = $attendanceDetail ?: [];
         }
-        foreach ($student_adds as $key => $student_add) {
-            $attendance_detail = $this->find(
-                'all',
-                array(
-                    'conditions' =>
-                        array(
-                            'Attendance.published_course_id' => $published_course_id,
-                            'Attendance.attendance_date >=' => $attendance_start_date,
-                            'Attendance.attendance_date <=' => $attendance_end_date,
-                            'Attendance.student_id' => $student_add['Student']['id']
-                        ),
-                    'order' => array('Attendance.attendance_date ASC'),
-                    'recursive' => -1
-                )
-            );
-            if (!empty($attendance_detail)) {
-                $student_adds[$key]['Attendance'] = $attendance_detail;
-            } else {
-                $student_adds[$key]['Attendance'] = array();
+
+        foreach ($studentAdds as $key => $studentAdd) {
+            if (empty($studentAdd['Student']['id'])) {
+                $studentAdds[$key]['Attendance'] = [];
+                continue;
             }
+
+            $attendanceDetail = $this->find()
+                ->where([
+                    'Attendances.published_course_id' => $publishedCourseId,
+                    'Attendances.attendance_date >=' => $attendanceStartDate,
+                    'Attendances.attendance_date <=' => $attendanceEndDate,
+                    'Attendances.student_id' => $studentAdd['Student']['id']
+                ])
+                ->order(['Attendances.attendance_date' => 'ASC'])
+                ->toArray();
+
+            $studentAdds[$key]['Attendance'] = $attendanceDetail ?: [];
         }
 
-        $course_attendance['register'] = $student_registers;
-        $course_attendance['add'] = $student_adds;
-
-        return $course_attendance;
+        return [
+            'register' => $studentRegisters,
+            'add' => $studentAdds
+        ];
     }
 
-    // Check whether the course schedule used in attendance or not
-    public function is_course_schedule_uesd_in_attendance($course_schedule_published_course_ids = null)
+    /**
+     * Checks if a course schedule is used in attendance records
+     *
+     * @param int|array|null $courseSchedulePublishedCourseIds Published course ID(s)
+     * @return bool True if used, false otherwise
+     */
+    public function isCourseScheduleUsedInAttendance($courseSchedulePublishedCourseIds = null)
     {
-
-        $count = $this->find(
-            'count',
-            array(
-                'conditions' => array('Attendance.published_course_id' => $course_schedule_published_course_ids),
-                'limit' => 2
-            )
-        );
-        if ($count > 0) {
-            return true;
-        } else {
+        if (empty($courseSchedulePublishedCourseIds)) {
             return false;
         }
+
+        $count = $this->find()
+            ->where(['Attendances.published_course_id IN' => (array)$courseSchedulePublishedCourseIds])
+            ->limit(2)
+            ->count();
+
+        return $count > 0;
     }
 }

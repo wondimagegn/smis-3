@@ -11,13 +11,14 @@
 			<div class="large-12 columns">
 				<div style="margin-top: -30px;">
 					<hr>
-					<?php 
+					<?php
+
+                    debug($studentList);
 					if (!empty($studentList)) { ?>
-						<?php 
-						//debug($studentList);
+						<?php
+
 						$disp =  $studentList = array_values($studentList);
 						$lastEntry = array_pop($disp);
-						//debug($lastEntry);
 						?>
 						<fieldset>
 							<div class="large-6 columns">
@@ -34,12 +35,12 @@
 								<strong class="fs14">
 									EHEECE: &nbsp; <?= (isset($studentList[0]['AcceptedStudent']['EHEECE_total_results']) && $studentList[0]['AcceptedStudent']['EHEECE_total_results'] > 100 ? $studentList[0]['AcceptedStudent']['EHEECE_total_results'] : 'N/A'); ?> <br>
 									<?= ($prepararoryResultSet == 1 && $preparatoryPercent > 0  ? 'Prepartory: &nbsp;'. $prepartory .'<br>' : ''); ?>
-									<?= ($freshmanResultSet == 1 && $freshmanPercent > 0  ? 'Freshman: &nbsp;'. $freshman .'<br>' : ''); ?> 
+									<?= ($freshmanResultSet == 1 && $freshmanPercent > 0  ? 'Freshman: &nbsp;'. $freshman .'<br>' : ''); ?>
 									<?= ($entranceResultSet == 1 && $entrancePercent > 0  ? 'Entrance: &nbsp;'. $entrance .'<br>' : ''); ?>
 									<?php
 									$affirmative_point = 0;
 									if (strcasecmp(trim($studentList[0]['AcceptedStudent']['sex']), 'female') == 0 || strcasecmp(trim($studentList[0]['AcceptedStudent']['sex']), 'f') == 0) {
-										$affirmative_point = DEFAULT_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT; 
+										$affirmative_point = DEFAULT_FEMALE_AFFIRMATIVE_POINTS_FOR_PLACEMENT;
 									} ?>
 									<?= ($affirmative_point > 0  ? 'Affirmative Point: &nbsp;'. $affirmative_point .'<br>' : ''); ?>
 									<?= ($entranceResultSet == 1 && $prepararoryResultSet == 1 && $freshmanResultSet == 1 && isset($entrance) && isset($prepartory) && isset($freshman) ? 'Total Weight: &nbsp;' . ($entrance + $prepartory + $freshman + $affirmative_point) : ($prepararoryResultSet == 1 && $freshmanResultSet == 1 && isset($prepartory) && isset($freshman) ? 'Total Weight: &nbsp;' . ($prepartory + $freshman + $affirmative_point) : ($freshmanResultSet == 1 && isset($freshman) ? 'Total Weight: &nbsp;' . ($freshman + $affirmative_point): ''))).'<br>'; ?>
@@ -92,10 +93,10 @@
 								</tbody>
 							</table>
 						</div>
-						<?php 
+						<?php
 					} else { ?>
 						<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style='margin-right: 15px;'></span>There is no department preference filled by <?= (isset($studentBasic['Student']['full_name']) ? $studentBasic['Student']['full_name'] . ' (' . $studentBasic['Student']['studentnumber']. ') ' : 'the selected student'); ?>.</div>
-						<?php 
+						<?php
 					} ?>
 				</div>
 			</div>

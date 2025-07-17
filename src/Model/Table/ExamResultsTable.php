@@ -1,135 +1,94 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
+use App\Controller\Component\AcademicYearComponent;
 
 class ExamResultsTable extends Table
 {
-
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
         $this->setTable('exam_results');
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
+
+        $this->belongsTo('CourseRegistrations', [
+            'foreignKey' => 'course_registration_id',
+            'joinType' => 'INNER',
+        ]);
+
+        $this->belongsTo('CourseAdds', [
+            'foreignKey' => 'course_registration_id',
+            'joinType' => 'INNER',
+        ]);
+
+        $this->belongsTo('MakeupExams', [
+            'foreignKey' => 'makeup_exam_id',
+            'joinType' => 'INNER',
+        ]);
 
         $this->belongsTo('ExamTypes', [
             'foreignKey' => 'exam_type_id',
             'joinType' => 'INNER',
         ]);
-        $this->belongsTo('CourseRegistrations', [
-            'foreignKey' => 'course_registration_id',
-        ]);
-        $this->belongsTo('CourseAdds', [
-            'foreignKey' => 'course_add_id',
-        ]);
-        $this->belongsTo('MakeupExams', [
-            'foreignKey' => 'makeup_exam_id',
-        ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
-        $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
         $validator
             ->numeric('result')
-            ->requirePresence('result', 'create')
-            ->notEmptyString('result');
-
-        $validator
-            ->boolean('course_add')
-            ->notEmptyString('course_add');
+            ->allowEmptyString('result')
+            ->add('result', 'numeric', [
+                'rule' => ['numeric'],
+                'message' => 'Use only number.',
+                'last' => true,
+            ])
+            ->add('result', 'comparison', [
+                'rule' => ['comparison', '>=', 0],
+                'message' => 'Invalid result.',
+                'last' => true,
+            ]);
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function isExamResultSubmitted(?array $published_course_ids = null): int
     {
-
-        $rules->add($rules->existsIn(['exam_type_id'], 'ExamTypes'));
-        $rules->add($rules->existsIn(['course_registration_id'], 'CourseRegistrations'));
-        $rules->add($rules->existsIn(['course_add_id'], 'CourseAdds'));
-        $rules->add($rules->existsIn(['makeup_exam_id'], 'MakeupExams'));
-
-        return $rules;
-    }
-
-    /**
-     * Is grade submitted for publishe course
-     * return array
-     */
-    public function isExamResultSubmitted($published_course_ids = null)
-    {
-
         $published_courses_student_registred_score_grade = 0;
 
-        $grade_submitted_registred_courses = $this->CourseRegistration->find(
-            'list',
-            array(
-                'conditions' => array('CourseRegistration.published_course_id' => $published_course_ids),
-                'fields' => array('CourseRegistration.id')
-            )
-        );
+        $grade_submitted_registred_courses = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.published_course_id IN' => $published_course_ids])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
         if (!empty($grade_submitted_registred_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamResult.course_registration_id' => $grade_submitted_registred_courses))
-            );
+            $published_courses_student_registred_score_grade = $this->find()
+                ->where(['ExamResults.course_registration_id IN' => $grade_submitted_registred_courses])
+                ->count();
 
             if ($published_courses_student_registred_score_grade > 0) {
                 return $published_courses_student_registred_score_grade;
             }
         }
 
-        //check course adds
-        $grade_submitted_add_courses = $this->CourseAdd->find(
-            'list',
-            array(
-                'conditions' => array(
-                    'CourseAdd.published_course_id' => $published_course_ids,
-                    'CourseAdd.department_approval=1',
-                    'CourseAdd.registrar_confirmation=1'
-                ),
-                'fields' => array('CourseAdd.id')
-            )
-        );
+        $grade_submitted_add_courses = $this->CourseAdds->find('list')
+            ->where([
+                'CourseAdds.published_course_id IN' => $published_course_ids,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1,
+            ])
+            ->select(['CourseAdds.id'])
+            ->toArray();
 
         if (!empty($grade_submitted_add_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamResult.course_add_id' => $grade_submitted_add_courses))
-            );
+            $published_courses_student_registred_score_grade = $this->find()
+                ->where(['ExamResults.course_add_id IN' => $grade_submitted_add_courses])
+                ->count();
 
             if ($published_courses_student_registred_score_grade > 0) {
                 return $published_courses_student_registred_score_grade;
@@ -139,115 +98,88 @@ class ExamResultsTable extends Table
         return $published_courses_student_registred_score_grade;
     }
 
-
-    function isStudenSectionChangePossible($student_id = null, $section_id = null)
+    public function isStudentSectionChangePossible(?int $student_id = null, ?int $section_id = null): bool
     {
+        $check = $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.student_id' => $student_id, 'CourseRegistrations.section_id' => $section_id])
+            ->count();
 
-        $check = $this->CourseRegistration->find(
-            'count',
-            array(
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.section_id' => $section_id
-                )
-            )
-        );
-        if ($check > 0) {
-            return false;
-        }
-        return true;
+        return $check == 0;
     }
 
-    function isRegistredInNameOfSectionAndSubmittedGrade($student_id = null, $section_id = null)
+    public function isRegistredInNameOfSectionAndSubmittedGrade(?int $student_id = null, ?int $section_id = null): bool
     {
+        $course_registration_ids = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.student_id' => $student_id, 'CourseRegistrations.section_id' => $section_id])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
-        $course_regitration_ids = $this->CourseRegistration->find(
-            'list',
-            array(
-                'fields' => 'id',
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.section_id' => $section_id
-                )
-            )
-        );
+        if (!empty($course_registration_ids)) {
+            $check = $this->CourseRegistrations->ExamGrades->find()
+                ->where(['ExamGrades.course_registration_id IN' => $course_registration_ids])
+                ->count();
 
-        if (!empty($course_regitration_ids)) {
-            $check = $this->CourseRegistration->ExamGrade->find('count', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $course_regitration_ids
-                )
-            ));
-            //if ($check == 0) {
             return true;
-            //}
         }
+
         return false;
     }
 
-    /**
-     *Function that calculate grade results and return pass/fail
-     */
-    public function calculateGradeAndReturnPassOrFail($exam_result = array())
+    public function calculateGradeAndReturnPassOrFail(array $exam_result = []): string
     {
-
-        $test = $this->GradeScale->find('all');
-        debug($test);
+        $test = $this->GradeScales->find()->toArray();
+        // debug($test);
         return "passed";
     }
 
-    public function getTotalResultGrade($result = null, $published_course_id = null)
+    public function getTotalResultGrade(?float $result = null, ?int $published_course_id = null): string
     {
-
         if (!$result) {
             return 'NG';
-        } else {
-            $grade_scales = $this->CourseRegistration->PublishedCourse->getGradeScaleDetail($published_course_id);
-            foreach ($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale) {
-                if ($result >= $grade_scale['minimum_result'] && $result <= $grade_scale['maximum_result']) {
-                    return $grade_scale['grade'];
-                }
+        }
+
+        $grade_scales = $this->CourseRegistrations->PublishedCourses->getGradeScaleDetail($published_course_id);
+
+        foreach ($grade_scales['GradeScaleDetail'] as $grade_scale) {
+            if ($result >= $grade_scale['minimum_result'] && $result <= $grade_scale['maximum_result']) {
+                return $grade_scale['grade'];
             }
         }
+
         return 'NG';
     }
 
-    public function generateCourseGrade($students = array(), $grade_scales = array(), $exam_types = array())
+    public function generateCourseGrade(array $students = [], array $grade_scales = [], array $exam_types = []): array
     {
+        $mandatory_exams = [];
+        $exam_types_of_published_course = [];
 
-        //debug($students);
-        //debug($exam_types);
-        $mandatory_exams = array();
-        $exam_types_of_published_course = array(); //exam_types of published course
-        foreach ($exam_types as $key => $exam_type) {
+        foreach ($exam_types as $exam_type) {
             if ($exam_type['ExamType']['mandatory'] == 1) {
                 $mandatory_exams[] = $exam_type['ExamType']['id'];
             }
             $exam_types_of_published_course[] = $exam_type['ExamType']['id'];
         }
-        //  debug($mandatory_exams);
+
+        // debug($mandatory_exams);
+
         foreach ($students as $stu_key => $student) {
-            //Grade calc for course registration and add
             if (!isset($student['MakeupExam'])) {
                 if (!isset($student['ExamGrade']) || empty($student['ExamGrade']) || $student['ExamGrade'][0]['department_approval'] == -1) {
                     $exam_sum = 0;
-                    $NG = false;
-                    $taken_exams = array();
-                    $grade = array();
-                    foreach ($student['ExamResult'] as $er_key => $examResult) {
-                        //if(!in_array($examResult['exam_type_id'], $taken_exams) ) {
-                        if (
-                            !in_array($examResult['exam_type_id'], $taken_exams) &&
-                            in_array($examResult['exam_type_id'], $exam_types_of_published_course)
-                        ) {
+                    $taken_exams = [];
+                    $grade = [];
+
+                    foreach ($student['ExamResult'] as $examResult) {
+                        if (!in_array($examResult['exam_type_id'], $taken_exams) && in_array($examResult['exam_type_id'], $exam_types_of_published_course)) {
                             $exam_sum += $examResult['result'];
                             $taken_exams[] = $examResult['exam_type_id'];
                         } else {
-                            //If there is duplication, the duplicated result will be deleted
                             $this->delete($examResult['id']);
                         }
                     }
-                    foreach ($mandatory_exams as $me_key => $mandatory_exam) {
+
+                    foreach ($mandatory_exams as $mandatory_exam) {
                         if (!in_array($mandatory_exam, $taken_exams)) {
                             $grade['grade'] = 'NG';
                             break;
@@ -255,133 +187,83 @@ class ExamResultsTable extends Table
                     }
 
                     if (empty($grade)) {
-                        foreach ($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale) {
+                        foreach ($grade_scales['GradeScaleDetail'] as $grade_scale) {
                             if ($exam_sum >= $grade_scale['minimum_result'] && $exam_sum <= $grade_scale['maximum_result']) {
                                 $grade['grade'] = $grade_scale['grade'];
                                 break;
                             }
                         }
                     }
-                    //debug($grade_scales);
-                    //debug($grade);
-                    if (count($taken_exams) >= count($exam_types)) {
-                        $grade['fully_taken'] = true;
-                    } else {
-                        $grade['fully_taken'] = false;
-                    }
-                    if (isset($student['CourseRegistration'])) {
-                        $grade['course_registration_id'] = $student['CourseRegistration']['id'];
-                    } else { //if(isset($student['CourseAdd']))
-                        $grade['course_add_id'] = $student['CourseAdd']['id'];
-                    }
-                    //else
-                    //$grade['makeup_exam_id'] = $student['MakeupExam']['id'];
+
+                    // debug($grade_scales);
+                    // debug($grade);
+
+                    $grade['fully_taken'] = count($taken_exams) >= count($exam_types);
+                    $grade['course_registration_id'] = $student['CourseRegistration']['id'] ?? null;
+                    $grade['course_add_id'] = $student['CourseAdd']['id'] ?? null;
+
                     $students[$stu_key]['GeneratedExamGrade'] = $grade;
-                }//End of grade calc for course registration and add
-            } else {//Grade calc for makeup exam
-                //debug($student);
-                //I have to figure out why i put the following condition
+                }
+            } else {
                 if (!isset($student['ExamGradeChange']) || empty($student['ExamGradeChange']) || $student['ExamGradeChange'][0]['department_approval'] == -1) {
-                    $NG = false;
-                    $grade = array();
+                    $grade = [];
+
                     if ($student['MakeupExam']['course_registration_id'] != null) {
-                        $grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->find(
-                            'first',
-                            array(
-                                'conditions' =>
-                                    array(
-                                        'ExamGrade.course_registration_id' => $student['MakeupExam']['course_registration_id']
-                                    ),
-                                'order' => array('ExamGrade.created DESC'),
-                                'recursive' => -1
-                            )
-                        );
-                        $grade['exam_grade_id'] = $grade['exam_grade_id']['ExamGrade']['id'];
-                        //$grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->field('id', array('ExamGrade.course_add_id' => $student['MakeupExam']['course_add_id']));
+                        $grade['exam_grade_id'] = $this->CourseRegistrations->ExamGrades->find()
+                            ->where(['ExamGrades.course_registration_id' => $student['MakeupExam']['course_registration_id']])
+                            ->order(['ExamGrades.created' => 'DESC'])
+                            ->first()
+                            ->id ?? null;
                     } else {
-                        $grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->find(
-                            'first',
-                            array(
-                                'conditions' =>
-                                    array(
-                                        'ExamGrade.course_add_id' => $student['MakeupExam']['course_add_id']
-                                    ),
-                                'order' => array('ExamGrade.created DESC'),
-                                'recursive' => -1
-                            )
-                        );
-                        $grade['exam_grade_id'] = $grade['exam_grade_id']['ExamGrade']['id'];
-                        //$grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->field('id', array('ExamGrade.course_registration_id' => $student['MakeupExam']['course_registration_id']));;
+                        $grade['exam_grade_id'] = $this->CourseRegistrations->ExamGrades->find()
+                            ->where(['ExamGrades.course_add_id' => $student['MakeupExam']['course_add_id']])
+                            ->order(['ExamGrades.created' => 'DESC'])
+                            ->first()
+                            ->id ?? null;
                     }
+
                     $grade['minute_number'] = $student['MakeupExam']['minute_number'];
                     $grade['makeup_exam_id'] = $student['MakeupExam']['id'];
                     $grade['makeup_exam_result'] = $student['MakeupExam']['result'];
                     $grade['initiated_by_department'] = 0;
+
                     if ($student['MakeupExam']['result'] == null) {
                         $grade['grade'] = 'NG';
-                    }
-
-                    if (!isset($grade['grade'])) {
-                        foreach ($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale) {
+                    } else {
+                        foreach ($grade_scales['GradeScaleDetail'] as $grade_scale) {
                             if ($student['MakeupExam']['result'] >= $grade_scale['minimum_result'] && $student['MakeupExam']['result'] <= $grade_scale['maximum_result']) {
                                 $grade['grade'] = $grade_scale['grade'];
                                 break;
                             }
                         }
                     }
-                    //debug($grade_scales);
-                    //debug($grade);
-                    if ($student['MakeupExam']['result'] == null) {
-                        $grade['fully_taken'] = false;
-                    } else {
-                        $grade['fully_taken'] = true;
-                    }
-                    //if($student['MakeupExam']['course_registration_id'] != null)
-                    //$grade['course_registration_id'] = $student['MakeupExam']['course_registration_id'];
-                    //else if(isset($student['CourseAdd']))
-                    //$grade['course_add_id'] = $student['CourseAdd']['id'];
-                    //else
-                    //$grade['makeup_exam_id'] = $student['MakeupExam']['id'];
+
+                    // debug($grade_scales);
+                    // debug($grade);
+
+                    $grade['fully_taken'] = $student['MakeupExam']['result'] != null;
+
                     $students[$stu_key]['GeneratedExamGrade'] = $grade;
-                }//End of grade calc for makeup exam
+                }
             }
-        }// End of each student processing (foreach loop)
-        /*
-        why ? it is nothing checked
-        $cccc++;
-        if (isset($cccc) && $cccc==3) {
-            return $students;
         }
-        */
+
         return $students;
     }
 
-    function generateGradeEntryCourseGrade(
-        $students = array(),
-        $grade_scales = array()
-    ) {
-
-        $exam_types_of_published_course = array();
+    public function generateGradeEntryCourseGrade(array $students = [], array $grade_scales = []): array
+    {
         foreach ($students as $stu_key => $student) {
-            //Grade calc for course registration and add
             if (!isset($student['ExamGradeChange']) || empty($student['ExamGradeChange']) || $student['ExamGradeChange'][0]['department_approval'] == -1) {
-                $NG = false;
-                $grade = array();
-                if (isset($student['ResultEntryAssignment']['course_registration_id'])) {
-                    $grade['course_registration_id'] = $student['ResultEntryAssignment']['course_registration_id'];
-                } else { //if(isset($student['CourseAdd']))
-                    $grade['course_add_id'] = $student['ResultEntryAssignment']['course_add_id'];
-                }
+                $grade = [];
 
-                if (
-                    $student['ResultEntryAssignment']['result']
-                    == null
-                ) {
+                $grade['course_registration_id'] = $student['ResultEntryAssignment']['course_registration_id'] ?? null;
+                $grade['course_add_id'] = $student['ResultEntryAssignment']['course_add_id'] ?? null;
+
+                if ($student['ResultEntryAssignment']['result'] == null) {
                     $grade['grade'] = 'NG';
-                }
-
-                if (!isset($grade['grade'])) {
-                    foreach ($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale) {
+                } else {
+                    foreach ($grade_scales['GradeScaleDetail'] as $grade_scale) {
                         if ($student['ResultEntryAssignment']['result'] >= $grade_scale['minimum_result'] && $student['ResultEntryAssignment']['result'] <= $grade_scale['maximum_result']) {
                             $grade['grade'] = $grade_scale['grade'];
                             break;
@@ -389,54 +271,47 @@ class ExamResultsTable extends Table
                     }
                 }
 
-                if ($student['ResultEntryAssignment']['result'] == null) {
-                    $grade['fully_taken'] = false;
-                } else {
-                    $grade['fully_taken'] = true;
-                }
+                $grade['fully_taken'] = $student['ResultEntryAssignment']['result'] != null;
 
                 $students[$stu_key]['GeneratedExamGrade'] = $grade;
-            } //End of grade calc for makeup exam
-        }// End of each student processing (foreach loop)
-        debug($students);
+            }
+        }
+
+        // debug($students);
         return $students;
     }
 
-
-    public function generateCourseGradeWithOutScale($students = array(), $exam_types = array())
+    public function generateCourseGradeWithoutScale(array $students = [], array $exam_types = []): array
     {
+        $mandatory_exams = [];
+        $exam_types_of_published_course = [];
 
-        $mandatory_exams = array();
-        $exam_types_of_published_course = array(); //exam_types of published course
-        foreach ($exam_types as $key => $exam_type) {
+        foreach ($exam_types as $exam_type) {
             if ($exam_type['ExamType']['mandatory'] == 1) {
                 $mandatory_exams[] = $exam_type['ExamType']['id'];
             }
             $exam_types_of_published_course[] = $exam_type['ExamType']['id'];
         }
-        //  debug($mandatory_exams);
+
+        // debug($mandatory_exams);
+
         foreach ($students as $stu_key => $student) {
-            //Grade calc for course registration and add
             if (!isset($student['MakeupExam'])) {
                 if (!isset($student['ExamGrade']) || empty($student['ExamGrade']) || $student['ExamGrade'][0]['department_approval'] == -1) {
                     $exam_sum = 0;
-                    $NG = false;
-                    $taken_exams = array();
-                    $grade = array();
-                    foreach ($student['ExamResult'] as $er_key => $examResult) {
-                        //if(!in_array($examResult['exam_type_id'], $taken_exams) ) {
-                        if (
-                            !in_array($examResult['exam_type_id'], $taken_exams) &&
-                            in_array($examResult['exam_type_id'], $exam_types_of_published_course)
-                        ) {
+                    $taken_exams = [];
+                    $grade = [];
+
+                    foreach ($student['ExamResult'] as $examResult) {
+                        if (!in_array($examResult['exam_type_id'], $taken_exams) && in_array($examResult['exam_type_id'], $exam_types_of_published_course)) {
                             $exam_sum += $examResult['result'];
                             $taken_exams[] = $examResult['exam_type_id'];
                         } else {
-                            //If there is duplication, the duplicated result will be deleted
                             $this->delete($examResult['id']);
                         }
                     }
-                    foreach ($mandatory_exams as $me_key => $mandatory_exam) {
+
+                    foreach ($mandatory_exams as $mandatory_exam) {
                         if (!in_array($mandatory_exam, $taken_exams)) {
                             $grade['grade'] = 'NG';
                             break;
@@ -444,300 +319,194 @@ class ExamResultsTable extends Table
                     }
 
                     if (empty($grade)) {
-                        //foreach($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale){
-                        //  if($exam_sum >= $grade_scale['minimum_result'] && $exam_sum <= $grade_scale['maximum_result']) {
                         $grade['grade'] = $exam_sum;
-                        //  break;
-                        //  }
-                        //  }
                     }
-                    //debug($grade_scales);
-                    //debug($grade);
-                    if (count($taken_exams) >= count($exam_types)) {
-                        $grade['fully_taken'] = true;
-                    } else {
-                        $grade['fully_taken'] = false;
-                    }
-                    if (isset($student['CourseRegistration'])) {
-                        $grade['course_registration_id'] = $student['CourseRegistration']['id'];
-                    } else { //if(isset($student['CourseAdd']))
-                        $grade['course_add_id'] = $student['CourseAdd']['id'];
-                    }
-                    //else
-                    //$grade['makeup_exam_id'] = $student['MakeupExam']['id'];
+
+                    // debug($grade);
+
+                    $grade['fully_taken'] = count($taken_exams) >= count($exam_types);
+                    $grade['course_registration_id'] = $student['CourseRegistration']['id'] ?? null;
+                    $grade['course_add_id'] = $student['CourseAdd']['id'] ?? null;
+
                     $students[$stu_key]['GeneratedExamGrade'] = $grade;
-                }//End of grade calc for course registration and add
-            } else {//Grade calc for makeup exam
-                //debug($student);
-                //I have to figure out why i put the following condition
+                }
+            } else {
                 if (!isset($student['ExamGradeChange']) || empty($student['ExamGradeChange']) || $student['ExamGradeChange'][0]['department_approval'] == -1) {
-                    $NG = false;
-                    $grade = array();
+                    $grade = [];
+
                     if ($student['MakeupExam']['course_registration_id'] != null) {
-                        $grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->find(
-                            'first',
-                            array(
-                                'conditions' =>
-                                    array(
-                                        'ExamGrade.course_registration_id' => $student['MakeupExam']['course_registration_id']
-                                    ),
-                                'order' => array('ExamGrade.created DESC'),
-                                'recursive' => -1
-                            )
-                        );
-                        $grade['exam_grade_id'] = $grade['exam_grade_id']['ExamGrade']['id'];
-                        //$grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->field('id', array('ExamGrade.course_add_id' => $student['MakeupExam']['course_add_id']));
+                        $grade['exam_grade_id'] = $this->CourseRegistrations->ExamGrades->find()
+                            ->where(['ExamGrades.course_registration_id' => $student['MakeupExam']['course_registration_id']])
+                            ->order(['ExamGrades.created' => 'DESC'])
+                            ->first()
+                            ->id ?? null;
                     } else {
-                        $grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->find(
-                            'first',
-                            array(
-                                'conditions' =>
-                                    array(
-                                        'ExamGrade.course_add_id' => $student['MakeupExam']['course_add_id']
-                                    ),
-                                'order' => array('ExamGrade.created DESC'),
-                                'recursive' => -1
-                            )
-                        );
-                        $grade['exam_grade_id'] = $grade['exam_grade_id']['ExamGrade']['id'];
-                        //$grade['exam_grade_id'] = $this->CourseRegistration->ExamGrade->field('id', array('ExamGrade.course_registration_id' => $student['MakeupExam']['course_registration_id']));;
+                        $grade['exam_grade_id'] = $this->CourseRegistrations->ExamGrades->find()
+                            ->where(['ExamGrades.course_add_id' => $student['MakeupExam']['course_add_id']])
+                            ->order(['ExamGrades.created' => 'DESC'])
+                            ->first()
+                            ->id ?? null;
                     }
+
                     $grade['minute_number'] = $student['MakeupExam']['minute_number'];
                     $grade['makeup_exam_id'] = $student['MakeupExam']['id'];
                     $grade['makeup_exam_result'] = $student['MakeupExam']['result'];
                     $grade['initiated_by_department'] = 0;
-                    if ($student['MakeupExam']['result'] == null) {
-                        $grade['grade'] = 'NG';
-                    }
 
-                    if (!isset($grade['grade'])) {
-                        // foreach($grade_scales['GradeScaleDetail'] as $gs_key => $grade_scale){
-                        //  if($student['MakeupExam']['result'] >= $grade_scale['minimum_result'] && $student['MakeupExam']['result'] <= $grade_scale['maximum_result']) {
-                        $grade['grade'] = $student['MakeupExam']['result'];
-                        //  break;
-                        // }
-                        //}
-                    }
-                    //debug($grade_scales);
-                    //debug($grade);
-                    if ($student['MakeupExam']['result'] == null) {
-                        $grade['fully_taken'] = false;
-                    } else {
-                        $grade['fully_taken'] = true;
-                    }
-                    //if($student['MakeupExam']['course_registration_id'] != null)
-                    //$grade['course_registration_id'] = $student['MakeupExam']['course_registration_id'];
-                    //else if(isset($student['CourseAdd']))
-                    //$grade['course_add_id'] = $student['CourseAdd']['id'];
-                    //else
-                    //$grade['makeup_exam_id'] = $student['MakeupExam']['id'];
+                    $grade['grade'] = $student['MakeupExam']['result'] == null ? 'NG' : $student['MakeupExam']['result'];
+
+                    // debug($grade);
+
+                    $grade['fully_taken'] = $student['MakeupExam']['result'] != null;
+
                     $students[$stu_key]['GeneratedExamGrade'] = $grade;
-                }//End of grade calc for makeup exam
+                }
             }
-        }// End of each student processing (foreach loop)
+        }
 
         return $students;
     }
 
-    public function submitGrade(
-        $student_course_register_and_adds,
-        $students_course_in_progress,
-        $grade_scales,
-        $exam_types
-    ) {
+    public function submitGrade(array $student_course_register_and_adds, array $students_course_in_progress, array $grade_scales, array $exam_types): array
+    {
+        $exam_grades = [];
+        $exam_grade_changes = [];
 
-        //debug($student_course_register_and_adds);
-        //debug($grade_scales);
-        $exam_grades = array();
-        $exam_grade_changes = array();
-        $students_register = $this->generateCourseGrade(
-            $student_course_register_and_adds['register'],
-            $grade_scales,
-            $exam_types
-        );
-        $students_add = $this->generateCourseGrade(
-            $student_course_register_and_adds['add'],
-            $grade_scales,
-            $exam_types
-        );
-        $students_makeup = $this->generateCourseGrade(
-            $student_course_register_and_adds['makeup'],
-            $grade_scales,
-            $exam_types
-        );
-        //debug($students_register);
-        foreach ($students_register as $key => $student) {
-            if (isset($student['GeneratedExamGrade']) && !in_array(
-                    $student['Student']['id'],
-                    $students_course_in_progress
-                )) {
+        $students_register = $this->generateCourseGrade($student_course_register_and_adds['register'], $grade_scales, $exam_types);
+        $students_add = $this->generateCourseGrade($student_course_register_and_adds['add'], $grade_scales, $exam_types);
+        $students_makeup = $this->generateCourseGrade($student_course_register_and_adds['makeup'], $grade_scales, $exam_types);
+
+        // debug($students_register);
+
+        foreach ($students_register as $student) {
+            if (isset($student['GeneratedExamGrade']) && !in_array($student['Student']['id'], $students_course_in_progress)) {
                 unset($student['GeneratedExamGrade']['fully_taken']);
                 $student['GeneratedExamGrade']['grade_scale_id'] = $grade_scales['GradeScale']['id'];
                 $exam_grades[] = $student['GeneratedExamGrade'];
             }
         }
-        foreach ($students_add as $key => $student) {
-            if (isset($student['GeneratedExamGrade']) && !in_array(
-                    $student['Student']['id'],
-                    $students_course_in_progress
-                )) {
+
+        foreach ($students_add as $student) {
+            if (isset($student['GeneratedExamGrade']) && !in_array($student['Student']['id'], $students_course_in_progress)) {
                 unset($student['GeneratedExamGrade']['fully_taken']);
                 $student['GeneratedExamGrade']['grade_scale_id'] = $grade_scales['GradeScale']['id'];
                 $exam_grades[] = $student['GeneratedExamGrade'];
             }
-        }//debug($exam_grades);
-        foreach ($students_makeup as $key => $student) {
-            if (isset($student['GeneratedExamGrade']) && !in_array(
-                    $student['Student']['id'],
-                    $students_course_in_progress
-                )) {
+        }
+
+        // debug($exam_grades);
+
+        foreach ($students_makeup as $student) {
+            if (isset($student['GeneratedExamGrade']) && !in_array($student['Student']['id'], $students_course_in_progress)) {
                 unset($student['GeneratedExamGrade']['fully_taken']);
                 $student['GeneratedExamGrade']['grade_scale_id'] = $grade_scales['GradeScale']['id'];
                 $exam_grade_changes[] = $student['GeneratedExamGrade'];
             }
         }
-        $grade_submit_status = array();
+
+        $grade_submit_status = [];
+
         if (!empty($exam_grades)) {
-            if ($this->CourseRegistration->ExamGrade->saveAll($exam_grades, array('validate' => false))) {
+            if ($this->CourseRegistrations->ExamGrades->saveMany($exam_grades, ['validate' => false])) {
                 if (!empty($exam_grade_changes)) {
-                    if (!$this->CourseRegistration->ExamGrade->ExamGradeChange->saveAll(
-                        $exam_grade_changes,
-                        array('validate' => false)
-                    )) {
-                        $grade_submit_status['error'] = "Exam grade for " . count(
-                                $exam_grades
-                            ) . " students is submited but faild to record makeup exam grade result. Please make your makeup exam grade submision again.";
+                    if (!$this->CourseRegistrations->ExamGrades->ExamGradeChanges->saveMany($exam_grade_changes, ['validate' => false])) {
+                        $grade_submit_status['error'] = "Exam grade for " . count($exam_grades) . " students is submitted but failed to record makeup exam grade result. Please make your makeup exam grade submission again.";
                     }
                 }
             } else {
-                $grade_submit_status['error'] = "Exam grade submision is faild. Please try again.";
+                $grade_submit_status['error'] = "Exam grade submission is failed. Please try again.";
             }
         } elseif (!empty($exam_grade_changes)) {
-            if (!$this->CourseRegistration->ExamGrade->ExamGradeChange->saveAll(
-                $exam_grade_changes,
-                array('validate' => false)
-            )) {
-                $grade_submit_status['error'] = "Makeup exam grade submission is faild. Please try again.";
+            if (!$this->CourseRegistrations->ExamGrades->ExamGradeChanges->saveMany($exam_grade_changes, ['validate' => false])) {
+                $grade_submit_status['error'] = "Makeup exam grade submission is failed. Please try again.";
             }
         }
+
         $grade_submit_status['course_registration_add'] = $exam_grades;
         $grade_submit_status['makeup_exam'] = $exam_grade_changes;
+
         return $grade_submit_status;
     }
 
-    public function submitGradeEntryAssignment(
-        $student_course_register_and_adds,
-        $students_course_in_progress,
-        $grade_scales
-    ) {
+    public function submitGradeEntryAssignment(array $student_course_register_and_adds, array $students_course_in_progress, array $grade_scales, AcademicYearComponent $academicYear): array
+    {
+        $exam_grades = [];
+        $exam_grade_changes = [];
 
-        $exam_grades = array();
-        $exam_grade_changes = array();
-        App::import('Component', 'AcademicYear');
-        $AcademicYear = new AcademicYearComponent(new ComponentRegistry());
+        $students_makeup = $this->generateGradeEntryCourseGrade($student_course_register_and_adds['makeup'], $grade_scales);
 
-        $students_makeup = $this->generateGradeEntryCourseGrade(
-            $student_course_register_and_adds['makeup'],
-            $grade_scales
-        );
-
-        foreach ($students_makeup as $key => $student) {
-            if (isset($student['GeneratedExamGrade']) && !in_array(
-                    $student['Student']['id'],
-                    $students_course_in_progress
-                )) {
-                //find academic year and semester
-                $academicYear = "";
+        foreach ($students_makeup as $student) {
+            if (isset($student['GeneratedExamGrade']) && !in_array($student['Student']['id'], $students_course_in_progress)) {
+                $academicYearValue = "";
                 $semester = "";
-                if (isset($student['GeneratedExamGrade']['course_add_id']) && !empty($student['GeneratedExamGrade']['course_add_id'])) {
-                    $regAddDetail = $this->CourseAdd->find(
-                        'first',
-                        array(
-                            'conditions' => array('CourseAdd.id' => $student['GeneratedExamGrade']['course_add_id']),
-                            'recursive' => -1
-                        )
-                    );
-                    $academicYear = $regAddDetail['CourseAdd']['academic_year'];
-                    $semester = $regAddDetail['CourseAdd']['semester'];
+
+                if (!empty($student['GeneratedExamGrade']['course_add_id'])) {
+                    $regAddDetail = $this->CourseAdds->find()
+                        ->where(['CourseAdds.id' => $student['GeneratedExamGrade']['course_add_id']])
+                        ->first();
+                    $academicYearValue = $regAddDetail->academic_year;
+                    $semester = $regAddDetail->semester;
                 } else {
-                    $regAddDetail = $this->CourseRegistration->find(
-                        'first',
-                        array(
-                            'conditions' => array('CourseRegistration.id' => $student['GeneratedExamGrade']['course_registration_id']),
-                            'recursive' => -1
-                        )
-                    );
-                    $academicYear = $regAddDetail['CourseRegistration']['academic_year'];
-                    $semester = $regAddDetail['CourseRegistration']['semester'];
+                    $regAddDetail = $this->CourseRegistrations->find()
+                        ->where(['CourseRegistrations.id' => $student['GeneratedExamGrade']['course_registration_id']])
+                        ->first();
+                    $academicYearValue = $regAddDetail->academic_year;
+                    $semester = $regAddDetail->semester;
                 }
+
                 unset($student['GeneratedExamGrade']['fully_taken']);
                 $student['GeneratedExamGrade']['grade_scale_id'] = $grade_scales['GradeScale']['id'];
 
-                $student['GeneratedExamGrade']['created'] = $AcademicYear->getAcademicYearBegainingDate(
-                    $academicYear,
-                    $semester
-                );
-                $student['GeneratedExamGrade']['modified'] = $AcademicYear->getAcademicYearBegainingDate(
-                    $academicYear,
-                    $semester
-                );
+                $student['GeneratedExamGrade']['created'] = $academicYear->getAcademicYearBegainingDate($academicYearValue, $semester);
+                $student['GeneratedExamGrade']['modified'] = $academicYear->getAcademicYearBegainingDate($academicYearValue, $semester);
 
                 $exam_grades[] = $student['GeneratedExamGrade'];
             }
         }
 
-        $grade_submit_status = array();
+        $grade_submit_status = [];
+
         if (!empty($exam_grades)) {
-            if ($this->CourseRegistration->ExamGrade->saveAll($exam_grades, array('validate' => false))) {
-            } else {
-                $grade_submit_status['error'] = "Exam grade submision is faild. Please try again.";
+            if (!$this->CourseRegistrations->ExamGrades->saveMany($exam_grades, ['validate' => false])) {
+                $grade_submit_status['error'] = "Exam grade submission is failed. Please try again.";
             }
         }
 
         $grade_submit_status['course_registration_add'] = $exam_grades;
         $grade_submit_status['makeup_exam'] = $exam_grade_changes;
+
         return $grade_submit_status;
     }
 
-    public function getExamGradeSubmissionStatus($published_course_id = null, $student_course_register_and_adds = null)
+    public function getExamGradeSubmissionStatus(?int $published_course_id = null, ?array $student_course_register_and_adds = null): array
     {
-
-        $grade_submission_status = array();
-
-        $grade_submission_status['scale_defined'] = false;
-
-        $grade_submission_status['grade_submited'] = false;
-        $grade_submission_status['grade_submited_partially'] = false;
-        $grade_submission_status['grade_submited_fully'] = false;
-
-        $grade_submission_status['grade_dpt_approved'] = false;
-        $grade_submission_status['grade_dpt_approved_partially'] = false;
-        $grade_submission_status['grade_dpt_approved_fully'] = false;
-
-        $grade_submission_status['grade_reg_approved'] = false;
-        $grade_submission_status['grade_reg_approved_partially'] = false;
-        $grade_submission_status['grade_reg_approved_fully'] = false;
-
-        $grade_submission_status['grade_dpt_rejected'] = false;
-        $grade_submission_status['grade_dpt_rejected_partially'] = false;
-        $grade_submission_status['grade_dpt_rejected_fully'] = false;
-
-        $grade_submission_status['grade_dpt_accepted'] = false;
-        $grade_submission_status['grade_dpt_accepted_partially'] = false;
-        $grade_submission_status['grade_dpt_accepted_fully'] = false;
-
-        $grade_submission_status['grade_reg_rejected'] = false;
-        $grade_submission_status['grade_reg_rejected_partially'] = false;
-        $grade_submission_status['grade_reg_rejected_fully'] = false;
-
-        $grade_submission_status['grade_reg_accepted'] = false;
-        $grade_submission_status['grade_reg_accepted_partially'] = false;
-        $grade_submission_status['grade_reg_accepted_fully'] = false;
+        $grade_submission_status = [
+            'scale_defined' => false,
+            'grade_submited' => false,
+            'grade_submited_partially' => false,
+            'grade_submited_fully' => false,
+            'grade_dpt_approved' => false,
+            'grade_dpt_approved_partially' => false,
+            'grade_dpt_approved_fully' => false,
+            'grade_reg_approved' => false,
+            'grade_reg_approved_partially' => false,
+            'grade_reg_approved_fully' => false,
+            'grade_dpt_rejected' => false,
+            'grade_dpt_rejected_partially' => false,
+            'grade_dpt_rejected_fully' => false,
+            'grade_dpt_accepted' => false,
+            'grade_dpt_accepted_partially' => false,
+            'grade_dpt_accepted_fully' => false,
+            'grade_reg_rejected' => false,
+            'grade_reg_rejected_partially' => false,
+            'grade_reg_rejected_fully' => false,
+            'grade_reg_accepted' => false,
+            'grade_reg_accepted_partially' => false,
+            'grade_reg_accepted_fully' => false,
+        ];
 
         if ($student_course_register_and_adds == null) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingPublishedCourse(
-                $published_course_id
-            );
+            $student_course_register_and_adds = $this->CourseRegistrations->PublishedCourses->getStudentsTakingPublishedCourse($published_course_id);
         }
 
         $count_submited_grade = 0;
@@ -752,73 +521,57 @@ class ExamResultsTable extends Table
         $students_add = $student_course_register_and_adds['add'];
         $students_makeup = $student_course_register_and_adds['makeup'];
 
-        foreach ($students_register as $key => $student) {
+        foreach ($students_register as $student) {
             if (!empty($student['ExamGrade'])) {
                 $count_submited_grade++;
                 if ($student['ExamGrade'][0]['department_approval'] != null) {
                     $count_dpt_approved_grade++;
-                    if ($student['ExamGrade'][0]['department_approval'] == 1) {
-                        $count_dpt_accepted_grade++;
-                    } else {
-                        $count_dpt_rejected_grade++;
-                    }
+                    $count_dpt_accepted_grade += $student['ExamGrade'][0]['department_approval'] == 1 ? 1 : 0;
+                    $count_dpt_rejected_grade += $student['ExamGrade'][0]['department_approval'] != 1 ? 1 : 0;
                 }
                 if ($student['ExamGrade'][0]['registrar_approval'] != null) {
                     $count_reg_approved_grade++;
-                    if ($student['ExamGrade'][0]['registrar_approval'] == 1) {
-                        $count_reg_accepted_grade++;
-                    } else {
-                        $count_reg_rejected_grade++;
-                    }
+                    $count_reg_accepted_grade += $student['ExamGrade'][0]['registrar_approval'] == 1 ? 1 : 0;
+                    $count_reg_rejected_grade += $student['ExamGrade'][0]['registrar_approval'] != 1 ? 1 : 0;
                 }
             }
         }
 
-        foreach ($students_add as $key => $student) {
+        foreach ($students_add as $student) {
             if (!empty($student['ExamGrade'])) {
                 $count_submited_grade++;
                 if ($student['ExamGrade'][0]['department_approval'] != null) {
                     $count_dpt_approved_grade++;
-                    if ($student['ExamGrade'][0]['department_approval'] == 1) {
-                        $count_dpt_accepted_grade++;
-                    } else {
-                        $count_dpt_rejected_grade++;
-                    }
+                    $count_dpt_accepted_grade += $student['ExamGrade'][0]['department_approval'] == 1 ? 1 : 0;
+                    $count_dpt_rejected_grade += $student['ExamGrade'][0]['department_approval'] != 1 ? 1 : 0;
                 }
                 if ($student['ExamGrade'][0]['registrar_approval'] != null) {
                     $count_reg_approved_grade++;
-                    if ($student['ExamGrade'][0]['registrar_approval'] == 1) {
-                        $count_reg_accepted_grade++;
-                    } else {
-                        $count_reg_rejected_grade++;
-                    }
+                    $count_reg_accepted_grade += $student['ExamGrade'][0]['registrar_approval'] == 1 ? 1 : 0;
+                    $count_reg_rejected_grade += $student['ExamGrade'][0]['registrar_approval'] != 1 ? 1 : 0;
                 }
             }
         }
-        //debug($students_makeup);
-        foreach ($students_makeup as $key => $student) {
+
+        // debug($students_makeup);
+
+        foreach ($students_makeup as $student) {
             if (!empty($student['ExamGradeChange'])) {
                 $count_submited_grade++;
                 if ($student['ExamGradeChange'][0]['department_approval'] != null) {
                     $count_dpt_approved_grade++;
-                    if ($student['ExamGradeChange'][0]['department_approval'] == 1) {
-                        $count_dpt_accepted_grade++;
-                    } else {
-                        $count_dpt_rejected_grade++;
-                    }
+                    $count_dpt_accepted_grade += $student['ExamGradeChange'][0]['department_approval'] == 1 ? 1 : 0;
+                    $count_dpt_rejected_grade += $student['ExamGradeChange'][0]['department_approval'] != 1 ? 1 : 0;
                 }
                 if ($student['ExamGradeChange'][0]['registrar_approval'] != null) {
                     $count_reg_approved_grade++;
-                    if ($student['ExamGradeChange'][0]['registrar_approval'] == 1) {
-                        $count_reg_accepted_grade++;
-                    } else {
-                        $count_reg_rejected_grade++;
-                    }
+                    $count_reg_accepted_grade += $student['ExamGradeChange'][0]['registrar_approval'] == 1 ? 1 : 0;
+                    $count_reg_rejected_grade += $student['ExamGradeChange'][0]['registrar_approval'] != 1 ? 1 : 0;
                 }
             }
         }
 
-        $grade_scale = $this->CourseRegistration->PublishedCourse->getGradeScaleDetail($published_course_id);
+        $grade_scale = $this->CourseRegistrations->PublishedCourses->getGradeScaleDetail($published_course_id);
         if (!isset($grade_scale['error'])) {
             $grade_submission_status['scale_defined'] = true;
         }
@@ -828,15 +581,15 @@ class ExamResultsTable extends Table
         }
         if ($count_submited_grade == (count($students_add) + count($students_register) + count($students_makeup))) {
             $grade_submission_status['grade_submited_fully'] = true;
-        } elseif ($count_submited_grade < (count($students_add) + count($students_register) + count(
-                    $students_makeup
-                ))) {
+        } elseif ($count_submited_grade < (count($students_add) + count($students_register) + count($students_makeup))) {
             $grade_submission_status['grade_submited_partially'] = true;
         }
-        //debug($count_dpt_approved_grade);
-        //debug((count($students_add) + count($students_register)));
-        //debug($students_add);
-        //debug($students_register);
+
+        // debug($count_dpt_approved_grade);
+        // debug((count($students_add) + count($students_register)));
+        // debug($students_add);
+        // debug($students_register);
+
         if ($count_dpt_approved_grade > 0) {
             $grade_submission_status['grade_dpt_approved'] = true;
             if ($count_dpt_approved_grade == $count_submited_grade) {
@@ -867,75 +620,64 @@ class ExamResultsTable extends Table
         if ($count_dpt_accepted_grade > 0) {
             $grade_submission_status['grade_dpt_accepted'] = true;
             if ($count_dpt_accepted_grade == $count_submited_grade) {
-                $grade_submission_status['grade_dpt_accepted_fully'] = false;
+                $grade_submission_status['grade_dpt_accepted_fully'] = true;
             } else {
                 $grade_submission_status['grade_dpt_accepted_partially'] = true;
             }
         }
 
         if ($count_reg_accepted_grade > 0) {
-            $grade_submission_status['grade_reg_rejected'] = true;
+            $grade_submission_status['grade_reg_accepted'] = true;
             if ($count_reg_accepted_grade == $count_dpt_approved_grade) {
+                $grade_submission_status['grade_reg_accepted_fully'] = true;
+            } else {
+                $grade_submission_status['grade_reg_accepted_partially'] = true;
+            }
+        }
+
+        if ($count_reg_rejected_grade > 0) {
+            $grade_submission_status['grade_reg_rejected'] = true;
+            if ($count_reg_rejected_grade == $count_dpt_approved_grade) {
                 $grade_submission_status['grade_reg_rejected_fully'] = true;
             } else {
                 $grade_submission_status['grade_reg_rejected_partially'] = true;
             }
         }
 
-        if ($count_reg_rejected_grade > 0) {
-            $grade_submission_status['grade_reg_accepted'] = false;
-            if ($count_reg_rejected_grade == $count_dpt_approved_grade) {
-                $grade_submission_status['grade_reg_accepted_fully'] = false;
-            } else {
-                $grade_submission_status['grade_reg_accepted_partially'] = false;
-            }
-        }
+        // debug($grade_submission_status);
 
-        //debug($grade_submission_status);
         return $grade_submission_status;
     }
 
-    public function getExamGradeEntrySubmissionStatus(
-        $published_course_id = null,
-        $student_course_register_and_adds = null
-    ) {
-
-        $grade_submission_status = array();
-
-        $grade_submission_status['scale_defined'] = false;
-
-        $grade_submission_status['grade_submited'] = false;
-        $grade_submission_status['grade_submited_partially'] = false;
-        $grade_submission_status['grade_submited_fully'] = false;
-
-        $grade_submission_status['grade_dpt_approved'] = false;
-        $grade_submission_status['grade_dpt_approved_partially'] = false;
-        $grade_submission_status['grade_dpt_approved_fully'] = false;
-
-        $grade_submission_status['grade_reg_approved'] = false;
-        $grade_submission_status['grade_reg_approved_partially'] = false;
-        $grade_submission_status['grade_reg_approved_fully'] = false;
-
-        $grade_submission_status['grade_dpt_rejected'] = false;
-        $grade_submission_status['grade_dpt_rejected_partially'] = false;
-        $grade_submission_status['grade_dpt_rejected_fully'] = false;
-
-        $grade_submission_status['grade_dpt_accepted'] = false;
-        $grade_submission_status['grade_dpt_accepted_partially'] = false;
-        $grade_submission_status['grade_dpt_accepted_fully'] = false;
-
-        $grade_submission_status['grade_reg_rejected'] = false;
-        $grade_submission_status['grade_reg_rejected_partially'] = false;
-        $grade_submission_status['grade_reg_rejected_fully'] = false;
-
-        $grade_submission_status['grade_reg_accepted'] = false;
-        $grade_submission_status['grade_reg_accepted_partially'] = false;
-        $grade_submission_status['grade_reg_accepted_fully'] = false;
+    public function getExamGradeEntrySubmissionStatus(?int $published_course_id = null, ?array $student_course_register_and_adds = null): array
+    {
+        $grade_submission_status = [
+            'scale_defined' => false,
+            'grade_submited' => false,
+            'grade_submited_partially' => false,
+            'grade_submited_fully' => false,
+            'grade_dpt_approved' => false,
+            'grade_dpt_approved_partially' => false,
+            'grade_dpt_approved_fully' => false,
+            'grade_reg_approved' => false,
+            'grade_reg_approved_partially' => false,
+            'grade_reg_approved_fully' => false,
+            'grade_dpt_rejected' => false,
+            'grade_dpt_rejected_partially' => false,
+            'grade_dpt_rejected_fully' => false,
+            'grade_dpt_accepted' => false,
+            'grade_dpt_accepted_partially' => false,
+            'grade_dpt_accepted_fully' => false,
+            'grade_reg_rejected' => false,
+            'grade_reg_rejected_partially' => false,
+            'grade_reg_rejected_fully' => false,
+            'grade_reg_accepted' => false,
+            'grade_reg_accepted_partially' => false,
+            'grade_reg_accepted_fully' => false,
+        ];
 
         if ($student_course_register_and_adds == null) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsRequiresGradeEntryExamPublishedCourse(
-                $published_course_id
-            );
+            $student_course_register_and_adds = $this->CourseRegistrations->PublishedCourses->getStudentsRequiresGradeEntryExamPublishedCourse($published_course_id);
         }
 
         $count_submited_grade = 0;
@@ -946,59 +688,39 @@ class ExamResultsTable extends Table
         $count_reg_accepted_grade = 0;
         $count_reg_rejected_grade = 0;
 
-
         $students_makeup = $student_course_register_and_adds['makeup'];
 
-        foreach ($students_makeup as $key => $student) {
-            if (
-                !empty($student['ExamGrade']) &&
-                !empty($student['CourseRegistration']['id'])
-            ) {
+        foreach ($students_makeup as $student) {
+            if (!empty($student['ExamGrade']) && !empty($student['CourseRegistration']['id'])) {
                 $count_submited_grade++;
                 if ($student['ExamGrade'][0]['department_approval'] != null) {
                     $count_dpt_approved_grade++;
-                    if ($student['ExamGrade'][0]['department_approval'] == 1) {
-                        $count_dpt_accepted_grade++;
-                    } else {
-                        $count_dpt_rejected_grade++;
-                    }
+                    $count_dpt_accepted_grade += $student['ExamGrade'][0]['department_approval'] == 1 ? 1 : 0;
+                    $count_dpt_rejected_grade += $student['ExamGrade'][0]['department_approval'] != 1 ? 1 : 0;
                 }
                 if ($student['ExamGrade'][0]['registrar_approval'] != null) {
                     $count_reg_approved_grade++;
-                    if ($student['ExamGrade'][0]['registrar_approval'] == 1) {
-                        $count_reg_accepted_grade++;
-                    } else {
-                        $count_reg_rejected_grade++;
-                    }
+                    $count_reg_accepted_grade += $student['ExamGrade'][0]['registrar_approval'] == 1 ? 1 : 0;
+                    $count_reg_rejected_grade += $student['ExamGrade'][0]['registrar_approval'] != 1 ? 1 : 0;
                 }
             }
 
-            if (
-                !empty($student['ExamGrade']) &&
-                !empty($student['CourseAdd']['id'])
-            ) {
+            if (!empty($student['ExamGrade']) && !empty($student['CourseAdd']['id'])) {
                 $count_submited_grade++;
                 if ($student['ExamGrade'][0]['department_approval'] != null) {
                     $count_dpt_approved_grade++;
-                    if ($student['ExamGrade'][0]['department_approval'] == 1) {
-                        $count_dpt_accepted_grade++;
-                    } else {
-                        $count_dpt_rejected_grade++;
-                    }
+                    $count_dpt_accepted_grade += $student['ExamGrade'][0]['department_approval'] == 1 ? 1 : 0;
+                    $count_dpt_rejected_grade += $student['ExamGrade'][0]['department_approval'] != 1 ? 1 : 0;
                 }
                 if ($student['ExamGrade'][0]['registrar_approval'] != null) {
                     $count_reg_approved_grade++;
-                    if ($student['ExamGrade'][0]['registrar_approval'] == 1) {
-                        $count_reg_accepted_grade++;
-                    } else {
-                        $count_reg_rejected_grade++;
-                    }
+                    $count_reg_accepted_grade += $student['ExamGrade'][0]['registrar_approval'] == 1 ? 1 : 0;
+                    $count_reg_rejected_grade += $student['ExamGrade'][0]['registrar_approval'] != 1 ? 1 : 0;
                 }
             }
         }
 
-
-        $grade_scale = $this->CourseRegistration->PublishedCourse->getGradeScaleDetail($published_course_id);
+        $grade_scale = $this->CourseRegistrations->PublishedCourses->getGradeScaleDetail($published_course_id);
         if (!isset($grade_scale['error'])) {
             $grade_submission_status['scale_defined'] = true;
         }
@@ -1006,9 +728,9 @@ class ExamResultsTable extends Table
         if ($count_submited_grade > 0) {
             $grade_submission_status['grade_submited'] = true;
         }
-        if ($count_submited_grade == (count($students_makeup))) {
+        if ($count_submited_grade == count($students_makeup)) {
             $grade_submission_status['grade_submited_fully'] = true;
-        } elseif ($count_submited_grade < (count($students_makeup))) {
+        } elseif ($count_submited_grade < count($students_makeup)) {
             $grade_submission_status['grade_submited_partially'] = true;
         }
 
@@ -1042,97 +764,87 @@ class ExamResultsTable extends Table
         if ($count_dpt_accepted_grade > 0) {
             $grade_submission_status['grade_dpt_accepted'] = true;
             if ($count_dpt_accepted_grade == $count_submited_grade) {
-                $grade_submission_status['grade_dpt_accepted_fully'] = false;
+                $grade_submission_status['grade_dpt_accepted_fully'] = true;
             } else {
                 $grade_submission_status['grade_dpt_accepted_partially'] = true;
             }
         }
 
         if ($count_reg_accepted_grade > 0) {
-            $grade_submission_status['grade_reg_rejected'] = true;
+            $grade_submission_status['grade_reg_accepted'] = true;
             if ($count_reg_accepted_grade == $count_dpt_approved_grade) {
+                $grade_submission_status['grade_reg_accepted_fully'] = true;
+            } else {
+                $grade_submission_status['grade_reg_accepted_partially'] = true;
+            }
+        }
+
+        if ($count_reg_rejected_grade > 0) {
+            $grade_submission_status['grade_reg_rejected'] = true;
+            if ($count_reg_rejected_grade == $count_dpt_approved_grade) {
                 $grade_submission_status['grade_reg_rejected_fully'] = true;
             } else {
                 $grade_submission_status['grade_reg_rejected_partially'] = true;
             }
         }
 
-        if ($count_reg_rejected_grade > 0) {
-            $grade_submission_status['grade_reg_accepted'] = false;
-            if ($count_reg_rejected_grade == $count_dpt_approved_grade) {
-                $grade_submission_status['grade_reg_accepted_fully'] = false;
-            } else {
-                $grade_submission_status['grade_reg_accepted_partially'] = false;
-            }
-        }
+        // debug($grade_submission_status);
 
-        //debug($grade_submission_status);
         return $grade_submission_status;
     }
 
-    function cancelSubmitedGrade($published_course_id = null, $student_course_register_and_adds = null)
+    public function cancelSubmitedGrade(?int $published_course_id = null, ?array $student_course_register_and_adds = null): array
     {
-
         if ($student_course_register_and_adds == null) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingPublishedCourse(
-                $published_course_id
-            );
+            $student_course_register_and_adds = $this->CourseRegistrations->PublishedCourses->getStudentsTakingPublishedCourse($published_course_id);
         }
 
-        $exam_grades_for_deletion = array();
-        $exam_grade_changes_for_deletion = array();
+        $exam_grades_for_deletion = [];
+        $exam_grade_changes_for_deletion = [];
+
         $students_register = $student_course_register_and_adds['register'];
         $students_add = $student_course_register_and_adds['add'];
         $students_makeup = $student_course_register_and_adds['makeup'];
 
         if (!empty($students_register) && is_array($students_register)) {
-            foreach ($students_register as $key => $student) {
-                if (isset($student['ExamGrade']) && !empty($student['ExamGrade']) && $student['ExamGrade'][0]['department_approval'] == null) {
+            foreach ($students_register as $student) {
+                if (!empty($student['ExamGrade']) && $student['ExamGrade'][0]['department_approval'] == null) {
                     $exam_grades_for_deletion[] = $student['ExamGrade'][0]['id'];
                 }
             }
         }
 
         if (!empty($students_add) && is_array($students_add)) {
-            foreach ($students_add as $key => $student) {
-                if (isset($student['ExamGrade']) && !empty($student['ExamGrade']) && $student['ExamGrade'][0]['department_approval'] == null) {
+            foreach ($students_add as $student) {
+                if (!empty($student['ExamGrade']) && $student['ExamGrade'][0]['department_approval'] == null) {
                     $exam_grades_for_deletion[] = $student['ExamGrade'][0]['id'];
                 }
             }
         }
 
         if (!empty($students_makeup) && is_array($students_makeup)) {
-            foreach ($students_makeup as $key => $student) {
-                if (isset($student['ExamGradeChange']) && !empty($student['ExamGradeChange']) && $student['ExamGradeChange'][0]['department_approval'] == null) {
+            foreach ($students_makeup as $student) {
+                if (!empty($student['ExamGradeChange']) && $student['ExamGradeChange'][0]['department_approval'] == null) {
                     $exam_grade_changes_for_deletion[] = $student['ExamGradeChange'][0]['id'];
                 }
             }
         }
 
-        $grade_cancelation_status = array();
+        $grade_cancelation_status = [];
 
         if (!empty($exam_grades_for_deletion)) {
-            if ($this->CourseRegistration->ExamGrade->deleteAll(array('ExamGrade.id' => $exam_grades_for_deletion),
-                false)) {
+            if ($this->CourseRegistrations->ExamGrades->deleteAll(['ExamGrades.id IN' => $exam_grades_for_deletion], false)) {
                 if (!empty($exam_grade_changes_for_deletion)) {
-                    if ($this->CourseRegistration->ExamGrade->ExamGradeChange->deleteAll(
-                        array('ExamGradeChange.id' => $exam_grade_changes_for_deletion),
-                        false
-                    )) {
-                        $grade_cancelation_status['error'] = "Exam grade cancelation for " . count(
-                                $exam_grades_for_deletion
-                            ) . " students is done but faild to cancel makeup exam grade. Please make your makeup exam grade cancelation again.";
+                    if (!$this->CourseRegistrations->ExamGrades->ExamGradeChanges->deleteAll(['ExamGradeChanges.id IN' => $exam_grade_changes_for_deletion], false)) {
+                        $grade_cancelation_status['error'] = "Exam grade cancellation for " . count($exam_grades_for_deletion) . " students is done but failed to cancel makeup exam grade. Please make your makeup exam grade cancellation again.";
                     }
                 }
             } else {
-                $grade_cancelation_status['error'] = "Exam grade cancelation is faild. Please try again.";
+                $grade_cancelation_status['error'] = "Exam grade cancellation is failed. Please try again.";
             }
         } elseif (!empty($exam_grade_changes_for_deletion)) {
-            if ($this->CourseRegistration->ExamGrade->ExamGradeChange->deleteAll(
-                array('ExamGradeChange.id' => $exam_grade_changes_for_deletion),
-                false
-            )) {
-                $grade_cancelation_status['error'] = "Makeup exam grade cancelation is faild. Please try again.";
+            if (!$this->CourseRegistrations->ExamGrades->ExamGradeChanges->deleteAll(['ExamGradeChanges.id IN' => $exam_grade_changes_for_deletion], false)) {
+                $grade_cancelation_status['error'] = "Makeup exam grade cancellation is failed. Please try again.";
             }
         }
 
@@ -1142,47 +854,38 @@ class ExamResultsTable extends Table
         return $grade_cancelation_status;
     }
 
-    function cancelSubmitedGradeEntry($published_course_id = null, $student_course_register_and_adds = null)
+    public function cancelSubmitedGradeEntry(?int $published_course_id = null, ?array $student_course_register_and_adds = null): array
     {
-
         if ($student_course_register_and_adds == null) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsRequiresGradeEntryExamPublishedCourse(
-                $published_course_id
-            );
+            $student_course_register_and_adds = $this->CourseRegistrations->PublishedCourses->getStudentsRequiresGradeEntryExamPublishedCourse($published_course_id);
         }
 
-        $exam_grades_for_deletion = array();
-        $exam_grade_changes_for_deletion = array();
+        $exam_grades_for_deletion = [];
+        $exam_grade_changes_for_deletion = [];
 
         $students_makeup = $student_course_register_and_adds['makeup'];
 
         if (!empty($students_makeup) && is_array($students_makeup)) {
-            foreach ($students_makeup as $key => $student) {
-                if (isset($student['CourseRegistration']['ExamGrade']) && !empty($student['CourseRegistration']['ExamGrade']) && $student['CourseRegistration']['ExamGrade'][0]['department_approval'] == null) {
+            foreach ($students_makeup as $student) {
+                if (!empty($student['CourseRegistration']['ExamGrade']) && $student['CourseRegistration']['ExamGrade'][0]['department_approval'] == null) {
                     $exam_grades_for_deletion[] = $student['ExamGrade'][0]['id'];
-                } elseif (isset($student['CourseAdd']['ExamGrade']) && !empty($student['CourseAdd']['ExamGrade']) && $student['CourseAdd']['ExamGrade'][0]['department_approval'] == null) {
+                } elseif (!empty($student['CourseAdd']['ExamGrade']) && $student['CourseAdd']['ExamGrade'][0]['department_approval'] == null) {
                     $exam_grades_for_deletion[] = $student['ExamGrade'][0]['id'];
                 }
             }
         }
 
-        $grade_cancelation_status = array();
+        $grade_cancelation_status = [];
 
         if (!empty($exam_grades_for_deletion)) {
-            if ($this->CourseRegistration->ExamGrade->deleteAll(array('ExamGrade.id' => $exam_grades_for_deletion),
-                false)) {
+            if ($this->CourseRegistrations->ExamGrades->deleteAll(['ExamGrades.id IN' => $exam_grades_for_deletion], false)) {
                 if (!empty($exam_grade_changes_for_deletion)) {
-                    if ($this->CourseRegistration->ExamGrade->ExamGradeChange->deleteAll(
-                        array('ExamGradeChange.id' => $exam_grade_changes_for_deletion),
-                        false
-                    )) {
-                        $grade_cancelation_status['error'] = "Exam grade cancelation for " . count(
-                                $exam_grades_for_deletion
-                            ) . " students is done but faild to cancel exam grade entry. Please make your exam grade entry cancelation again.";
+                    if (!$this->CourseRegistrations->ExamGrades->ExamGradeChanges->deleteAll(['ExamGradeChanges.id IN' => $exam_grade_changes_for_deletion], false)) {
+                        $grade_cancelation_status['error'] = "Exam grade cancellation for " . count($exam_grades_for_deletion) . " students is done but failed to cancel exam grade entry. Please make your exam grade entry cancellation again.";
                     }
                 }
             } else {
-                $grade_cancelation_status['error'] = "Exam grade cancelation is faild. Please try again.";
+                $grade_cancelation_status['error'] = "Exam grade cancellation is failed. Please try again.";
             }
         }
 
@@ -1192,3 +895,4 @@ class ExamResultsTable extends Table
         return $grade_cancelation_status;
     }
 }
+?>

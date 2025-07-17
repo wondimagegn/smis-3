@@ -414,8 +414,15 @@ return [
     'Roles' => [
         'registrar' => 3 // Replace with actual role ID
     ],
+
     'Session' => [
-        'defaults' => 'php' // Switch from 'database' to 'php'
+        'defaults' => 'php',
+        'timeout' => 1440, // Session timeout in minutes
+        'cookieTimeout' => 1440,
+        'ini' => [
+            'session.cookie_secure' => true, // Use secure cookies if HTTPS
+            'session.cookie_httponly' => true,
+        ],
     ],
 
 ];

@@ -1,11 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\I18n\Time;
 
+/**
+ * Announcements Table
+ */
 class AnnouncementsTable extends Table
 {
     /**
@@ -22,85 +24,61 @@ class AnnouncementsTable extends Table
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'User',
+            'joinType' => 'LEFT',
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('headline')
-            ->maxLength('headline', 255)
             ->requirePresence('headline', 'create')
-            ->notEmptyString('headline');
-
-        $validator
+            ->notEmptyString('headline', 'Please provide a headline.')
             ->scalar('story')
             ->requirePresence('story', 'create')
-            ->notEmptyString('story');
-
-        $validator
-            ->boolean('is_published')
-            ->notEmptyString('is_published');
-
-        $validator
-            ->dateTime('annucement_start')
-            ->requirePresence('annucement_start', 'create')
-            ->notEmptyDateTime('annucement_start');
-
-        $validator
-            ->dateTime('annucement_end')
-            ->requirePresence('annucement_end', 'create')
-            ->notEmptyDateTime('annucement_end');
+            ->notEmptyString('story', 'Please provide a story.')
+            ->numeric('is_published')
+            ->requirePresence('is_published', 'create')
+            ->notEmptyString('is_published', 'Please specify publication status.')
+            ->dateTime('announcement_start')
+            ->requirePresence('announcement_start', 'create')
+            ->notEmptyDateTime('announcement_start', 'Please provide a valid start date.')
+            ->dateTime('announcement_end')
+            ->requirePresence('announcement_end', 'create')
+            ->notEmptyDateTime('announcement_end', 'Please provide a valid end date.')
+            ->uuid('user_id')
+            ->requirePresence('user_id', 'create')
+            ->notEmptyString('user_id', 'Please provide a valid user ID.');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Retrieves non-expired, published announcements
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @return array Announcements
      */
-    public function buildRules(RulesChecker $rules)
-    {
-        $rules->add($rules->existsIn(['user_id'], 'Users'));
-
-        return $rules;
-    }
-
     public function getNotExpiredAnnouncements()
     {
+        $today = Time::now()->format('Y-m-d');
 
-        $announcements = $this->find(
-            'all',
-            array(
-                'conditions' => array(
-                    'Announcement.annucement_start <=' => date('Y-m-d'),
-                    'Announcement.annucement_end >=' => date('Y-m-d'),
-                    'Announcement.is_published' => 1,
-
-            ),
-                'order' => array('Announcement.annucement_start DESC'),
-                'contain' => array('User')
-            )
-        );
-        return $announcements;
+        return $this->find()
+            ->where([
+                'Announcements.announcement_start <=' => $today,
+                'Announcements.announcement_end >=' => $today,
+                'Announcements.is_published' => 1
+            ])
+            ->order(['Announcements.announcement_start' => 'DESC'])
+            ->contain(['Users'])
+            ->toArray();
     }
 }

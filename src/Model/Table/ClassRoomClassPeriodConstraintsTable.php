@@ -1,26 +1,11 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
 /**
- * ClassRoomClassPeriodConstraints Model
- *
- * @property \App\Model\Table\ClassRoomsTable&\Cake\ORM\Association\BelongsTo $ClassRooms
- * @property \App\Model\Table\ClassPeriodsTable&\Cake\ORM\Association\BelongsTo $ClassPeriods
- *
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint get($primaryKey, $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint newEntity($data = null, array $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint[] newEntities(array $data, array $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint|false save(\Cake\Datasource\EntityInterface $entity, $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint saveOrFail(\Cake\Datasource\EntityInterface $entity, $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint patchEntity(\Cake\Datasource\EntityInterface $entity, array $data, array $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint[] patchEntities($entities, array $data, array $options = [])
- * @method \App\Model\Entity\ClassRoomClassPeriodConstraint findOrCreate($search, callable $callback = null, $options = [])
+ * ClassRoomClassPeriodConstraints Table
  */
 class ClassRoomClassPeriodConstraintsTable extends Table
 {
@@ -35,64 +20,81 @@ class ClassRoomClassPeriodConstraintsTable extends Table
         parent::initialize($config);
 
         $this->setTable('class_room_class_period_constraints');
-        $this->setDisplayField('id');
+        $this->setDisplayField('class_room_id');
         $this->setPrimaryKey('id');
 
         $this->belongsTo('ClassRooms', [
             'foreignKey' => 'class_room_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'ClassRoom',
+            'joinType' => 'LEFT'
         ]);
+
         $this->belongsTo('ClassPeriods', [
             'foreignKey' => 'class_period_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'ClassPeriod',
+            'joinType' => 'LEFT'
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
         $validator
-            ->integer('id')
             ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('academic_year')
-            ->maxLength('academic_year', 9)
-            ->requirePresence('academic_year', 'create')
-            ->notEmptyString('academic_year');
-
-        $validator
-            ->scalar('semester')
-            ->maxLength('semester', 3)
-            ->requirePresence('semester', 'create')
-            ->notEmptyString('semester');
-
-        $validator
-            ->boolean('active')
-            ->allowEmptyString('active');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Checks if a class room class period constraint can be deleted
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $id Constraint ID
+     * @param int|null $collegeId College ID
+     * @return bool True if eligible for deletion, false otherwise
      */
-    public function buildRules(RulesChecker $rules)
+    public function checkDeleteEligibility($id = null, $collegeId = null): bool
     {
-        $rules->add($rules->existsIn(['class_room_id'], 'ClassRooms'));
-        $rules->add($rules->existsIn(['class_period_id'], 'ClassPeriods'));
+        if (!$id || !$collegeId) {
+            return false;
+        }
 
-        return $rules;
+        $classPeriodIds = $this->ClassPeriods->find('list')
+            ->select(['ClassPeriods.id'])
+            ->where(['ClassPeriods.college_id' => $collegeId])
+            ->toArray();
+
+        if (empty($classPeriodIds)) {
+            return false;
+        }
+
+        $count = $this->find()
+            ->where([
+                'ClassRoomClassPeriodConstraints.class_period_id IN' => array_values($classPeriodIds),
+                'ClassRoomClassPeriodConstraints.id' => $id
+            ])
+            ->count();
+
+        return $count > 0;
+    }
+
+    /**
+     * Counts the number of constraints using a class room
+     *
+     * @param int|null $id Class room ID
+     * @return int Number of constraints
+     */
+    public function isClassRoomUsed($id = null): int
+    {
+        if (!$id) {
+            return 0;
+        }
+
+        return $this->find()
+            ->where(['ClassRoomClassPeriodConstraints.class_room_id' => $id])
+            ->limit(2)
+            ->count();
     }
 }

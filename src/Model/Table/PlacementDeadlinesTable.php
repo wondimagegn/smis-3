@@ -1,21 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\Core\Configure;
 
 class PlacementDeadlinesTable extends Table
 {
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
@@ -23,137 +15,80 @@ class PlacementDeadlinesTable extends Table
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
             'joinType' => 'INNER',
         ]);
+
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
             'joinType' => 'INNER',
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->dateTime('deadline')
-            ->requirePresence('deadline', 'create')
-            ->notEmptyDateTime('deadline');
-
-        $validator
-            ->scalar('academic_year')
-            ->maxLength('academic_year', 30)
-            ->requirePresence('academic_year', 'create')
-            ->notEmptyString('academic_year');
-
-        $validator
-            ->integer('group_identifier')
-            ->requirePresence('group_identifier', 'create')
-            ->notEmptyString('group_identifier');
-
-        $validator
-            ->scalar('applied_for')
-            ->maxLength('applied_for', 200)
-            ->requirePresence('applied_for', 'create')
-            ->notEmptyString('applied_for');
-
-        $validator
-            ->integer('placement_round')
-            ->requirePresence('placement_round', 'create')
-            ->notEmptyString('placement_round');
+            ->dateTime('deadline', 'Invalid datetime format')
+            ->notEmptyDateTime('deadline')
+            ->numeric('program_id', 'Program ID must be numeric')
+            ->notEmptyString('program_id')
+            ->numeric('program_type_id', 'Program Type ID must be numeric')
+            ->notEmptyString('program_type_id')
+            ->notEmptyString('academic_year', 'Academic year is required')
+            ->numeric('group_identifier', 'Group identifier must be numeric')
+            ->notEmptyString('group_identifier')
+            ->notEmptyString('applied_for', 'Applied for is required');
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function getDeadlineStatus(array $acceptedStudentdetail = [], string $applied_for, int $placementRound, string $academic_year): int
     {
-        $rules->add($rules->existsIn(['program_id'], 'Programs'));
-        $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
-
-        return $rules;
-    }
-
-    // 0 - no deadline is defined at all
-    // 1 - deadline defined and not passed
-    // 2 - deadline defined and passed
-
-    public function getDeadlineStatus($acceptedStudentdetail = array(), $applied_for, $placementRound, $academic_year)
-    {
-        $status = $this->find('first', array('conditions' => array(
-            //'PlacementDeadline.program_id' => $acceptedStudentdetail['AcceptedStudent']['program_id'],
-            'PlacementDeadline.program_id' => Configure::read('programs_available_for_placement_preference'),
-            'PlacementDeadline.applied_for' => $applied_for,
-            //'PlacementDeadline.program_type_id' => $acceptedStudentdetail['AcceptedStudent']['program_type_id'],
-            'PlacementDeadline.program_type_id' => Configure::read('program_types_available_for_placement_preference'),
-            'PlacementDeadline.placement_round' => $placementRound,
-            'PlacementDeadline.academic_year LIKE ' => $academic_year . '%',
-            // 'PlacementDeadline.deadline > ' => date("Y-m-d H:i:s")
-        )));
-
-        debug($status);
+        $status = $this->find('first')
+            ->where([
+                'PlacementDeadlines.program_id IN' => Configure::read('programs_available_for_placement_preference'),
+                'PlacementDeadlines.applied_for' => $applied_for,
+                'PlacementDeadlines.program_type_id IN' => Configure::read('program_types_available_for_placement_preference'),
+                'PlacementDeadlines.placement_round' => $placementRound,
+                'PlacementDeadlines.academic_year LIKE' => $academic_year . '%'
+            ])
+            ->disableHydration()
+            ->first();
 
         if (!empty($status)) {
-            if ($status['PlacementDeadline']['deadline'] > date("Y-m-d H:i:s")) {
-                // deined not passed
-                return 1;
-            } elseif ($status['PlacementDeadline']['deadline'] < date("Y-m-d H:i:s")) {
-                //defined and passed
-                return 2;
+            $currentDateTime = date('Y-m-d H:i:s');
+            if ($status['PlacementDeadline']['deadline'] > $currentDateTime) {
+                return 1; // Defined, not passed
+            } elseif ($status['PlacementDeadline']['deadline'] < $currentDateTime) {
+                return 2; // Defined, passed
             }
         }
-        return 0;
+
+        return 0; // No deadline defined
     }
 
-    public function isDuplicated($data = array())
+    public function isDuplicated(array $data = []): bool
     {
-        if (isset($data) && !empty($data)) {
-            if (isset($data['PlacementDeadline']['id'])) {
-                $definedCount = $this->find("count", array(
-                    'conditions' => array(
-                        'PlacementDeadline.id <>' => $data['PlacementDeadline']['id'],
-                        'PlacementDeadline.applied_for' => $data['PlacementDeadline']['applied_for'],
-                        'PlacementDeadline.program_id' => $data['PlacementDeadline']['program_id'],
-                        'PlacementDeadline.program_type_id' => $data['PlacementDeadline']['program_type_id'],
-                        'PlacementDeadline.academic_year' => $data['PlacementDeadline']['academic_year'],
-                        'PlacementDeadline.placement_round' => $data['PlacementDeadline']['placement_round']
-                    ),
-                    'recursive' => -1
-                ));
-            } else {
-                $definedCount = $this->find("count", array(
-                    'conditions' => array(
-                        'PlacementDeadline.applied_for' => $data['PlacementDeadline']['applied_for'],
-                        'PlacementDeadline.program_id' => $data['PlacementDeadline']['program_id'],
-                        'PlacementDeadline.program_type_id' => $data['PlacementDeadline']['program_type_id'],
-                        'PlacementDeadline.academic_year' => $data['PlacementDeadline']['academic_year'],
-                        'PlacementDeadline.placement_round' => $data['PlacementDeadline']['placement_round']
-                    ),
-                    'recursive' => -1
-                ));
+        if (!empty($data)) {
+            $conditions = [
+                'PlacementDeadlines.applied_for' => $data['PlacementDeadline']['applied_for'],
+                'PlacementDeadlines.program_id' => $data['PlacementDeadline']['program_id'],
+                'PlacementDeadlines.program_type_id' => $data['PlacementDeadline']['program_type_id'],
+                'PlacementDeadlines.academic_year' => $data['PlacementDeadline']['academic_year'],
+                'PlacementDeadlines.placement_round' => $data['PlacementDeadline']['placement_round']
+            ];
+
+            if (!empty($data['PlacementDeadline']['id'])) {
+                $conditions['PlacementDeadlines.id <>'] = $data['PlacementDeadline']['id'];
             }
 
-            if ($definedCount) {
-                return true;
-            }
+            $definedCount = $this->find('count')
+                ->where($conditions)
+                ->disableHydration()
+                ->count();
+
+            return $definedCount > 0;
         }
 
         return false;

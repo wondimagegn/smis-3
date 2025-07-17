@@ -42,13 +42,7 @@ class AppController extends Controller
     public function initialize()
     {
         parent::initialize();
-        /*
-        $this->loadComponent('Acl', [
-            'className' => 'Acl.Acl',
 
-
-        ]);
-        */
 
         $this->loadComponent('Acl', [
             'className' => 'App.CustomAcl'
@@ -84,12 +78,14 @@ class AppController extends Controller
 
 
             'authError' => 'You do not have permission to access the page you just selected',
-            'unauthorizedRedirect' => false, // ✅ Prevent redirect loop
+            //'unauthorizedRedirect' => false, // ✅ Prevent redirect loop
+
+            'unauthorizedRedirect' => [
+                'controller' => 'Dashboard',
+                'action' => 'index'
+            ], // Redirect to home page on permission denial
+
             'storage' => 'Session',
-
-            // 'unauthorizedRedirect' => $this->referer(),
-            //  'authorize' => ['Controller'], // Optional for ACL
-
         ]);
         // Ensure user session is loaded
         $this->set('authUser', $this->Auth->user());
@@ -183,6 +179,7 @@ class AppController extends Controller
                 if ($auth['id'] && !$session->read('permissionLists') ) {
 
                     $permissionLists = $userTable->getAllPermissions($auth['id']);
+                    //debug($permissionLists);
 
                     Configure::write('permissionLists', $permissionLists['permission']);
                     Configure::write('PermissionLists.Perm', $permissionLists['permission']);
@@ -277,45 +274,5 @@ class AppController extends Controller
                 }
             }
         }
-
-        /*
-        $user = $this->Auth->user();
-
-        if (!empty($user) && isset($user['id'])) {
-
-            // === Role mode configuration ===
-            $roleBasedRoles = [2, 3];    // roles to check via Role ARO (e.g., Admin, Manager)
-
-            // Build ACO path
-            $plugin = $this->request->getParam('plugin');
-            $prefix = $this->request->getParam('prefix');
-            $controller = $this->request->getParam('controller');
-            $action = $this->request->getParam('action');
-
-            $acoPath = 'controllers/';
-            if ($plugin) {
-                $acoPath .= $plugin . '/';
-            }
-            if ($prefix) {
-                $acoPath .= Inflector::camelize($prefix) . '/';
-            }
-            $acoPath .= $controller . '/' . $action;
-
-            // === Permission Check Mode ===
-            $roleId = $user['role_id'];
-            if (in_array($roleId, $roleBasedRoles)) {
-                // Check against role permissions
-                $aro = ['model' => 'Roles', 'foreign_key' => $roleId];
-            }  else {
-                // Optional: Default fallback (e.g. deny or use role check)
-                $aro = ['model' => 'Users', 'foreign_key' => $user['id']];
-            }
-            if (!$this->Acl->check($aro, $acoPath)) {
-                $this->Flash->error(__('You are not authorized to access this page.'));
-                return $this->redirect('/');
-            }
-        }
-        */
-
     }
 }

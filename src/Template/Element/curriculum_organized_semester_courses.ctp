@@ -2,8 +2,9 @@
 
 $credit_type = '';
 
-if (isset($student_academic_profile['Curriculum']['type_credit']) && !empty($student_academic_profile['Curriculum']['type_credit'])) {
-	$crtype = explode('ECTS', $student_academic_profile['Curriculum']['type_credit']);
+if (isset($studentAcademicProfile['Curriculum']['type_credit']) &&
+    !empty($studentAcademicProfile['Curriculum']['type_credit'])) {
+	$crtype = explode('ECTS',$studentAcademicProfile['Curriculum']['type_credit']);
 	if (count($crtype) == 2) {
 		$credit_type = 'ECTS';
 	} else {
@@ -11,10 +12,12 @@ if (isset($student_academic_profile['Curriculum']['type_credit']) && !empty($stu
 	}
 }
 
-if (isset($student_academic_profile['Curriculum']['Course']) && !empty($student_academic_profile['Curriculum']['Course'])) {
-	
-	$curriculums = $student_academic_profile['Curriculum']['Course'];
-	
+if (isset($studentAcademicProfile['Curriculum']['courses'])
+    && !empty($studentAcademicProfile['Curriculum']['courses'])) {
+
+	$curriculums = $studentAcademicProfile['Curriculum']['courses'];
+
+
 	foreach ($curriculums as $year_level => $semester) {
 		foreach ($semester as $sem => $course) { ?>
 			<div style="overflow-x:auto;">
@@ -41,15 +44,15 @@ if (isset($student_academic_profile['Curriculum']['Course']) && !empty($student_
 									<td style="background: #fff;" class="vcenter"><?= $value['course_code']; ?></td>
 									<td style="background: #fff;" class="vcenter"><?= $value['course_title']; ?></td>
 									<td style="background: #fff; text-align:center;" class="center"><?= $value['credit']; ?></td>
-									<td style="background: #fff; text-align:center;" class="center"><?= (isset($value['CourseCategory']['name']) && !empty($value['CourseCategory']['name']) ? $value['CourseCategory']['name'] : 'N/A'); ?></td>
-									<td style="background: #fff; text-align:center;" class="center"><?= $value['GradeType']['type']; ?></td>
+									<td style="background: #fff; text-align:center;" class="center"><?= (isset($value['course_category']['name']) && !empty($value['course_category']['name']) ? $value['course_category']['name'] : 'N/A'); ?></td>
+									<td style="background: #fff; text-align:center;" class="center"><?= $value['grade_type']['type']; ?></td>
 									<td style="background: #fff;" class="center">
 										<?php
-										if (!empty($value['Prerequisite'])) {
+										if (!empty($value['prerequisites'])) {
 											//echo '<span style="padding: 4px;">';
 											echo '<ul style="text-align:left;">';
-											foreach ($value['Prerequisite'] as $p => $pv) {
-												echo '<li style="text-align:left;">' . $pv['PrerequisiteCourse']['course_title'] . ' (' . $pv['PrerequisiteCourse']['course_code'] . ')' . '</li>';
+											foreach ($value['prerequisites'] as $p => $pv) {
+												echo '<li style="text-align:left;">' . $pv['prerequisite_course']['course_title'] . ' (' . $pv['prerequisite_course']['course_code'] . ')' . '</li>';
 											}
 											echo '</ul>';
 											//echo '</span>';
@@ -60,12 +63,12 @@ if (isset($student_academic_profile['Curriculum']['Course']) && !empty($student_
 									</td>
 								</tr>
 								<?php
-							} ?> 
+							} ?>
 						</tbody>
 					</table>
 				</fieldset>
 			</div>
 			<?php
 		}
-	} 
+	}
 } ?>

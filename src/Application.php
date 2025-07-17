@@ -36,11 +36,18 @@ class Application extends BaseApplication
      */
     public function bootstrap()
     {
+        // Call parent to load bootstrap from files.
+        parent::bootstrap();
+
         $this->addPlugin('Acl', ['autoload' => true]);
         $this->addPlugin('Acls', ['autoload' => true, 'routes' => true]);
 
-        // Call parent to load bootstrap from files.
-        parent::bootstrap();
+        $this->addPlugin('JoseGonzalez\Upload', [
+            'bootstrap' => false,
+            'path' => ROOT . DS . 'vendor' . DS . 'josegonzalez' . DS . 'cakephp-upload' . DS
+        ]);
+
+        debug(\Cake\Core\Plugin::loaded());
 
         if (PHP_SAPI === 'cli') {
             $this->bootstrapCli();
@@ -53,11 +60,6 @@ class Application extends BaseApplication
         if (Configure::read('debug')) {
             $this->addPlugin('DebugKit');
         }
-
-        // Load more plugins here
-
-        $this->addPlugin('Josegonzalez/Upload');
-
     }
 
     /**
@@ -66,6 +68,7 @@ class Application extends BaseApplication
      * @param \Cake\Http\MiddlewareQueue $middlewareQueue The middleware queue to setup.
      * @return \Cake\Http\MiddlewareQueue The updated middleware queue.
      */
+
     public function middleware($middlewareQueue)
     {
         $middlewareQueue

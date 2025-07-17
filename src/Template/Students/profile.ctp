@@ -15,7 +15,7 @@
 		foreach ($regionsAll as $region_id => $region_name) { ?>
 			region["<?= $region_id; ?>"] = "<?= $region_name; ?>";
 			<?php
-		} 
+		}
 	} ?>
 
 	function addRow(tableID, model, no_of_fields, all_fields, other) {
@@ -68,7 +68,7 @@
 				var element = document.createElement("input");
 				element.type = "text";
 				element.style = "width:100%;";
-				element.placeholder = "A"; 
+				element.placeholder = "A";
 			} else if (elementArray[i - 1] == 'mark') {
 				var element = document.createElement("input");
 				element.type = "number";
@@ -176,7 +176,7 @@
 		$("#region_id_" + id).empty();
 		$("#region_id_" + id).attr('disabled', true);
 		$("#city_id_" + id).attr('disabled', true);
-		
+
 		//get form action
 		var formUrl = '/students/get_regions/' + formData;
 
@@ -278,9 +278,9 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 						<hr>
 						<?php
 					} ?>
-					
+
 					<?php $this->assign('title_details', (!empty($this->request->params['controller']) ? ' ' . Inflector::humanize(Inflector::underscore($this->request->params['controller'])) . (!empty($this->request->params['action']) && $this->request->params['action'] != 'index' ? ' | ' . ucwords(str_replace('_', ' ', $this->request->params['action'])) : '') : '') . (isset($studentDetail['Student']['id']) ? ' - '. $studentDetail['Student']['full_name'] . ' ('. $studentDetail['Student']['studentnumber'] .')' : '')); ?>
-					
+
 					<?php
 					if (!empty($studentDetail['Attachment'][0]['basename']) || (empty($studentDetail['Attachment'][0]['basename']) && ALLOW_STUDENTS_TO_UPLOAD_PROFILE_PICTURE == 0)) { ?>
 						<?= $this->Form->create('Student', array('data-abide', 'novalidate' => true)); ?>
@@ -302,13 +302,10 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 								<div class="large-12 columns">
 									<?php
 									echo $this->Form->hidden('id', array('value' => $studentDetail['Student']['id']));
-									//echo $this->Form->hidden('program_id', array('value' => $studentDetail['Student']['program_id']));
-									//echo $this->Form->hidden('program_type_id', array('value' => $studentDetail['Student']['program_type_id']));
-
 									if (isset($studentDetail['Contact'][0]['id'])) {
 										echo $this->Form->hidden('Contact.0.id', array('value' => $studentDetail['Contact'][0]['id']));
 									}
-									
+
 									echo $this->Form->hidden('Contact.0.student_id', array('value' => $studentDetail['Student']['id']));
 
 									$errors = $this->Form->validationErrors;
@@ -316,7 +313,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 									$ethiopianStudent = (isset($studentDetail['Student']['country_id']) && $studentDetail['Student']['country_id'] == COUNTRY_ID_OF_ETHIOPIA ? true : false);
 
 									$ugProgram = (isset($studentDetail['Student']['program_id']) && $studentDetail['Student']['program_id'] == PROGRAM_UNDEGRADUATE ? true : false);
-									
+
 									if (count($errors['Student']) > 0 && isset($this->data['Student'])) {
 										$flatErrors = Set::flatten($errors['Student']); ?>
 										<div class="errorSummary">
@@ -371,29 +368,13 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													<div class="large-12 columns">
 														<label> Middle Name (Amharic): <?= ($ethiopianStudent ? '&nbsp;<span class="rejected">*</span>' : ''); ?>
 															<?= $this->Form->input('amharic_middle_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'id' => 'AmharicTextMiddleName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-															<?php
-															/* if (empty($studentDetail['Student']['amharic_middle_name'])) { ?>
-																<?= $this->Form->input('amharic_middle_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'id' => 'AmharicTextMiddleName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-																<?php
-															} else { ?>
-																<?= $this->Form->input('amharic_middle_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'readOnly' => true, 'id' => 'AmharicTextMiddleName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-																<?= $this->Form->hidden('amharic_middle_name', array('value' => (!empty($this->data['Student']['amharic_middle_name']) ? $this->data['Student']['amharic_middle_name'] : $studentDetail['Student']['amharic_middle_name']))); ?>
-																<?php
-															} */ ?>
+
 														</label>
 													</div>
 													<div class="large-12 columns">
 														<label> Last Name (Amharic):<?= ($ethiopianStudent ? '&nbsp;<span class="rejected">*</span>' : ''); ?>
 															<?= $this->Form->input('amharic_last_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'id' => 'AmharicTextLastName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-															<?php
-															/* if (empty($studentDetail['Student']['amharic_last_name'])) { ?>
-																<?= $this->Form->input('amharic_last_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'id' => 'AmharicTextLastName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-																<?php
-															} else { ?>
-																<?= $this->Form->input('amharic_last_name', array('label' => false, 'div' => true, 'required' => $ethiopianStudent, 'readOnly' => true, 'id' => 'AmharicTextLastName', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);")); ?>
-																<?= $this->Form->hidden('amharic_last_name', array('value' => (!empty($this->data['Student']['amharic_last_name']) ? $this->data['Student']['amharic_last_name'] : $studentDetail['Student']['amharic_last_name']))); ?>
-																<?php
-															} */ ?>
+
 														</label>
 													</div>
 
@@ -436,7 +417,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 										<tbody>
 											<tr><td colspan=2><strong>Profile Picture</strong></td></tr>
 											<?php
-											
+
 											$atLeastOneImage = true;
 
 											if (!empty($studentDetail['Attachment'][0]['basename'])) {
@@ -452,7 +433,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													$canbe_deleted = date("Y-m-d H:i:s", mktime(date("H"), date("i"), date("s"), date("n"), date("j") - DAYS_ALLOWED_TO_DELETE_PROFILE_PICTURE_FROM_LAST_UPLOAD, date("Y")));
 													//debug($canbe_deleted);
 
-													if ($canbe_deleted < $studentDetail['Attachment'][0]['modified'] && $this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) { 
+													if ($canbe_deleted < $studentDetail['Attachment'][0]['modified'] && $this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT) {
 														$action_controller_id = 'edit~students~' . $studentDetail['Attachment'][0]['foreign_key'];
 														?>
 														<tr>
@@ -496,7 +477,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 											} else {
 												$stream = '---';
 											} ?>
-															
+
 											<tr><td colspan=2><strong>Classification of Admission</strong></td></tr>
 											<tr><td style="padding-left:30px;">Program: <?= $programs[$studentDetail['Student']['program_id']]; ?></td></tr>
 											<tr><td style="padding-left:30px;">Program Type: <?= $programTypes[$studentDetail['Student']['program_type_id']]; ?></td></tr>
@@ -628,9 +609,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 						</div>
 
 						<div class="content" id="education_background">
-							<!-- <hr style="margin-top: -10px;">
-								<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: normal;"><span style='margin-right: 15px;'></span><b>Important Note:</b> Information you provide in this page should be properly formated and error free as it affects official transcript or student copy address contents. Please also avoid adding unnecessary spaces in any of input fields and make sure school name doesn't exceed more than 30 characters. If you want to add more than one record for the required information, you can use 'Add Row' button and make sure the information you are entering is chronologically ordered.</div>
-							<hr> -->
+
 							<?php
 							if (($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && $studentDetail['Program']['id'] == PROGRAM_UNDEGRADUATE) || (!empty($this->data['HighSchoolEducationBackground']))) { ?>
 
@@ -687,7 +666,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													if (!empty($this->data['HighSchoolEducationBackground'])) {
 														$count = 1;
 														foreach ($this->data['HighSchoolEducationBackground'] as $bk => $bv) {
-															echo $this->Form->hidden('HighSchoolEducationBackground.' . $bk . '.student_id', array('value' => $studentDetail['Student']['id'])); 
+															echo $this->Form->hidden('HighSchoolEducationBackground.' . $bk . '.student_id', array('value' => $studentDetail['Student']['id']));
 															if (!empty($bv['id'])) {
 																echo $this->Form->hidden('HighSchoolEducationBackground.' . $bk . '.id');
 															} ?>
@@ -714,7 +693,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 															<td class="center"><div style="margin-top: 10px;"><?= $this->Form->input('HighSchoolEducationBackground.0.town', array('class' => "otherRequiredText-input", 'label' => false, 'style' => 'width:100%;', 'onBlur' => 'checkIsAlpha(this)', 'required')); ?></div></td>
 														</tr>
 														<?php
-														echo $this->Form->hidden('HighSchoolEducationBackground.0.student_id', array('value' => $studentDetail['Student']['id'])); 
+														echo $this->Form->hidden('HighSchoolEducationBackground.0.student_id', array('value' => $studentDetail['Student']['id']));
 													} ?>
 												</tbody>
 											</table>
@@ -729,7 +708,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													</td>
 												</tr>
 											</table>
-											
+
 										</div>
 										<br>
 									</div>
@@ -747,7 +726,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 								<hr>
 
 								<?php
-								
+
 								$higher_fields = array(
 									'name' => '1',
 									'field_of_study' => '2',
@@ -792,7 +771,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													if (!empty($this->data['HigherEducationBackground'])) {
 														$count = 1;
 														foreach ($this->data['HigherEducationBackground'] as $bk => $bv) {
-															echo $this->Form->hidden('HigherEducationBackground.' . $bk . '.id'); 
+															echo $this->Form->hidden('HigherEducationBackground.' . $bk . '.id');
 															echo $this->Form->hidden('HigherEducationBackground.' . $bk . '.student_id', array('value' => $studentDetail['Student']['id'])); ?>
 															<tr>
 																<td class="center"><?= $count; ?></td>
@@ -817,7 +796,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 															<td class="center"><div style="margin-top: 10px;"><?= $this->Form->input('HigherEducationBackground.0.city', array('class' => "otherRequiredText-input", 'required', 'onBlur' => 'checkIsAlpha(this)', 'style' => 'width:100%;', 'label' => false, 'type' => 'text', 'placeholder' => 'City..')); ?></div></td>
 														</tr>
 														<?php
-														echo $this->Form->hidden('HigherEducationBackground.0.student_id', array('value' => $studentDetail['Student']['id']));  
+														echo $this->Form->hidden('HigherEducationBackground.0.student_id', array('value' => $studentDetail['Student']['id']));
 													} ?>
 												</tbody>
 											</table>
@@ -836,7 +815,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 									</div>
 								</div>
 								<?php
-							} 
+							}
 
 
 							$from = date('Y') - 30;
@@ -851,7 +830,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 
 							<div class="row">
 								<?php
-								if (($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && $studentDetail['Program']['id'] == PROGRAM_UNDEGRADUATE && ALLOW_ESLCE_RESULTS_TO_BE_FILLED_FOR_UNDER_GRADUATE_STUDENTS == 1) || (!empty($this->data['EslceResult']))) { 
+								if (($this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && $studentDetail['Program']['id'] == PROGRAM_UNDEGRADUATE && ALLOW_ESLCE_RESULTS_TO_BE_FILLED_FOR_UNDER_GRADUATE_STUDENTS == 1) || (!empty($this->data['EslceResult']))) {
 
 									$eslce_fields = array('subject' => '1', 'grade' => '2', 'exam_year' => '3');
 									$eslce_all_fields = "";
@@ -885,7 +864,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													if (!empty($this->data['EslceResult'])) {
 														$count = 0;
 														foreach ($this->data['EslceResult'] as $bk => $bv) {
-															echo $this->Form->hidden('EslceResult.' . $bk . '.id'); 
+															echo $this->Form->hidden('EslceResult.' . $bk . '.id');
 															echo $this->Form->hidden('EslceResult.' . $bk . '.student_id', array('value' => $studentDetail['Student']['id'])); ?>
 															<tr>
 																<td class="center"><?= ++$count; ?></td>
@@ -903,7 +882,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 															<td class="center"><?= $this->Form->input('EslceResult.0.exam_year', array('name' => "data[EslceResult][0][exam_year]", 'value' => isset($this->data['EslceResult'][0]['exam_year']) ? $this->data['EslceResult'][0]['exam_year'] : '',  'label' => false, 'style' => 'width:100%;', 'type' => 'select', 'options' => $yearoptions, 'empty' => '[ Select Year ]')); ?></td>
 														</tr>
 														<?php
-														echo $this->Form->hidden('EslceResult.0.student_id', array('value' => $studentDetail['Student']['id'])); 
+														echo $this->Form->hidden('EslceResult.0.student_id', array('value' => $studentDetail['Student']['id']));
 													} ?>
 												</tbody>
 											</table>
@@ -923,8 +902,8 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 									<?php
 								}
 
-								if ((/* $ethiopianStudent &&  */$this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && ($studentDetail['Program']['id'] == PROGRAM_UNDEGRADUATE)) || (isset($this->data['EheeceResult'][0]['subject']) && !empty($this->data['EheeceResult'][0]['subject']))) { 
-									
+								if ((/* $ethiopianStudent &&  */$this->Session->read('Auth.User')['role_id'] == ROLE_STUDENT && ($studentDetail['Program']['id'] == PROGRAM_UNDEGRADUATE)) || (isset($this->data['EheeceResult'][0]['subject']) && !empty($this->data['EheeceResult'][0]['subject']))) {
+
 									$eheece_fields = array('subject' => '1', 'mark' => '2'/* , 'exam_year' => '3' */);
 									$eheece_all_fields = "";
 									$sepeheece = "";
@@ -962,7 +941,7 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 													if (!empty($this->data['EheeceResult'])) {
 														$count = 0;
 														foreach ($this->data['EheeceResult'] as $bk => $bv) {
-															echo $this->Form->hidden('EheeceResult.' . $bk . '.id'); 
+															echo $this->Form->hidden('EheeceResult.' . $bk . '.id');
 															echo $this->Form->hidden('EheeceResult.' . $bk . '.student_id', array('value' => $studentDetail['Student']['id'])); ?>
 															<tr>
 																<td class="center"><?= ++$count; ?></td>
@@ -1004,16 +983,16 @@ if (isset($studentDetail) && !empty($studentDetail['Student'])) { ?>
 									</div>
 									<?php
 								} ?>
-								
+
 							</div>
 						</div>
 					</div>
 
 					<hr>
-					
+
 					<h6 class="fs13 warning-box" style="font-weight: normal;">Inputs/fields marked <b class="rejected">*</b> are required and you have to select or provide the required information, not marked fields are optional. Please check all tabs before updating your profile.</h6>
 					<!-- <br> -->
-					
+
 					<?= $this->Form->end(array('label' => 'Update Student Detail', /* 'disabled', */ 'name' => 'updateStudentDetail', 'id' => 'updateStudentDetail', 'class' => 'tiny radius button bg-blue')); ?>
 
 				</div>
@@ -1049,7 +1028,7 @@ function toggleSubmitButtonActive() {
 
 		if (isNaN(obj.value) || obj.value == '' || obj.value < 2.00 || obj.value > 4.00) {
 			obj.style.border = '2px solid red';
-			
+
 			if (!message) {
 				message = document.createElement("div");
 				message.id = "customMessageCGPA";
@@ -1067,7 +1046,7 @@ function toggleSubmitButtonActive() {
 			const rect = obj.getBoundingClientRect();
 			message.style.top = `${rect.top + window.scrollY + obj.offsetHeight + 5}px`;
 			message.style.left = `${rect.left + window.scrollX}px`;
-			
+
 			obj.focus();
 
 			// Remove the message after a few seconds
@@ -1078,7 +1057,7 @@ function toggleSubmitButtonActive() {
 			return false;
 		} else {
 			obj.style.border = '2px solid #ccc';
-			
+
 			if (message) {
 				message.remove();
 			}
@@ -1093,7 +1072,7 @@ function toggleSubmitButtonActive() {
 
 		if (isNaN(obj.value) || obj.value == '' || obj.value < 1 || obj.value > 100) {
 			obj.style.border = '2px solid red';
-			
+
 			if (!message) {
 				message = document.createElement("div");
 				message.id = "customMessageMark";
@@ -1111,7 +1090,7 @@ function toggleSubmitButtonActive() {
 			const rect = obj.getBoundingClientRect();
 			message.style.top = `${rect.top + window.scrollY + obj.offsetHeight + 5}px`;
 			message.style.left = `${rect.left + window.scrollX}px`;
-			
+
 			obj.focus();
 
 			// Remove the message after a few seconds
@@ -1122,7 +1101,7 @@ function toggleSubmitButtonActive() {
 			return false;
 		} else {
 			obj.style.border = '2px solid #ccc';
-			
+
 			if (message) {
 				message.remove();
 			}
@@ -1138,7 +1117,7 @@ function toggleSubmitButtonActive() {
 	function capitalizeWordsExcludePrepositions(str) {
 
 		const prepositions = ['and', 'or', 'of', 'in', 'on', 'at', 'with', 'from', 'by', 'about', 'as', 'into', 'like', 'through', 'after', 'over', 'between', 'out', 'against', 'during', 'without', 'before', 'under', 'around', 'among'];
-		
+
 		return str.split(' ').map(word => {
 			if (prepositions.includes(word.toLowerCase())) {
 				return word.toLowerCase();
@@ -1146,7 +1125,7 @@ function toggleSubmitButtonActive() {
 				return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 			}
 		}).join(' ');
-		
+
 	}
 
 	function checkIsAlpha(obj) {
@@ -1165,7 +1144,7 @@ function toggleSubmitButtonActive() {
 
 		if (!pattern.test(obj.value)) {
 			obj.style.border = '2px solid red';
-			
+
 			if (!message) {
 				message = document.createElement("div");
 				message.id = "customMessage";
@@ -1183,7 +1162,7 @@ function toggleSubmitButtonActive() {
 			const rect = obj.getBoundingClientRect();
 			message.style.top = `${rect.top + window.scrollY + obj.offsetHeight + 5}px`;
 			message.style.left = `${rect.left + window.scrollX}px`;
-			
+
 			obj.focus();
 
 			// Remove the message after a few seconds
@@ -1194,7 +1173,7 @@ function toggleSubmitButtonActive() {
 			return false;
 		} else {
 			obj.style.border = '2px solid #ccc';
-			
+
 			if (message) {
 				message.remove();
 			}
@@ -1233,7 +1212,7 @@ function toggleSubmitButtonActive() {
 				return false;
 			}
 		}
-		
+
 		if ($('#email').val() == '') {
 			alert('Please provide your primary personal email address.');
 			$('#email').focus();
@@ -1329,7 +1308,7 @@ function toggleSubmitButtonActive() {
 			return false;
 		}
 
-		
+
 		if ($('#phonemobile').val() == '') {
 			alert('Please provide your primary emergency contact mobile number in Address & Primary Contact tab.');
 			$('#phonemobile').focus();
@@ -1478,7 +1457,7 @@ function toggleSubmitButtonActive() {
 	// get regions based on selected country
 
 	$('#country_id_2').change(function() {
-		
+
 		var countryId = $(this).val();
 
 		$('#region_id_2').attr('disabled', true);
@@ -1517,7 +1496,7 @@ function toggleSubmitButtonActive() {
 
 	// Load zone options based on selected region
 	$('#region_id_2').change(function() {
-		
+
 		var regionId = $(this).val();
 
 		$('#zone_id_2').attr('disabled', true);
@@ -1543,7 +1522,7 @@ function toggleSubmitButtonActive() {
 			});
 
 			return false;
-			
+
 		} else {
 			$('#zone_id_2').empty().append('<option value="">[ Select Zone ]</option>');
 			$('#woreda_id_2').empty().append('<option value="">[ Select Woreda ]</option>');
@@ -1609,7 +1588,7 @@ function toggleSubmitButtonActive() {
 	// get regions based on selected country
 
 	$('#country_id_1').change(function() {
-		
+
 		var countryId = $(this).val();
 
 		$('#region_id_1').attr('disabled', true);
@@ -1648,7 +1627,7 @@ function toggleSubmitButtonActive() {
 
 	// Load zone options based on selected region
 	$('#region_id_1').change(function() {
-		
+
 		var regionId = $(this).val();
 
 		$('#zone_id_1').attr('disabled', true);
@@ -1674,7 +1653,7 @@ function toggleSubmitButtonActive() {
 			});
 
 			return false;
-			
+
 		} else {
 			$('#zone_id_1').empty().append('<option value="">[ Select Zone ]</option>');
 			$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');

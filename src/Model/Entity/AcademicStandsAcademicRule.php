@@ -16,12 +16,7 @@ class AcademicStandsAcademicRule extends Entity
      * @var array
      */
     protected $_accessible = [
-        'academic_stand_id' => true,
-        'academic_rule_id' => true,
-        'archive' => true,
-        'created' => true,
-        'modified' => true,
-        'academic_stand' => true,
-        'academic_rule' => true,
+        '*' => true,
+        'id' => false,
     ];
 }

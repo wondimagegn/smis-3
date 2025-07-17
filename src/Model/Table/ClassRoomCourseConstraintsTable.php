@@ -1,15 +1,14 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
 
+/**
+ * ClassRoomCourseConstraints Table
+ */
 class ClassRoomCourseConstraintsTable extends Table
 {
-
     /**
      * Initialize method
      *
@@ -18,111 +17,92 @@ class ClassRoomCourseConstraintsTable extends Table
      */
     public function initialize(array $config)
     {
-
         parent::initialize($config);
 
         $this->setTable('class_room_course_constraints');
-        $this->setDisplayField('id');
+        $this->setDisplayField('published_course_id');
         $this->setPrimaryKey('id');
 
         $this->belongsTo('PublishedCourses', [
             'foreignKey' => 'published_course_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'PublishedCourse'
+            'joinType' => 'LEFT'
         ]);
+
         $this->belongsTo('ClassRooms', [
             'foreignKey' => 'class_room_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'ClassRoom'
+            'joinType' => 'LEFT'
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
-
         $validator
-            ->integer('id')
             ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('type')
-            ->maxLength('type', 20)
-            ->requirePresence('type', 'create')
-            ->notEmptyString('type');
-
-        $validator
-            ->boolean('active')
-            ->requirePresence('active', 'create')
-            ->notEmptyString('active');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Checks if a class room course constraint can be deleted
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $id Constraint ID
+     * @param int|null $collegeId College ID
+     * @return bool True if eligible for deletion, false otherwise
      */
-    public function buildRules(RulesChecker $rules)
+    public function checkDeleteEligibility($id = null, $collegeId = null): bool
     {
-
-        $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
-        $rules->add($rules->existsIn(['class_room_id'], 'ClassRooms'));
-
-        return $rules;
-    }
-
-    public function beforeDeleteCheckEligibility($id = null, $college_id = null)
-    {
-
-        $departments = $this->PublishedCourse->Department->find(
-            'list',
-            array('fields' => array('Department.id'), 'conditions' => array('Department.college_id' => $college_id))
-        );
-        $publishedCourses_id_array = $this->PublishedCourse->find(
-            'list',
-            array(
-                'fields' => array('PublishedCourse.id'),
-                'conditions' => array(
-                    'PublishedCourse.drop' => 0,
-                    "OR" => array(
-                        array('PublishedCourse.college_id' => $college_id),
-                        array('PublishedCourse.department_id' => $departments)
-                    )
-                )
-            )
-        );
-        $count = $this->find(
-            'count',
-            array(
-                'conditions' => array(
-                    'ClassRoomCourseConstraint.published_course_id' => $publishedCourses_id_array,
-                    'ClassRoomCourseConstraint.id' => $id
-                )
-            )
-        );
-        if ($count > 0) {
-            return true;
-        } else {
+        if (!$id || !$collegeId) {
             return false;
         }
+
+        $departmentsTable = $this->PublishedCourses->Departments;
+        $departmentIds = $departmentsTable->find('list')
+            ->select(['Departments.id'])
+            ->where(['Departments.college_id' => $collegeId])
+            ->toArray();
+
+        $publishedCourseIds = $this->PublishedCourses->find('list')
+            ->select(['PublishedCourses.id'])
+            ->where([
+                'PublishedCourses.drop' => 0,
+                'OR' => [
+                    ['PublishedCourses.college_id' => $collegeId],
+                    ['PublishedCourses.department_id IN' => array_values($departmentIds)]
+                ]
+            ])
+            ->toArray();
+
+        $count = $this->find()
+            ->where([
+                'ClassRoomCourseConstraints.published_course_id IN' => array_values($publishedCourseIds),
+                'ClassRoomCourseConstraints.id' => $id
+            ])
+            ->count();
+
+        return $count > 0;
     }
 
-    public function is_class_room_used($id = null)
+    /**
+     * Counts the number of constraints using a class room
+     *
+     * @param int|null $id Class room ID
+     * @return int Number of constraints
+     */
+    public function isClassRoomUsed($id = null): int
     {
+        if (!$id) {
+            return 0;
+        }
 
-        $count = $this->find(
-            'count',
-            array('conditions' => array('ClassRoomCourseConstraint.class_room_id' => $id), 'limit' => 2)
-        );
-        return $count;
+        return $this->find()
+            ->where(['ClassRoomCourseConstraints.class_room_id' => $id])
+            ->limit(2)
+            ->count();
     }
 }

@@ -1,4011 +1,2756 @@
 <?php
-
 namespace App\Model\Table;
-
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
-use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
+use Cake\Core\Configure;
+use Cake\ORM\Query;
+use Cake\Datasource\EntityInterface;
+use Cake\ORM\TableRegistry;
+use Cake\Event\Event;
 use Cake\Datasource\ConnectionManager;
 use Cake\Database\Expression\QueryExpression;
-use Cake\Utility\Hash;
-
-
-
 class ExamGradesTable extends Table
 {
-
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
         $this->setTable('exam_grades');
-        $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
+        // Associations
         $this->belongsTo('CourseRegistrations', [
-            'className' => 'CourseRegistrations',
             'foreignKey' => 'course_registration_id',
-            'propertyName' => 'CourseRegistration',
-        ]);
-        $this->belongsTo('CourseAdds', [
-            'className' => 'CourseAdds',
-            'foreignKey' => 'course_add_id',
-            'propertyName' => 'CourseAdd',
-        ]);
-        $this->belongsTo('CourseInstructorAssignments', [
-            'className' => 'CourseInstructorAssignments',
-            'foreignKey' => 'course_instructor_assignment_id',
-            'propertyName' => 'CourseInstructorAssignment',
-        ]);
-        $this->belongsTo('MakeupExams', [
-            'className' => 'MakeupExams',
-            'foreignKey' => 'makeup_exam_id',
-            'propertyName' => 'MakeupExam',
+            'joinType' => 'LEFT',
         ]);
         $this->belongsTo('GradeScales', [
-            'className' => 'GradeScales',
             'foreignKey' => 'grade_scale_id',
-            'joinType' => 'INNER',
-            'propertyName' => 'GradeScale',
+            'joinType' => 'LEFT',
+        ]);
+        $this->belongsTo('CourseAdds', [
+            'foreignKey' => 'course_add_id',
+            'joinType' => 'LEFT',
+        ]);
+        $this->belongsTo('MakeupExams', [
+            'foreignKey' => 'makeup_exam_id',
+            'joinType' => 'LEFT',
+        ]);
+        $this->belongsTo('CourseInstructorAssignments', [
+            'foreignKey' => 'course_instructor_assignment_id',
+            'joinType' => 'LEFT',
         ]);
         $this->hasMany('ExamGradeChanges', [
-            'className' => 'ExamGradeChanges',
             'foreignKey' => 'exam_grade_id',
-            'propertyName' => 'ExamGradeChange',
+            'dependent' => false,
         ]);
+
+        // Behaviors
+        // Placeholder for Tools.Logable (requires CakePHP 3.x compatible version)
+        // $this->addBehavior('Tools.Logable', [
+        //     'change' => 'full',
+        //     'description_ids' => true,
+        //     'displayField' => 'username',
+        //     'foreignKey' => 'foreign_key'
+        // ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->scalar('grade')
-            ->maxLength('grade', 20)
+            ->numeric('grade')
             ->requirePresence('grade', 'create')
-            ->notEmptyString('grade');
+            ->notEmptyString('grade', 'Please provide grade');
 
         $validator
-            ->boolean('department_reply')
-            ->notEmptyString('department_reply');
+            ->numeric('course_registration_id')
+            ->allowEmptyString('course_registration_id')
+            ->add('course_registration_id', 'numeric', [
+                'rule' => 'numeric',
+                'message' => 'Course Registration id must be numeric'
+            ]);
 
         $validator
-            ->allowEmptyString('department_approval');
+            ->numeric('course_add_id')
+            ->allowEmptyString('course_add_id')
+            ->add('course_add_id', 'numeric', [
+                'rule' => 'numeric',
+                'message' => 'Course Add id must be numeric'
+            ]);
 
         $validator
-            ->scalar('department_reason')
-            ->allowEmptyString('department_reason');
-
-        $validator
-            ->dateTime('department_approval_date')
-            ->allowEmptyDateTime('department_approval_date');
-
-        $validator
-            ->scalar('department_approved_by')
-            ->maxLength('department_approved_by', 36)
-            ->allowEmptyString('department_approved_by');
-
-        $validator
-            ->allowEmptyString('registrar_approval');
-
-        $validator
-            ->scalar('registrar_reason')
-            ->allowEmptyString('registrar_reason');
-
-        $validator
-            ->dateTime('registrar_approval_date')
-            ->allowEmptyDateTime('registrar_approval_date');
-
-        $validator
-            ->scalar('registrar_approved_by')
-            ->maxLength('registrar_approved_by', 36)
-            ->allowEmptyString('registrar_approved_by');
+            ->numeric('makeup_exam_id')
+            ->allowEmptyString('makeup_exam_id')
+            ->add('makeup_exam_id', 'numeric', [
+                'rule' => 'numeric',
+                'message' => 'Makeup Exam id must be numeric'
+            ]);
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function isGradeSubmitted($publishedCourseIds = null, array $studentLists = []): int
     {
+        $publishedCoursesStudentRegisteredScoreGrade = 0;
 
-        $rules->add($rules->existsIn(['course_registration_id'], 'CourseRegistrations'));
-        $rules->add($rules->existsIn(['course_add_id'], 'CourseAdds'));
-        $rules->add($rules->existsIn(['course_instructor_assignment_id'], 'CourseInstructorAssignments'));
-        $rules->add($rules->existsIn(['makeup_exam_id'], 'MakeupExams'));
-        $rules->add($rules->existsIn(['grade_scale_id'], 'GradeScales'));
-
-        return $rules;
-    }
-
-
-    // Is grade submitted for publishe course
-    function is_grade_submitted($published_course_ids = null, $student_lists = array())
-    {
-
-        $published_courses_student_registred_score_grade = 0;
-        // debug("is_grade_submitted = ".$published_course_ids);
-
-        if (isset($student_lists) && !empty($student_lists)) {
-            $grade_submitted_registred_courses = $this->CourseRegistration->find('list', array(
-                'conditions' => array(
-                    'CourseRegistration.published_course_id' => $published_course_ids,
-                    'CourseRegistration.student_id' => $student_lists
-                ),
-                'fields' => array('CourseRegistration.id')
-            ));
+        if (!empty($studentLists)) {
+            $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+                ->where([
+                    'CourseRegistrations.published_course_id IN' => $publishedCourseIds,
+                    'CourseRegistrations.student_id IN' => $studentLists
+                ])
+                ->select(['CourseRegistrations.id'])
+                ->toArray();
         } else {
-            $grade_submitted_registred_courses = $this->CourseRegistration->find(
-                'list',
-                array(
-                    'conditions' => array('CourseRegistration.published_course_id' => $published_course_ids),
-                    'fields' => array('CourseRegistration.id')
-                )
-            );
+            $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.published_course_id IN' => $publishedCourseIds])
+                ->select(['CourseRegistrations.id'])
+                ->toArray();
         }
 
+        if (!empty($gradeSubmittedRegisteredCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $gradeSubmittedRegisteredCourses])
+                ->count();
 
-        if (!empty($grade_submitted_registred_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_registration_id' => $grade_submitted_registred_courses))
-            );
-
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
         }
 
-        //check course adds
-        if (isset($student_lists) && !empty($student_lists)) {
-            $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-                'conditions' => array(
-                    'CourseAdd.published_course_id' => $published_course_ids,
-                    'CourseAdd.student_id' => $student_lists,
-                    'CourseAdd.department_approval = 1',
-                    'CourseAdd.registrar_confirmation = 1'
-                ),
-                'fields' => array('CourseAdd.id')
-            ));
+        if (!empty($studentLists)) {
+            $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+                ->where([
+                    'CourseAdds.published_course_id IN' => $publishedCourseIds,
+                    'CourseAdds.student_id IN' => $studentLists,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->select(['CourseAdds.id'])
+                ->toArray();
         } else {
-            $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-                'conditions' => array(
-                    'CourseAdd.published_course_id' => $published_course_ids,
-                    'CourseAdd.department_approval = 1',
-                    'CourseAdd.registrar_confirmation = 1'
-                ),
-                'fields' => array('CourseAdd.id')
-            ));
+            $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+                ->where([
+                    'CourseAdds.published_course_id IN' => $publishedCourseIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->select(['CourseAdds.id'])
+                ->toArray();
         }
 
+        if (!empty($gradeSubmittedAddCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->count();
 
-        if (!empty($grade_submitted_add_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_add_id' => $grade_submitted_add_courses))
-            );
-
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
-            /* $published_courses_student_registred_score_grade = ClassRegistry::init('ExamResult')->find('count', array('conditions' => array('ExamResult.course_add_id' => $grade_submitted_add_courses)));
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
-            } */
         }
 
-        return $published_courses_student_registred_score_grade;
+        return $publishedCoursesStudentRegisteredScoreGrade;
     }
 
-
-    // grade submitted for publishe course,  return array
-
-    function getGradeSubmmissionDate($published_course_ids = null)
+    public function getGradeSubmissionDate($publishedCourseIds = null): array
     {
+        $publishedCoursesStudentRegisteredScoreGrade = [];
 
-        $published_courses_student_registred_score_grade = array();
+        $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.published_course_id IN' => $publishedCourseIds])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
-        $grade_submitted_registred_courses = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.published_course_id' => $published_course_ids
-            ),
-            'fields' => array('CourseRegistration.id')
-        ));
+        if (!empty($gradeSubmittedRegisteredCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $gradeSubmittedRegisteredCourses])
+                ->first();
 
-        if (!empty($grade_submitted_registred_courses)) {
-            $published_courses_student_registred_score_grade = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $grade_submitted_registred_courses
-                ),
-                'recursive' => -1
-            ));
-
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+            if (!empty($publishedCoursesStudentRegisteredScoreGrade)) {
+                return $publishedCoursesStudentRegisteredScoreGrade->toArray();
             }
         }
 
-        //check course adds
-        $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-            'conditions' => array(
-                'CourseAdd.published_course_id' => $published_course_ids,
-                //'CourseAdd.department_approval=1',
-                //'CourseAdd.registrar_confirmation=1'
-            ),
-            'fields' => array('CourseAdd.id')
-        ));
+        $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+            ->where(['CourseAdds.published_course_id IN' => $publishedCourseIds])
+            ->select(['CourseAdds.id'])
+            ->toArray();
 
-        if (!empty($grade_submitted_add_courses)) {
-            $published_courses_student_registred_score_grade = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $grade_submitted_add_courses
-                ),
-                'recursive' => -1
-            ));
+        if (!empty($gradeSubmittedAddCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->first();
 
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+            if (!empty($publishedCoursesStudentRegisteredScoreGrade)) {
+                return $publishedCoursesStudentRegisteredScoreGrade->toArray();
             }
 
-            $published_courses_student_registred_score_grade = ClassRegistry::init('ExamResult')->find('first', array(
-                'conditions' => array(
-                    'ExamResult.course_add_id' => $grade_submitted_add_courses
-                ),
-                'recursive' => -1
-            ));
+            $examResultsTable = TableRegistry::getTableLocator()->get('ExamResults');
+            $publishedCoursesStudentRegisteredScoreGrade = $examResultsTable->find()
+                ->where(['ExamResults.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->first();
 
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+            if (!empty($publishedCoursesStudentRegisteredScoreGrade)) {
+                return $publishedCoursesStudentRegisteredScoreGrade->toArray();
             }
         }
 
-        return $published_courses_student_registred_score_grade;
+        return $publishedCoursesStudentRegisteredScoreGrade;
     }
 
-    // to allow hard deletion
-    // Check grade is submitted for current section of student  given student id and section id return true if grade is submitted and return false if grade has not been submitted and allow hard deletion.
-
-    function isCourseGradeSubmitted($student_id = null, $section_id = null)
+    public function isCourseGradeSubmitted(?int $studentId = null, ?int $sectionId = null): bool
     {
-
-        if (isset($section_id)) {
-            // get student published courses for the given section
-            $sections = $this->CourseRegistration->PublishedCourse->find('all', array(
-                'conditions' => array('PublishedCourse.section_id' => $section_id),
-                'recursive' => -1
-            ));
-
-            $publishedCourse_ids = array();
-
-            if (!empty($sections)) {
-                foreach ($sections as $sk => $sv) {
-                    $publishedCourse_ids[] = $sv['PublishedCourse']['id'];
-                }
-            }
-
-            $list_course_registration_ids = array();
-
-            if (!empty($publishedCourse_ids)) {
-                //find course regisration number
-                if (!empty($student_id)) {
-                    /* $courseRegistration = $this->CourseRegistration->find('all', array(
-                        'conditions' => array(
-                            'CourseRegistration.student_id' => $student_id,
-                            'CourseRegistration.published_course_id' => $publishedCourse_ids
-                        ),
-                        'fields' => array('id', 'student_id'),
-                        'recursive' => -1
-                    ));
-
-                    if (!empty($courseRegistration)) {
-                        foreach ($courseRegistration as $crk => $crv) {
-                            $list_course_registration_ids[] = $crv['CourseRegistration']['id'];
-                        }
-                    } */
-
-                    $list_course_registration_ids = $this->CourseRegistration->find('list', array(
-                        'conditions' => array(
-                            'CourseRegistration.student_id' => $student_id,
-                            'CourseRegistration.published_course_id' => $publishedCourse_ids
-                        ),
-                        'fields' => array('CourseRegistration.id')
-                    ));
-                } else {
-                    $list_course_registration_ids = $this->CourseRegistration->find('list', array(
-                        'conditions' => array(
-                            'CourseRegistration.published_course_id' => $publishedCourse_ids
-                        ),
-                        'fields' => array('CourseRegistration.id')
-                    ));
-                }
-
-                if (!empty($list_course_registration_ids)) {
-                    // ExamResults should be checked first than ExamGrades, If assesment is started, we can assume grade is beig submitted. Neway.
-
-                    $gradeSubmitted = $this->find(
-                        'count',
-                        array(
-                            'conditions' => array('ExamGrade.course_registration_id' => $list_course_registration_ids),
-                            'recursive' => -1
-                        )
-                    );
-
-                    if ($gradeSubmitted > 0) {
-                        return true;
-                    }
-                    /* $examResultFilled = ClassRegistry::init('ExamResult')->find('count', array('conditions' => array('ExamResult.course_registration_id' => $list_course_registration_ids), 'recursive' => -1));
-
-                    if ($examResultFilled > 0) {
-                        return true;
-                    } */
-                }
-
-                $list_course_add_ids = array();
-
-                //check course adds
-                if (!empty($student_id)) {
-                    $list_course_add_ids = $this->CourseAdd->find('list', array(
-                        'conditions' => array(
-                            'CourseAdd.student_id' => $student_id,
-                            'CourseAdd.published_course_id' => $publishedCourse_ids,
-                            'CourseAdd.department_approval = 1',
-                            'CourseAdd.registrar_confirmation = 1'
-                        ),
-                        'fields' => array('CourseAdd.id')
-                    ));
-                } else {
-                    $list_course_add_ids = $this->CourseAdd->find('list', array(
-                        'conditions' => array(
-                            'CourseAdd.published_course_id' => $publishedCourse_ids,
-                            'CourseAdd.department_approval = 1',
-                            'CourseAdd.registrar_confirmation = 1'
-                        ),
-                        'fields' => array('CourseAdd.id')
-                    ));
-                }
-
-                if (!empty($list_course_add_ids)) {
-                    // ExamResults should be checked first than ExamGrades, If assesment is started, we can assume grade is beig submitted. Neway.
-
-                    $published_courses_student_added_score_grade = $this->find(
-                        'count',
-                        array(
-                            'conditions' => array('ExamGrade.course_add_id' => $list_course_add_ids),
-                            'recursive' => -1
-                        )
-                    );
-
-                    if ($published_courses_student_added_score_grade > 0) {
-                        return true;
-                    }
-                    /* $published_courses_student_added_score_grade = ClassRegistry::init('ExamResult')->find('count', array('conditions' => array('ExamResult.course_add_id' => $list_course_add_ids), 'recursive' => -1));
-
-                    if ($published_courses_student_added_score_grade > 0) {
-                        return true;
-                    } */
-                }
-            }
+        if (!isset($sectionId)) {
             return false;
         }
-        return false;
-    }
 
-    // To be implemented
-    function isEverGradeSubmitInTheNameOfSection($section_id = null)
-    {
+        $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+            ->where(['PublishedCourses.section_id' => $sectionId])
+            ->select(['PublishedCourses.id'])
+            ->toArray();
 
-        if (isset($section_id)) {
-            // get student published courses for the given section
-            $sections = $this->CourseRegistration->PublishedCourse->find(
-                'all',
-                array('conditions' => array('PublishedCourse.section_id' => $section_id), 'recursive' => -1)
-            );
+        $publishedCourseIds = array_column($publishedCourses, 'id');
 
-            $gradeSubmitted = 0;
-            $publishedCourse_ids = array();
-
-            $list_course_registration_ids = array();
-            $grade_submitted_add_courses = array();
-
-            if (!empty($sections)) {
-                foreach ($sections as $sk => $sv) {
-                    $publishedCourse_ids[] = $sv['PublishedCourse']['id'];
-                }
-            }
-
-            if (!empty($publishedCourse_ids)) {
-                //find course regisration id
-                $list_course_registration_ids = $this->CourseRegistration->find('list', array(
-                    'conditions' => array(
-                        'CourseRegistration.published_course_id' => $publishedCourse_ids
-                    ),
-                    'fields' => array('CourseRegistration.id')
-                ));
-
-                //find course add id
-                $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-                    'conditions' => array(
-                        'CourseAdd.published_course_id' => $publishedCourse_ids,
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation = 1'
-                    ),
-                    'fields' => array('CourseAdd.id')
-                ));
-            }
-
-            //find grade submitted
-
-            if (!empty($list_course_registration_ids)) {
-                $gradeSubmitted = $this->find(
-                    'count',
-                    array(
-                        'conditions' => array('ExamGrade.course_registration_id' => $list_course_registration_ids),
-                        'recursive' => -1
-                    )
-                );
-
-                if ($gradeSubmitted > 0) {
-                    return true;
-                }
-
-                $gradeSubmitted = ClassRegistry::init('ExamResult')->find(
-                    'count',
-                    array(
-                        'conditions' => array('ExamResult.course_registration_id' => $list_course_registration_ids),
-                        'recursive' => -1
-                    )
-                );
-
-                if ($gradeSubmitted > 0) {
-                    return true;
-                }
-            }
-
-            if (!empty($grade_submitted_add_courses)) {
-                $published_courses_student_registred_score_grade = $this->find(
-                    'count',
-                    array(
-                        'conditions' => array('ExamGrade.course_add_id' => $grade_submitted_add_courses),
-                        'recursive' => -1
-                    )
-                );
-
-                if ($published_courses_student_registred_score_grade > 0) {
-                    return true;
-                }
-
-                $published_courses_student_registred_score_grade = ClassRegistry::init('ExamResult')->find(
-                    'count',
-                    array(
-                        'conditions' => array('ExamResult.course_add_id' => $grade_submitted_add_courses),
-                        'recursive' => -1
-                    )
-                );
-
-                if ($published_courses_student_registred_score_grade > 0) {
-                    return true;
-                }
-            }
-
+        if (empty($publishedCourseIds)) {
             return false;
+        }
+
+        $listCourseRegistrationIds = [];
+        if (!empty($studentId)) {
+            $listCourseRegistrationIds = $this->CourseRegistrations->find('list')
+                ->where([
+                    'CourseRegistrations.student_id' => $studentId,
+                    'CourseRegistrations.published_course_id IN' => $publishedCourseIds
+                ])
+                ->select(['CourseRegistrations.id'])
+                ->toArray();
+        } else {
+            $listCourseRegistrationIds = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.published_course_id IN' => $publishedCourseIds])
+                ->select(['CourseRegistrations.id'])
+                ->toArray();
+        }
+
+        if (!empty($listCourseRegistrationIds)) {
+            $gradeSubmitted = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $listCourseRegistrationIds])
+                ->count();
+
+            if ($gradeSubmitted > 0) {
+                return true;
+            }
+        }
+
+        $listCourseAddIds = [];
+        if (!empty($studentId)) {
+            $listCourseAddIds = $this->CourseAdds->find('list')
+                ->where([
+                    'CourseAdds.student_id' => $studentId,
+                    'CourseAdds.published_course_id IN' => $publishedCourseIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->select(['CourseAdds.id'])
+                ->toArray();
+        } else {
+            $listCourseAddIds = $this->CourseAdds->find('list')
+                ->where([
+                    'CourseAdds.published_course_id IN' => $publishedCourseIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->select(['CourseAdds.id'])
+                ->toArray();
+        }
+
+        if (!empty($listCourseAddIds)) {
+            $publishedCoursesStudentAddedScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $listCourseAddIds])
+                ->count();
+
+            if ($publishedCoursesStudentAddedScoreGrade > 0) {
+                return true;
+            }
         }
 
         return false;
     }
 
-    function gradeCanBeChanged($grade_id = null)
+    public function isEverGradeSubmitInTheNameOfSection(?int $sectionId = null): bool
     {
+        if (!isset($sectionId)) {
+            return false;
+        }
 
-        $grade_history = $this->find('first', array(
-            'conditions' => array(
-                'ExamGrade.id' => $grade_id
-            ),
-            'contain' => array(
-                'CourseRegistration' => array(
-                    'PublishedCourse' => array(
-                        'Course' => array('id', 'course_code_title'),
-                        'fields' => array('id', 'course_id')
-                    ),
-                    'Student' => array('id', 'full_name_studentnumber', 'graduated'),
-                    'fields' => array('id', 'student_id', 'published_course_id')
-                ),
-                'CourseAdd' => array(
-                    'PublishedCourse' => array(
-                        'Course' => array('id', 'course_code_title'),
-                        'fields' => array('id', 'course_id')
-                    ),
-                    'Student' => array('id', 'full_name_studentnumber', 'graduated'),
-                    'fields' => array('id', 'student_id', 'published_course_id')
-                ),
-                'MakeupExam' => array(
-                    'PublishedCourse' => array(
-                        'Course' => array('id', 'course_code_title'),
-                        'fields' => array('id', 'course_id')
-                    ),
-                    'Student' => array('id', 'full_name_studentnumber', 'graduated'),
-                    'fields' => array('id', 'student_id', 'published_course_id')
-                ),
-                'ExamGradeChange'
-            )
-        ));
+        $sections = $this->CourseRegistrations->PublishedCourses->find()
+            ->where(['PublishedCourses.section_id' => $sectionId])
+            ->select(['PublishedCourses.id'])
+            ->toArray();
 
-        debug($grade_history);
+        $publishedCourseIds = array_column($sections, 'id');
+        $listCourseRegistrationIds = [];
+        $gradeSubmittedAddCourses = [];
 
-        if (!empty($grade_history['ExamGrade'])) {
-            $course_title_course_code = '';
-            $full_name_studentnumber = '';
-            $most_recent_grade = '';
+        if (!empty($publishedCourseIds)) {
+            $listCourseRegistrationIds = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.published_course_id IN' => $publishedCourseIds])
+                ->select(['CourseRegistrations.id'])
+                ->toArray();
 
-            if (!empty($grade_history['CourseRegistration']['id'])) {
-                if (!empty($grade_history['CourseRegistration']['Student']['id'])) {
-                    $full_name_studentnumber = $grade_history['CourseRegistration']['Student']['full_name_studentnumber'];
+            $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+                ->where([
+                    'CourseAdds.published_course_id IN' => $publishedCourseIds,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->select(['CourseAdds.id'])
+                ->toArray();
+        }
+
+        if (!empty($listCourseRegistrationIds)) {
+            $gradeSubmitted = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $listCourseRegistrationIds])
+                ->count();
+
+            if ($gradeSubmitted > 0) {
+                return true;
+            }
+
+            $examResultsTable = TableRegistry::getTableLocator()->get('ExamResults');
+            $gradeSubmitted = $examResultsTable->find()
+                ->where(['ExamResults.course_registration_id IN' => $listCourseRegistrationIds])
+                ->count();
+
+            if ($gradeSubmitted > 0) {
+                return true;
+            }
+        }
+
+        if (!empty($gradeSubmittedAddCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->count();
+
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return true;
+            }
+
+            $examResultsTable = TableRegistry::getTableLocator()->get('ExamResults');
+            $publishedCoursesStudentRegisteredScoreGrade = $examResultsTable->find()
+                ->where(['ExamResults.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->count();
+
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function gradeCanBeChanged(?int $gradeId = null)
+    {
+        $gradeHistory = $this->find()
+            ->where(['ExamGrades.id' => $gradeId])
+            ->contain([
+                'CourseRegistrations' => [
+                    'PublishedCourses' => [
+                        'Courses' => ['fields' => ['id', 'course_code_title']],
+                        'fields' => ['id', 'course_id']
+                    ],
+                    'Students' => ['fields' => ['id', 'full_name_studentnumber', 'graduated']],
+                    'fields' => ['id', 'student_id', 'published_course_id']
+                ],
+                'CourseAdds' => [
+                    'PublishedCourses' => [
+                        'Courses' => ['fields' => ['id', 'course_code_title']],
+                        'fields' => ['id', 'course_id']
+                    ],
+                    'Students' => ['fields' => ['id', 'full_name_studentnumber', 'graduated']],
+                    'fields' => ['id', 'student_id', 'published_course_id']
+                ],
+                'MakeupExams' => [
+                    'PublishedCourses' => [
+                        'Courses' => ['fields' => ['id', 'course_code_title']],
+                        'fields' => ['id', 'course_id']
+                    ],
+                    'Students' => ['fields' => ['id', 'full_name_studentnumber', 'graduated']],
+                    'fields' => ['id', 'student_id', 'published_course_id']
+                ],
+                'ExamGradeChanges'
+            ])
+            ->first();
+
+        if (!empty($gradeHistory)) {
+            $courseTitleCourseCode = '';
+            $fullNameStudentnumber = '';
+            $mostRecentGrade = '';
+
+            if (!empty($gradeHistory->course_registration)) {
+                if (!empty($gradeHistory->course_registration->student)) {
+                    $fullNameStudentnumber = $gradeHistory->course_registration->student->full_name_studentnumber;
                 }
-                if (!empty($grade_history['CourseRegistration']['PublishedCourse']['id']) && !empty($grade_history['CourseRegistration']['PublishedCourse']['Course']['id'])) {
-                    $course_title_course_code = $grade_history['CourseRegistration']['PublishedCourse']['Course']['course_code_title'];
+                if (!empty($gradeHistory->course_registration->published_course) && !empty($gradeHistory->course_registration->published_course->course)) {
+                    $courseTitleCourseCode = $gradeHistory->course_registration->published_course->course->course_code_title;
                 }
-            } elseif (!empty($grade_history['CourseAdd']['id'])) {
-                if (!empty($grade_history['CourseAdd']['Student']['id'])) {
-                    $full_name_studentnumber = $grade_history['CourseAdd']['Student']['full_name_studentnumber'];
+            } elseif (!empty($gradeHistory->course_add)) {
+                if (!empty($gradeHistory->course_add->student)) {
+                    $fullNameStudentnumber = $gradeHistory->course_add->student->full_name_studentnumber;
                 }
-                if (!empty($grade_history['CourseAdd']['PublishedCourse']['id']) && !empty($grade_history['CourseAdd']['PublishedCourse']['Course']['id'])) {
-                    $course_title_course_code = $grade_history['CourseAdd']['PublishedCourse']['Course']['course_code_title'];
+                if (!empty($gradeHistory->course_add->published_course) && !empty($gradeHistory->course_add->published_course->course)) {
+                    $courseTitleCourseCode = $gradeHistory->course_add->published_course->course->course_code_title;
                 }
-            } elseif (!empty($grade_history['MakeupExam']['id'])) {
-                if (!empty($grade_history['MakeupExam']['Student']['id'])) {
-                    $full_name_studentnumber = $grade_history['MakeupExam']['Student']['full_name_studentnumber'];
+            } elseif (!empty($gradeHistory->makeup_exam)) {
+                if (!empty($gradeHistory->makeup_exam->student)) {
+                    $fullNameStudentnumber = $gradeHistory->makeup_exam->student->full_name_studentnumber;
                 }
-                if (!empty($grade_history['MakeupExam']['PublishedCourse']['id']) && !empty($grade_history['MakeupExam']['PublishedCourse']['Course']['id'])) {
-                    $course_title_course_code = $grade_history['MakeupExam']['PublishedCourse']['Course']['course_code_title'];
+                if (!empty($gradeHistory->makeup_exam->published_course) && !empty($gradeHistory->makeup_exam->published_course->course)) {
+                    $courseTitleCourseCode = $gradeHistory->makeup_exam->published_course->course->course_code_title;
                 }
             }
 
-            if ($grade_history['ExamGrade']) {
-                $most_recent_grade = $grade_history['ExamGrade']['grade'];
-                if ($grade_history['ExamGrade']['department_approval'] == null) {
-                    return "There is already a submitted grade " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is waiting for department approval. Please first finalize the approval process for the already submitted grade before recording a new grade.";
-                } elseif ($grade_history['ExamGrade']['department_approval'] == 1 && $grade_history['ExamGrade']['registrar_approval'] == null) {
-                    return "There is already a submitted grade" . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is waiting for registrar approval. Please first let the registrar finalize the approval process for the already submitted grade before recording a new grade.";
+            if (!empty($gradeHistory->grade)) {
+                $mostRecentGrade = $gradeHistory->grade;
+                if ($gradeHistory->department_approval === null) {
+                    return sprintf(
+                        "There is already a submitted grade %s for %s which is waiting for department approval. Please first finalize the approval process for the already submitted grade before recording a new grade.",
+                        !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                        (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                    );
+                } elseif ($gradeHistory->department_approval == 1 && $gradeHistory->registrar_approval === null) {
+                    return sprintf(
+                        "There is already a submitted grade %s for %s which is waiting for registrar approval. Please first let the registrar finalize the approval process for the already submitted grade before recording a new grade.",
+                        !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                        (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                    );
                 }
             }
 
-            if (isset($grade_history['ExamGradeChange']) && !empty($grade_history['ExamGradeChange'])) {
-                foreach ($grade_history['ExamGradeChange'] as $key => $examGradeChange) {
-                    //Is it waiting department approval?
-                    $most_recent_grade = $examGradeChange['grade'];
-                    if ($examGradeChange['manual_ng_conversion'] != 1 && $examGradeChange['auto_ng_conversion'] != 1) {
-                        if ($examGradeChange['initiated_by_department'] != 1 && $examGradeChange['department_approval'] == null) {
-                            if ($examGradeChange['makeup_exam_result'] == null) {
-                                return "There is already a submitted grade change request " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is awaiting department approval. Please first finalize the approval process for the already submitted grade change request before recording a new grade.";
+            if (!empty($gradeHistory->exam_grade_changes)) {
+                foreach ($gradeHistory->exam_grade_changes as $examGradeChange) {
+                    $mostRecentGrade = $examGradeChange->grade;
+                    if ($examGradeChange->manual_ng_conversion != 1 && $examGradeChange->auto_ng_conversion != 1) {
+                        if ($examGradeChange->initiated_by_department != 1 && $examGradeChange->department_approval === null) {
+                            if ($examGradeChange->makeup_exam_result === null) {
+                                return sprintf(
+                                    "There is already a submitted grade change request %s for %s which is awaiting department approval. Please first finalize the approval process for the already submitted grade change request before recording a new grade.",
+                                    !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                                    (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                                );
                             } else {
-                                return "There is already a submitted makeup exam grade " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is awaiting department approval. Please first finalize the approval process for the already submitted makeup exam grade before recording a new grade.";
+                                return sprintf(
+                                    "There is already a submitted makeup exam grade %s for %s which is awaiting department approval. Please first finalize the approval process for the already submitted makeup exam grade before recording a new grade.",
+                                    !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                                    (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                                );
                             }
-                        } elseif (($examGradeChange['initiated_by_department'] == 1 && $examGradeChange['department_approval'] != -1 && $examGradeChange['registrar_approval'] != -1) || ($examGradeChange['initiated_by_department'] != 1 && $examGradeChange['department_approval'] == 1)) {
-                            if ($examGradeChange['initiated_by_department'] == 1 && $examGradeChange['makeup_exam_result'] != null) {
-                                return "There is already a submitted supplementary exam grade " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is awaiting registrar approval. Please first let the registrar finalize the approval process for the already submitted supplementary exam grade before recording a new grade.";
-                            } elseif ($examGradeChange['makeup_exam_result'] == null && $examGradeChange['college_approval'] == null) {
-                                return "There is already a submitted grade " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is awaiting college approval. Please first let the college finalize the approval process for the already submitted grade before recording a new grade.";
-                            } elseif (($examGradeChange['makeup_exam_result'] != null || $examGradeChange['college_approval'] == 1) && $examGradeChange['registrar_approval'] == null) {
-                                return "There is already a submitted grade " . (!empty($most_recent_grade) ? '(' . $most_recent_grade . ')' : '') . ' for ' . ((!empty($full_name_studentnumber) ? $full_name_studentnumber : 'the selected student') . (!empty($course_title_course_code) ? ' for ' . $course_title_course_code : ' and course')) . " which is awaiting registrar approval. Please first let the registrar finalize the approval process for the already submitted grade before recording a new grade.";
+                        } elseif (($examGradeChange->initiated_by_department == 1 && $examGradeChange->department_approval != -1 && $examGradeChange->registrar_approval != -1) || ($examGradeChange->initiated_by_department != 1 && $examGradeChange->department_approval == 1)) {
+                            if ($examGradeChange->initiated_by_department == 1 && $examGradeChange->makeup_exam_result !== null) {
+                                return sprintf(
+                                    "There is already a submitted supplementary exam grade %s for %s which is awaiting registrar approval. Please first let the registrar finalize the approval process for the already submitted supplementary exam grade before recording a new grade.",
+                                    !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                                    (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                                );
+                            } elseif ($examGradeChange->makeup_exam_result === null && $examGradeChange->college_approval === null) {
+                                return sprintf(
+                                    "There is already a submitted grade %s for %s which is awaiting college approval. Please first let the college finalize the approval process for the already submitted grade before recording a new grade.",
+                                    !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                                    (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                                );
+                            } elseif (($examGradeChange->makeup_exam_result !== null || $examGradeChange->college_approval == 1) && $examGradeChange->registrar_approval === null) {
+                                return sprintf(
+                                    "There is already a submitted grade %s for %s which is awaiting registrar approval. Please first let the registrar finalize the approval process for the already submitted grade before recording a new grade.",
+                                    !empty($mostRecentGrade) ? "($mostRecentGrade)" : '',
+                                    (!empty($fullNameStudentnumber) ? $fullNameStudentnumber : 'the selected student') . (!empty($courseTitleCourseCode) ? " for $courseTitleCourseCode" : ' and course')
+                                );
                             }
                         }
                     }
-                } //Auto and manual grade change removal
+                }
             }
         }
 
         return true;
     }
 
-    function getStudentCoursesAndFinalGrade($student_id, $acadamic_year, $semester, $include_exempted = 0)
+    public function getStudentCoursesAndFinalGrade(int $studentId, ?string $academicYear, ?string $semester, int $includeExempted = 0): array
     {
+        $coursesAndGrades = [];
 
-        $courses_and_grades = array();
+        $courseRegistered = $this->CourseRegistrations->find()
+            ->where([
+                'CourseRegistrations.student_id' => $studentId,
+                'CourseRegistrations.academic_year' => $academicYear,
+                'CourseRegistrations.semester' => $semester
+            ])
+            ->contain(['PublishedCourses.Courses'])
+            ->order(['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC'])
+            ->toArray();
 
-        $course_registered = $this->CourseRegistration->find('all', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-                'CourseRegistration.academic_year' => $acadamic_year,
-                'CourseRegistration.semester' => $semester,
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            ),
-            'order' => array(
-                'CourseRegistration.academic_year' => 'ASC',
-                'CourseRegistration.semester' => 'ASC',
-                'CourseRegistration.id' => 'ASC'
-            )
-        ));
+        $courseAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.academic_year' => $academicYear,
+                'CourseAdds.semester' => $semester
+            ])
+            ->contain(['PublishedCourses.Courses'])
+            ->order(['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC'])
+            ->toArray();
 
-        $course_added = $this->CourseAdd->find('all', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.academic_year' => $acadamic_year,
-                'CourseAdd.semester' => $semester
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            ),
-            'order' => array('CourseAdd.academic_year' => 'ASC', 'CourseAdd.semester' => 'ASC', 'CourseAdd.id' => 'ASC')
-        ));
-
-        if (isset($course_added) && !empty($course_added)) {
-            foreach ($course_added as $ca_key => $ca_value) {
-                if (!($ca_value['PublishedCourse']['add'] == 1 || ($ca_value['CourseAdd']['department_approval'] == 1 && $ca_value['CourseAdd']['registrar_confirmation'] == 1))) {
-                    unset($course_added[$ca_key]);
-                }
+        foreach ($courseAdded as $key => $courseAdd) {
+            if (!($courseAdd->published_course->add == 1 || ($courseAdd->department_approval == 1 && $courseAdd->registrar_confirmation == 1))) {
+                unset($courseAdded[$key]);
             }
         }
 
-        $student_detail = $this->CourseAdd->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
+        $studentDetail = $this->CourseAdds->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
 
-        $exempted_courses = array();
+        $exemptedCourses = [];
+        $studentLevel = $this->CourseAdds->Students->StudentExamStatuses->studentYearAndSemesterLevelOfStatus($studentId, $academicYear, $semester);
 
-        $student_level = $this->CourseAdd->Student->StudentExamStatus->studentYearAndSemesterLevelOfStatus(
-            $student_id,
-            $acadamic_year,
-            $semester
-        );
-        //debug($student_level);
+        $yearLevels = [
+            1 => '1st',
+            2 => '2nd',
+            3 => '3rd'
+        ];
+        $studentYearLevel = isset($yearLevels[$studentLevel['year']]) ? $yearLevels[$studentLevel['year']] : $studentLevel['year'] . 'th';
 
-        if ($student_level['year'] == 1) {
-            $student_year_level = '1st';
-        } elseif ($student_level['year'] == 2) {
-            $student_year_level = '2nd';
-        } elseif ($student_level['year'] == 3) {
-            $student_year_level = '3rd';
-        } else {
-            if (isset($student_level['year'])) {
-                $student_year_level = $student_level['year'] . 'th';
-            } else {
-                $student_year_level = $student_level['year'] . 'th';
-            }
-        }
+        $yearLevelId = TableRegistry::getTableLocator()->get('YearLevels')->find()
+            ->where([
+                'YearLevels.department_id' => $studentDetail->department_id,
+                'YearLevels.name' => $studentYearLevel
+            ])
+            ->select(['YearLevels.id'])
+            ->first()->id ?? null;
 
-        $year_level_id = ClassRegistry::init('YearLevel')->field('id', array(
-            'YearLevel.department_id' => $student_detail['Student']['department_id'],
-            'YearLevel.name' => $student_year_level,
-        ));
+        if (!empty($studentDetail->curriculum_id)) {
+            $coursesToBeGiven = $this->CourseAdds->PublishedCourses->Courses->find()
+                ->where([
+                    'Courses.curriculum_id' => $studentDetail->curriculum_id,
+                    'Courses.year_level_id' => $yearLevelId,
+                    'Courses.semester' => $semester
+                ])
+                ->toArray();
 
-        if (!empty($student_detail['Student']['curriculum_id'])) {
-            $courses_to_be_given = $this->CourseAdd->PublishedCourse->Course->find('all', array(
-                'conditions' => array(
-                    'Course.curriculum_id' => $student_detail['Student']['curriculum_id'],
-                    'Course.year_level_id' => $year_level_id,
-                    'Course.semester' => $semester
-                ),
-                'recursive' => -1
-            ));
+            if ($includeExempted == 1) {
+                $allExemptedCourses = $this->CourseAdds->Students->CourseExemptions->find()
+                    ->where([
+                        'CourseExemptions.student_id' => $studentDetail->id,
+                        'CourseExemptions.department_accept_reject' => 1,
+                        'CourseExemptions.registrar_confirm_deny' => 1
+                    ])
+                    ->toArray();
 
-            if ($include_exempted == 1) {
-                $all_exempted_courses = $this->CourseAdd->Student->CourseExemption->find('all', array(
-                    'conditions' => array(
-                        'CourseExemption.student_id' => $student_detail['Student']['id'],
-                        'CourseExemption.department_accept_reject' => 1,
-                        'CourseExemption.registrar_confirm_deny' => 1,
-                    ),
-                    'recursive' => -1
-                ));
-
-                if (isset($all_exempted_courses) && !empty($all_exempted_courses)) {
-                    foreach ($all_exempted_courses as $ex_key => $exempted_course) {
-                        foreach ($courses_to_be_given as $c_key => $course_to_be_given) {
-                            if ($course_to_be_given['Course']['id'] == $exempted_course['CourseExemption']['course_id']) {
-                                $index = count($courses_and_grades);
-                                $courses_and_grades[$index]['course_title'] = trim(
-                                    $course_to_be_given['Course']['course_title']
-                                );
-                                $courses_and_grades[$index]['course_code'] = trim(
-                                    $course_to_be_given['Course']['course_code']
-                                );
-                                $courses_and_grades[$index]['course_id'] = $course_to_be_given['Course']['id'];
-                                $courses_and_grades[$index]['major'] = $course_to_be_given['Course']['major'];
-                                $courses_and_grades[$index]['credit'] = $course_to_be_given['Course']['credit'];
-                                $courses_and_grades[$index]['thesis'] = $course_to_be_given['Course']['thesis'];
-                                $courses_and_grades[$index]['elective'] = $course_to_be_given['Course']['elective'];
-
-                                if (isset($exempted_course['CourseExemption']['grade']) && !empty($exempted_course['CourseExemption']['grade'])) {
-                                    $courses_and_grades[$index]['grade'] = $exempted_course['CourseExemption']['grade'] . '(EX)';
-                                } else {
-                                    $courses_and_grades[$index]['grade'] = 'EX';
-                                }
-                            }
+                foreach ($allExemptedCourses as $exemptedCourse) {
+                    foreach ($coursesToBeGiven as $courseToBeGiven) {
+                        if ($courseToBeGiven->id == $exemptedCourse->course_id) {
+                            $index = count($coursesAndGrades);
+                            $coursesAndGrades[$index] = [
+                                'course_title' => trim($courseToBeGiven->course_title),
+                                'course_code' => trim($courseToBeGiven->course_code),
+                                'course_id' => $courseToBeGiven->id,
+                                'major' => $courseToBeGiven->major,
+                                'credit' => $courseToBeGiven->credit,
+                                'thesis' => $courseToBeGiven->thesis,
+                                'elective' => $courseToBeGiven->elective,
+                                'grade' => !empty($exemptedCourse->grade) ? $exemptedCourse->grade . '(EX)' : 'EX'
+                            ];
                         }
                     }
                 }
             }
         }
 
-        if (!empty($course_registered)) {
-            foreach ($course_registered as $key => $value) {
-                if (!$this->CourseRegistration->isCourseDroped(
-                        $value['CourseRegistration']['id']
-                    ) && isset($value['PublishedCourse']['Course']['id'])) {
-                    $index = count($courses_and_grades);
-                    $courses_and_grades[$index]['course_title'] = trim(
-                        $value['PublishedCourse']['Course']['course_title']
+        foreach ($courseRegistered as $value) {
+            if (!$this->CourseRegistrations->isCourseDropped($value->id) && !empty($value->published_course->course)) {
+                $index = count($coursesAndGrades);
+                $coursesAndGrades[$index] = [
+                    'course_title' => trim($value->published_course->course->course_title),
+                    'course_code' => trim($value->published_course->course->course_code),
+                    'course_id' => $value->published_course->course->id,
+                    'credit' => $value->published_course->course->credit,
+                    'thesis' => $value->published_course->course->thesis,
+                    'elective' => $value->published_course->course->elective
+                ];
+
+                if ($studentDetail->curriculum_id != $value->published_course->course->curriculum_id) {
+                    $coursesAndGrades[$index]['major'] = TableRegistry::getTableLocator()->get('EquivalentCourses')->isEquivalentCourseMajor(
+                        $value->published_course->course_id,
+                        $studentDetail->curriculum_id
                     );
-                    $courses_and_grades[$index]['course_code'] = trim(
-                        $value['PublishedCourse']['Course']['course_code']
-                    );
-                    $courses_and_grades[$index]['course_id'] = $value['PublishedCourse']['Course']['id'];
-
-                    if ($student_detail['Student']['curriculum_id'] != $value['PublishedCourse']['Course']['curriculum_id']) {
-                        $coursemajor = ClassRegistry::init('EquivalentCourse')->isEquivalentCourseMajor(
-                            $value['PublishedCourse']['course_id'],
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        $courses_and_grades[$index]['major'] = $coursemajor;
-                    } else {
-                        $courses_and_grades[$index]['major'] = $value['PublishedCourse']['Course']['major'];
-                    }
-
-                    //$courses_and_grades[$index]['major'] = $value['PublishedCourse']['Course']['major'];
-                    $courses_and_grades[$index]['credit'] = $value['PublishedCourse']['Course']['credit'];
-                    $courses_and_grades[$index]['thesis'] = $value['PublishedCourse']['Course']['thesis'];
-                    $courses_and_grades[$index]['elective'] = $value['PublishedCourse']['Course']['elective'];
-
-
-                    $grade_detail = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                    //debug($grade_detail);
-                    //debug($courses_and_grades);
-                    if (!empty($grade_detail)) {
-                        $courses_and_grades[$index]['grade'] = $grade_detail['grade'];
-                        if (isset($grade_detail['point_value'])) {
-                            $courses_and_grades[$index]['point_value'] = $grade_detail['point_value'];
-                            $courses_and_grades[$index]['pass_grade'] = $grade_detail['pass_grade'];
-                            $courses_and_grades[$index]['used_in_gpa'] = $grade_detail['used_in_gpa'];
-                        } else {
-                            $gradeTypeDetailsPF = ClassRegistry::init('Grade')->find('first', array(
-                                'conditions' => array('Grade.id' => $grade_detail['grade_id']),
-                                'contain' => array('GradeType')
-                            ));
-                            debug($gradeTypeDetailsPF);
-                            if (isset($gradeTypeDetailsPF['GradeType']) && !empty($gradeTypeDetailsPF['GradeType'])) {
-                                if ($gradeTypeDetailsPF['GradeType']['used_in_gpa'] == false) {
-                                    $courses_and_grades[$index]['pass_fail_grade'] = true;
-                                    //  break;
-                                }
-                            }
-                        }
-                    }
-
-                    //To determine if a student registered more than once for the same course
-                    $matching_courses = array();
-                    $cID = $value['PublishedCourse']['Course']['id'];
-
-                    if (!empty($student_detail['Student']['curriculum_id'])) {
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $cID,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                    }
-
-                    $matching_courses[$cID] = $cID;
-                    //debug($matching_courses);
-
-                    $register_and_add_freq = $this->getCourseFrequenceRegAdds($matching_courses, $student_id);
-
-                    //If the student add or register once
-                    if (count($register_and_add_freq) <= 1) {
-                        $courses_and_grades[$index]['repeated_old'] = false;
-                        $courses_and_grades[$index]['repeated_new'] = false;
-                    } else {
-                        //If the student has multiple registration and/or add
-                        $rept = $this->repeatationLabeling(
-                            $register_and_add_freq,
-                            'register',
-                            $value['CourseRegistration']['id'],
-                            $student_detail,
-                            $courses_and_grades[$index]['course_id']
-                        );
-                        $courses_and_grades[$index]['repeated_old'] = $rept['repeated_old'];
-                        $courses_and_grades[$index]['repeated_new'] = $rept['repeated_new'];
-                        /* if ($value['CourseRegistration']['id'] == 681549) {
-                            debug($rept);
-                        } */
-                    }
-                }
-            }
-        }
-
-        if (!empty($course_added)) {
-            foreach ($course_added as $key => $value) {
-                $index = count($courses_and_grades);
-                $courses_and_grades[$index]['course_title'] = trim($value['PublishedCourse']['Course']['course_title']);
-                $courses_and_grades[$index]['course_code'] = trim($value['PublishedCourse']['Course']['course_code']);
-                $courses_and_grades[$index]['course_id'] = $value['PublishedCourse']['Course']['id'];
-
-                if ($student_detail['Student']['curriculum_id'] != $value['PublishedCourse']['Course']['curriculum_id']) {
-                    $coursemajor = ClassRegistry::init('EquivalentCourse')->isEquivalentCourseMajor(
-                        $value['PublishedCourse']['course_id'],
-                        $student_detail['Student']['curriculum_id']
-                    );
-                    $courses_and_grades[$index]['major'] = $coursemajor;
                 } else {
-                    $courses_and_grades[$index]['major'] = $value['PublishedCourse']['Course']['major'];
+                    $coursesAndGrades[$index]['major'] = $value->published_course->course->major;
                 }
 
-                $courses_and_grades[$index]['credit'] = $value['PublishedCourse']['Course']['credit'];
-                $courses_and_grades[$index]['thesis'] = $value['PublishedCourse']['Course']['thesis'];
-                $courses_and_grades[$index]['elective'] = $value['PublishedCourse']['Course']['elective'];
+                $gradeDetail = $this->getApprovedGrade($value->course_registration->id, 1);
 
-                $grade_detail = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
-
-                if (!empty($grade_detail)) {
-                    $courses_and_grades[$index]['grade'] = $grade_detail['grade'];
-                    if (isset($grade_detail['point_value'])) {
-                        $courses_and_grades[$index]['point_value'] = $grade_detail['point_value'];
-                        $courses_and_grades[$index]['pass_grade'] = $grade_detail['pass_grade'];
-                        $courses_and_grades[$index]['used_in_gpa'] = $grade_detail['used_in_gpa'];
-                    }
-                }
-
-                //To determine if a student registered more than once for the same course
-                $matching_courses = array();
-                $cID = $value['PublishedCourse']['Course']['id'];
-
-                if (!empty($student_detail['Student']['curriculum_id'])) {
-                    $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                        $cID,
-                        $student_detail['Student']['curriculum_id']
-                    );
-                }
-
-                $matching_courses[$cID] = $cID;
-                debug($matching_courses);
-
-                $register_and_add_freq = $this->getCourseFrequenceRegAdds($matching_courses, $student_id);
-
-                //If the student add or register once
-                if (count($register_and_add_freq) <= 1) {
-                    $courses_and_grades[$index]['repeated_old'] = false;
-                    $courses_and_grades[$index]['repeated_new'] = false;
-                } else {
-                    //If the student has multiple registration and/or add
-                    //debug($value['CourseAdd']['id']);
-                    //debug($this->repeatationLabeling($register_and_add_freq, 'add', $value['CourseAdd']['id'], $student_detail, $courses_and_grades[$index]['course_id']));
-
-                    $rept = $this->repeatationLabeling(
-                        $register_and_add_freq,
-                        'add',
-                        $value['CourseAdd']['id'],
-                        $student_detail,
-                        $courses_and_grades[$index]['course_id']
-                    );
-                    $courses_and_grades[$index]['repeated_old'] = $rept['repeated_old'];
-                    $courses_and_grades[$index]['repeated_new'] = $rept['repeated_new'];
-                }
-            }
-        }
-
-        // debug($courses_and_grades);
-        return $courses_and_grades;
-    }
-
-    function getApprovedGrade($register_add_id = null, $registration = 1)
-    {
-
-        //debug($register_add_id);
-        $approved_grade_detail = array();
-
-        if ($registration == 1) {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $register_add_id,
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                //'order' => array('ExamGrade.created' => 'DESC'), // Back Dated grade affects this, Neway
-                'order' => array('ExamGrade.id' => 'DESC'),
-                'recursive' => -1
-            ));
-            //debug($grade_detail);
-        } else {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $register_add_id,
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                //'order' => array('ExamGrade.created' => 'DESC'), // Back Dated grade affects this, Neway
-                'order' => array('ExamGrade.id' => 'DESC'),
-                'recursive' => -1
-            ));
-            //debug($grade_detail);
-        }
-
-        if (!empty($grade_detail)) {
-            $grade_change = $this->ExamGradeChange->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.exam_grade_id' => $grade_detail['ExamGrade']['id'],
-                    'OR' => array(
-                        array(
-                            'ExamGradeChange.department_approval' => 1,
-                            'ExamGradeChange.registrar_approval' => 1,
-                            array(
-                                'OR' => array(
-                                    array(
-                                        //If it is grade change
-                                        'ExamGradeChange.makeup_exam_result IS NULL',
-                                        'ExamGradeChange.college_approval' => 1,
-                                    ),
-                                    array(
-                                        //Makeup exam
-                                        'ExamGradeChange.makeup_exam_result IS NOT NULL',
-                                    )
-                                )
-                            )
-                        ),
-                        'ExamGradeChange.manual_ng_conversion = 1',
-                        'ExamGradeChange.auto_ng_conversion = 1'
-                    )
-                ),
-                'recursive' => -1,
-                //'order' => array('ExamGradeChange.created' => 'DESC')
-                'order' => array('ExamGradeChange.id' => 'DESC')
-            ));
-
-            if (!empty($grade_change)) {
-                $approved_grade_detail['grade'] = $grade_change['ExamGradeChange']['grade'];
-                $approved_grade_detail['gradeChangeRequested'] = $grade_change['ExamGradeChange']['created'];
-                $approved_grade_detail['gradeChangeApproved'] = $grade_change['ExamGradeChange']['modified'];
-                $approved_grade_detail['gradeChangeReason'] = $grade_change['ExamGradeChange']['reason'];
-                $approved_grade_detail['gradeChangeResult'] = $grade_change['ExamGradeChange']['result'];
-                $approved_grade_detail['makeupExamResult'] = $grade_change['ExamGradeChange']['makeup_exam_result'];
-                $approved_grade_detail['manualNGConversion'] = $grade_change['ExamGradeChange']['manual_ng_conversion'];
-                $approved_grade_detail['autoNGConversion'] = $grade_change['ExamGradeChange']['auto_ng_conversion'];
-                $approved_grade_detail['grade_change_id'] = $grade_change['ExamGradeChange']['id'];
-
-                if ($grade_change['ExamGradeChange']['manual_ng_conversion']) {
-                    $approved_grade_detail['manualNGConvertedBy'] = ClassRegistry::init('User')->field(
-                        'full_name',
-                        array('User.id' => $grade_change['ExamGradeChange']['manual_ng_converted_by'])
-                    );
-                }
-            } else {
-                $approved_grade_detail['grade'] = $grade_detail['ExamGrade']['grade'];
-                $approved_grade_detail['approved'] = $grade_detail['ExamGrade']['modified'];
-            }
-
-            $approved_grade_detail['grade_id'] = $grade_detail['ExamGrade']['id'];
-            $approved_grade_detail['submitted'] = $grade_detail['ExamGrade']['created'];
-
-            $approved_grade_detail['backdatedGradeEntry'] = ((strpos(
-                    $grade_detail['ExamGrade']['registrar_reason'],
-                    'backend'
-                ) !== false) || $grade_detail['ExamGrade']['registrar_reason'] == 'Via backend data entry interface' ? 1 : 0);
-            $approved_grade_detail['registrarGradeEntry'] = ((strpos(
-                    $grade_detail['ExamGrade']['registrar_reason'],
-                    'Data Entry'
-                ) !== false) && $grade_detail['ExamGrade']['registrar_reason'] == 'Registrar Data Entry interface' ? 1 : 0);
-
-            if ($approved_grade_detail['backdatedGradeEntry']) {
-                $approved_grade_detail['approved'] = $grade_detail['ExamGrade']['modified'];
-            }
-
-            $grade_related_detail = $this->GradeScale->find('first', array(
-                'conditions' => array(
-                    'GradeScale.id' => $grade_detail['ExamGrade']['grade_scale_id']
-                ),
-                'contain' => array(
-                    'GradeScaleDetail' => array(
-                        'Grade' => array(
-                            'conditions' => array(
-                                'Grade.grade' => $approved_grade_detail['grade']
-                            ),
-                            'GradeType'
-                        )
-                    )
-                )
-            ));
-
-            if (isset($grade_related_detail['GradeScaleDetail']) && !empty($grade_related_detail['GradeScaleDetail'])) {
-                foreach ($grade_related_detail['GradeScaleDetail'] as $key => $value) {
-                    //debug($value);
-                    if (!empty($value['Grade'])) {
-                        $approved_grade_detail['point_value'] = $value['Grade']['point_value'];
-                        $approved_grade_detail['pass_grade'] = $value['Grade']['pass_grade'];
-                        $approved_grade_detail['used_in_gpa'] = $value['Grade']['GradeType']['used_in_gpa'];
-                        $approved_grade_detail['grade_scale_id'] = $value['grade_scale_id'];
-                        $approved_grade_detail['grade_type'] = $value['Grade']['GradeType']['type'];
-                        $approved_grade_detail['grade_type_id'] = $value['Grade']['GradeType']['id'];
-                        $approved_grade_detail['repeatable'] = $value['Grade']['allow_repetition'];
-                        $approved_grade_detail['grade_scale'] = $grade_related_detail['GradeScale']['name'];
-                        break;
+                if (!empty($gradeDetail)) {
+                    $coursesAndGrades[$index]['grade'] = $gradeDetail['grade'];
+                    if (isset($gradeDetail['point_value'])) {
+                        $coursesAndGrades[$index]['point_value'] = $gradeDetail['point_value'];
+                        $coursesAndGrades[$index]['pass_grade'] = $gradeDetail['pass_grade'];
+                        $coursesAndGrades[$index]['used_in_gpa'] = $gradeDetail['used_in_gpa'];
                     } else {
-                        /*
-                        $gradeTypeDetailsPF = ClassRegistry::init('Grade')->find('first',array('conditions'=>array('Grade.id'=>$value['grade_id']), 'contain'=>array('GradeType')));
-                        debug($gradeTypeDetailsPF);
-                        if (isset($gradeTypeDetailsPF['GradeType']) && !empty($gradeTypeDetailsPF['GradeType'])) {
-                            if ($gradeTypeDetailsPF['GradeType']['used_in_gpa']==false) {
-                                $approved_grade_detail['pass_fail_grade'] = true;
-                                break;
-                            }
-                        }
-                        */
-                    }
-                }
-            }
+                        $gradeTypeDetailsPF = TableRegistry::getTableLocator()->get('Grades')->find()
+                            ->where(['Grades.id' => $gradeDetail['grade_id']])
+                            ->contain(['GradeTypes'])
+                            ->first();
 
-            if (isset($approved_grade_detail['grade']) && (strcasecmp(
-                        $approved_grade_detail['grade'],
-                        'NG'
-                    ) == 0 || strcasecmp($approved_grade_detail['grade'], 'DO') == 0 || strcasecmp(
-                        $approved_grade_detail['grade'],
-                        'I'
-                    ) == 0 || strcasecmp($approved_grade_detail['grade'], 'W') == 0)) {
-                $approved_grade_detail['pass_grade'] = 0;
-            }
-
-            //debug($approved_grade_detail);
-            return $approved_grade_detail;
-        } else {
-            return array();
-        }
-    }
-
-    function getApprovedNotChangedGrade($register_add_id = null, $registration = 1)
-    {
-
-        $approved_grade_detail = array();
-
-        if ($registration == 1) {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $register_add_id,
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                'recursive' => -1
-            ));
-        } else {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $register_add_id,
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                'recursive' => -1
-            ));
-        }
-
-        if (!empty($grade_detail)) {
-            $approved_grade_detail['grade'] = $grade_detail['ExamGrade']['grade'];
-            $approved_grade_detail['grade_id'] = $grade_detail['ExamGrade']['id'];
-            $approved_grade_detail['exam_grade_grade_scale_id'] = $grade_detail['ExamGrade']['grade_scale_id'];
-
-            $grade_related_detail = $this->GradeScale->find('first', array(
-                'conditions' => array(
-                    'GradeScale.id' => $grade_detail['ExamGrade']['grade_scale_id']
-                ),
-                'contain' => array(
-                    'GradeScaleDetail' => array(
-                        'Grade' => array(
-                            'conditions' => array(
-                                'Grade.grade' => $approved_grade_detail['grade']
-                            ),
-                            'GradeType'
-                        )
-                    )
-                )
-            ));
-
-            if (isset($grade_related_detail['GradeScaleDetail']) && !empty($grade_related_detail['GradeScaleDetail'])) {
-                foreach ($grade_related_detail['GradeScaleDetail'] as $key => $value) {
-                    //debug($value);
-                    if (!empty($value['Grade'])) {
-                        //debug($value['Grade']);
-                        $approved_grade_detail['point_value'] = (isset($value['Grade']['point_value']) ? $value['Grade']['point_value'] : 0);
-                        $approved_grade_detail['pass_grade'] = (isset($value['Grade']['pass_grade']) ? $value['Grade']['pass_grade'] : false);
-                        $approved_grade_detail['used_in_gpa'] = (isset($value['Grade']['GradeType']['used_in_gpa']) ? $value['Grade']['GradeType']['used_in_gpa'] : false);
-                        $approved_grade_detail['allow_repetition'] = (isset($value['Grade']['allow_repetition']) ? $value['Grade']['allow_repetition'] : false);
-                        break;
-                    }
-                }
-            }
-            return $approved_grade_detail;
-        } else {
-            return array();
-        }
-    }
-
-    function getApprovedGradeForMakeUpExam($register_add_id = null, $registration = 1)
-    {
-
-        $approved_grade_detail = array();
-
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['C-'] = 'C-';
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['D'] = 'D';
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['F'] = 'F';
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['I'] = 'I';
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['NG'] = 'NG';
-        $possibleAllowedRepetitionGrade[PROGRAM_UNDEGRADUATE]['Fx'] = 'Fx';
-
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['C'] = 'C';
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['C+'] = 'C+';
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['D'] = 'D';
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['F'] = 'F';
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['I'] = 'I';
-        $possibleAllowedRepetitionGrade[PROGRAM_POST_GRADUATE]['NG'] = 'NG';
-
-        if ($registration == 1) {
-            $grade_details = $this->find('all', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $register_add_id,
-                    'ExamGrade.course_registration_id is not null',
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                'recursive' => -1
-            ));
-        } else {
-            $grade_details = $this->find('all', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $register_add_id,
-                    'ExamGrade.course_registration_id is not null',
-                    'ExamGrade.department_approval' => 1,
-                    'ExamGrade.registrar_approval' => 1,
-                ),
-                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                'recursive' => -1
-            ));
-        }
-
-        //debug($grade_details[0]);
-
-        if (!empty($grade_details)) {
-            foreach ($grade_details as $grade_detail_id => $grade_detail) {
-                $approved_grade_detail['grade'] = $grade_detail['ExamGrade']['grade'];
-                $approved_grade_detail['grade_id'] = $grade_detail['ExamGrade']['id'];
-                $approved_grade_detail['exam_grade_grade_scale_id'] = (!empty($grade_detail['ExamGrade']['grade_scale_id']) ? $grade_detail['ExamGrade']['grade_scale_id'] : 0);
-
-                $grade_related_detail = $this->GradeScale->find('first', array(
-                    'conditions' => array(
-                        'GradeScale.id' => $grade_detail['ExamGrade']['grade_scale_id']
-                    ),
-                    'contain' => array(
-                        'GradeScaleDetail' => array(
-                            'Grade' => array(
-                                'conditions' => array(
-                                    'Grade.grade' => $approved_grade_detail['grade']
-                                ),
-                                'GradeType'
-                            )
-                        )
-                    )
-                ));
-
-                if (isset($grade_related_detail['GradeScaleDetail']) && !empty($grade_related_detail['GradeScaleDetail'])) {
-                    //debug($grade_related_detail);
-                    foreach ($grade_related_detail['GradeScaleDetail'] as $key => $value) {
-                        //debug($value);
-                        if (!empty($value['Grade']) && ((isset($value['Grade']['allow_repetition']) && $value['Grade']['allow_repetition']) || (!empty($possibleAllowedRepetitionGrade) && in_array(
-                                        $value['Grade']['grade'],
-                                        $possibleAllowedRepetitionGrade[$grade_related_detail['GradeScale']['program_id']]
-                                    )))) {
-                            $approved_grade_detail['point_value'] = (isset($value['Grade']['point_value']) ? $value['Grade']['point_value'] : 0);
-                            $approved_grade_detail['pass_grade'] = (isset($value['Grade']['pass_grade']) ? $value['Grade']['pass_grade'] : false);
-                            $approved_grade_detail['used_in_gpa'] = (isset($value['Grade']['GradeType']['used_in_gpa']) ? $value['Grade']['GradeType']['used_in_gpa'] : false);
-                            $approved_grade_detail['allow_repetition'] = (isset($value['Grade']['allow_repetition']) ? $value['Grade']['allow_repetition'] : false);
-                            return $approved_grade_detail;
+                        if (!empty($gradeTypeDetailsPF->grade_type) && !$gradeTypeDetailsPF->grade_type->used_in_gpa) {
+                            $coursesAndGrades[$index]['pass_fail_grade'] = true;
                         }
                     }
                 }
+
+                $matchingCourses = [$value->published_course->course->id => $value->published_course->course->id];
+                if (!empty($studentDetail->curriculum_id)) {
+                    $matchingCourses = array_merge(
+                        $matchingCourses,
+                        TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($value->published_course->course->id, $studentDetail->curriculum_id)
+                    );
+                }
+
+                $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentId);
+
+                if (count($registerAndAddFreq) <= 1) {
+                    $coursesAndGrades[$index]['repeated_old'] = false;
+                    $coursesAndGrades[$index]['repeated_new'] = false;
+                } else {
+                    $rept = $this->repeatationLabeling($registerAndAddFreq, 'register', $value->course_registration->id, $studentDetail, $coursesAndGrades[$index]['course_id']);
+                    $coursesAndGrades[$index]['repeated_old'] = $rept['repeated_old'];
+                    $coursesAndGrades[$index]['repeated_new'] = $rept['repeated_new'];
+                }
             }
-            return $approved_grade_detail;
-        } else {
-            return array();
-        }
-    }
-
-    function getGradeForStats($register_add_id = null, $registration = 1)
-    {
-
-        //debug($register_add_id);
-        $approved_grade_detail = array();
-
-        if ($registration == 1) {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $register_add_id,
-                ),
-                'order' => array('ExamGrade.created DESC'),
-                'recursive' => -1
-            ));
-        } else {
-            $grade_detail = $this->find('first', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $register_add_id,
-                ),
-                'order' => array('ExamGrade.created DESC'),
-                'recursive' => -1
-            ));
-            //debug($grade_detail);
         }
 
-        if (!empty($grade_detail)) {
-            $grade_change = $this->ExamGradeChange->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.exam_grade_id' => $grade_detail['ExamGrade']['id'],
-                    'OR' => array(
-                        array(
-                            'OR' => array(
-                                array(
-                                    //If it is grade change
-                                    'ExamGradeChange.makeup_exam_result IS NULL',
-                                    'ExamGradeChange.college_approval' => 1,
-                                ),
-                                array(
-                                    //Makeup exam
-                                    'ExamGradeChange.makeup_exam_result IS NOT NULL',
-                                )
-                            )
+        foreach ($courseAdded as $value) {
+            $index = count($coursesAndGrades);
+            $coursesAndGrades[$index] = [
+                'course_title' => trim($value->published_course->course->course_title),
+                'course_code' => trim($value->published_course->course->course_code),
+                'course_id' => $value->published_course->course->id,
+                'credit' => $value->published_course->course->credit,
+                'thesis' => $value->published_course->course->thesis,
+                'elective' => $value->published_course->course->elective
+            ];
 
-                        ),
-                        'ExamGradeChange.manual_ng_conversion = 1',
-                        'ExamGradeChange.auto_ng_conversion = 1'
-                    )
-                ),
-                'recursive' => -1,
-                'order' => array('ExamGradeChange.created DESC')
-            ));
-
-            //debug($grade_change);
-
-            if (!empty($grade_change)) {
-                $approved_grade_detail['grade'] = $grade_change['ExamGradeChange']['grade'];
+            if ($studentDetail->curriculum_id != $value->published_course->course->curriculum_id) {
+                $coursesAndGrades[$index]['major'] = TableRegistry::getTableLocator()->get('EquivalentCourses')->isEquivalentCourseMajor(
+                    $value->published_course->course_id,
+                    $studentDetail->curriculum_id
+                );
             } else {
-                $approved_grade_detail['grade'] = $grade_detail['ExamGrade']['grade'];
+                $coursesAndGrades[$index]['major'] = $value->published_course->course->major;
             }
 
-            $approved_grade_detail['grade_id'] = $grade_detail['ExamGrade']['id'];
+            $gradeDetail = $this->getApprovedGrade($value->course_add->id, 0);
 
-            $grade_related_detail = $this->GradeScale->find('first', array(
-                'conditions' => array(
-                    'GradeScale.id' => $grade_detail['ExamGrade']['grade_scale_id']
-                ),
-                'contain' => array(
-                    'GradeScaleDetail' => array(
-                        'Grade' => array(
-                            'conditions' => array(
-                                'Grade.grade' => $approved_grade_detail['grade']
-                            ),
-                            'GradeType'
-                        )
-                    )
-                )
-            ));
+            if (!empty($gradeDetail)) {
+                $coursesAndGrades[$index]['grade'] = $gradeDetail['grade'];
+                if (isset($gradeDetail['point_value'])) {
+                    $coursesAndGrades[$index]['point_value'] = $gradeDetail['point_value'];
+                    $coursesAndGrades[$index]['pass_grade'] = $gradeDetail['pass_grade'];
+                    $coursesAndGrades[$index]['used_in_gpa'] = $gradeDetail['used_in_gpa'];
+                }
+            }
 
-            if (isset($grade_related_detail['GradeScaleDetail'])) {
-                foreach ($grade_related_detail['GradeScaleDetail'] as $key => $value) {
-                    //debug($value);
-                    if (!empty($value['Grade'])) {
-                        $approved_grade_detail['point_value'] = $value['Grade']['point_value'];
-                        $approved_grade_detail['pass_grade'] = $value['Grade']['pass_grade'];
-                        $approved_grade_detail['used_in_gpa'] = $value['Grade']['GradeType']['used_in_gpa'];
+            $matchingCourses = [$value->published_course->course->id => $value->published_course->course->id];
+            if (!empty($studentDetail->curriculum_id)) {
+                $matchingCourses = array_merge(
+                    $matchingCourses,
+                    TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($value->published_course->course->id, $studentDetail->curriculum_id)
+                );
+            }
+
+            $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentId);
+
+            if (count($registerAndAddFreq) <= 1) {
+                $coursesAndGrades[$index]['repeated_old'] = false;
+                $coursesAndGrades[$index]['repeated_new'] = false;
+            } else {
+                $rept = $this->repeatationLabeling($registerAndAddFreq, 'add', $value->course_add->id, $studentDetail, $coursesAndGrades[$index]['course_id']);
+                $coursesAndGrades[$index]['repeated_old'] = $rept['repeated_old'];
+                $coursesAndGrades[$index]['repeated_new'] = $rept['repeated_new'];
+            }
+        }
+
+        return $coursesAndGrades;
+    }
+
+    public function getApprovedGrade(?int $registerAddId = null, int $registration = 1): array
+    {
+        $approvedGradeDetail = [];
+
+        $gradeDetail = $this->find()
+            ->where([
+                $registration == 1 ? 'ExamGrades.course_registration_id' : 'ExamGrades.course_add_id' => $registerAddId,
+                'ExamGrades.department_approval' => 1,
+                'ExamGrades.registrar_approval' => 1
+            ])
+            ->order(['ExamGrades.id' => 'DESC'])
+            ->first();
+
+        if (!empty($gradeDetail)) {
+            $gradeChange = $this->ExamGradeChanges->find()
+                ->where([
+                    'ExamGradeChanges.exam_grade_id' => $gradeDetail->id,
+                    'OR' => [
+                        [
+                            'ExamGradeChanges.department_approval' => 1,
+                            'ExamGradeChanges.registrar_approval' => 1,
+                            'OR' => [
+                                [
+                                    'ExamGradeChanges.makeup_exam_result IS NULL',
+                                    'ExamGradeChanges.college_approval' => 1
+                                ],
+                                ['ExamGradeChanges.makeup_exam_result IS NOT NULL']
+                            ]
+                        ],
+                        ['ExamGradeChanges.manual_ng_conversion' => 1],
+                        ['ExamGradeChanges.auto_ng_conversion' => 1]
+                    ]
+                ])
+                ->order(['ExamGradeChanges.id' => 'DESC'])
+                ->first();
+
+            if (!empty($gradeChange)) {
+                $approvedGradeDetail = [
+                    'grade' => $gradeChange->grade,
+                    'gradeChangeRequested' => $gradeChange->created,
+                    'gradeChangeApproved' => $gradeChange->modified,
+                    'gradeChangeReason' => $gradeChange->reason,
+                    'gradeChangeResult' => $gradeChange->result,
+                    'makeupExamResult' => $gradeChange->makeup_exam_result,
+                    'manualNGConversion' => $gradeChange->manual_ng_conversion,
+                    'autoNGConversion' => $gradeChange->auto_ng_conversion,
+                    'grade_change_id' => $gradeChange->id,
+                    'noGradeChangeRecorded' => false
+                ];
+
+                if ($gradeChange->manual_ng_conversion) {
+                    $approvedGradeDetail['manualNGConvertedBy'] = TableRegistry::getTableLocator()->get('Users')
+                        ->find()
+                        ->where(['Users.id' => $gradeChange->manual_ng_converted_by])
+                        ->select(['Users.first_name','Users.middle_name','Users.last_name'])
+                        ->first()->full_name ?? '';
+                }
+            } else {
+                $approvedGradeDetail = [
+                    'grade' => $gradeDetail->grade,
+                    'approved' => $gradeDetail->modified,
+                    'noGradeChangeRecorded' => true
+                ];
+            }
+
+            $approvedGradeDetail['grade_id'] = $gradeDetail->id;
+            $approvedGradeDetail['submitted'] = $gradeDetail->created;
+            $approvedGradeDetail['backdatedGradeEntry'] = (stripos($gradeDetail->registrar_reason, 'backend') !== false || $gradeDetail->registrar_reason == 'Via backend data entry interface') ? 1 : 0;
+            $approvedGradeDetail['registrarGradeEntry'] = (stripos($gradeDetail->registrar_reason, 'Data Entry') !== false && $gradeDetail->registrar_reason == 'Registrar Data Entry interface') ? 1 : 0;
+
+            if ($approvedGradeDetail['backdatedGradeEntry']) {
+                $approvedGradeDetail['approved'] = $gradeDetail->modified;
+            }
+
+            $gradeRelatedDetail = $this->GradeScales->find()
+                ->where(['GradeScales.id' => $gradeDetail->grade_scale_id])
+                ->contain([
+                    'GradeScaleDetails.Grades' => [
+                        'conditions' => ['Grades.grade' => $approvedGradeDetail['grade']],
+                        'GradeTypes'
+                    ]
+                ])
+                ->first();
+
+            if (!empty($gradeRelatedDetail->grade_scale_details)) {
+                foreach ($gradeRelatedDetail->grade_scale_details as $value) {
+                    if (!empty($value->grade)) {
+                        $approvedGradeDetail['point_value'] = $value->grade->point_value;
+                        $approvedGradeDetail['pass_grade'] = $value->grade->pass_grade;
+                        $approvedGradeDetail['used_in_gpa'] = $value->grade->grade_type->used_in_gpa;
+                        $approvedGradeDetail['grade_scale_id'] = $value->grade_scale_id;
+                        $approvedGradeDetail['grade_type'] = $value->grade->grade_type->type;
+                        $approvedGradeDetail['grade_type_id'] = $value->grade->grade_type->id;
+                        $approvedGradeDetail['repeatable'] = $value->grade->allow_repetition;
+                        $approvedGradeDetail['grade_scale'] = $gradeRelatedDetail->name;
                         break;
                     }
                 }
             }
-            //debug($approved_grade_detail);
-            return $approved_grade_detail;
-        } else {
-            return array();
+
+            if (!empty($approvedGradeDetail['grade']) && in_array(strtoupper($approvedGradeDetail['grade']), ['NG', 'DO', 'I', 'W'])) {
+                $approvedGradeDetail['pass_grade'] = 0;
+            }
+
+            return $approvedGradeDetail;
         }
+
+        return [];
     }
 
-    function editableExamType($published_course_id)
+    public function getApprovedNotChangedGrade(?int $registerAddId = null, int $registration = 1): array
     {
+        $approvedGradeDetail = [];
 
+        $gradeDetail = $this->find()
+            ->where([
+                $registration == 1 ? 'ExamGrades.course_registration_id' : 'ExamGrades.course_add_id' => $registerAddId,
+                'ExamGrades.department_approval' => 1,
+                'ExamGrades.registrar_approval' => 1
+            ])
+            ->order(['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC'])
+            ->first();
+
+        if (!empty($gradeDetail)) {
+            $approvedGradeDetail = [
+                'grade' => $gradeDetail->grade,
+                'grade_id' => $gradeDetail->id,
+                'exam_grade_grade_scale_id' => $gradeDetail->grade_scale_id,
+                'noGradeChangeRecorded' => empty($gradeDetail->exam_grade_changes)
+            ];
+
+            $gradeRelatedDetail = $this->GradeScales->find()
+                ->where(['GradeScales.id' => $gradeDetail->grade_scale_id])
+                ->contain([
+                    'GradeScaleDetails.Grades' => [
+                        'conditions' => ['Grades.grade' => $approvedGradeDetail['grade']],
+                        'GradeTypes'
+                    ]
+                ])
+                ->first();
+
+            if (!empty($gradeRelatedDetail->grade_scale_details)) {
+                foreach ($gradeRelatedDetail->grade_scale_details as $value) {
+                    if (!empty($value->grade)) {
+                        $approvedGradeDetail['point_value'] = $value->grade->point_value ?? 0;
+                        $approvedGradeDetail['pass_grade'] = $value->grade->pass_grade ?? false;
+                        $approvedGradeDetail['used_in_gpa'] = $value->grade->grade_type->used_in_gpa ?? false;
+                        $approvedGradeDetail['allow_repetition'] = $value->grade->allow_repetition ?? false;
+                        break;
+                    }
+                }
+            }
+
+            return $approvedGradeDetail;
+        }
+
+        return [];
+    }
+
+    public function getApprovedGradeForMakeUpExam(?int $registerAddId = null, int $registration = 1): array
+    {
+        $approvedGradeDetail = [];
+        $possibleAllowedRepetitionGrade = [
+            PROGRAM_UNDERGRADUATE => [
+                'C-' => 'C-',
+                'D' => 'D',
+                'F' => 'F',
+                'I' => 'I',
+                'Fx' => 'Fx'
+            ],
+            PROGRAM_POST_GRADUATE => [
+                'C' => 'C',
+                'C+' => 'C+',
+                'D' => 'D',
+                'F' => 'F',
+                'I' => 'I'
+            ]
+        ];
+
+        $gradeDetails = $this->find()
+            ->where([
+                $registration == 1 ? 'ExamGrades.course_registration_id' : 'ExamGrades.course_add_id' => $registerAddId,
+                'ExamGrades.course_registration_id IS NOT NULL',
+                'ExamGrades.department_approval' => 1,
+                'ExamGrades.registrar_approval' => 1
+            ])
+            ->order(['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC'])
+            ->toArray();
+
+        if (!empty($gradeDetails)) {
+            foreach ($gradeDetails as $gradeDetail) {
+                $approvedGradeDetail = [
+                    'grade' => $gradeDetail->grade,
+                    'grade_id' => $gradeDetail->id,
+                    'exam_grade_grade_scale_id' => $gradeDetail->grade_scale_id ?? 0,
+                    'haveGradeChange' => !empty($gradeDetail->exam_grade_changes)
+                ];
+
+                $gradeRelatedDetail = $this->GradeScales->find()
+                    ->where(['GradeScales.id' => $gradeDetail->grade_scale_id])
+                    ->contain([
+                        'GradeScaleDetails.Grades' => [
+                            'conditions' => ['Grades.grade' => $approvedGradeDetail['grade']],
+                            'GradeTypes'
+                        ]
+                    ])
+                    ->first();
+
+                if (!empty($gradeRelatedDetail->grade_scale_details)) {
+                    foreach ($gradeRelatedDetail->grade_scale_details as $value) {
+                        if (!empty($value->grade) && (
+                                ($value->grade->allow_repetition ?? false) ||
+                                (!empty($possibleAllowedRepetitionGrade[$gradeRelatedDetail->program_id]) &&
+                                    in_array($value->grade->grade, $possibleAllowedRepetitionGrade[$gradeRelatedDetail->program_id]))
+                            )) {
+                            $approvedGradeDetail['point_value'] = $value->grade->point_value ?? 0;
+                            $approvedGradeDetail['pass_grade'] = $value->grade->pass_grade ?? false;
+                            $approvedGradeDetail['used_in_gpa'] = $value->grade->grade_type->used_in_gpa ?? false;
+                            $approvedGradeDetail['allow_repetition'] = $value->grade->allow_repetition ?? false;
+
+                            if ($approvedGradeDetail['grade'] == 'NG' && $approvedGradeDetail['haveGradeChange']) {
+                                $approvedGradeDetail['allow_repetition'] = false;
+                            }
+
+                            return $approvedGradeDetail;
+                        }
+                    }
+                }
+            }
+            return $approvedGradeDetail;
+        }
+
+        return [];
+    }
+
+    public function getGradeForStats(?int $registerAddId = null, int $registration = 1): array
+    {
+        $approvedGradeDetail = [];
+
+        $gradeDetail = $this->find()
+            ->where([$registration == 1 ? 'ExamGrades.course_registration_id' : 'ExamGrades.course_add_id' => $registerAddId])
+            ->order(['ExamGrades.created' => 'DESC'])
+            ->first();
+
+        if (!empty($gradeDetail)) {
+            $gradeChange = $this->ExamGradeChanges->find()
+                ->where([
+                    'ExamGradeChanges.exam_grade_id' => $gradeDetail->id,
+                    'OR' => [
+                        [
+                            'OR' => [
+                                [
+                                    'ExamGradeChanges.makeup_exam_result IS NULL',
+                                    'ExamGradeChanges.college_approval' => 1
+                                ],
+                                ['ExamGradeChanges.makeup_exam_result IS NOT NULL']
+                            ]
+                        ],
+                        ['ExamGradeChanges.manual_ng_conversion' => 1],
+                        ['ExamGradeChanges.auto_ng_conversion' => 1]
+                    ]
+                ])
+                ->order(['ExamGradeChanges.created' => 'DESC'])
+                ->first();
+
+            $approvedGradeDetail['grade'] = !empty($gradeChange) ? $gradeChange->grade : $gradeDetail->grade;
+            $approvedGradeDetail['grade_id'] = $gradeDetail->id;
+
+            $gradeRelatedDetail = $this->GradeScales->find()
+                ->where(['GradeScales.id' => $gradeDetail->grade_scale_id])
+                ->contain([
+                    'GradeScaleDetails.Grades' => [
+                        'conditions' => ['Grades.grade' => $approvedGradeDetail['grade']],
+                        'GradeTypes'
+                    ]
+                ])
+                ->first();
+
+            if (!empty($gradeRelatedDetail->grade_scale_details)) {
+                foreach ($gradeRelatedDetail->grade_scale_details as $value) {
+                    if (!empty($value->grade)) {
+                        $approvedGradeDetail['point_value'] = $value->grade->point_value;
+                        $approvedGradeDetail['pass_grade'] = $value->grade->pass_grade;
+                        $approvedGradeDetail['used_in_gpa'] = $value->grade->grade_type->used_in_gpa;
+                        break;
+                    }
+                }
+            }
+
+            return $approvedGradeDetail;
+        }
+
+        return [];
+    }
+
+    public function editableExamType(int $publishedCourseId): bool
+    {
         $gradeSubmittedCountR = 0;
         $gradeSubmittedCountA = 0;
 
-        $registIds = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.published_course_id' => $published_course_id,
-            ),
-            'fields' => array('CourseRegistration.id', 'CourseRegistration.id')
-        ));
+        $registIds = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.published_course_id' => $publishedCourseId])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
-        $addIds = $this->CourseAdd->find('list', array(
-            'conditions' => array(
-                'CourseAdd.published_course_id' => $published_course_id,
-            ),
-            'fields' => array('CourseAdd.id', 'CourseAdd.id')
-        ));
+        $addIds = $this->CourseAdds->find('list')
+            ->where(['CourseAdds.published_course_id' => $publishedCourseId])
+            ->select(['CourseAdds.id'])
+            ->toArray();
 
         if (!empty($registIds)) {
-            $gradeSubmittedCountR = $this->find('count', array(
-                'conditions' => array(
-                    'ExamGrade.course_registration_id' => $registIds,
-                    'ExamGrade.department_approval' => 1
-                )
-            ));
+            $gradeSubmittedCountR = $this->find()
+                ->where([
+                    'ExamGrades.course_registration_id IN' => $registIds,
+                    'ExamGrades.department_approval' => 1
+                ])
+                ->count();
         }
 
         if (!empty($addIds)) {
-            $gradeSubmittedCountA = $this->find('count', array(
-                'conditions' => array(
-                    'ExamGrade.course_add_id' => $addIds,
-                    'ExamGrade.department_approval' => 1
-                )
-            ));
+            $gradeSubmittedCountA = $this->find()
+                ->where([
+                    'ExamGrades.course_add_id IN' => $addIds,
+                    'ExamGrades.department_approval' => 1
+                ])
+                ->count();
         }
 
-        if ($gradeSubmittedCountR > 0 || $gradeSubmittedCountA > 0) {
-            return true;
-        }
-
-        return false;
+        return $gradeSubmittedCountR > 0 || $gradeSubmittedCountA > 0;
     }
 
-    function getExamType($register_add_id = null, $registration = 1)
+    public function getExamType(?int $registerAddId = null, int $registration = 1): array
     {
+        $examResult = [];
 
-        $exam_result = array();
+        $examResultsTable = TableRegistry::getTableLocator()->get('ExamResults');
+        $examResult = $examResultsTable->find()
+            ->where([
+                $registration == 1 ? ['ExamResults.course_registration_id' => $registerAddId] : ['ExamResults.course_registration_id' => $registerAddId, 'course_add' => 1]
+            ])
+            ->contain(['ExamTypes' => ['sort' => ['ExamTypes.order' => 'ASC']]])
+            ->toArray();
 
-        if ($registration == 1) {
-            $exam_result = $this->CourseRegistration->ExamResult->find('all', array(
-                'conditions' => array(
-                    'ExamResult.course_registration_id' => $register_add_id,
-                ),
-                'contain' => array('ExamType' => array('order' => 'ExamType.order'))
-            ));
-        } else {
-            $exam_result = $this->CourseRegistration->ExamResult->find('all', array(
-                'conditions' => array(
-                    'ExamResult.course_registration_id' => $register_add_id,
-                    'course_add' => 1,
-                ),
-                'contain' => array('ExamType' => array('order' => 'ExamType.order'))
-            ));
-        }
-
-        return $exam_result;
+        return $examResult;
     }
 
-    function getStudentsWithNG($published_course_id = null)
+    public function getStudentsWithNG(?int $publishedCourseId = null): array
     {
+        $studentsWithNg = [];
 
-        $students_with_ng = array();
+        if (!empty($publishedCourseId)) {
+            $publishedCourseTable= TableRegistry::getTableLocator()->get('PublishedCourses');
+            $studentCourseRegisterAndAdds = $publishedCourseTable->getStudentsTakingPublishedCourse($publishedCourseId);
 
-        $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingPublishedCourse(
-            $published_course_id
-        );
-        //debug($student_course_register_and_adds);
+            foreach ($studentCourseRegisterAndAdds as $registerAddMakeup) {
+                foreach ($registerAddMakeup as $value) {
 
-        if (!empty($student_course_register_and_adds)) {
-            foreach ($student_course_register_and_adds as $key => $register_add_makeup) {
-                foreach ($register_add_makeup as $key => $value) {
+                    if ($value->student->graduated == 0) {
+                        $grade = [];
+
+                        if ( $value instanceof \App\Model\Entity\CourseRegistration && !empty($value->id) && is_numeric($value->id) && $value->id > 0) {
+                            $grade = $this->getApprovedGrade($value->id, 1);
+                        } elseif ($value instanceof \App\Model\Entity\CourseAdd  && !empty($value->id)
+                            && is_numeric($value->id) && $value->id > 0) {
+                            $grade = $this->getApprovedGrade($value->id, 0);
+                        }
+
+                        if (!empty($grade) && strcasecmp($grade['grade'], 'NG') == 0
+                            && !empty($grade['noGradeChangeRecorded'])) {
+                            $index = count($studentsWithNg);
+                            $studentsWithNg[$index] = [
+                                'full_name' => $value->student->full_name,
+                                'studentnumber' => $value->student->studentnumber,
+                                'gender' => $value->student->gender,
+                                'grade_id' => $grade['grade_id'],
+                                'grade' => $grade['grade'],
+                                'haveAssesmentData' => !empty($value->exam_results)
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $studentsWithNg;
+    }
+
+    public function getStudentsWithFX(?int $publishedCourseId = null, bool $fxSelectedByStudent = false): array
+    {
+        $studentsWithFx = [];
+
+        if (!empty($publishedCourseId)) {
+            $studentCourseRegisterAndAdds = $fxSelectedByStudent
+                ? $this->CourseRegistrations->PublishedCourses->getStudentsTakingFxExamPublishedCourse($publishedCourseId)
+                : $this->CourseRegistrations->PublishedCourses->getStudentsTakingPublishedCourse($publishedCourseId);
+
+            foreach ($studentCourseRegisterAndAdds as $registerAddMakeup) {
+                foreach ($registerAddMakeup as $value) {
                     if ($value['Student']['graduated'] == 0) {
-                        //debug($value['Student']['graduated']);
+                        $grade = [];
 
-                        $garde = array();
-
-                        if (isset($value['CourseRegistration']) && !empty($value['CourseRegistration']) && is_numeric(
-                                $value['CourseRegistration']['id']
-                            ) && $value['CourseRegistration']['id'] > 0) {
-                            $garde = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                        } elseif (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && is_numeric(
-                                $value['CourseAdd']['id']
-                            ) && $value['CourseAdd']['id'] > 0) {
-                            $garde = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
+                        if (!empty($value['CourseRegistration']) && is_numeric($value['CourseRegistration']['id']) && $value['CourseRegistration']['id'] > 0) {
+                            $grade = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
+                        } elseif (!empty($value['CourseAdd']) && is_numeric($value['CourseAdd']['id']) && $value['CourseAdd']['id'] > 0) {
+                            $grade = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
                         }
 
-                        if (!empty($garde) && strcasecmp($garde['grade'], 'NG') == 0) {
-                            $index = count($students_with_ng);
-                            $students_with_ng[$index]['full_name'] = $value['Student']['first_name'] . ' ' . $value['Student']['middle_name'] . ' ' . $value['Student']['last_name'];
-                            $students_with_ng[$index]['studentnumber'] = $value['Student']['studentnumber'];
-                            $students_with_ng[$index]['gender'] = $value['Student']['gender'];
-                            $students_with_ng[$index]['grade_id'] = $garde['grade_id'];
-                            $students_with_ng[$index]['grade'] = $garde['grade'];
-                            $students_with_ng[$index]['haveAssesmentData'] = (isset($value['ExamResult']) && !empty($value['ExamResult']) ? true : false);
+                        if (!empty($grade) && strcasecmp($grade['grade'], 'Fx') == 0 && !empty($grade['noGradeChangeRecorded'])) {
+                            $studentsWithFx[$value['Student']['id']] = [
+                                'full_name' => $value['Student']['first_name'] . ' ' . $value['Student']['middle_name'] . ' ' . $value['Student']['last_name'],
+                                'studentnumber' => $value['Student']['studentnumber'],
+                                'student_id' => $value['Student']['id'],
+                                'grade_id' => $grade['grade_id'],
+                                'gender' => $value['Student']['gender'],
+                                'p_c_id' => $publishedCourseId ?? 0,
+                                'grade' => $grade['grade']
+                            ];
+
+                            if (!empty($value['CourseRegistration']) && is_numeric($value['CourseRegistration']['id']) && $value['CourseRegistration']['id'] > 0) {
+                                $studentsWithFx[$value['Student']['id']]['course_registration_id'] = $value['CourseRegistration']['id'];
+                                $studentsWithFx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
+                            } elseif (!empty($value['CourseAdd']) && is_numeric($value['CourseAdd']['id']) && $value['CourseAdd']['id'] > 0) {
+                                $studentsWithFx[$value['Student']['id']]['course_add_id'] = $value['CourseAdd']['id'];
+                                $studentsWithFx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
+                            }
                         }
                     }
                 }
             }
         }
 
-        return $students_with_ng;
+        return $studentsWithFx;
     }
 
-    function getStudentsWithFX($published_course_id = null, $fxselectedbystudent = false)
+    public function getStudentsWithFXForMakeupAssignment(?int $publishedCourseId = null, bool $fxSelectedByStudent = false): array
     {
+        $studentsWithFx = [];
 
-        $students_with_fx = array();
+        if ($fxSelectedByStudent && !empty($publishedCourseId)) {
+            $studentCourseRegisterAndAdds = $this->CourseRegistrations->PublishedCourses->getStudentsTakingFxExamPublishedCourse($publishedCourseId);
 
-        if ($fxselectedbystudent) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingFxExamPublishedCourse(
-                $published_course_id
-            );
-        } else {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingPublishedCourse(
-                $published_course_id
-            );
-        }
+            foreach ($studentCourseRegisterAndAdds as $registerAddMakeup) {
+                foreach ($registerAddMakeup as $value) {
+                    if ($value['Student']['graduated'] == 0) {
+                        $grade = !empty($value['CourseRegistration']) && !empty($value['CourseRegistration']['id'])
+                            ? $this->getApprovedGrade($value['CourseRegistration']['id'], 1)
+                            : $this->getApprovedGrade($value['CourseAdd']['id'], 0);
 
-        if (!empty($student_course_register_and_adds)) {
-            foreach ($student_course_register_and_adds as $key => $register_add_makeup) {
-                foreach ($register_add_makeup as $key => $value) {
-                    $garde = array();
+                        if (!empty($grade) && strcasecmp($grade['grade'], 'Fx') == 0 && !empty($grade['noGradeChangeRecorded'])) {
+                            $studentsWithFx[$value['Student']['id']] = [
+                                'full_name' => $value['Student']['first_name'] . ' ' . $value['Student']['middle_name'] . ' ' . $value['Student']['last_name'],
+                                'studentnumber' => $value['Student']['studentnumber'],
+                                'student_id' => $value['Student']['id'],
+                                'grade_id' => $grade['grade_id'],
+                                'gender' => $value['Student']['gender'],
+                                'p_c_id' => $publishedCourseId ?? 0,
+                                'grade' => $grade['grade']
+                            ];
 
-                    if (isset($value['CourseRegistration']) && !empty($value['CourseRegistration']) && is_numeric(
-                            $value['CourseRegistration']['id']
-                        ) && $value['CourseRegistration']['id'] > 0) {
-                        $garde = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                    } elseif (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && is_numeric(
-                            $value['CourseAdd']['id']
-                        ) && $value['CourseAdd']['id'] > 0) {
-                        $garde = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
-                    }
-
-                    if (!empty($garde) && (strcasecmp(
-                                $garde['grade'],
-                                'Fx'
-                            ) == 0 /* || (strcasecmp($garde['grade'], 'F') == 0 &&  isset($garde['used_in_gpa']) && $garde['used_in_gpa']) */)) {
-                        $index = count($students_with_fx);
-
-                        $students_with_fx[$value['Student']['id']]['full_name'] = $value['Student']['first_name'] . ' ' . $value['Student']['middle_name'] . ' ' . $value['Student']['last_name'];
-                        $students_with_fx[$value['Student']['id']]['studentnumber'] = $value['Student']['studentnumber'];
-                        $students_with_fx[$value['Student']['id']]['student_id'] = $value['Student']['id'];
-                        $students_with_fx[$value['Student']['id']]['grade_id'] = $garde['grade_id'];
-
-                        if (isset($value['CourseRegistration']) && !empty($value['CourseRegistration']) && is_numeric(
-                                $value['CourseRegistration']['id']
-                            ) && $value['CourseRegistration']['id'] > 0) {
-                            $students_with_fx[$value['Student']['id']]['course_registration_id'] = $value['CourseRegistration']['id'];
-                            $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
-                        } elseif (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && is_numeric(
-                                $value['CourseAdd']['id']
-                            ) && $value['CourseAdd']['id'] > 0) {
-                            $students_with_fx[$value['Student']['id']]['course_add_id'] = $value['CourseAdd']['id'];
-                            $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
+                            if (!empty($value['CourseRegistration']) && !empty($value['CourseRegistration']['id'])) {
+                                $studentsWithFx[$value['Student']['id']]['course_registration_id'] = $value['CourseRegistration']['id'];
+                                $studentsWithFx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
+                                $studentsWithFx[$value['Student']['id']]['makeupalreadyapplied'] = TableRegistry::getTableLocator()->get('MakeupExams')->makeUpExamApplied(
+                                    $value['Student']['id'],
+                                    $value['PublishedCourse']['id'],
+                                    $value['CourseRegistration']['id'],
+                                    1
+                                );
+                            } elseif (!empty($value['CourseAdd']) && !empty($value['CourseAdd']['id'])) {
+                                $studentsWithFx[$value['Student']['id']]['course_add_id'] = $value['CourseAdd']['id'];
+                                $studentsWithFx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
+                                $studentsWithFx[$value['Student']['id']]['makeupalreadyapplied'] = TableRegistry::getTableLocator()->get('MakeupExams')->makeUpExamApplied(
+                                    $value['Student']['id'],
+                                    $value['PublishedCourse']['id'],
+                                    $value['CourseAdd']['id'],
+                                    0
+                                );
+                            }
                         }
-
-                        $students_with_fx[$value['Student']['id']]['grade'] = (isset($garde['grade']) ? $garde['grade'] : '');
                     }
                 }
             }
         }
 
-        return $students_with_fx;
+        return $studentsWithFx;
     }
 
-    function getStudentsWithFXForMakeupAssignment($published_course_id = null, $fxselectedbystudent = false)
+    public function getStudentCopies(?array $studentIds = null, ?string $academicYear = null, ?string $semester = null): array
     {
+        $studentCopies = [];
 
-        $students_with_fx = array();
-        $student_course_register_and_adds = array();
-
-        if ($fxselectedbystudent) {
-            $student_course_register_and_adds = $this->CourseRegistration->PublishedCourse->getStudentsTakingFxExamPublishedCourse(
-                $published_course_id
-            );
-        }
-
-        if (!empty($student_course_register_and_adds)) {
-            foreach ($student_course_register_and_adds as $key => $register_add_makeup) {
-                foreach ($register_add_makeup as $key => $value) {
-                    if (isset($value['CourseRegistration']) && !empty($value['CourseRegistration']) && $value['CourseRegistration']['id'] != "") {
-                        $garde = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                    } else {
-                        $garde = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
-                    }
-
-                    if (!empty($garde) && strcasecmp($garde['grade'], 'Fx') == 0) {
-                        $index = count($students_with_fx);
-
-                        $students_with_fx[$value['Student']['id']]['full_name'] = $value['Student']['first_name'] . ' ' . $value['Student']['middle_name'] . ' ' . $value['Student']['last_name'];
-                        $students_with_fx[$value['Student']['id']]['studentnumber'] = $value['Student']['studentnumber'];
-                        $students_with_fx[$value['Student']['id']]['student_id'] = $value['Student']['id'];
-                        $students_with_fx[$value['Student']['id']]['grade_id'] = $garde['grade_id'];
-
-                        if (isset($value['CourseRegistration']) && !empty($value['CourseRegistration']) && $value['CourseRegistration']['id'] != "") {
-                            $students_with_fx[$value['Student']['id']]['course_registration_id'] = $value['CourseRegistration']['id'];
-                            $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
-                            $students_with_fx[$value['Student']['id']]['makeupalreadyapplied'] = ClassRegistry::init(
-                                'MakeupExam'
-                            )->makeUpExamApplied(
-                                $value['Student']['id'],
-                                $value['PublishedCourse']['id'],
-                                $value['CourseRegistration']['id'],
-                                1
-                            );
-                        } elseif (isset($value['CourseAdd']) && !empty($value['CourseAdd']) && $value['CourseAdd']['id'] != "") {
-                            $students_with_fx[$value['Student']['id']]['course_add_id'] = $value['CourseAdd']['id'];
-                            $students_with_fx[$value['Student']['id']]['published_course_id'] = $value['PublishedCourse']['id'];
-                            $students_with_fx[$value['Student']['id']]['makeupalreadyapplied'] = ClassRegistry::init(
-                                'MakeupExam'
-                            )->makeUpExamApplied(
-                                $value['Student']['id'],
-                                $value['PublishedCourse']['id'],
-                                $value['CourseAdd']['id'],
-                                0
-                            );
-                        }
-
-                        $students_with_fx[$value['Student']['id']]['grade'] = $garde['grade'];
-                    }
+        if (!empty($studentIds)) {
+            foreach ($studentIds as $studentId) {
+                $studentCopy = $this->getStudentCopy($studentId, $academicYear, $semester);
+                if (!empty($studentCopy['courses'])) {
+                    $studentCopy['University'] = TableRegistry::getTableLocator()->get('Universities')->getStudentUniversity($studentId);
+                    $studentCopies[] = $studentCopy;
                 }
             }
         }
 
-        return $students_with_fx;
+        return $studentCopies;
     }
 
-    function getStudentCopies($student_ids = null, $academic_year = null, $semester = null)
+    public function getStudentCopy(?int $studentId = null, ?string $academicYear = null, ?string $semester = null): array
     {
+        $studentCopy = [];
 
-        $student_copies = array();
+        if (!empty($studentId) && is_numeric($studentId) && $studentId > 0) {
+            $studentDetail = $this->CourseAdds->Students->find()
+                ->where(['Students.id' => $studentId])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name', 'shortname']],
+                    'ProgramTypes' => ['fields' => ['id', 'name', 'shortname', 'equivalent_to_id']],
+                    'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                    'Colleges' => [
+                        'fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone'],
+                        'Campuses' => ['fields' => ['id', 'name']]
+                    ],
+                    'Curriculums'
+                ])
+                ->first();
 
-        if (!empty($student_ids)) {
-            foreach ($student_ids as $key => $student_id) {
-                $student_copy = $this->getStudentCopy($student_id, $academic_year, $semester);
-                if (!empty($student_copy['courses'])) {
-                    $student_copy['University'] = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
-                    $student_copies[] = $student_copy;
-                }
-            }
-        }
+            $programTypeId = $this->CourseAdds->Students->ProgramTypeTransfers->getStudentProgramType($studentId, $academicYear, $semester);
+            $programTypeDetail = $this->CourseAdds->Students->ProgramTypes->find()
+                ->where(['ProgramTypes.id' => $programTypeId])
+                ->first();
 
-        return $student_copies;
-    }
-
-    function getStudentCopy($student_id = null, $academic_year = null, $semester = null)
-    {
-
-        $student_copy = array();
-
-        if (!empty($student_id) && is_numeric($student_id) && $student_id > 0) {
-            $student_detail = $this->CourseAdd->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => $student_id
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name', 'shortname'),
-                    'ProgramType' => array('id', 'name', 'shortname', 'equivalent_to_id'),
-                    'Department' => array('id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone'),
-                    'College' => array(
-                        'fields' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Campus' => array('id', 'name'),
-                    ),
-                    'Curriculum',
-                )
-            ));
-
-            //debug($student_detail);
-            $program_type_id = $this->CourseAdd->Student->ProgramTypeTransfer->getStudentProgramType(
-                $student_id,
-                $academic_year,
-                $semester
+            $studentCopy['ProgramType'] = $programTypeDetail->toArray();
+            $programTypeId = $this->CourseAdds->Students->ProgramTypes->getParentProgramType($programTypeId);
+            $pattern = $this->CourseAdds->Students->ProgramTypes->StudentStatusPatterns->getProgramTypePattern(
+                $studentDetail->program_id,
+                $programTypeId,
+                $academicYear
             );
 
-            $program_type_detail = $this->CourseAdd->Student->ProgramType->find(
-                'first',
-                array('conditions' => array('ProgramType.id' => $program_type_id), 'recursive' => -1)
-            );
+            $ayAndSList = [[
+                'academic_year' => $academicYear,
+                'semester' => $semester
+            ]];
 
-            $student_copy['ProgramType'] = $program_type_detail['ProgramType'];
-            $program_type_id = $this->CourseAdd->Student->ProgramType->getParentProgramType($program_type_id);
+            if ($pattern > 1) {
+                $statusPrepared = $this->CourseAdds->Students->StudentExamStatuses->find()
+                    ->where([
+                        'StudentExamStatuses.student_id' => $studentId,
+                        'StudentExamStatuses.academic_year' => $academicYear,
+                        'StudentExamStatuses.semester' => $semester
+                    ])
+                    ->count();
 
-            $pattern = $this->CourseAdd->Student->ProgramType->StudentStatusPattern->getProgramTypePattern(
-                $student_detail['Student']['program_id'],
-                $program_type_id,
-                $academic_year
-            );
-
-            //Retrieving AY and Semester list based on pattern for status
-            $ay_and_s_list = array();
-            debug($pattern);
-
-            if ($pattern <= 1) {
-                $ay_and_s_list[0]['academic_year'] = $academic_year;
-                $ay_and_s_list[0]['semester'] = $semester;
-            } else {
-                $status_prepared = $this->CourseAdd->Student->StudentExamStatus->find('count', array(
-                    'conditions' => array(
-                        'StudentExamStatus.student_id' => $student_id,
-                        'StudentExamStatus.academic_year' => $academic_year,
-                        'StudentExamStatus.semester' => $semester
-                    ),
-                    'recursive' => -1,
-                    //'order' => array('StudentExamStatus.created' => 'DESC')
-                    'order' => array(
-                        'StudentExamStatus.academic_year' => 'DESC',
-                        'StudentExamStatus.semester' => 'DESC',
-                        'StudentExamStatus.created' => 'DESC'
-                    )
-                ));
-
-                debug($status_prepared);
-
-                if ($status_prepared == 0) {
-                    $ay_and_s_list_draft = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToGenerateStatus(
-                        $student_detail['Student']['id'],
-                        $academic_year,
+                if ($statusPrepared == 0) {
+                    $ayAndSListDraft = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToGenerateStatus(
+                        $studentDetail->id,
+                        $academicYear,
                         $semester
                     );
-                    debug($ay_and_s_list_draft);
-                    //If there are lots of semester without status generation. It is to avoid including other semester/s in the current pattern
-                    if (count($ay_and_s_list_draft) > $pattern) {
-                        for ($i = 0; $i < $pattern; $i++) {
-                            $ay_and_s_list[$i] = $ay_and_s_list_draft[$i];
-                        }
+                    if (count($ayAndSListDraft) > $pattern) {
+                        $ayAndSList = array_slice($ayAndSListDraft, 0, $pattern);
                     } else {
-                        $ay_and_s_list = $ay_and_s_list_draft;
+                        $ayAndSList = $ayAndSListDraft;
                     }
                 } else {
-                    $ay_and_s_list = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToUpdateStatus(
-                        $student_detail['Student']['id'],
-                        $academic_year,
+                    $ayAndSList = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToUpdateStatus(
+                        $studentDetail->id,
+                        $academicYear,
                         $semester
                     );
-                    debug($ay_and_s_list);
                 }
             }
-            debug($ay_and_s_list);
 
-            //Get list of courses a student registered within the pattern AY and semester list
-            $options = array();
+            $options = [
+                'conditions' => ['CourseRegistrations.student_id' => $studentDetail->id],
+                'contain' => [
+                    'PublishedCourses' => [
+                        'Courses' => [
+                            'Curriculums',
+                            'GradeTypes.Grades'
+                        ],
+                        'Sections' => [
+                            'fields' => ['id', 'name'],
+                            'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'specialization_english_degree_nomenclature', 'english_degree_nomenclature', 'active']],
+                            'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                            'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']],
+                            'YearLevels' => ['fields' => ['id', 'name']]
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'full_name'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ]
+                    ],
+                    'Sections' => [
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'specialization_english_degree_nomenclature', 'english_degree_nomenclature', 'active']],
+                        'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']],
+                        'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                        'Programs' => ['fields' => ['id', 'name', 'shortname']],
+                        'ProgramTypes' => ['fields' => ['id', 'name', 'shortname']],
+                        'YearLevels' => ['fields' => ['id', 'name']]
+                    ]
+                ],
+                'order' => ['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC']
+            ];
 
-            if (!empty($ay_and_s_list)) {
-                foreach ($ay_and_s_list as $key => $ay_s) {
-                    $options['conditions']['OR'][] = array(
-                        'CourseRegistration.academic_year' => $ay_s['academic_year'],
-                        'CourseRegistration.semester' => $ay_s['semester'],
-                        'CourseRegistration.student_id' => $student_detail['Student']['id']
+            foreach ($ayAndSList as $ayS) {
+                $options['conditions']['OR'][] = [
+                    'CourseRegistrations.academic_year' => $ayS['academic_year'],
+                    'CourseRegistrations.semester' => $ayS['semester']
+                ];
+            }
+
+            $studentCourseRegistrations = $this->CourseRegistrations->find('all', $options)->toArray();
+
+            $options = [
+                'conditions' => [
+                    'CourseAdds.student_id' => $studentDetail->id,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ],
+                'contain' => [
+                    'PublishedCourses' => [
+                        'Courses' => [
+                            'Curriculums',
+                            'GradeTypes.Grades'
+                        ],
+                        'Sections' => [
+                            'fields' => ['id', 'name'],
+                            'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                            'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']]
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'full_name'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ]
+                    ]
+                ],
+                'order' => ['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC']
+            ];
+
+            foreach ($ayAndSList as $ayS) {
+                $options['conditions']['OR'][] = [
+                    'CourseAdds.academic_year' => $ayS['academic_year'],
+                    'CourseAdds.semester' => $ayS['semester']
+                ];
+            }
+
+            $studentCourseAdds = $this->CourseAdds->find('all', $options)->toArray();
+
+            $studentCopy['courses'] = [];
+
+            foreach ($studentCourseRegistrations as $studentCourseRegistration) {
+                if ($studentCourseRegistration->published_course->drop == 0 && !$this->CourseRegistrations->isCourseDropped($studentCourseRegistration->id)) {
+                    $rIndex = count($studentCopy['courses']);
+                    $studentCopy['courses'][$rIndex] = [
+                        'Course' => $studentCourseRegistration->published_course->course,
+                        'PublishedCourse' => $studentCourseRegistration->published_course,
+                        'CourseRegistration' => $studentCourseRegistration,
+                        'Grade' => $this->getApprovedGrade($studentCourseRegistration->id, 1),
+                        'ExamType' => $this->getExamType($studentCourseRegistration->id, 1),
+                        'hasEquivalentMap' => TableRegistry::getTableLocator()->get('EquivalentCourses')->checkCourseHasEquivalentCourse(
+                            $studentCourseRegistration->published_course->course_id,
+                            $studentDetail->curriculum_id
+                        ),
+                        'section' => $studentCourseRegistration->published_course->section,
+                        'regAdd' => 10
+                    ];
+
+                    $courseId = $studentCourseRegistration->published_course->course->id;
+                    $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse(
+                        $courseId,
+                        $studentDetail->curriculum_id
                     );
-                }
-                //}
+                    $matchingCourses[$courseId] = $courseId;
 
-                $options['conditions']['CourseRegistration.student_id'] = $student_detail['Student']['id'];
+                    $studentDetailArray = ['Student' => $studentDetail->toArray()];
+                    $registerAddId = $studentCourseRegistration->id;
 
-                $options['contain'] = array(
-                    'PublishedCourse' => array(
-                        'Course' => array(
-                            'Curriculum',
-                            'GradeType' => array('Grade')
-                        ),
-                        'Section' => array(
-                            'fields' => array('id', 'name'),
-                            'Curriculum' => array(
-                                'id',
-                                'name',
-                                'year_introduced',
-                                'type_credit',
-                                'specialization_english_degree_nomenclature',
-                                'english_degree_nomenclature',
-                                'active'
-                            ),
-                            'Department' => array(
-                                'id',
-                                'name',
-                                'college_id',
-                                'type',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                            'College' => array(
-                                'id',
-                                'name',
-                                'shortname',
-                                'type',
-                                'stream',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                            'YearLevel' => array('id', 'name'),
-                        ),
-                        'YearLevel' => array('fields' => array('id', 'name')),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        )
-                    ),
-                    'Section' => array(
-                        'Curriculum' => array(
-                            'id',
-                            'name',
-                            'year_introduced',
-                            'type_credit',
-                            'specialization_english_degree_nomenclature',
-                            'english_degree_nomenclature',
-                            'active'
-                        ),
-                        'College' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Department' => array(
-                            'id',
-                            'name',
-                            'college_id',
-                            'type',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Program' => array('id', 'name', 'shortname'),
-                        'ProgramType' => array('id', 'name', 'shortname'),
-                        'YearLevel' => array('id', 'name'),
-                    ),
-                );
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
 
-                $options['order'] = array(
-                    'CourseRegistration.academic_year' => 'ASC',
-                    'CourseRegistration.semester' => 'ASC',
-                    'CourseRegistration.id' => 'ASC'
-                );
-
-                $student_course_registrations = $this->CourseRegistration->find('all', $options);
-
-                //Get list of courses a student added within the pattern AY and semester list
-                $options = array();
-
-                //if (!empty($ay_and_s_list)) {
-                foreach ($ay_and_s_list as $key => $ay_s) {
-                    $options['conditions']['OR'][] = array(
-                        'CourseAdd.academic_year' => $ay_s['academic_year'],
-                        'CourseAdd.semester' => $ay_s['semester'],
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation = 1',
-                        'CourseAdd.student_id' => $student_detail['Student']['id']
-                    );
-                }
-                //}
-
-                $options['conditions']['CourseAdd.student_id'] = $student_detail['Student']['id'];
-
-                $options['contain'] = array(
-                    'PublishedCourse' => array(
-                        'Course' => array(
-                            'Curriculum',
-                            'GradeType' => array('Grade')
-                        ),
-                        'Section' => array(
-                            'fields' => array('id', 'name'),
-                            'Curriculum' => array(
-                                'id',
-                                'name',
-                                'year_introduced',
-                                'type_credit',
-                                'specialization_english_degree_nomenclature',
-                                'english_degree_nomenclature',
-                                'active'
-                            ),
-                            'Department' => array(
-                                'id',
-                                'name',
-                                'college_id',
-                                'type',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                            'College' => array(
-                                'id',
-                                'name',
-                                'shortname',
-                                'type',
-                                'stream',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                        ),
-                        'YearLevel' => array('fields' => array('id', 'name')),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        )
-                    )
-                );
-
-                $options['order'] = array(
-                    'CourseAdd.academic_year' => 'ASC',
-                    'CourseAdd.semester' => 'ASC',
-                    'CourseAdd.id' => 'ASC'
-                );
-
-                $student_course_adds = $this->CourseAdd->find('all', $options);
-            }
-
-
-            $student_copy['courses'] = array();
-
-            //List courses the student registered for
-            if (!empty($student_course_registrations)) {
-                foreach ($student_course_registrations as $key => $student_course_registration) {
-                    if ($student_course_registration['PublishedCourse']['drop'] == 0 && !$this->CourseRegistration->isCourseDroped(
-                            $student_course_registration['CourseRegistration']['id']
-                        )) {
-                        $r_index = count($student_copy['courses']);
-                        $student_copy['courses'][$r_index]['Course'] = $student_course_registration['PublishedCourse']['Course'];
-                        $student_copy['courses'][$r_index]['PublishedCourse'] = $student_course_registration['PublishedCourse'];
-                        $student_copy['courses'][$r_index]['CourseRegistration'] = $student_course_registration['CourseRegistration'];
-                        $student_copy['courses'][$r_index]['Grade'] = $this->getApprovedGrade(
-                            $student_course_registration['CourseRegistration']['id'],
-                            1
-                        );
-                        $student_copy['courses'][$r_index]['ExamType'] = $this->getExamType(
-                            $student_course_registration['CourseRegistration']['id'],
-                            1
-                        );
-                        $student_copy['courses'][$r_index]['hasEquivalentMap'] = ClassRegistry::init(
-                            'EquivalentCourse'
-                        )->checkCourseHasEquivalentCourse(
-                            $student_course_registration['PublishedCourse']['course_id'],
-                            $student_detail['Student']['curriculum_id']
-                        );
-
-                        // to check that or verify that later Neway
-                        $student_copy['courses'][$r_index]['section'] = $student_course_registration['PublishedCourse']['Section'];
-                        // to display the examgrade is from reg/add in results tab, Neway 10 = Registration,  11 = course add
-                        $student_copy['courses'][$r_index]['regAdd'] = 10;
-
-                        //$student_copy['courses'][$r_index]['firstTime'] = $this->isRegistrationAddForFirstTime($student_course_registration['CourseRegistration']['id'], 1, 1);
-
-                        $course_id = $student_course_registration['PublishedCourse']['Course']['id'];
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $course_id,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        $matching_courses[$course_id] = $course_id;
-
-                        $studentDetail['Student'] = $student_detail['Student'];
-                        $register_add_id = $student_course_registration['CourseRegistration']['id'];
-
-                        $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                            $matching_courses,
-                            $student_detail['Student']['id']
-                        );
-
-                        if (count($register_and_add_freq) <= 1) {
-                            $student_copy['courses'][$r_index]['firstTime'] = 1;
-                        } else {
-                            $student_copy['courses'][$r_index]['firstTime'] = 0;
-                            if (isset($course_id) && !empty($course_id)) {
-                                $rep = $this->repeatationLabeling(
-                                    $register_and_add_freq,
-                                    'register',
-                                    $register_add_id,
-                                    $studentDetail,
-                                    $course_id
-                                );
-                                //debug($rep);
-                                /* if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                                //return true;
-                            } */
-                                $student_copy['courses'][$r_index]['RepeatitionLabel'] = $rep;
-                            }
-                        }
-                    }
-                }
-            }
-
-            //List courses the student added for
-            if (!empty($student_course_adds)) {
-                foreach ($student_course_adds as $key => $student_course_add) {
-                    if ($student_course_add['PublishedCourse']['drop'] == 0) {
-                        $r_index = count($student_copy['courses']);
-                        $student_copy['courses'][$r_index]['Course'] = $student_course_add['PublishedCourse']['Course'];
-                        $student_copy['courses'][$r_index]['CourseAdd'] = $student_course_add['CourseAdd'];
-                        $student_copy['courses'][$r_index]['Grade'] = $this->getApprovedGrade(
-                            $student_course_add['CourseAdd']['id'],
-                            0
-                        );
-                        $student_copy['courses'][$r_index]['ExamType'] = $this->getExamType(
-                            $student_course_add['CourseAdd']['id'],
-                            0
-                        );
-                        $student_copy['courses'][$r_index]['hasEquivalentMap'] = ClassRegistry::init(
-                            'EquivalentCourse'
-                        )->checkCourseHasEquivalentCourse(
-                            $student_course_add['PublishedCourse']['course_id'],
-                            $student_detail['Student']['curriculum_id']
-                        );
-
-                        // to check that or verify that later Neway
-                        $student_copy['courses'][$r_index]['section'] = $student_course_add['PublishedCourse']['Section'];
-                        // to display the examgrade is from reg/add in results tab, Neway 10 = Registration,  11 = course add
-                        $student_copy['courses'][$r_index]['regAdd'] = 11;
-                        //$student_copy['courses'][$r_index]['firstTime'] = $this->isRegistrationAddForFirstTime($student_course_add['CourseAdd']['id'], 0, 1);
-
-                        $course_id = $student_course_add['PublishedCourse']['Course']['id'];
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $course_id,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        $matching_courses[$course_id] = $course_id;
-
-                        $studentDetail['Student'] = $student_detail['Student'];
-                        $register_add_id = $student_course_add['CourseAdd']['id'];
-
-                        $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                            $matching_courses,
-                            $student_detail['Student']['id']
-                        );
-
-                        if (count($register_and_add_freq) <= 1) {
-                            $student_copy['courses'][$r_index]['firstTime'] = 1;
-                        } else {
-                            $student_copy['courses'][$r_index]['firstTime'] = 0;
-                            if (isset($course_id) && !empty($course_id)) {
-                                $rep = $this->repeatationLabeling(
-                                    $register_and_add_freq,
-                                    'add',
-                                    $register_add_id,
-                                    $studentDetail,
-                                    $course_id
-                                );
-                                //debug($rep);
-                                /* if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                                //return true;
-                            } */
-                                $student_copy['courses'][$r_index]['RepeatitionLabel'] = $rep;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!empty($student_course_registrations)) {
-                $section_detail = $this->CourseAdd->Student->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.id' => $student_course_registrations[0]['PublishedCourse']['section_id']
-                    ),
-                    'contain' => array(
-                        'Curriculum' => array(
-                            'id',
-                            'name',
-                            'year_introduced',
-                            'type_credit',
-                            'specialization_english_degree_nomenclature',
-                            'english_degree_nomenclature',
-                            'active'
-                        ),
-                        'College' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'type_amharic',
-                            'amharic_name',
-                            'phone'
-                        ),
-                        'Department' => array(
-                            'id',
-                            'name',
-                            'college_id',
-                            'type',
-                            'type_amharic',
-                            'amharic_name',
-                            'phone'
-                        ),
-                        'Program' => array('id', 'name', 'shortname'),
-                        'ProgramType' => array('id', 'name', 'shortname'),
-                        'YearLevel' => array('id', 'name'),
-                    )
-                ));
-
-                $student_copy['Section'] = $section_detail['Section'];
-                $student_copy['Section']['Program'] = $section_detail['Program'];
-                $student_copy['Section']['ProgramType'] = $section_detail['ProgramType'];
-                $student_copy['Section']['Curriculum'] = $section_detail['Curriculum'];
-                $student_copy['Section']['College'] = $section_detail['College'];
-                $student_copy['Section']['Department'] = $section_detail['Department'];
-                $student_copy['Section']['YearLevel'] = $section_detail['YearLevel'];
-                $student_copy['YearLevel'] = $section_detail['YearLevel'];
-            } else {
-                $student_copy['Section'] = array();
-                $student_copy['YearLevel'] = array();
-            }
-
-            $student_copy['Student'] = $student_detail['Student'];
-            $student_copy['Curriculum'] = $student_detail['Curriculum'];
-            $student_copy['Program'] = $student_detail['Program'];
-            $student_copy['College'] = $student_detail['College'];
-            $student_copy['Department'] = $student_detail['Department'];
-            $student_copy['academic_year'] = $academic_year;
-            $student_copy['semester'] = $semester;
-
-            $student_copy['Student']['Program'] = $student_detail['Program'];
-            $student_copy['Student']['ProgramType'] = $student_detail['ProgramType'];
-            $student_copy['Student']['College'] = $student_detail['College'];
-            //$student_copy['Student']['Curriculum'] = $student_detail['Curriculum'];
-            $student_copy['Student']['Department'] = $student_detail['Department'];
-
-
-            $student_status = $this->CourseRegistration->Student->StudentExamStatus->find('first', array(
-                'conditions' => array(
-                    'StudentExamStatus.student_id' => $student_id,
-                    'StudentExamStatus.academic_year' => $academic_year,
-                    'StudentExamStatus.semester' => $semester
-                ),
-                'contain' => array('AcademicStatus'),
-                'order' => array(/* 'StudentExamStatus.academic_year' => 'DESC', 'StudentExamStatus.semester' => 'DESC', */
-                    'StudentExamStatus.created' => 'DESC'
-                )
-            ));
-
-            //debug($student_status);
-            if (!isset($student_status['StudentExamStatus']) && empty($student_status)) {
-                $student_copy['StudentExamStatus'] = array();
-                $student_copy['AcademicStatus'] = array();
-            } else {
-                $student_copy['StudentExamStatus'] = $student_status['StudentExamStatus'];
-                $student_copy['AcademicStatus'] = $student_status['AcademicStatus'];
-            }
-
-            //Retrieving previous status
-            $all_student_status = $this->CourseRegistration->Student->StudentExamStatus->find('all', array(
-                'conditions' => array(
-                    'StudentExamStatus.student_id' => $student_id,
-                ),
-                'contain' => array('AcademicStatus'),
-                //'order' => array('StudentExamStatus.academic_year ASC', 'StudentExamStatus.semester ASC')
-                'group' => array(
-                    'StudentExamStatus.student_id',
-                    'StudentExamStatus.academic_year',
-                    'StudentExamStatus.semester'
-                ),
-                'order' => array('StudentExamStatus.academic_year' => 'ASC', 'StudentExamStatus.semester' => 'ASC')
-            ));
-
-            $previous_credit_hour_sum = 0;
-            $previous_grade_point_sum = 0;
-            $previous_student_status = array();
-            $previous_academic_status = array();
-
-            if (!empty($all_student_status)) {
-                foreach ($all_student_status as $st_key => $student_status2) {
-                    if (strcasecmp(
-                            $student_status2['StudentExamStatus']['academic_year'],
-                            $academic_year
-                        ) == 0 && strcasecmp(
-                            $student_status2['StudentExamStatus']['semester'],
-                            $semester
-                        ) == 0 || empty($student_status)) {
-                        break;
+                    if (count($registerAndAddFreq) <= 1) {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 1;
                     } else {
-                        $previous_credit_hour_sum += $student_status2['StudentExamStatus']['credit_hour_sum'];
-                        $previous_grade_point_sum += $student_status2['StudentExamStatus']['grade_point_sum'];
-                        $previous_student_status = $student_status2['StudentExamStatus'];
-                        $previous_academic_status = $student_status2['AcademicStatus'];
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 0;
+                        if (!empty($courseId)) {
+                            $rep = $this->repeatationLabeling($registerAndAddFreq, 'register', $registerAddId, $studentDetailArray, $courseId);
+                            $studentCopy['courses'][$rIndex]['RepeatitionLabel'] = $rep;
+                        }
                     }
                 }
             }
 
-            //If there is previous status
-            if (!empty($previous_student_status)) {
-                $student_copy['PreviousStudentExamStatus'] = $previous_student_status;
-                $student_copy['PreviousAcademicStatus'] = $previous_academic_status;
-                $student_copy['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previous_credit_hour_sum;
-                $student_copy['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previous_grade_point_sum;
+            foreach ($studentCourseAdds as $studentCourseAdd) {
+                if ($studentCourseAdd->published_course->drop == 0) {
+                    $rIndex = count($studentCopy['courses']);
+                    $studentCopy['courses'][$rIndex] = [
+                        'Course' => $studentCourseAdd->published_course->course,
+                        'PublishedCourse' => $studentCourseAdd->published_course,
+                        'CourseAdd' => $studentCourseAdd,
+                        'Grade' => $this->getApprovedGrade($studentCourseAdd->id, 0),
+                        'ExamType' => $this->getExamType($studentCourseAdd->id, 0),
+                        'hasEquivalentMap' => TableRegistry::getTableLocator()->get('EquivalentCourses')->checkCourseHasEquivalentCourse(
+                            $studentCourseAdd->published_course->course_id,
+                            $studentDetail->curriculum_id
+                        ),
+                        'section' => $studentCourseAdd->published_course->section,
+                        'regAdd' => 11
+                    ];
+
+                    $courseId = $studentCourseAdd->published_course->course->id;
+                    $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse(
+                        $courseId,
+                        $studentDetail->curriculum_id
+                    );
+                    $matchingCourses[$courseId] = $courseId;
+
+                    $studentDetailArray = ['Student' => $studentDetail->toArray()];
+                    $registerAddId = $studentCourseAdd->id;
+
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
+
+                    if (count($registerAndAddFreq) <= 1) {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 1;
+                    } else {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 0;
+                        if (!empty($courseId)) {
+                            $rep = $this->repeatationLabeling($registerAndAddFreq, 'add', $registerAddId, $studentDetailArray, $courseId);
+                            $studentCopy['courses'][$rIndex]['RepeatitionLabel'] = $rep;
+                        }
+                    }
+                }
+            }
+
+            if (!empty($studentCourseRegistrations)) {
+                $sectionDetail = $this->CourseAdds->Students->Sections->find()
+                    ->where(['Sections.id' => $studentCourseRegistrations[0]->published_course->section_id])
+                    ->contain([
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'specialization_english_degree_nomenclature', 'english_degree_nomenclature', 'active']],
+                        'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']],
+                        'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                        'Programs' => ['fields' => ['id', 'name', 'shortname']],
+                        'ProgramTypes' => ['fields' => ['id', 'name', 'shortname']],
+                        'YearLevels' => ['fields' => ['id', 'name']]
+                    ])
+                    ->first();
+
+                $studentCopy['Section'] = $sectionDetail->toArray();
+                $studentCopy['Section']['Program'] = $sectionDetail->program->toArray();
+                $studentCopy['Section']['ProgramType'] = $sectionDetail->program_type->toArray();
+                $studentCopy['Section']['Curriculum'] = $sectionDetail->curriculum->toArray();
+                $studentCopy['Section']['College'] = $sectionDetail->college->toArray();
+                $studentCopy['Section']['Department'] = $sectionDetail->department->toArray();
+                $studentCopy['Section']['YearLevel'] = $sectionDetail->year_level->toArray();
+                $studentCopy['YearLevel'] = $sectionDetail->year_level->toArray();
             } else {
-                //If there is no previous status
-                $student_copy['PreviousStudentExamStatus'] = array();
-                $student_copy['PreviousAcademicStatus'] = array();
+                $studentCopy['Section'] = [];
+                $studentCopy['YearLevel'] = [];
+            }
+
+            $studentCopy['Student'] = $studentDetail->toArray();
+            $studentCopy['Curriculum'] = $studentDetail->curriculum->toArray();
+            $studentCopy['Program'] = $studentDetail->program->toArray();
+            $studentCopy['College'] = $studentDetail->college->toArray();
+            $studentCopy['Department'] = $studentDetail->department->toArray();
+            $studentCopy['academic_year'] = $academicYear;
+            $studentCopy['semester'] = $semester;
+
+            $studentCopy['Student']['Program'] = $studentDetail->program->toArray();
+            $studentCopy['Student']['ProgramType'] = $studentDetail->program_type->toArray();
+            $studentCopy['Student']['College'] = $studentDetail->college->toArray();
+            $studentCopy['Student']['Department'] = $studentDetail->department->toArray();
+
+            $studentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                ->where([
+                    'StudentExamStatuses.student_id' => $studentId,
+                    'StudentExamStatuses.academic_year' => $academicYear,
+                    'StudentExamStatuses.semester' => $semester
+                ])
+                ->contain(['AcademicStatuses'])
+                ->order(['StudentExamStatuses.created' => 'DESC'])
+                ->first();
+
+            if (empty($studentStatus)) {
+                $studentCopy['StudentExamStatus'] = [];
+                $studentCopy['AcademicStatus'] = [];
+            } else {
+                $studentCopy['StudentExamStatus'] = $studentStatus->toArray();
+                $studentCopy['AcademicStatus'] = $studentStatus->academic_status->toArray();
+            }
+
+            $allStudentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                ->where(['StudentExamStatuses.student_id' => $studentId])
+                ->contain(['AcademicStatuses'])
+                ->group(['StudentExamStatuses.student_id', 'StudentExamStatuses.academic_year', 'StudentExamStatuses.semester'])
+                ->order(['StudentExamStatuses.academic_year' => 'ASC', 'StudentExamStatuses.semester' => 'ASC'])
+                ->toArray();
+
+            $previousCreditHourSum = 0;
+            $previousGradePointSum = 0;
+            $previousStudentStatus = [];
+            $previousAcademicStatus = [];
+
+            foreach ($allStudentStatus as $studentStatus2) {
+                if ($studentStatus2->academic_year == $academicYear && $studentStatus2->semester == $semester || empty($studentStatus)) {
+                    break;
+                }
+                $previousCreditHourSum += $studentStatus2->credit_hour_sum;
+                $previousGradePointSum += $studentStatus2->grade_point_sum;
+                $previousStudentStatus = $studentStatus2->toArray();
+                $previousAcademicStatus = $studentStatus2->academic_status->toArray();
+            }
+
+            if (!empty($previousStudentStatus)) {
+                $studentCopy['PreviousStudentExamStatus'] = $previousStudentStatus;
+                $studentCopy['PreviousAcademicStatus'] = $previousAcademicStatus;
+                $studentCopy['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previousCreditHourSum;
+                $studentCopy['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previousGradePointSum;
+            } else {
+                $studentCopy['PreviousStudentExamStatus'] = [];
+                $studentCopy['PreviousAcademicStatus'] = [];
             }
         }
 
-        return $student_copy;
+        return $studentCopy;
     }
 
-    function getStudentACProfile($student_id = null, $academic_year = null, $semester = null)
+
+    public function getStudentACProfile(?int $studentId = null, ?string $academicYear = null, ?string $semester = null): array
     {
+        $studentCopy = [];
 
-        $student_copy = array();
+        if (!empty($studentId) && is_numeric($studentId) && $studentId > 0) {
+            $studentDetail = $this->CourseAdds->Students->find()
+                ->where(['Students.id' => $studentId])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name', 'equivalent_to_id']],
+                    'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                    'Colleges' => [
+                        'fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone'],
+                        'Campuses' => ['fields' => ['id', 'name']]
+                    ],
+                    'Curriculums'
+                ])
+                ->first();
 
-        if (!empty($student_id) && is_numeric($student_id) && $student_id > 0) {
-            $student_detail = $this->CourseAdd->Student->find('first', array(
-                'conditions' => array(
-                    'Student.id' => $student_id
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name', 'equivalent_to_id'),
-                    'Department' => array('id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone'),
-                    'College' => array(
-                        'fields' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
+            $programTypeId = $this->CourseAdds->Students->ProgramTypeTransfers->getStudentProgramType($studentId, $academicYear, $semester);
+            $programTypeDetail = $this->CourseAdds->Students->ProgramTypes->find()
+                ->where(['ProgramTypes.id' => $programTypeId])
+                ->first();
+
+            $studentCopy['ProgramType'] = $programTypeDetail ? $programTypeDetail->toArray() : [];
+            $programTypeId = $this->CourseAdds->Students->ProgramTypes->getParentProgramType($programTypeId);
+            $pattern = $this->CourseAdds->Students->ProgramTypes->StudentStatusPatterns->getProgramTypePattern(
+                $studentDetail->program_id,
+                $programTypeId,
+                $academicYear
+            );
+
+            $ayAndSList = [[
+                'academic_year' => $academicYear,
+                'semester' => $semester
+            ]];
+
+            $options = [
+                'conditions' => ['CourseRegistrations.student_id' => $studentDetail->id],
+                'contain' => [
+                    'PublishedCourses' => [
+                        'Courses' => [
+                            'Curriculums',
+                            'GradeTypes.Grades'
+                        ],
+                        'Sections' => [
+                            'fields' => ['id', 'name'],
+                            'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                            'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']]
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'first_name', 'middle_name', 'last_name'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ]
+                    ],
+                    'Sections' => [
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'specialization_english_degree_nomenclature', 'english_degree_nomenclature', 'active']],
+                        'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']],
+                        'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                        'Programs' => ['fields' => ['id', 'name']],
+                        'ProgramTypes' => ['fields' => ['id', 'name']],
+                        'YearLevels' => ['fields' => ['id', 'name']]
+                    ]
+                ],
+                'order' => ['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC']
+            ];
+
+            foreach ($ayAndSList as $ayS) {
+                $options['conditions']['OR'][] = [
+                    'CourseRegistrations.academic_year' => $ayS['academic_year'],
+                    'CourseRegistrations.semester' => $ayS['semester']
+                ];
+            }
+
+            $studentCourseRegistrations = $this->CourseRegistrations->find('all', $options)->toArray();
+
+            $options = [
+                'conditions' => [
+                    'CourseAdds.student_id' => $studentDetail->id,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ],
+                'contain' => [
+                    'PublishedCourses' => [
+                        'Courses' => [
+                            'Curriculums',
+                            'GradeTypes.Grades'
+                        ],
+                        'Sections' => [
+                            'fields' => ['id', 'name'],
+                            'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                            'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']]
+                        ],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'first_name', 'middle_name', 'last_name'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ]
+                    ]
+                ],
+                'order' => ['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC']
+            ];
+
+            foreach ($ayAndSList as $ayS) {
+                $options['conditions']['OR'][] = [
+                    'CourseAdds.academic_year' => $ayS['academic_year'],
+                    'CourseAdds.semester' => $ayS['semester']
+                ];
+            }
+
+            $studentCourseAdds = $this->CourseAdds->find('all', $options)->toArray();
+
+            $studentCopy['courses'] = [];
+
+            foreach ($studentCourseRegistrations as $studentCourseRegistration) {
+                if ($studentCourseRegistration->published_course->drop == 0 && !$this->CourseRegistrations->isCourseDropped($studentCourseRegistration->id)) {
+                    $rIndex = count($studentCopy['courses']);
+                    $studentCopy['courses'][$rIndex] = [
+                        'Course' => $studentCourseRegistration->published_course->course,
+                        'PublishedCourse' => $studentCourseRegistration->published_course,
+                        'CourseRegistration' => $studentCourseRegistration,
+                        'Grade' => $this->getApprovedGrade($studentCourseRegistration->id, 1),
+                        'ExamType' => $this->getExamType($studentCourseRegistration->id, 1),
+                        'hasEquivalentMap' => TableRegistry::getTableLocator()->get('EquivalentCourses')->checkCourseHasEquivalentCourse(
+                            $studentCourseRegistration->published_course->course_id,
+                            $studentDetail->curriculum_id
                         ),
-                        'Campus' => array('id', 'name'),
-                    ),
-                    'Curriculum',
-                )
-            ));
-            //debug($student_detail);
+                        'section' => $studentCourseRegistration->published_course->section,
+                        'regAdd' => 10
+                    ];
 
-            $program_type_id = $this->CourseAdd->Student->ProgramTypeTransfer->getStudentProgramType(
-                $student_id,
-                $academic_year,
-                $semester
-            );
-
-            $program_type_detail = $this->CourseAdd->Student->ProgramType->find(
-                'first',
-                array('conditions' => array('ProgramType.id' => $program_type_id), 'recursive' => -1)
-            );
-
-            $student_copy['ProgramType'] = $program_type_detail['ProgramType'];
-            $program_type_id = $this->CourseAdd->Student->ProgramType->getParentProgramType($program_type_id);
-            $pattern = $this->CourseAdd->Student->ProgramType->StudentStatusPattern->getProgramTypePattern(
-                $student_detail['Student']['program_id'],
-                $program_type_id,
-                $academic_year
-            );
-
-            //Retrieving AY and Semester list based on pattern for status
-            $ay_and_s_list = array();
-            $ay_and_s_list[0]['academic_year'] = $academic_year;
-            $ay_and_s_list[0]['semester'] = $semester;
-
-            //Get list of courses a student registered within the pattern AY and semester list
-            $options = array();
-            $student_course_registrations = array();
-
-            if (!empty($ay_and_s_list)) {
-                foreach ($ay_and_s_list as $key => $ay_s) {
-                    $options['conditions']['OR'][] = array(
-                        'CourseRegistration.academic_year' => $ay_s['academic_year'],
-                        'CourseRegistration.semester' => $ay_s['semester'],
-                        'CourseRegistration.student_id' => $student_detail['Student']['id']
+                    $courseId = $studentCourseRegistration->published_course->course->id;
+                    $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse(
+                        $courseId,
+                        $studentDetail->curriculum_id
                     );
-                }
+                    $matchingCourses[$courseId] = $courseId;
 
-                $options['conditions']['CourseRegistration.student_id'] = $student_detail['Student']['id'];
+                    $studentDetailArray = ['Student' => $studentDetail->toArray()];
+                    $registerAddId = $studentCourseRegistration->id;
 
-                $options['contain'] = array(
-                    'PublishedCourse' => array(
-                        'Course' => array(
-                            'Curriculum',
-                            'GradeType' => array('Grade')
-                        ),
-                        'Section' => array(
-                            'fields' => array('id', 'name'),
-                            'Department' => array(
-                                'id',
-                                'name',
-                                'college_id',
-                                'type',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                            'College' => array(
-                                'id',
-                                'name',
-                                'shortname',
-                                'type',
-                                'stream',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                        ),
-                        'YearLevel' => array('fields' => array('id', 'name')),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        )
-                    ),
-                    'Section' => array(
-                        'Curriculum' => array(
-                            'id',
-                            'name',
-                            'year_introduced',
-                            'type_credit',
-                            'specialization_english_degree_nomenclature',
-                            'english_degree_nomenclature',
-                            'active'
-                        ),
-                        'College' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Department' => array(
-                            'id',
-                            'name',
-                            'college_id',
-                            'type',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                    ),
-                );
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
 
-                $options['order'] = array(
-                    'CourseRegistration.academic_year' => 'ASC',
-                    'CourseRegistration.semester' => 'ASC',
-                    'CourseRegistration.id' => 'ASC'
-                );
-
-                $student_course_registrations = $this->CourseRegistration->find('all', $options);
-                //}
-
-                //Get list of courses a student added within the pattern AY and semester list
-                $options = array();
-                $student_course_adds = array();
-
-                //if (!empty($ay_and_s_list)) {
-                foreach ($ay_and_s_list as $key => $ay_s) {
-                    $options['conditions']['OR'][] = array(
-                        'CourseAdd.academic_year' => $ay_s['academic_year'],
-                        'CourseAdd.semester' => $ay_s['semester'],
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation = 1',
-                        'CourseAdd.student_id' => $student_detail['Student']['id']
-                    );
-                }
-
-                $options['conditions']['CourseAdd.student_id'] = $student_detail['Student']['id'];
-
-                $options['contain'] = array(
-                    'PublishedCourse' => array(
-                        'Course' => array(
-                            'Curriculum',
-                            'GradeType' => array('Grade')
-                        ),
-                        'Section' => array(
-                            'fields' => array('id', 'name'),
-                            'Department' => array(
-                                'id',
-                                'name',
-                                'college_id',
-                                'type',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                            'College' => array(
-                                'id',
-                                'name',
-                                'shortname',
-                                'type',
-                                'stream',
-                                'amharic_name',
-                                'type_amharic',
-                                'phone'
-                            ),
-                        ),
-                        'YearLevel' => array('fields' => array('id', 'name')),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name'),
-                                'Position' => array('id', 'position'),
-                                'Title' => array('id', 'title'),
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        )
-                    )
-                );
-
-                $options['order'] = array(
-                    'CourseAdd.academic_year' => 'ASC',
-                    'CourseAdd.semester' => 'ASC',
-                    'CourseAdd.id' => 'ASC'
-                );
-
-                $student_course_adds = $this->CourseAdd->find('all', $options);
-            }
-
-            //List courses the student registered for
-            $student_copy['courses'] = array();
-            // $student_copy['massAdds'] = array();
-
-            if (!empty($student_course_registrations)) {
-                foreach ($student_course_registrations as $key => $student_course_registration) {
-                    if ($student_course_registration['PublishedCourse']['drop'] == 0 && !$this->CourseRegistration->isCourseDroped(
-                            $student_course_registration['CourseRegistration']['id']
-                        )) {
-                        $r_index = count($student_copy['courses']);
-                        $student_copy['courses'][$r_index]['Course'] = $student_course_registration['PublishedCourse']['Course'];
-                        $student_copy['courses'][$r_index]['PublishedCourse'] = $student_course_registration['PublishedCourse'];
-                        $student_copy['courses'][$r_index]['CourseRegistration'] = $student_course_registration['CourseRegistration'];
-                        $student_copy['courses'][$r_index]['Grade'] = $this->getApprovedGrade(
-                            $student_course_registration['CourseRegistration']['id'],
-                            1
-                        );
-                        $student_copy['courses'][$r_index]['ExamType'] = $this->getExamType(
-                            $student_course_registration['CourseRegistration']['id'],
-                            1
-                        );
-                        $student_copy['courses'][$r_index]['hasEquivalentMap'] = ClassRegistry::init(
-                            'EquivalentCourse'
-                        )->checkCourseHasEquivalentCourse(
-                            $student_course_registration['PublishedCourse']['course_id'],
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        // to check that or verify that later Neway
-                        $student_copy['courses'][$r_index]['section'] = $student_course_registration['PublishedCourse']['Section'];
-                        // to display the examgrade is from reg/add in results tab, Neway 10 = Registration,  11 = course add
-                        $student_copy['courses'][$r_index]['regAdd'] = 10;
-
-                        //$student_copy['courses'][$r_index]['firstTime'] = $this->isRegistrationAddForFirstTime($student_course_registration['CourseRegistration']['id'], 1, 1);
-
-                        $course_id = $student_course_registration['PublishedCourse']['Course']['id'];
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $course_id,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        $matching_courses[$course_id] = $course_id;
-
-                        $studentDetail['Student'] = $student_detail['Student'];
-                        $register_add_id = $student_course_registration['CourseRegistration']['id'];
-
-                        $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                            $matching_courses,
-                            $student_detail['Student']['id']
-                        );
-
-                        if (count($register_and_add_freq) <= 1) {
-                            $student_copy['courses'][$r_index]['firstTime'] = 1;
-                        } else {
-                            $student_copy['courses'][$r_index]['firstTime'] = 0;
-                            if (isset($course_id) && !empty($course_id)) {
-                                $rep = $this->repeatationLabeling(
-                                    $register_and_add_freq,
-                                    'register',
-                                    $register_add_id,
-                                    $studentDetail,
-                                    $course_id
-                                );
-                                //debug($rep);
-                                /* if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                                //return true;
-                            } */
-                                $student_copy['courses'][$r_index]['RepeatitionLabel'] = $rep;
-                            }
-                        }
-                    }
-                }
-            }
-
-            //List courses the student added for
-            if (!empty($student_course_adds)) {
-                foreach ($student_course_adds as $key => $student_course_add) {
-                    if ($student_course_add['PublishedCourse']['drop'] == 0) {
-                        $r_index = count($student_copy['courses']);
-                        $student_copy['courses'][$r_index]['Course'] = $student_course_add['PublishedCourse']['Course'];
-                        $student_copy['courses'][$r_index]['PublishedCourse'] = $student_course_add['PublishedCourse'];
-                        $student_copy['courses'][$r_index]['CourseAdd'] = $student_course_add['CourseAdd'];
-                        $student_copy['courses'][$r_index]['Grade'] = $this->getApprovedGrade(
-                            $student_course_add['CourseAdd']['id'],
-                            0
-                        );
-                        $student_copy['courses'][$r_index]['ExamType'] = $this->getExamType(
-                            $student_course_add['CourseAdd']['id'],
-                            0
-                        );
-                        $student_copy['courses'][$r_index]['hasEquivalentMap'] = ClassRegistry::init(
-                            'EquivalentCourse'
-                        )->checkCourseHasEquivalentCourse(
-                            $student_course_add['PublishedCourse']['course_id'],
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        // to check that or verify that later Neway
-                        $student_copy['courses'][$r_index]['section'] = $student_course_add['PublishedCourse']['Section'];
-                        // to display the examgrade is from reg/add in results tab, Neway 10 = Registration,  11 = course add
-                        $student_copy['courses'][$r_index]['regAdd'] = 11;
-                        //$student_copy['courses'][$r_index]['firstTime'] = $this->isRegistrationAddForFirstTime($student_course_add['CourseAdd']['id'], 0, 1);
-
-                        $course_id = $student_course_add['PublishedCourse']['Course']['id'];
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $course_id,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                        $matching_courses[$course_id] = $course_id;
-
-                        $studentDetail['Student'] = $student_detail['Student'];
-                        $register_add_id = $student_course_add['CourseAdd']['id'];
-
-                        $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                            $matching_courses,
-                            $student_detail['Student']['id']
-                        );
-
-                        if (count($register_and_add_freq) <= 1) {
-                            $student_copy['courses'][$r_index]['firstTime'] = 1;
-                        } else {
-                            $student_copy['courses'][$r_index]['firstTime'] = 0;
-                            if (isset($course_id) && !empty($course_id)) {
-                                $rep = $this->repeatationLabeling(
-                                    $register_and_add_freq,
-                                    'add',
-                                    $register_add_id,
-                                    $studentDetail,
-                                    $course_id
-                                );
-                                //debug($rep);
-                                /* if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                                //return true;
-                            } */
-                                $student_copy['courses'][$r_index]['RepeatitionLabel'] = $rep;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // don't remove this, shows section and college institute, the code seems silly but it works, Neway
-            if (!empty($student_course_registrations)) {
-                $section_detail = $this->CourseAdd->Student->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.id' => $student_course_registrations[0]['PublishedCourse']['section_id']
-                    ),
-                    'contain' => array(
-                        'Curriculum' => array(
-                            'id',
-                            'name',
-                            'year_introduced',
-                            'type_credit',
-                            'specialization_english_degree_nomenclature',
-                            'english_degree_nomenclature',
-                            'active'
-                        ),
-                        'College' => array(
-                            'id',
-                            'name',
-                            'shortname',
-                            'type',
-                            'stream',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Department' => array(
-                            'id',
-                            'name',
-                            'college_id',
-                            'type',
-                            'amharic_name',
-                            'type_amharic',
-                            'phone'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                    )
-                ));
-                $student_copy['Section'] = $section_detail['Section'];
-                $student_copy['Section']['Program'] = $section_detail['Program'];
-                $student_copy['Section']['ProgramType'] = $section_detail['ProgramType'];
-                $student_copy['Section']['Curriculum'] = $section_detail['Curriculum'];
-                $student_copy['Section']['College'] = $section_detail['College'];
-                $student_copy['Section']['Department'] = $section_detail['Department'];
-                $student_copy['Section']['YearLevel'] = $section_detail['YearLevel'];
-                $student_copy['YearLevel'] = $section_detail['YearLevel'];
-            } else {
-                $student_copy['Section'] = array();
-                $student_copy['YearLevel'] = array();
-            }
-
-            $student_copy['Student'] = $student_detail['Student'];
-            $student_copy['Curriculum'] = $student_detail['Curriculum'];
-            $student_copy['Program'] = $student_detail['Program'];
-            $student_copy['College'] = $student_detail['College'];
-            $student_copy['Department'] = $student_detail['Department'];
-            $student_copy['academic_year'] = $academic_year;
-            $student_copy['semester'] = $semester;
-
-            $student_copy['Student']['Program'] = $student_detail['Program'];
-            $student_copy['Student']['ProgramType'] = $student_detail['ProgramType'];
-            $student_copy['Student']['College'] = $student_detail['College'];
-            //$student_copy['Student']['Curriculum'] = $student_detail['Curriculum'];
-            $student_copy['Student']['Department'] = $student_detail['Department'];
-
-            $student_status = $this->CourseRegistration->Student->StudentExamStatus->find('first', array(
-                'conditions' => array(
-                    'StudentExamStatus.student_id' => $student_id,
-                    'StudentExamStatus.academic_year' => $academic_year,
-                    'StudentExamStatus.semester' => $semester
-                ),
-                'contain' => array('AcademicStatus'),
-                'order' => array(
-                    'StudentExamStatus.academic_year' => 'ASC',
-                    'StudentExamStatus.semester' => 'ASC',
-                    'StudentExamStatus.id' => 'DESC'
-                )
-            ));
-            //debug($student_status);
-
-            if (!isset($student_status['StudentExamStatus']) && empty($student_status)) {
-                $student_copy['StudentExamStatus'] = array();
-                $student_copy['AcademicStatus'] = array();
-            } else {
-                $student_copy['StudentExamStatus'] = $student_status['StudentExamStatus'];
-                $student_copy['AcademicStatus'] = $student_status['AcademicStatus'];
-            }
-
-            //Retrieving previous status
-            $all_student_status = $this->CourseRegistration->Student->StudentExamStatus->find('all', array(
-                'conditions' => array(
-                    'StudentExamStatus.student_id' => $student_id,
-                ),
-                'contain' => array('AcademicStatus'),
-                //'order' => array('StudentExamStatus.academic_year ASC', 'StudentExamStatus.semester ASC')
-                'group' => array(
-                    'StudentExamStatus.student_id',
-                    'StudentExamStatus.academic_year',
-                    'StudentExamStatus.semester'
-                ),
-                'order' => array(
-                    'StudentExamStatus.academic_year' => 'ASC',
-                    'StudentExamStatus.semester' => 'ASC',
-                    'StudentExamStatus.id' => 'DESC'
-                )
-            ));
-
-            $previous_credit_hour_sum = 0;
-            $previous_grade_point_sum = 0;
-            $previous_student_status = array();
-            $previous_academiv_status = array();
-
-            if (!empty($all_student_status)) {
-                foreach ($all_student_status as $st_key => $student_status2) {
-                    if (strcasecmp(
-                            $student_status2['StudentExamStatus']['academic_year'],
-                            $academic_year
-                        ) == 0 && strcasecmp(
-                            $student_status2['StudentExamStatus']['semester'],
-                            $semester
-                        ) == 0 || empty($student_status)) {
-                        break;
+                    if (count($registerAndAddFreq) <= 1) {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 1;
                     } else {
-                        $previous_credit_hour_sum += $student_status2['StudentExamStatus']['credit_hour_sum'];
-                        $previous_grade_point_sum += $student_status2['StudentExamStatus']['grade_point_sum'];
-                        $previous_student_status = $student_status2['StudentExamStatus'];
-                        $previous_academiv_status = $student_status2['AcademicStatus'];
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 0;
+                        if (!empty($courseId)) {
+                            $rep = $this->repeatationLabeling($registerAndAddFreq, 'register', $registerAddId, $studentDetailArray, $courseId);
+                            $studentCopy['courses'][$rIndex]['RepeatitionLabel'] = $rep;
+                        }
                     }
                 }
             }
 
-            //If there is previous status
-            if (!empty($previous_student_status)) {
-                $student_copy['PreviousStudentExamStatus'] = $previous_student_status;
-                $student_copy['PreviousAcademicStatus'] = $previous_academiv_status;
-                $student_copy['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previous_credit_hour_sum;
-                $student_copy['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previous_grade_point_sum;
+            foreach ($studentCourseAdds as $studentCourseAdd) {
+                if ($studentCourseAdd->published_course->drop == 0) {
+                    $rIndex = count($studentCopy['courses']);
+                    $studentCopy['courses'][$rIndex] = [
+                        'Course' => $studentCourseAdd->published_course->course,
+                        'PublishedCourse' => $studentCourseAdd->published_course,
+                        'CourseAdd' => $studentCourseAdd,
+                        'Grade' => $this->getApprovedGrade($studentCourseAdd->id, 0),
+                        'ExamType' => $this->getExamType($studentCourseAdd->id, 0),
+                        'hasEquivalentMap' => TableRegistry::getTableLocator()->get('EquivalentCourses')->checkCourseHasEquivalentCourse(
+                            $studentCourseAdd->published_course->course_id,
+                            $studentDetail->curriculum_id
+                        ),
+                        'section' => $studentCourseAdd->published_course->section,
+                        'regAdd' => 11
+                    ];
+
+                    $courseId = $studentCourseAdd->published_course->course->id;
+                    $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse(
+                        $courseId,
+                        $studentDetail->curriculum_id
+                    );
+                    $matchingCourses[$courseId] = $courseId;
+
+                    $studentDetailArray = ['Student' => $studentDetail->toArray()];
+                    $registerAddId = $studentCourseAdd->id;
+
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
+
+                    if (count($registerAndAddFreq) <= 1) {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 1;
+                    } else {
+                        $studentCopy['courses'][$rIndex]['firstTime'] = 0;
+                        if (!empty($courseId)) {
+                            $rep = $this->repeatationLabeling($registerAndAddFreq, 'add', $registerAddId, $studentDetailArray, $courseId);
+                            $studentCopy['courses'][$rIndex]['RepeatitionLabel'] = $rep;
+                        }
+                    }
+                }
+            }
+
+            if (!empty($studentCourseRegistrations)) {
+                $sectionDetail = $this->CourseAdds->Students->Sections->find()
+                    ->where(['Sections.id' => $studentCourseRegistrations[0]->published_course->section_id])
+                    ->contain([
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'specialization_english_degree_nomenclature', 'english_degree_nomenclature', 'active']],
+                        'Colleges' => ['fields' => ['id', 'name', 'shortname', 'type', 'stream', 'amharic_name', 'type_amharic', 'phone']],
+                        'Departments' => ['fields' => ['id', 'name', 'college_id', 'type', 'amharic_name', 'type_amharic', 'phone']],
+                        'Programs' => ['fields' => ['id', 'name']],
+                        'ProgramTypes' => ['fields' => ['id', 'name']],
+                        'YearLevels' => ['fields' => ['id', 'name']]
+                    ])
+                    ->first();
+
+                $studentCopy['Section'] = $sectionDetail ? $sectionDetail->toArray() : [];
+                $studentCopy['Section']['Program'] = $sectionDetail->program ? $sectionDetail->program->toArray() : [];
+                $studentCopy['Section']['ProgramType'] = $sectionDetail->program_type ? $sectionDetail->program_type->toArray() : [];
+                $studentCopy['Section']['Curriculum'] = $sectionDetail->curriculum ? $sectionDetail->curriculum->toArray() : [];
+                $studentCopy['Section']['College'] = $sectionDetail->college ? $sectionDetail->college->toArray() : [];
+                $studentCopy['Section']['Department'] = $sectionDetail->department ? $sectionDetail->department->toArray() : [];
+                $studentCopy['Section']['YearLevel'] = $sectionDetail->year_level ? $sectionDetail->year_level->toArray() : [];
+                $studentCopy['YearLevel'] = $sectionDetail->year_level ? $sectionDetail->year_level->toArray() : [];
             } else {
-                //If there is no previous status
-                $student_copy['PreviousStudentExamStatus'] = array();
-                $student_copy['PreviousAcademicStatus'] = array();
+                $studentCopy['Section'] = [];
+                $studentCopy['YearLevel'] = [];
+            }
+
+            $studentCopy['Student'] = $studentDetail->toArray();
+            $studentCopy['Curriculum'] = $studentDetail->curriculum ? $studentDetail->curriculum->toArray() : [];
+            $studentCopy['Program'] = $studentDetail->program ? $studentDetail->program->toArray() : [];
+            $studentCopy['College'] = $studentDetail->college ? $studentDetail->college->toArray() : [];
+            $studentCopy['Department'] = $studentDetail->department ? $studentDetail->department->toArray() : [];
+            $studentCopy['academic_year'] = $academicYear;
+            $studentCopy['semester'] = $semester;
+
+            $studentCopy['Student']['Program'] = $studentDetail->program ? $studentDetail->program->toArray() : [];
+            $studentCopy['Student']['ProgramType'] = $studentDetail->program_type ? $studentDetail->program_type->toArray() : [];
+            $studentCopy['Student']['College'] = $studentDetail->college ? $studentDetail->college->toArray() : [];
+            $studentCopy['Student']['Department'] = $studentDetail->department ? $studentDetail->department->toArray() : [];
+
+            $studentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                ->where([
+                    'StudentExamStatuses.student_id' => $studentId,
+                    'StudentExamStatuses.academic_year' => $academicYear,
+                    'StudentExamStatuses.semester' => $semester
+                ])
+                ->contain(['AcademicStatuses'])
+                ->order(['StudentExamStatuses.academic_year' => 'ASC', 'StudentExamStatuses.semester' => 'ASC', 'StudentExamStatuses.id' => 'DESC'])
+                ->first();
+
+            if (empty($studentStatus)) {
+                $studentCopy['StudentExamStatus'] = [];
+                $studentCopy['AcademicStatus'] = [];
+            } else {
+                $studentCopy['StudentExamStatus'] = $studentStatus->toArray();
+                $studentCopy['AcademicStatus'] = $studentStatus->academic_status ? $studentStatus->academic_status->toArray() : [];
+            }
+
+            $allStudentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                ->where(['StudentExamStatuses.student_id' => $studentId])
+                ->contain(['AcademicStatuses'])
+                ->group(['StudentExamStatuses.student_id', 'StudentExamStatuses.academic_year', 'StudentExamStatuses.semester'])
+                ->order(['StudentExamStatuses.academic_year' => 'ASC', 'StudentExamStatuses.semester' => 'ASC', 'StudentExamStatuses.id' => 'DESC'])
+                ->toArray();
+
+            $previousCreditHourSum = 0;
+            $previousGradePointSum = 0;
+            $previousStudentStatus = [];
+            $previousAcademicStatus = [];
+
+            foreach ($allStudentStatus as $studentStatus2) {
+                if ($studentStatus2->academic_year == $academicYear && $studentStatus2->semester == $semester || empty($studentStatus)) {
+                    break;
+                }
+                $previousCreditHourSum += $studentStatus2->credit_hour_sum;
+                $previousGradePointSum += $studentStatus2->grade_point_sum;
+                $previousStudentStatus = $studentStatus2->toArray();
+                $previousAcademicStatus = $studentStatus2->academic_status ? $studentStatus2->academic_status->toArray() : [];
+            }
+
+            if (!empty($previousStudentStatus)) {
+                $studentCopy['PreviousStudentExamStatus'] = $previousStudentStatus;
+                $studentCopy['PreviousAcademicStatus'] = $previousAcademicStatus;
+                $studentCopy['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previousCreditHourSum;
+                $studentCopy['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previousGradePointSum;
+            } else {
+                $studentCopy['PreviousStudentExamStatus'] = [];
+                $studentCopy['PreviousAcademicStatus'] = [];
             }
         }
 
-        return $student_copy;
+        return $studentCopy;
     }
 
-    function getMasterSheet($section_id = null, $academic_year = null, $semester = null)
+    public function getMasterSheet(?int $sectionId = null, ?string $academicYear = null, ?string $semester = null): array
     {
+        $studentsAndGrades = [];
+        $registeredCourses = [];
+        $addedCourses = [];
 
-        $students_and_grades = array();
+        $studentsInSection = $this->CourseRegistrations->Students->Sections->StudentsSections->find()
+            ->where(['StudentsSections.section_id' => $sectionId])
+            ->group(['StudentsSections.student_id', 'StudentsSections.section_id'])
+            ->toArray();
 
-        $students_in_section = $this->CourseRegistration->Student->Section->StudentsSection->find('all', array(
-            'conditions' => array(
-                'StudentsSection.section_id' => $section_id
-            ),
-            'group' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.section_id'
-            ),
-            'recursive' => -1,
-        ));
+        $studentsInSectionIds = $this->CourseRegistrations->Students->Sections->StudentsSections->find('list')
+            ->where(['StudentsSections.section_id' => $sectionId])
+            ->group(['StudentsSections.student_id', 'StudentsSections.section_id'])
+            ->select(['StudentsSections.student_id'])
+            ->toArray();
 
-        $students_in_section_ids = $this->CourseRegistration->Student->Section->StudentsSection->find('list', array(
-            'conditions' => array(
-                'StudentsSection.section_id' => $section_id
-            ),
-            'group' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.section_id'
-            ),
-            'fields' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.student_id'
-            ),
-            'recursive' => -1,
-        ));
+        $studentRegisteredCourseForSection = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.section_id' => $sectionId])
+            ->select(['CourseRegistrations.student_id', 'CourseRegistrations.section_id'])
+            ->toArray();
 
-        $studentRegisteredCourseForSection = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.section_id' => $section_id
-            ),
-            'fields' => array(
-                'CourseRegistration.student_id',
-                'CourseRegistration.section_id'
-            ),
-            'recursive' => -1,
-        ));
-
-        $count = count($students_in_section);
+        $count = count($studentsInSection);
 
         if (!empty($studentRegisteredCourseForSection)) {
             foreach ($studentRegisteredCourseForSection as $stuId => $sectId) {
-                if (!in_array($stuId, $students_in_section_ids) && $sectId == $section_id) {
-                    $students_in_section[$count]['StudentsSection']['student_id'] = $stuId;
-                    $students_in_section[$count]['StudentsSection']['section_id'] = $sectId;
+                if (!in_array($stuId, $studentsInSectionIds) && $sectId == $sectionId) {
+                    $studentsInSection[$count]['StudentsSection'] = [
+                        'student_id' => $stuId,
+                        'section_id' => $sectId
+                    ];
                     $count++;
                 }
             }
         }
 
-        /* Get each student pattern, AY & Semester and list of courses s/he registered and add within the returned AY and semester */
-        $registered_courses = array();
-        $added_courses = array();
+        if (!empty($studentsInSection)) {
+            foreach ($studentsInSection as $sectionStudent) {
+                $studentDetail = $this->CourseAdds->Students->find()
+                    ->where(['Students.id' => $sectionStudent['StudentsSection']['student_id']])
+                    ->first();
 
-        if (!empty($students_in_section)) {
-            foreach ($students_in_section as $key => $section_student) {
-                $student_detail = $this->CourseAdd->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $section_student['StudentsSection']['student_id']
-                    ),
-                    'recursive' => -1
-                ));
-
-                $program_type_id = $this->CourseAdd->Student->ProgramTypeTransfer->getStudentProgramType(
-                    $student_detail['Student']['id'],
-                    $academic_year,
+                $programTypeId = $this->CourseAdds->Students->ProgramTypeTransfers->getStudentProgramType(
+                    $studentDetail->id,
+                    $academicYear,
                     $semester
                 );
-
-                $program_type_id = $this->CourseAdd->Student->ProgramType->getParentProgramType($program_type_id);
-                $pattern = $this->CourseAdd->Student->ProgramType->StudentStatusPattern->getProgramTypePattern(
-                    $student_detail['Student']['program_id'],
-                    $program_type_id,
-                    $academic_year
+                $programTypeId = $this->CourseAdds->Students->ProgramTypes->getParentProgramType($programTypeId);
+                $pattern = $this->CourseAdds->Students->ProgramTypes->StudentStatusPatterns->getProgramTypePattern(
+                    $studentDetail->program_id,
+                    $programTypeId,
+                    $academicYear
                 );
 
-                //Retrieving AY and Semester list based on pattern for status
-                $ay_and_s_list = array();
+                $ayAndSList = [];
 
                 if ($pattern <= 1) {
-                    $ay_and_s_list[0]['academic_year'] = $academic_year;
-                    $ay_and_s_list[0]['semester'] = $semester;
+                    $ayAndSList[0] = [
+                        'academic_year' => $academicYear,
+                        'semester' => $semester
+                    ];
                 } else {
-                    $status_prepared = $this->CourseAdd->Student->StudentExamStatus->find('count', array(
-                        'conditions' => array(
-                            'StudentExamStatus.student_id' => $student_detail['Student']['id'],
-                            'StudentExamStatus.academic_year' => $academic_year,
-                            'StudentExamStatus.semester' => $semester
-                        ),
-                        //'order' => array('StudentExamStatus.created' => 'DESC'),
-                        'order' => array(
-                            'StudentExamStatus.academic_year' => 'DESC',
-                            'StudentExamStatus.semester' => 'DESC',
-                            'StudentExamStatus.created' => 'DESC'
-                        ),
-                        'recursive' => -1,
-                    ));
+                    $statusPrepared = $this->CourseAdds->Students->StudentExamStatuses->find()
+                        ->where([
+                            'StudentExamStatuses.student_id' => $studentDetail->id,
+                            'StudentExamStatuses.academic_year' => $academicYear,
+                            'StudentExamStatuses.semester' => $semester
+                        ])
+                        ->count();
 
-                    if ($status_prepared == 0) {
-                        $ay_and_s_list_draft = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToGenerateStatus(
-                            $student_detail['Student']['id'],
-                            $academic_year,
+                    if ($statusPrepared == 0) {
+                        $ayAndSListDraft = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToGenerateStatus(
+                            $studentDetail->id,
+                            $academicYear,
                             $semester
                         );
-                        //If there are lots of semester without status generation. It is to avoid including other semester/s in the current pattern
-                        if (count($ay_and_s_list_draft) > $pattern) {
+                        if (count($ayAndSListDraft) > $pattern) {
                             for ($i = 0; $i < $pattern; $i++) {
-                                $ay_and_s_list[$i] = $ay_and_s_list_draft[$i];
+                                $ayAndSList[$i] = $ayAndSListDraft[$i];
                             }
                         } else {
-                            $ay_and_s_list = $ay_and_s_list_draft;
+                            $ayAndSList = $ayAndSListDraft;
                         }
                     } else {
-                        $ay_and_s_list = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToUpdateStatus(
-                            $student_detail['Student']['id'],
-                            $academic_year,
+                        $ayAndSList = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToUpdateStatus(
+                            $studentDetail->id,
+                            $academicYear,
                             $semester
                         );
                     }
-                } //End of getting AY and Semester list
+                }
 
-                //Get list of courses a student registered within the pattern AY and semester list
-                $options = array();
+                $options = [
+                    'conditions' => ['CourseRegistrations.student_id' => $studentDetail->id],
+                    'contain' => ['PublishedCourses.Courses']
+                ];
 
-                if (!empty($ay_and_s_list)) {
-                    foreach ($ay_and_s_list as $key => $ay_s) {
-                        $options['conditions']['OR'][] = array(
-                            'CourseRegistration.academic_year' => $ay_s['academic_year'],
-                            'CourseRegistration.semester' => $ay_s['semester'],
-                        );
+                if (!empty($ayAndSList)) {
+                    foreach ($ayAndSList as $ayS) {
+                        $options['conditions']['OR'][] = [
+                            'CourseRegistrations.academic_year' => $ayS['academic_year'],
+                            'CourseRegistrations.semester' => $ayS['semester']
+                        ];
                     }
                 }
 
-                $options['conditions']['CourseRegistration.student_id'] = $student_detail['Student']['id'];
-                $options['contain'] = array('PublishedCourse' => array('Course'));
+                $studentCourseRegistrations = $this->CourseRegistrations->find('all', $options)->toArray();
 
-                $student_course_registrations = $this->CourseRegistration->find('all', $options);
+                $options = [
+                    'conditions' => [
+                        'CourseAdds.student_id' => $studentDetail->id,
+                        'CourseAdds.department_approval' => 1,
+                        'CourseAdds.registrar_confirmation' => 1
+                    ],
+                    'contain' => ['PublishedCourses.Courses']
+                ];
 
-                //Get list of courses a student added within the pattern AY and semester list
-                $options = array();
-
-                if (!empty($ay_and_s_list)) {
-                    foreach ($ay_and_s_list as $key => $ay_s) {
-                        $options['conditions']['OR'][] = array(
-                            'CourseAdd.academic_year' => $ay_s['academic_year'],
-                            'CourseAdd.semester' => $ay_s['semester'],
-                            'CourseAdd.department_approval = 1',
-                            'CourseAdd.registrar_confirmation = 1'
-                        );
+                if (!empty($ayAndSList)) {
+                    foreach ($ayAndSList as $ayS) {
+                        $options['conditions']['OR'][] = [
+                            'CourseAdds.academic_year' => $ayS['academic_year'],
+                            'CourseAdds.semester' => $ayS['semester']
+                        ];
                     }
                 }
 
-                $options['conditions']['CourseAdd.student_id'] = $student_detail['Student']['id'];
-                $options['contain'] = array('PublishedCourse' => array('Course'));
+                $studentCourseAdds = $this->CourseAdds->find('all', $options)->toArray();
 
-                $student_course_adds = $this->CourseAdd->find('all', $options);
-
-                //List courses the section registered for
-                if (!empty($student_course_registrations)) {
-                    foreach ($student_course_registrations as $key => $student_course_registration) {
-                        if ($student_course_registration['PublishedCourse']['drop'] == 0) {
-                            //Avoiding repeated data
-                            foreach ($registered_courses as $key2 => $registered_course) {
-                                if ($registered_course['id'] == $student_course_registration['PublishedCourse']['Course']['id']) {
-                                    continue 2;
-                                }
+                foreach ($studentCourseRegistrations as $studentCourseRegistration) {
+                    if ($studentCourseRegistration->published_course->drop == 0) {
+                        foreach ($registeredCourses as $registeredCourse) {
+                            if ($registeredCourse['id'] == $studentCourseRegistration->published_course->course->id) {
+                                continue 2;
                             }
-
-                            $r_index = count($registered_courses);
-
-                            $registered_courses[$r_index]['id'] = $student_course_registration['PublishedCourse']['Course']['id'];
-                            $registered_courses[$r_index]['course_title'] = $student_course_registration['PublishedCourse']['Course']['course_title'];
-                            $registered_courses[$r_index]['course_id'] = $student_course_registration['PublishedCourse']['Course']['id'];
-                            $registered_courses[$r_index]['course_code'] = $student_course_registration['PublishedCourse']['Course']['course_code'];
-                            $registered_courses[$r_index]['credit'] = $student_course_registration['PublishedCourse']['Course']['credit'];
-                            $registered_courses[$r_index]['published_course_id'] = $student_course_registration['CourseRegistration']['published_course_id'];
                         }
+
+                        $rIndex = count($registeredCourses);
+                        $registeredCourses[$rIndex] = [
+                            'id' => $studentCourseRegistration->published_course->course->id,
+                            'course_title' => $studentCourseRegistration->published_course->course->course_title,
+                            'course_id' => $studentCourseRegistration->published_course->course->id,
+                            'course_code' => $studentCourseRegistration->published_course->course->course_code,
+                            'credit' => $studentCourseRegistration->published_course->course->credit,
+                            'published_course_id' => $studentCourseRegistration->published_course_id
+                        ];
                     }
                 }
 
-                //List courses the section added for
-                if (!empty($student_course_adds)) {
-                    foreach ($student_course_adds as $key => $student_course_add) {
-                        if ($student_course_add['PublishedCourse']['drop'] == 0) {
-                            //Avoiding repeated data
-                            foreach ($added_courses as $key2 => $added_course) {
-                                if ($added_course['id'] == $student_course_add['PublishedCourse']['Course']['id']) {
-                                    continue 2;
-                                }
+                foreach ($studentCourseAdds as $studentCourseAdd) {
+                    if ($studentCourseAdd->published_course->drop == 0) {
+                        foreach ($addedCourses as $addedCourse) {
+                            if ($addedCourse['id'] == $studentCourseAdd->published_course->course->id) {
+                                continue 2;
                             }
-
-                            $r_index = count($added_courses);
-
-                            $added_courses[$r_index]['id'] = $student_course_add['PublishedCourse']['Course']['id'];
-                            $added_courses[$r_index]['course_title'] = $student_course_add['PublishedCourse']['Course']['course_title'];
-                            $added_courses[$r_index]['course_code'] = $student_course_add['PublishedCourse']['Course']['course_code'];
-                            $added_courses[$r_index]['course_id'] = $student_course_add['PublishedCourse']['Course']['id'];
-                            $added_courses[$r_index]['credit'] = $student_course_add['PublishedCourse']['Course']['credit'];
-                            $added_courses[$r_index]['published_course_id'] = $student_course_add['CourseAdd']['published_course_id'];
                         }
+
+                        $rIndex = count($addedCourses);
+                        $addedCourses[$rIndex] = [
+                            'id' => $studentCourseAdd->published_course->course->id,
+                            'course_title' => $studentCourseAdd->published_course->course->course_title,
+                            'course_code' => $studentCourseAdd->published_course->course->course_code,
+                            'course_id' => $studentCourseAdd->published_course->course->id,
+                            'credit' => $studentCourseAdd->published_course->course->credit,
+                            'published_course_id' => $studentCourseAdd->published_course_id
+                        ];
                     }
                 }
             }
         }
 
-        //Compiling each registered course grade
-        if (!empty($students_in_section)) {
-            foreach ($students_in_section as $key => $value) {
-                $previous_ay_and_s_list = $this->getListOfAyAndSemester(
-                    $value['StudentsSection']['student_id'],
-                    $academic_year,
-                    $semester
-                );
-                $deduct_credit = 0;
-                $deduct_gp = 0;
-                $index = count($students_and_grades);
+        if (!empty($studentsInSection)) {
+            foreach ($studentsInSection as $value) {
+                $previousAyAndSList = $this->getListOfAyAndSemester($value['StudentsSection']['student_id'], $academicYear, $semester);
+                $index = count($studentsAndGrades);
 
-                $student_detail = $this->CourseRegistration->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $value['StudentsSection']['student_id']
-                    ),
-                    'recursive' => -1
-                ));
+                $studentDetail = $this->CourseRegistrations->Students->find()
+                    ->where(['Students.id' => $value['StudentsSection']['student_id']])
+                    ->first();
 
-                $students_and_grades[$index]['full_name'] = $student_detail['Student']['first_name'] . ' ' . $student_detail['Student']['middle_name'] . ' ' . $student_detail['Student']['last_name'];
-                $students_and_grades[$index]['studentnumber'] = $student_detail['Student']['studentnumber'];
-                $students_and_grades[$index]['gender'] = $student_detail['Student']['gender'];
+                $studentsAndGrades[$index] = [
+                    'full_name' => $studentDetail->first_name . ' ' . $studentDetail->middle_name . ' ' . $studentDetail->last_name,
+                    'studentnumber' => $studentDetail->studentnumber,
+                    'gender' => $studentDetail->gender
+                ];
 
-                $student_status = $this->CourseRegistration->Student->StudentExamStatus->find('first', array(
-                    'conditions' => array(
-                        'StudentExamStatus.student_id' => $value['StudentsSection']['student_id'],
-                        'StudentExamStatus.academic_year' => $academic_year,
-                        'StudentExamStatus.semester' => $semester
-                    ),
-                    'contain' => array(
-                        'AcademicStatus'
-                    )
-                ));
-                //debug($student_status);
+                $studentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                    ->where([
+                        'StudentExamStatuses.student_id' => $value['StudentsSection']['student_id'],
+                        'StudentExamStatuses.academic_year' => $academicYear,
+                        'StudentExamStatuses.semester' => $semester
+                    ])
+                    ->contain(['AcademicStatuses'])
+                    ->first();
 
-                if (isset($student_status['StudentExamStatus'])) {
-                    $students_and_grades[$index]['StudentExamStatus'] = $student_status['StudentExamStatus'];
-                    $students_and_grades[$index]['AcademicStatus'] = $student_status['AcademicStatus'];
+                if (!empty($studentStatus)) {
+                    $studentsAndGrades[$index]['StudentExamStatus'] = $studentStatus->toArray();
+                    $studentsAndGrades[$index]['AcademicStatus'] = $studentStatus->academic_status ? $studentStatus->academic_status->toArray() : [];
                 } else {
-                    $students_and_grades[$index]['StudentExamStatus'] = array();
-                    $students_and_grades[$index]['AcademicStatus'] = array();
+                    $studentsAndGrades[$index]['StudentExamStatus'] = [];
+                    $studentsAndGrades[$index]['AcademicStatus'] = [];
                 }
 
-                //Retrieving previous status
-                $all_student_status = $this->CourseRegistration->Student->StudentExamStatus->find('all', array(
-                    'conditions' => array(
-                        'StudentExamStatus.student_id' => $value['StudentsSection']['student_id'],
-                    ),
-                    //'order' => array('StudentExamStatus.created' => 'ASC'),
-                    'group' => array(
-                        'StudentExamStatus.student_id',
-                        'StudentExamStatus.academic_year',
-                        'StudentExamStatus.semester'
-                    ),
-                    'order' => array('StudentExamStatus.academic_year' => 'ASC', 'StudentExamStatus.semester' => 'ASC'),
-                    'recursive' => -1,
-                ));
+                $allStudentStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                    ->where(['StudentExamStatuses.student_id' => $value['StudentsSection']['student_id']])
+                    ->group(['StudentExamStatuses.student_id', 'StudentExamStatuses.academic_year', 'StudentExamStatuses.semester'])
+                    ->order(['StudentExamStatuses.academic_year' => 'ASC', 'StudentExamStatuses.semester' => 'ASC'])
+                    ->toArray();
 
-                $previous_credit_hour_sum = 0;
-                $previous_grade_point_sum = 0;
-                $previous_student_status = array();
+                $previousCreditHourSum = 0;
+                $previousGradePointSum = 0;
+                $previousStudentStatus = [];
 
-                if (!empty($all_student_status)) {
-                    foreach ($all_student_status as $st_key => $student_status2) {
-                        if (strcasecmp(
-                                $student_status2['StudentExamStatus']['academic_year'],
-                                $academic_year
-                            ) == 0 && strcasecmp($student_status2['StudentExamStatus']['semester'], $semester) == 0) {
-                            break;
-                        } else {
-                            $previous_credit_hour_sum += $student_status2['StudentExamStatus']['credit_hour_sum'];
-                            $previous_grade_point_sum += $student_status2['StudentExamStatus']['grade_point_sum'];
-                            $previous_student_status = $student_status2['StudentExamStatus'];
-                        }
+                foreach ($allStudentStatus as $studentStatus2) {
+                    if ($studentStatus2->academic_year == $academicYear && $studentStatus2->semester == $semester) {
+                        break;
                     }
+                    $previousCreditHourSum += $studentStatus2->credit_hour_sum;
+                    $previousGradePointSum += $studentStatus2->grade_point_sum;
+                    $previousStudentStatus = $studentStatus2->toArray();
                 }
 
-                //If there is previous status
-                if (!empty($previous_student_status)) {
-                    $students_and_grades[$index]['PreviousStudentExamStatus'] = $previous_student_status;
-                    $students_and_grades[$index]['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previous_credit_hour_sum;
-                    $students_and_grades[$index]['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previous_grade_point_sum;
+                if (!empty($previousStudentStatus)) {
+                    $studentsAndGrades[$index]['PreviousStudentExamStatus'] = $previousStudentStatus;
+                    $studentsAndGrades[$index]['PreviousStudentExamStatus']['previous_credit_hour_sum'] = $previousCreditHourSum;
+                    $studentsAndGrades[$index]['PreviousStudentExamStatus']['previous_grade_point_sum'] = $previousGradePointSum;
                 } else {
-                    //If there is no previous status
-                    $students_and_grades[$index]['PreviousStudentExamStatus'] = array();
+                    $studentsAndGrades[$index]['PreviousStudentExamStatus'] = [];
                 }
 
-                //Exam grade for each course a student registered
-                if (!empty($registered_courses)) {
-                    foreach ($registered_courses as $key2 => $registered_course) {
-                        //debug($registered_course);
+                if (!empty($registeredCourses)) {
+                    foreach ($registeredCourses as $registeredCourse) {
+                        $registrationId = $this->CourseRegistrations->find()
+                            ->where([
+                                'CourseRegistrations.published_course_id' => $registeredCourse['published_course_id'],
+                                'CourseRegistrations.student_id' => $value['StudentsSection']['student_id']
+                            ])
+                            ->select(['CourseRegistrations.id'])
+                            ->first();
 
-                        $registration_id = $this->CourseRegistration->field('id', array(
-                            'CourseRegistration.published_course_id' => $registered_course['published_course_id'],
-                            'CourseRegistration.student_id' => $value['StudentsSection']['student_id'],
-                        ));
-
-                        if (!empty($registration_id)) {
-                            //debug($this->getApprovedGrade($registration_id, 1));
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']] = $this->getApprovedGrade(
-                                $registration_id,
-                                1
-                            );
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['credit'] = $registered_course['credit'];
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['registered'] = true;
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['droped'] = $this->CourseRegistration->isCourseDroped(
-                                $registration_id
-                            );
+                        if (!empty($registrationId)) {
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']] = $this->getApprovedGrade($registrationId->id, 1);
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['credit'] = $registeredCourse['credit'];
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['registered'] = true;
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['droped'] = $this->CourseRegistrations->isCourseDropped($registrationId->id);
                         } else {
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']] = array();
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['registered'] = false;
-                        }
-                        //END: Getting repeated courses credit hour (if there is any)
-                    }
-                }
-
-
-                //Exam grade for each course a student added
-                if (!empty($added_courses)) {
-                    foreach ($added_courses as $key2 => $added_course) {
-                        $add_id = $this->CourseAdd->field('id', array(
-                            'CourseAdd.published_course_id' => $added_course['published_course_id'],
-                            'CourseAdd.student_id' => $value['StudentsSection']['student_id'],
-                            'CourseAdd.department_approval = 1',
-                            'CourseAdd.registrar_confirmation = 1'
-                        ));
-
-                        if (!empty($add_id)) {
-                            $students_and_grades[$index]['courses']['a-' . $added_course['id']] = $this->getApprovedGrade(
-                                $add_id,
-                                0
-                            );
-                            $students_and_grades[$index]['courses']['a-' . $added_course['id']]['credit'] = $added_course['credit'];
-                            $students_and_grades[$index]['courses']['a-' . $added_course['id']]['added'] = true;
-                            //START: Getting repeated courses credit hour (if there is any)
-                        } else {
-                            $students_and_grades[$index]['courses']['a-' . $added_course['id']] = array();
-                            $students_and_grades[$index]['courses']['a-' . $added_course['id']]['added'] = false;
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']] = [];
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['registered'] = false;
                         }
                     }
                 }
 
-                $all_ay_s_list_for_deduction_calc = $previous_ay_and_s_list;
-                $ded_index = count($all_ay_s_list_for_deduction_calc);
+                if (!empty($addedCourses)) {
+                    foreach ($addedCourses as $addedCourse) {
+                        $addId = $this->CourseAdds->find()
+                            ->where([
+                                'CourseAdds.published_course_id' => $addedCourse['published_course_id'],
+                                'CourseAdds.student_id' => $value['StudentsSection']['student_id'],
+                                'CourseAdds.department_approval' => 1,
+                                'CourseAdds.registrar_confirmation' => 1
+                            ])
+                            ->select(['CourseAdds.id'])
+                            ->first();
 
-                $all_ay_s_list_for_deduction_calc[$ded_index]['academic_year'] = $academic_year;
-                $all_ay_s_list_for_deduction_calc[$ded_index]['semester'] = $semester;
+                        if (!empty($addId)) {
+                            $studentsAndGrades[$index]['courses']['a-' . $addedCourse['id']] = $this->getApprovedGrade($addId->id, 0);
+                            $studentsAndGrades[$index]['courses']['a-' . $addedCourse['id']]['credit'] = $addedCourse['credit'];
+                            $studentsAndGrades[$index]['courses']['a-' . $addedCourse['id']]['added'] = true;
+                        } else {
+                            $studentsAndGrades[$index]['courses']['a-' . $addedCourse['id']] = [];
+                            $studentsAndGrades[$index]['courses']['a-' . $addedCourse['id']]['added'] = false;
+                        }
+                    }
+                }
 
-                $credit_and_point_deduction = $this->getTotalCreditAndPointDeduction(
-                    $value['StudentsSection']['student_id'],
-                    $all_ay_s_list_for_deduction_calc
-                );
+                $allAySListForDeductionCalc = $previousAyAndSList;
+                $dedIndex = count($allAySListForDeductionCalc);
+                $allAySListForDeductionCalc[$dedIndex] = [
+                    'academic_year' => $academicYear,
+                    'semester' => $semester
+                ];
 
-                $students_and_grades[$index]['deduct_credit'] = $credit_and_point_deduction['deduct_credit_hour_sum'];
-                $students_and_grades[$index]['deduct_gp'] = $credit_and_point_deduction['deduct_grade_point_sum'];
+                $creditAndPointDeduction = $this->getTotalCreditAndPointDeduction($value['StudentsSection']['student_id'], $allAySListForDeductionCalc);
+
+                $studentsAndGrades[$index]['deduct_credit'] = $creditAndPointDeduction['deduct_credit_hour_sum'];
+                $studentsAndGrades[$index]['deduct_gp'] = $creditAndPointDeduction['deduct_grade_point_sum'];
             }
         }
 
-        $master_sheet = array();
-        $master_sheet['registered_courses'] = $registered_courses;
-        $master_sheet['added_courses'] = $added_courses;
-        $master_sheet['students_and_grades'] = $students_and_grades;
-        //debug($students_ids);
-
-        return $master_sheet;
+        return [
+            'registered_courses' => $registeredCourses,
+            'added_courses' => $addedCourses,
+            'students_and_grades' => $studentsAndGrades
+        ];
     }
 
-    function studentCopy($student_ids = array())
+    public function studentCopy(array $studentIds = []): array
     {
+        $studentCopyArray = [];
 
-        $student_copy = array();
-        $student_copy_array = array();
+        if (!empty($studentIds)) {
+            foreach ($studentIds as $studentId) {
+                $studentCopy = [];
 
-        if (!empty($student_ids)) {
-            App::import('Component', 'Auth');
-            $Auth = new AuthComponent(new ComponentRegistry());
+                $studentDetail = $this->CourseRegistrations->Students->find()
+                    ->where(['Students.id' => $studentId])
+                    ->contain([
+                        'Curriculums',
+                        'GraduateLists',
+                        'GraduationWorks' => ['sort' => ['GraduationWorks.created' => 'DESC']],
+                        'ExitExams' => ['sort' => ['ExitExams.exam_date' => 'DESC', 'ExitExams.id' => 'DESC']],
+                        'Programs',
+                        'ProgramTypes',
+                        'HighSchoolEducationBackgrounds' => [
+                            'conditions' => ['HighSchoolEducationBackgrounds.national_exam_taken' => 1],
+                            'Regions' => [
+                                'fields' => ['id', 'name', 'country_id'],
+                                'Countries' => ['fields' => ['id', 'name']]
+                            ]
+                        ],
+                        'HigherEducationBackgrounds',
+                        'EslceResults',
+                        'EheeceResults',
+                        'Departments',
+                        'Colleges',
+                        'Countries' => ['fields' => ['id', 'name']],
+                        'Regions' => [
+                            'fields' => ['id', 'name', 'country_id'],
+                            'Countries' => ['fields' => ['id', 'name']]
+                        ],
+                        'AcceptedStudents' => [
+                            'fields' => ['id', 'studentnumber', 'high_school', 'moeadmissionnumber', 'region_id', 'academicyear'],
+                            'Regions' => [
+                                'fields' => ['id', 'name', 'country_id'],
+                                'Countries' => ['fields' => ['id', 'name']]
+                            ]
+                        ],
+                        'EslceResults' => ['sort' => ['EslceResults.exam_year' => 'DESC']],
+                        'EheeceResults' => ['sort' => ['EheeceResults.exam_year' => 'DESC']]
+                    ])
+                    ->first();
 
-            foreach ($student_ids as $ky => $student_id) {
-                $student_detail = $this->CourseRegistration->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $student_id
-                    ),
-                    'contain' => array(
-                        'Curriculum',
-                        'GraduateList',
-                        'GraduationWork' => array('order' => array('GraduationWork.created DESC')),
-                        'ExitExam' => array('order' => array('ExitExam.exam_date' => 'DESC', 'ExitExam.id' => 'DESC')),
-                        'Program',
-                        'ProgramType',
-                        'HighSchoolEducationBackground' => array(
-                            'conditions' => array(
-                                'HighSchoolEducationBackground.national_exam_taken' => 1
-                            ),
-                            'Region' => array(
-                                'fields' => array('id', 'name', 'country_id'),
-                                'Country' => array('id', 'name'),
-                            )
-                        ),
-                        'HigherEducationBackground',
-                        'EslceResult',
-                        'EheeceResult',
-                        'Department',
-                        'College',
-                        'Country' => array('id', 'name'),
-                        'Region' => array(
-                            'fields' => array('id', 'name', 'country_id'),
-                            'Country' => array('id', 'name'),
-                        ),
-                        'AcceptedStudent' => array(
-                            'fields' => array(
-                                'id',
-                                'studentnumber',
-                                'high_school',
-                                'moeadmissionnumber',
-                                'region_id',
-                                'academicyear'
-                            ),
-                            'Region' => array(
-                                'fields' => array('id', 'name', 'country_id'),
-                                'Country' => array('id', 'name'),
-                            )
-                        ),
-                        'EslceResult' => array('order' => array('EslceResult.exam_year' => 'DESC')),
-                        'EheeceResult' => array('order' => array('EheeceResult.exam_year' => 'DESC')),
-                    )
-                ));
+                $universityDetail = TableRegistry::getTableLocator()->get('Universities')->getStudentUniversity($studentId);
+                $transcriptFooterDetail = $this->CourseRegistrations->Students->Programs->TranscriptFooters->getStudentTranscriptFooter($studentId);
 
+                $auth = $this->getController()->Authentication->getIdentity();
+                $recentCode = TableRegistry::getTableLocator()->get('CertificateVerificationCodes')->find()
+                    ->where([
+                        'CertificateVerificationCodes.student_id' => $studentId,
+                        'CertificateVerificationCodes.user' => $auth->full_name,
+                        'CertificateVerificationCodes.type' => 'Student Copy'
+                    ])
+                    ->first();
 
-                $university_detail = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
-                $transcript_footer_detail = $this->CourseRegistration->Student->Program->TranscriptFooter->getStudentTranscriptFooter(
-                    $student_id
-                );
-
-                $recentCode = ClassRegistry::init('CertificateVerificationCode')->find('first', array(
-                    'conditions' => array(
-                        'CertificateVerificationCode.student_id' => $student_id,
-                        'CertificateVerificationCode.user' => $Auth->user('full_name'),
-                        'CertificateVerificationCode.type' => "Student Copy"
-                    )
-                ));
-
-                if (isset($recentCode) && !empty($recentCode)) {
-                    $code = $recentCode['CertificateVerificationCode']['code'];
+                if ($recentCode) {
+                    $code = $recentCode->code;
                 } else {
-                    $verification = array();
-                    $code = ClassRegistry::init('CertificateVerificationCode')->generateCode('SC');
-                    $verification['CertificateVerificationCode']['user'] = $Auth->user('full_name');
-                    $verification['CertificateVerificationCode']['student_id'] = $student_id;
-                    $verification['CertificateVerificationCode']['type'] = "Student Copy";
-                    $verification['CertificateVerificationCode']['code'] = $code;
-                    //ClassRegistry::init('CertificateVerificationCode')->create();
-                    ClassRegistry::init('CertificateVerificationCode')->save($verification);
+                    $code = TableRegistry::getTableLocator()->get('CertificateVerificationCodes')->generateCode('SC');
+                    $verification = TableRegistry::getTableLocator()->get('CertificateVerificationCodes')->newEntity([
+                        'user' => $auth->full_name,
+                        'student_id' => $studentId,
+                        'type' => 'Student Copy',
+                        'code' => $code
+                    ]);
+                    TableRegistry::getTableLocator()->get('CertificateVerificationCodes')->save($verification);
                 }
 
-                $ExitExam = array();
+                $exitExam = [];
 
-                if ($student_detail['Student']['program_id'] == 1) {
-                    $approvedExitExamGrade = $this->getApprovedExitExamGrade($student_id);
+                if ($studentDetail->program_id == 1) {
+                    $approvedExitExamGrade = $this->getApprovedExitExamGrade($studentId);
 
-                    if (isset($approvedExitExamGrade) && !empty($approvedExitExamGrade['grade'])) {
-                        $ExitExam['course'] = $approvedExitExamGrade['Course']['course_code_title'];
-                        //debug($approvedExitExamGrade['Course']['course_code_title']);
-                        $gradeForDocument = ((strcasecmp($approvedExitExamGrade['grade'], 'P') == 0 || strcasecmp(
-                                $approvedExitExamGrade['grade'],
-                                'Pass'
-                            ) == 0) ? 'Pass' : ((strcasecmp($approvedExitExamGrade['grade'], 'F') == 0 || strcasecmp(
-                                $approvedExitExamGrade['grade'],
-                                'Fail'
-                            ) == 0) ? 'Fail' : '---'));
+                    if (!empty($approvedExitExamGrade['grade'])) {
+                        $exitExam['course'] = $approvedExitExamGrade['Course']['course_code_title'];
+                        $gradeMap = [
+                            'p' => 'Pass',
+                            'pass' => 'Pass',
+                            'f' => 'Fail',
+                            'fail' => 'Fail'
+                        ];
+                        $gradeForDocument = $gradeMap[strtolower($approvedExitExamGrade['grade'])] ?? '---';
 
-                        $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
-                            'conditions' => array(
-                                'ExitExam.student_id' => $student_id,
-                                //'ExitExam.course_id' =>  $student['Student']['ExitExamGrade']['course_id']
-                            ),
-                            'order' => array('ExitExam.exam_date' => 'DESC', 'ExitExam.id' => 'DESC'),
-                            'recursive' => -1
-                        ));
+                        $exitExamResult = TableRegistry::getTableLocator()->get('ExitExams')->find()
+                            ->where(['ExitExams.student_id' => $studentId])
+                            ->order(['ExitExams.exam_date' => 'DESC', 'ExitExams.id' => 'DESC'])
+                            ->first();
 
-                        if ($exitExamresult) {
-                            //debug($exitExamresult['ExitExam']);
-                            $gradeForDocument .= ' (' . $exitExamresult['ExitExam']['result'] . '%)';
-                            $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
-                            $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
+                        if ($exitExamResult) {
+                            $gradeForDocument .= ' (' . $exitExamResult->result . '%)';
+                            $exitExam['exam_date'] = $exitExamResult->exam_date;
+                            $exitExam['result'] = $exitExamResult->result;
                         }
 
-                        if (isset($exitExamresult['ExitExam']['result']) && is_numeric(
-                                $exitExamresult['ExitExam']['result']
-                            ) && ((int)$exitExamresult['ExitExam']['result'] < 50)) {
-                            $gradeForDocument = 'Fail (' . $exitExamresult['ExitExam']['result'] . '%)';
+                        if (!empty($exitExamResult->result) && is_numeric($exitExamResult->result)) {
+                            $gradeForDocument = (int)$exitExamResult->result < 50
+                                ? 'Fail (' . $exitExamResult->result . '%)'
+                                : 'Pass (' . $exitExamResult->result . '%)';
                         }
 
-                        if (isset($exitExamresult['ExitExam']['result']) && is_numeric(
-                                $exitExamresult['ExitExam']['result']
-                            ) && ((int)$exitExamresult['ExitExam']['result'] >= 50)) {
-                            $gradeForDocument = 'Pass (' . $exitExamresult['ExitExam']['result'] . '%)';
-                        }
-
-                        $ExitExam['result_formated'] = $gradeForDocument;
+                        $exitExam['result_formated'] = $gradeForDocument;
                     } else {
-                        $exitExamresult = ClassRegistry::init('ExitExam')->find('first', array(
-                            'conditions' => array(
-                                'ExitExam.student_id' => $student_id,
-                                //'ExitExam.course_id' =>  $student['Student']['ExitExamGrade']['course_id']
-                            ),
-                            'order' => array('ExitExam.exam_date' => 'DESC', 'ExitExam.id' => 'DESC'),
-                            'recursive' => -1
-                        ));
+                        $exitExamResult = TableRegistry::getTableLocator()->get('ExitExams')->find()
+                            ->where(['ExitExams.student_id' => $studentId])
+                            ->order(['ExitExams.exam_date' => 'DESC', 'ExitExams.id' => 'DESC'])
+                            ->first();
 
-                        if ($exitExamresult) {
-                            if (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] >= 50) {
-                                $gradeForDocument = 'Pass (' . $exitExamresult['ExitExam']['result'] . '%)';
-                                $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
-                                $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
-                                $ExitExam['result_formated'] = $gradeForDocument;
-                            } elseif (!empty($exitExamresult['ExitExam']['result']) && $exitExamresult['ExitExam']['result'] < 50) {
-                                $gradeForDocument = 'Fail (' . $exitExamresult['ExitExam']['result'] . '%)';
-                                $ExitExam['exam_date'] = $exitExamresult['ExitExam']['exam_date'];
-                                $ExitExam['result'] = $exitExamresult['ExitExam']['result'];
-                                $ExitExam['result_formated'] = $gradeForDocument;
-                            }
+                        if ($exitExamResult && !empty($exitExamResult->result)) {
+                            $gradeForDocument = $exitExamResult->result >= 50
+                                ? 'Pass (' . $exitExamResult->result . '%)'
+                                : 'Fail (' . $exitExamResult->result . '%)';
+                            $exitExam['exam_date'] = $exitExamResult->exam_date;
+                            $exitExam['result'] = $exitExamResult->result;
+                            $exitExam['result_formated'] = $gradeForDocument;
                         }
                     }
                 }
 
+                $studentCopy['student_detail'] = [
+                    'Student' => array_merge($studentDetail->toArray(), ['code' => $code]),
+                    'Country' => $studentDetail->country ? $studentDetail->country->toArray() : [],
+                    'Region' => $studentDetail->region ? $studentDetail->region->toArray() : [],
+                    'AcceptedStudent' => $studentDetail->accepted_student ? $studentDetail->accepted_student->toArray() : [],
+                    'GraduationWork' => !empty($studentDetail->graduation_works) ? $studentDetail->graduation_works[0]->toArray() : [],
+                    'Curriculum' => $studentDetail->curriculum ? $studentDetail->curriculum->toArray() : [],
+                    'University' => $universityDetail,
+                    'TranscriptFooter' => $transcriptFooterDetail,
+                    'College' => $studentDetail->college ? $studentDetail->college->toArray() : [],
+                    'Department' => $studentDetail->department ? $studentDetail->department->toArray() : [],
+                    'Program' => $studentDetail->program ? $studentDetail->program->toArray() : [],
+                    'ProgramType' => $studentDetail->program_type ? $studentDetail->program_type->toArray() : [],
+                    'HighSchoolEducationBackground' => $studentDetail->high_school_education_backgrounds,
+                    'HigherEducationBackground' => $studentDetail->higher_education_backgrounds,
+                    'EslceResult' => $studentDetail->eslce_results,
+                    'EheeceResult' => $studentDetail->eheece_results,
+                    'GraduateList' => $studentDetail->graduate_list ? $studentDetail->graduate_list->toArray() : [],
+                    'ExemptionList' => $this->CourseRegistrations->Students->CourseExemptions->studentExemptedCourseList($studentId),
+                    'ExitExam' => $exitExam
+                ];
 
-                //Student profile
-                $student_copy['student_detail']['Student'] = $student_detail['Student'];
-                $student_copy['student_detail']['Student']['code'] = $code;
-                $student_copy['student_detail']['Student']['Country'] = $student_detail['Country'];
-                $student_copy['student_detail']['Student']['Region'] = $student_detail['Region'];
-                $student_copy['student_detail']['Student']['AcceptedStudent'] = $student_detail['AcceptedStudent'];
-                $student_copy['student_detail']['GraduationWork'] = (isset($student_detail['GraduationWork'][0]) ? $student_detail['GraduationWork'][0] : array());
-                $student_copy['student_detail']['Curriculum'] = $student_detail['Curriculum'];
-                $student_copy['student_detail']['University'] = $university_detail;
-                $student_copy['student_detail']['TranscriptFooter'] = $transcript_footer_detail;
-                $student_copy['student_detail']['College'] = $student_detail['College'];
-                $student_copy['student_detail']['Department'] = $student_detail['Department'];
-                $student_copy['student_detail']['Program'] = $student_detail['Program'];
-                $student_copy['student_detail']['ProgramType'] = $student_detail['ProgramType'];
-                $student_copy['student_detail']['HighSchoolEducationBackground'] = $student_detail['HighSchoolEducationBackground'];
-                $student_copy['student_detail']['HigherEducationBackground'] = $student_detail['HigherEducationBackground'];
-                $student_copy['student_detail']['EslceResult'] = $student_detail['EslceResult'];
-                $student_copy['student_detail']['EheeceResult'] = $student_detail['EheeceResult'];
-                $student_copy['student_detail']['EslceResult'] = $student_detail['EslceResult'];
-                $student_copy['student_detail']['EheeceResult'] = $student_detail['EheeceResult'];
-                $student_copy['student_detail']['GraduateList'] = $student_detail['GraduateList'];
-                $student_copy['student_detail']['ExemptionList'] = $this->CourseRegistration->Student->CourseExemption->studentExemptedCourseList(
-                    $student_id
-                );
+                $studentCopy['student_detail']['GraduationStatus'] = !empty($studentDetail->graduate_list->id)
+                    ? TableRegistry::getTableLocator()->get('GraduationStatuses')->getStudentGraduationStatus($studentId)
+                    : null;
 
-                $student_copy['student_detail']['ExitExam'] = $ExitExam;
-                debug($student_copy['student_detail']['ExitExam']);
+                $firstRegistration = $this->CourseRegistrations->find()
+                    ->where(['CourseRegistrations.student_id' => $studentId])
+                    ->order(['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC'])
+                    ->first();
 
-                if ($student_detail['GraduateList']['id'] != "") {
-                    $student_copy['student_detail']['GraduationStatuse'] = ClassRegistry::init(
-                        'GraduationStatus'
-                    )->getStudentGraduationStatus($student_id);
+                $firstAdd = $this->CourseAdds->find()
+                    ->where([
+                        'CourseAdds.student_id' => $studentId,
+                        'CourseAdds.department_approval' => 1,
+                        'CourseAdds.registrar_confirmation' => 1
+                    ])
+                    ->order(['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC'])
+                    ->first();
+
+                $firstAySe = [];
+
+                if (!empty($firstRegistration) && empty($firstAdd)) {
+                    $firstAySe = [
+                        'academic_year' => $firstRegistration->academic_year,
+                        'semester' => $firstRegistration->semester
+                    ];
+                } elseif (empty($firstRegistration) && !empty($firstAdd)) {
+                    $firstAySe = [
+                        'academic_year' => $firstAdd->academic_year,
+                        'semester' => $firstAdd->semester
+                    ];
+                } elseif (empty($firstRegistration) && empty($firstAdd)) {
+                    $firstAySe = [
+                        'academic_year' => null,
+                        'semester' => null
+                    ];
+                } elseif (substr($firstRegistration->academic_year, 0, 4) > substr($firstAdd->academic_year, 0, 4)) {
+                    $firstAySe = [
+                        'academic_year' => $firstAdd->academic_year,
+                        'semester' => $firstAdd->semester
+                    ];
                 } else {
-                    $student_copy['student_detail']['GraduationStatuse'] = null;
+                    $firstAySe = [
+                        'academic_year' => $firstRegistration->academic_year,
+                        'semester' => $firstRegistration->semester
+                    ];
                 }
 
-                //debug($student_detail);exit();
-                //Student grades
-                //The first date the student either register or add
+                $lastRegistration = $this->CourseRegistrations->find()
+                    ->where(['CourseRegistrations.student_id' => $studentId])
+                    ->order(['CourseRegistrations.academic_year' => 'DESC', 'CourseRegistrations.semester' => 'DESC', 'CourseRegistrations.id' => 'DESC'])
+                    ->first();
 
-                $first_registration = $this->CourseRegistration->find('first', array(
-                    'conditions' => array(
-                        'CourseRegistration.student_id' => $student_id
-                    ),
-                    //'order' => array('CourseRegistration.created ASC'),
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'ASC',
-                        'CourseRegistration.semester' => 'ASC',
-                        'CourseRegistration.id' => 'ASC'
-                    )
-                ));
+                $lastAdd = $this->CourseAdds->find()
+                    ->where([
+                        'CourseAdds.student_id' => $studentId,
+                        'CourseAdds.department_approval' => 1,
+                        'CourseAdds.registrar_confirmation' => 1
+                    ])
+                    ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+                    ->first();
 
-                $first_add = $this->CourseAdd->find('first', array(
-                    'conditions' => array(
-                        'CourseAdd.student_id' => $student_id,
-                        'CourseAdd.department_approval=1',
-                        'CourseAdd.registrar_confirmation=1'
-                    ),
-                    //'order' => array('CourseAdd.created ASC'),
-                    'order' => array(
-                        'CourseAdd.academic_year' => 'ASC',
-                        'CourseAdd.semester' => 'ASC',
-                        'CourseAdd.id' => 'ASC'
-                    ),
-                ));
+                $lastAySe = [];
 
-                //debug($first_registration);
-                if (!empty($first_registration) && empty($first_add)) {
-                    $first_ay_se['academic_year'] = $first_registration['CourseRegistration']['academic_year'];
-                    $first_ay_se['semester'] = $first_registration['CourseRegistration']['semester'];
-                } elseif (empty($first_registration) && !empty($first_add)) {
-                    $first_ay_se['academic_year'] = $first_add['CourseAdd']['academic_year'];
-                    $first_ay_se['semester'] = $first_add['CourseAdd']['semester'];
-                } elseif (empty($first_registration) && empty($first_add)) {
-                    $first_ay_se['academic_year'] = null;
-                    $first_ay_se['semester'] = null;
-                } elseif (substr($first_registration['CourseRegistration']['academic_year'], 0, 4) > substr(
-                        $first_add['CourseAdd']['academic_year'],
-                        0,
-                        4
-                    )) {
-                    $first_ay_se['academic_year'] = $first_add['CourseAdd']['academic_year'];
-                    $first_ay_se['semester'] = $first_add['CourseAdd']['semester'];
+                if (!empty($lastRegistration) && empty($lastAdd)) {
+                    $lastAySe = [
+                        'academic_year' => $lastRegistration->academic_year,
+                        'semester' => $lastRegistration->semester
+                    ];
+                } elseif (empty($lastRegistration) && !empty($lastAdd)) {
+                    $lastAySe = [
+                        'academic_year' => $lastAdd->academic_year,
+                        'semester' => $lastAdd->semester
+                    ];
+                } elseif (empty($lastRegistration) && empty($lastAdd)) {
+                    $lastAySe = [
+                        'academic_year' => null,
+                        'semester' => null
+                    ];
+                } elseif (substr($lastRegistration->academic_year, 0, 4) < substr($lastAdd->academic_year, 0, 4)) {
+                    $lastAySe = [
+                        'academic_year' => $lastAdd->academic_year,
+                        'semester' => $lastAdd->semester
+                    ];
                 } else {
-                    $first_ay_se['academic_year'] = $first_registration['CourseRegistration']['academic_year'];
-                    $first_ay_se['semester'] = $first_registration['CourseRegistration']['semester'];
+                    $lastAySe = [
+                        'academic_year' => $lastRegistration->academic_year,
+                        'semester' => $lastRegistration->semester
+                    ];
                 }
 
-                //The last a/y and semster the student register or add
-                $last_registration = $this->CourseRegistration->find('first', array(
-                    'conditions' => array(
-                        'CourseRegistration.student_id' => $student_id
-                    ),
-                    //'order' => array('CourseRegistration.created DESC'),
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'DESC',
-                        'CourseRegistration.semester' => 'DESC',
-                        'CourseRegistration.id' => 'DESC'
-                    )
-                ));
-
-                $last_add = $this->CourseAdd->find('first', array(
-                    'conditions' => array(
-                        'CourseAdd.student_id' => $student_id,
-                        'CourseAdd.department_approval = 1',
-                        'CourseAdd.registrar_confirmation = 1'
-                    ),
-                    //'order' => array('CourseAdd.created DESC'),
-                    'order' => array(
-                        'CourseAdd.academic_year' => 'DESC',
-                        'CourseAdd.semester' => 'DESC',
-                        'CourseAdd.id' => 'DESC'
-                    )
-                ));
-
-                if (!empty($last_registration) && empty($last_add)) {
-                    $last_ay_se['academic_year'] = $last_registration['CourseRegistration']['academic_year'];
-                    $last_ay_se['semester'] = $last_registration['CourseRegistration']['semester'];
-                } elseif (empty($last_registration) && !empty($last_add)) {
-                    $last_ay_se['academic_year'] = $last_add['CourseAdd']['academic_year'];
-                    $last_ay_se['semester'] = $last_add['CourseAdd']['semester'];
-                } elseif (empty($last_registration) && empty($last_add)) {
-                    $last_ay_se['academic_year'] = null;
-                    $last_ay_se['semester'] = null;
-                } elseif (substr($last_registration['CourseRegistration']['academic_year'], 0, 4) < substr(
-                        $last_add['CourseAdd']['academic_year'],
-                        0,
-                        4
-                    )) {
-                    $last_ay_se['academic_year'] = $last_add['CourseAdd']['academic_year'];
-                    $last_ay_se['semester'] = $last_add['CourseAdd']['semester'];
-                } else {
-                    $last_ay_se['academic_year'] = $last_registration['CourseRegistration']['academic_year'];
-                    $last_ay_se['semester'] = $last_registration['CourseRegistration']['semester'];
-                }
-
-                if ($first_ay_se['academic_year'] != null && $first_ay_se['semester'] != null) {
-                    $next_ay_se = $this->CourseRegistration->Student->StudentExamStatus->getPreviousSemester(
-                        $first_ay_se['academic_year'],
-                        $first_ay_se['semester']
+                if (!empty($firstAySe['academic_year']) && !empty($firstAySe['semester'])) {
+                    $nextAySe = $this->CourseRegistrations->Students->StudentExamStatuses->getPreviousSemester(
+                        $firstAySe['academic_year'],
+                        $firstAySe['semester']
                     );
-                    $student_copy['courses_taken'] = array();
+                    $studentCopy['courses_taken'] = [];
 
                     do {
-                        $next_ay_se = $this->CourseRegistration->Student->StudentExamStatus->getNextSemster(
-                            $next_ay_se['academic_year'],
-                            $next_ay_se['semester']
+                        $nextAySe = $this->CourseRegistrations->Students->StudentExamStatuses->getNextSemester(
+                            $nextAySe['academic_year'],
+                            $nextAySe['semester']
                         );
 
-                        $index = count($student_copy['courses_taken']);
-
-                        $student_copy['courses_taken'][$index]['academic_year'] = $next_ay_se['academic_year'];
-                        $student_copy['courses_taken'][$index]['semester'] = $next_ay_se['semester'];
-                        $student_copy['courses_taken'][$index]['readmitted'] = $this->CourseRegistration->Student->Readmission->isReadmitted(
-                            $student_id,
-                            $next_ay_se['academic_year'],
-                            $next_ay_se['semester']
-                        );
-
-
-                        $exam_status = $this->CourseRegistration->Student->StudentExamStatus->find('first', array(
-                            'conditions' => array(
-                                'StudentExamStatus.student_id' => $student_id,
-                                'StudentExamStatus.academic_year' => $next_ay_se['academic_year'],
-                                'StudentExamStatus.semester' => $next_ay_se['semester']
-                            ),
-                            'contain' => array('AcademicStatus'),
-                            'order' => array(/* 'StudentExamStatus.academic_year' => 'DESC', 'StudentExamStatus.semester' => 'DESC', */
-                                'StudentExamStatus.created' => 'DESC'
+                        $index = count($studentCopy['courses_taken']);
+                        $studentCopy['courses_taken'][$index] = [
+                            'academic_year' => $nextAySe['academic_year'],
+                            'semester' => $nextAySe['semester'],
+                            'readmitted' => $this->CourseRegistrations->Students->Readmissions->isReadmitted(
+                                $studentId,
+                                $nextAySe['academic_year'],
+                                $nextAySe['semester']
                             )
-                        ));
+                        ];
 
-                        $student_copy['courses_taken'][$index]['status'] = (empty($exam_status) ? null : $exam_status);
-                        $student_copy['courses_taken'][$index]['courses_and_grades'] = $this->getStudentCoursesAndFinalGrade(
-                            $student_id,
-                            $next_ay_se['academic_year'],
-                            $next_ay_se['semester'],
+                        $examStatus = $this->CourseRegistrations->Students->StudentExamStatuses->find()
+                            ->where([
+                                'StudentExamStatuses.student_id' => $studentId,
+                                'StudentExamStatuses.academic_year' => $nextAySe['academic_year'],
+                                'StudentExamStatuses.semester' => $nextAySe['semester']
+                            ])
+                            ->contain(['AcademicStatuses'])
+                            ->order(['StudentExamStatuses.created' => 'DESC'])
+                            ->first();
+
+                        $studentCopy['courses_taken'][$index]['status'] = $examStatus ? $examStatus->toArray() : null;
+                        $studentCopy['courses_taken'][$index]['courses_and_grades'] = $this->getStudentCoursesAndFinalGrade(
+                            $studentId,
+                            $nextAySe['academic_year'],
+                            $nextAySe['semester'],
                             0
                         );
 
-                        if (empty($student_copy['courses_taken'][$index]['courses_and_grades'])) {
-                            unset($student_copy['courses_taken'][$index]);
+                        if (empty($studentCopy['courses_taken'][$index]['courses_and_grades'])) {
+                            unset($studentCopy['courses_taken'][$index]);
                         }
-                    } while (!(strcasecmp(
-                            $last_ay_se['academic_year'],
-                            $next_ay_se['academic_year']
-                        ) == 0 && strcasecmp($last_ay_se['semester'], $next_ay_se['semester']) == 0));
+                    } while (!($lastAySe['academic_year'] == $nextAySe['academic_year'] && $lastAySe['semester'] == $nextAySe['semester']));
                 }
-                $student_copy_array[] = $student_copy;
+
+                $studentCopyArray[] = $studentCopy;
             }
         }
-        //debug($student_copy_array);
-        return $student_copy_array;
+
+        return $studentCopyArray;
     }
 
-    /*** Returns all academic year and semester a student register and/or add. ***/
-    function getListOfAyAndSemester($student_id = null, $upto_acadamic_year = null, $upto_first_semester = null)
+    public function getListOfAyAndSemester(?int $studentId = null, ?string $uptoAcademicYear = null, ?string $uptoFirstSemester = null): array
     {
+        $ayAndSList = [];
 
-        //It excludes up-to a/y and semester if they are given.
-        //Otherwise it will return the whole academic year and semester a student attends a course
-        $ay_and_s_list = array();
-        $next_ay_and_s = array();
-        $academic_status_empty = array();
+        $firstAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->order(['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC'])
+            ->first();
 
-        $first_added = $this->CourseAdd->find('first', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseAdd.created' => 'ASC'),
-            'order' => array('CourseAdd.academic_year' => 'ASC', 'CourseAdd.semester' => 'ASC', 'CourseAdd.id' => 'ASC')
-        ));
+        $firstRegistered = $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->order(['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC'])
+            ->first();
 
-        $first_registered = $this->CourseRegistration->find('first', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseRegistration.created' => 'ASC'),
-            'order' => array(
-                'CourseRegistration.academic_year' => 'ASC',
-                'CourseRegistration.semester' => 'ASC',
-                'CourseRegistration.id' => 'ASC'
-            )
-        ));
+        $academicStatusEmpty = $this->CourseAdds->Students->StudentExamStatuses->find()
+            ->where(['StudentExamStatuses.student_id' => $studentId])
+            ->order(['StudentExamStatuses.academic_year' => 'DESC', 'StudentExamStatuses.semester' => 'DESC', 'StudentExamStatuses.created' => 'DESC'])
+            ->first();
 
-
-        $academic_status_empty = $this->CourseAdd->Student->StudentExamStatus->find('first', array(
-            'conditions' => array(
-                'StudentExamStatus.student_id' => $student_id,
-            ),
-            'recursive' => -1,
-            //'order' => array('StudentExamStatus.created' => 'DESC')
-            'order' => array(
-                'StudentExamStatus.academic_year' => 'DESC',
-                'StudentExamStatus.semester' => 'DESC',
-                'StudentExamStatus.created' => 'DESC'
-            )
-        ));
-
-        // introduced for regeneration bug when there is no status history in the system
-
-        if (empty($academic_status_empty) && !empty($upto_acadamic_year) && !empty($upto_first_semester)) {
-            $ay_and_s_list[0]['academic_year'] = $upto_acadamic_year;
-            $ay_and_s_list[0]['semester'] = $upto_first_semester;
-            return $ay_and_s_list;
+        if (empty($academicStatusEmpty) && !empty($uptoAcademicYear) && !empty($uptoFirstSemester)) {
+            return [[
+                'academic_year' => $uptoAcademicYear,
+                'semester' => $uptoFirstSemester
+            ]];
         }
 
-        $last_added = $this->CourseAdd->find('first', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseAdd.created' => 'DESC'),
-            'order' => array(
-                'CourseAdd.academic_year' => 'DESC',
-                'CourseAdd.semester' => 'DESC',
-                'CourseAdd.id' => 'DESC'
-            )
-        ));
+        $lastAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+            ->first();
 
-        $last_registered = $this->CourseRegistration->find('first', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseRegistration.created' => 'DESC'),
-            'order' => array(
-                'CourseRegistration.academic_year' => 'DESC',
-                'CourseRegistration.semester' => 'DESC',
-                'CourseRegistration.id' => 'DESC'
-            )
-        ));
+        $lastRegistered = $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->order(['CourseRegistrations.academic_year' => 'DESC', 'CourseRegistrations.semester' => 'DESC', 'CourseRegistrations.id' => 'DESC'])
+            ->first();
 
-        // If there is no registration and add (fresh student for the first time)
-        if (empty($first_added) && empty($first_registered)) {
-            return array();
-            // If the course registration comes first, then we need to start the acdamic year and semester generation from the earliest possible time
-        } elseif (
-            isset($first_registered['CourseRegistration']) && !empty($first_registered['CourseRegistration']) &&
-            (((!isset($first_added['CourseAdd']) || empty($first_added['CourseAdd']))) ||
-                ((isset($first_added['CourseAdd']) && !empty($first_added['CourseAdd']) && $first_added['CourseAdd']['created'] > $first_registered['CourseRegistration']['created'])))
-        ) {
-            $next_ay_and_s['academic_year'] = $first_registered['CourseRegistration']['academic_year'];
-            $next_ay_and_s['semester'] = $first_registered['CourseRegistration']['semester'];
-            //debug($first_registered);
+        if (empty($firstAdded) && empty($firstRegistered)) {
+            return [];
+        }
+
+        $nextAyAndS = [];
+
+        if (!empty($firstRegistered) && (empty($firstAdded) || $firstAdded->created > $firstRegistered->created)) {
+            $nextAyAndS = [
+                'academic_year' => $firstRegistered->academic_year,
+                'semester' => $firstRegistered->semester
+            ];
         } else {
-            $next_ay_and_s['academic_year'] = $first_added['CourseAdd']['academic_year'];
-            $next_ay_and_s['semester'] = $first_added['CourseAdd']['semester'];
+            $nextAyAndS = [
+                'academic_year' => $firstAdded->academic_year,
+                'semester' => $firstAdded->semester
+            ];
         }
 
-        if (
-            isset($last_registered['CourseRegistration']) && !empty($last_registered['CourseRegistration']) &&
-            (((!isset($last_added['CourseAdd']) || empty($last_added['CourseAdd']))) ||
-                (isset($last_added['CourseAdd']) && !empty($last_added['CourseAdd']) && ($last_added['CourseAdd']['created'] < $last_registered['CourseRegistration']['created'] || $last_added['CourseAdd']['academic_year'] < $last_registered['CourseRegistration']['academic_year'])))
-        ) {
-            $last_ay = $last_registered['CourseRegistration']['academic_year'];
-            $last_s = $last_registered['CourseRegistration']['semester'];
-            // debug($last_ay);
-        } else {
-            $last_ay = $last_added['CourseAdd']['academic_year'];
-            $last_s = $last_added['CourseAdd']['semester'];
-            //debug($last_ay);
-        }
+        $lastAy = !empty($lastRegistered) && (empty($lastAdded) || $lastAdded->created < $lastRegistered->created)
+            ? $lastRegistered->academic_year
+            : ($lastAdded ? $lastAdded->academic_year : null);
+        $lastS = !empty($lastRegistered) && (empty($lastAdded) || $lastAdded->created < $lastRegistered->created)
+            ? $lastRegistered->semester
+            : ($lastAdded ? $lastAdded->semester : null);
 
-
-        /////// ADDED BY NEWAY FOR TEMPORARY FRESHMAN FIRST SEMESTER BACKDATED GRADE ENTRY FIX /////////////////
-
-        /* if (($student_id == 259844 || $student_id == 259846) && !empty($first_registered) && (!is_numeric($first_registered['CourseRegistration']['year_level_id']) || $first_registered['CourseRegistration']['year_level_id'] == 0)) {
-            $ay_and_s_list[0]['academic_year'] = $first_registered['CourseRegistration']['academic_year'];
-            $ay_and_s_list[0]['semester'] = $first_registered['CourseRegistration']['semester'];
-            return $ay_and_s_list;
-        } */
-
-        /////// END ADDED BY NEWAY FOR TEMPORARY FRESHMAN FIRST SEMESTER BACKDATED GRADE ENTRY FIX /////////////////
-
-
-        //If the student takes only one semester
-        if ((strcasecmp($last_ay, $next_ay_and_s['academic_year']) == 0 && strcasecmp(
-                $last_s,
-                $next_ay_and_s['semester']
-            ) == 0)) {
-            $ay_and_s_list[0]['academic_year'] = $next_ay_and_s['academic_year'];
-            $ay_and_s_list[0]['semester'] = $next_ay_and_s['semester'];
-            return $ay_and_s_list;
+        if ($lastAy == $nextAyAndS['academic_year'] && $lastS == $nextAyAndS['semester']) {
+            return [[
+                'academic_year' => $nextAyAndS['academic_year'],
+                'semester' => $nextAyAndS['semester']
+            ]];
         }
 
         $count = 1;
 
-        while (!(($upto_acadamic_year != null && $upto_first_semester != null && strcasecmp(
-                $upto_acadamic_year,
-                $next_ay_and_s['academic_year']
-            ) == 0 && strcasecmp($upto_first_semester, $next_ay_and_s['semester']) == 0))) {
+        while (!(($uptoAcademicYear && $uptoFirstSemester && $uptoAcademicYear == $nextAyAndS['academic_year'] && $uptoFirstSemester == $nextAyAndS['semester']))) {
             $count++;
-
             if ($count > 100) {
-                return $ay_and_s_list;
+                return $ayAndSList;
             }
 
-            $course_registered = $this->CourseRegistration->find('count', array(
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.academic_year' => $next_ay_and_s['academic_year'],
-                    'CourseRegistration.semester' => $next_ay_and_s['semester'],
-                ),
-                'recursive' => -1
-            ));
+            $courseRegistered = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.student_id' => $studentId,
+                    'CourseRegistrations.academic_year' => $nextAyAndS['academic_year'],
+                    'CourseRegistrations.semester' => $nextAyAndS['semester']
+                ])
+                ->count();
 
-            $course_added = $this->CourseAdd->find('count', array(
-                'conditions' => array(
-                    'CourseAdd.student_id' => $student_id,
-                    'CourseAdd.academic_year' => $next_ay_and_s['academic_year'],
-                    'CourseAdd.semester' => $next_ay_and_s['semester'],
-                ),
-                'recursive' => -1
-            ));
+            $courseAdded = $this->CourseAdds->find()
+                ->where([
+                    'CourseAdds.student_id' => $studentId,
+                    'CourseAdds.academic_year' => $nextAyAndS['academic_year'],
+                    'CourseAdds.semester' => $nextAyAndS['semester']
+                ])
+                ->count();
 
-            if ($course_registered > 0 || $course_added > 0) {
-                $index = count($ay_and_s_list);
-                $ay_and_s_list[$index]['academic_year'] = $next_ay_and_s['academic_year'];
-                $ay_and_s_list[$index]['semester'] = $next_ay_and_s['semester'];
+            if ($courseRegistered > 0 || $courseAdded > 0) {
+                $index = count($ayAndSList);
+                $ayAndSList[$index] = [
+                    'academic_year' => $nextAyAndS['academic_year'],
+                    'semester' => $nextAyAndS['semester']
+                ];
             }
 
-            if (strcasecmp($last_ay, $next_ay_and_s['academic_year']) == 0 && strcasecmp(
-                    $last_s,
-                    $next_ay_and_s['semester']
-                ) == 0) {
+            if ($lastAy == $nextAyAndS['academic_year'] && $lastS == $nextAyAndS['semester']) {
                 break;
             }
 
-            $next_ay_and_s = $this->CourseRegistration->Student->StudentExamStatus->getNextSemster(
-                $next_ay_and_s['academic_year'],
-                $next_ay_and_s['semester']
+            $nextAyAndS = $this->CourseRegistrations->Students->StudentExamStatuses->getNextSemester(
+                $nextAyAndS['academic_year'],
+                $nextAyAndS['semester']
             );
         }
 
-        // withdrawlAfterRegistration must be enabled if there is no problem in the function, Mass Registration via section might register such students students evenif they withdraw and we will endup canceling NGs when the students return. (Neway)
-
-        /* if (!empty($ay_and_s_list)) {
-            foreach ($ay_and_s_list as $k => &$v) {
-                $withdrawlAfterRegistration = $this->CourseRegistration->Student->Clearance->withDrawaAfterRegistration($student_id, $v['academic_year'], $v['semester']);
-                if ($withdrawlAfterRegistration) {
-                    unset($ay_and_s_list[$k]);
-                }
-            }
-        } */
-
-        return $ay_and_s_list;
+        return $ayAndSList;
     }
 
-    function isRegistrationAddForFirstTime($id = null, $registration = 1, $include_equivalent = 1)
+    public function isRegistrationAddForFirstTime(?int $id = null, int $registration = 1, int $includeEquivalent = 1): bool
     {
-
-        //To determine if a student registered more than once for the same course
-
-        $course_id = null;
-        $student_id = null;
+        $courseId = null;
+        $studentId = null;
+        $studentDetail = [];
+        $studentDepartment = [];
+        $courseDepartment = [];
 
         if ($registration == 1) {
-            $regisration_detail = $this->CourseRegistration->find('first', array(
-                'conditions' => array(
-                    'CourseRegistration.id' => $id
-                ),
-                'contain' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'Course'
-                    )
-                )
-            ));
+            $registrationDetail = $this->CourseRegistrations->find()
+                ->where(['CourseRegistrations.id' => $id])
+                ->contain([
+                    'Students',
+                    'PublishedCourses.Courses'
+                ])
+                ->first();
 
-            $course_id = (isset($regisration_detail['PublishedCourse']['Course']['id']) && !empty($regisration_detail['PublishedCourse']['Course']['id']) ? $regisration_detail['PublishedCourse']['Course']['id'] : null);
-            $student_id = (isset($regisration_detail['CourseRegistration']['student_id']) && !empty($regisration_detail['CourseRegistration']['student_id']) ? $regisration_detail['CourseRegistration']['student_id'] : null);
-            $studentDetail = (!empty($student_id) ? $this->CourseRegistration->Student->find(
-                "first",
-                array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-            ) : array());
-
-            $student_department['Student'] = (isset($regisration_detail['Student']) && !empty($regisration_detail['Student']['id']) ? $regisration_detail['Student'] : array());
-            $course_department['Course'] = (isset($regisration_detail['PublishedCourse']['Course']) && !empty($regisration_detail['PublishedCourse']['Course']['id']) ? $regisration_detail['PublishedCourse']['Course'] : array());
+            $courseId = $registrationDetail->published_course->course->id ?? null;
+            $studentId = $registrationDetail->student_id ?? null;
+            $studentDetail = $studentId ? $this->CourseRegistrations->Students->find()->where(['Students.id' => $studentId])->first() : [];
+            $studentDepartment['Student'] = $registrationDetail->student ? $registrationDetail->student->toArray() : [];
+            $courseDepartment['Course'] = $registrationDetail->published_course->course ? $registrationDetail->published_course->course->toArray() : [];
         } else {
-            //debug($id);
+            $addDetail = $this->CourseAdds->find()
+                ->where(['CourseAdds.id' => $id])
+                ->contain([
+                    'Students',
+                    'PublishedCourses.Courses'
+                ])
+                ->first();
 
-            $add_detail = $this->CourseAdd->find('first', array(
-                'conditions' => array(
-                    'CourseAdd.id' => $id
-                ),
-                'contain' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'Course'
-                    )
-                )
-            ));
-
-            $course_id = (isset($add_detail['PublishedCourse']['Course']['id']) && !empty($add_detail['PublishedCourse']['Course']['id']) ? $add_detail['PublishedCourse']['Course']['id'] : null);
-            $student_id = (isset($add_detail['CourseAdd']['student_id']) && !empty($add_detail['CourseAdd']['student_id']) ? $add_detail['CourseAdd']['student_id'] : null);
-            $studentDetail = (!empty($student_id) ? $this->CourseAdd->Student->find(
-                "first",
-                array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-            ) : array());
-            $student_department['Student'] = (isset($add_detail['Student']) && !empty($add_detail['Student']['id']) ? $add_detail['Student'] : array());
-            $course_department['Course'] = (isset($add_detail['PublishedCourse']['Course']) && !empty($add_detail['PublishedCourse']['Course']['id']) ? $add_detail['PublishedCourse']['Course'] : array());
-            //debug($course_id);
+            $courseId = $addDetail->published_course->course->id ?? null;
+            $studentId = $addDetail->student_id ?? null;
+            $studentDetail = $studentId ? $this->CourseAdds->Students->find()->where(['Students.id' => $studentId])->first() : [];
+            $studentDepartment['Student'] = $addDetail->student ? $addDetail->student->toArray() : [];
+            $courseDepartment['Course'] = $addDetail->published_course->course ? $addDetail->published_course->course->toArray() : [];
         }
 
-        if (!empty($student_id) && !empty($course_id)) {
-            //debug($course_id);
+        if (!empty($studentId) && !empty($courseId)) {
+            $matchingCourses = [];
 
-            $matching_courses = array();
-
-            if ($include_equivalent == 1 && isset($student_department['Student']) && !empty($student_department['Student']['curriculum_id'])) {
-                $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                    $course_id,
-                    $student_department['Student']['curriculum_id']
+            if ($includeEquivalent == 1 && !empty($studentDepartment['Student']['curriculum_id'])) {
+                $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse(
+                    $courseId,
+                    $studentDepartment['Student']['curriculum_id']
                 );
             }
 
-            $matching_courses[$course_id] = $course_id;
+            $matchingCourses[$courseId] = $courseId;
+            $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentId);
 
-            $register_and_add_freq = $this->getCourseFrequenceRegAdds($matching_courses, $student_id); //array();
-
-            //If the student add or register once
-            if (count($register_and_add_freq) <= 1) {
+            if (count($registerAndAddFreq) <= 1) {
                 return true;
-            } else {
-                //debug($register_and_add_freq);
-                if ($registration == 1) {
-                    if (isset($regisration_detail['PublishedCourse']['course_id']) && !empty($regisration_detail['PublishedCourse']['course_id'])) {
-                        $rep = $this->repeatationLabeling(
-                            $register_and_add_freq,
-                            'register',
-                            $id,
-                            $studentDetail,
-                            $regisration_detail['PublishedCourse']['course_id']
-                        );
-
-                        debug($rep);
-
-                        if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                            return true;
-                        }
-                    }
-                } else {
-                    //debug($id);
-                    //debug($register_and_add_freq);
-
-                    if (isset($add_detail['PublishedCourse']['course_id']) && !empty($add_detail['PublishedCourse']['course_id'])) {
-                        $rep = $this->repeatationLabeling(
-                            $register_and_add_freq,
-                            'add',
-                            $id,
-                            $studentDetail,
-                            $add_detail['PublishedCourse']['course_id']
-                        );
-
-                        debug($rep);
-
-                        if ($rep['repeated_old'] == false && $rep['repeated_new'] == true) {
-                            return true;
-                        }
-                    }
-                }
-                //debug($register_and_add_freq);
             }
-            debug($register_and_add_freq);
+
+            if ($registration == 1 && !empty($registrationDetail->published_course->course_id)) {
+                $rep = $this->repeatationLabeling(
+                    $registerAndAddFreq,
+                    'register',
+                    $id,
+                    $studentDetail ? ['Student' => $studentDetail->toArray()] : [],
+                    $registrationDetail->published_course->course_id
+                );
+
+                if ($rep['repeated_old'] === false && $rep['repeated_new'] === true) {
+                    return true;
+                }
+            } elseif (!empty($addDetail->published_course->course_id)) {
+                $rep = $this->repeatationLabeling(
+                    $registerAndAddFreq,
+                    'add',
+                    $id,
+                    $studentDetail ? ['Student' => $studentDetail->toArray()] : [],
+                    $addDetail->published_course->course_id
+                );
+
+                if ($rep['repeated_old'] === false && $rep['repeated_new'] === true) {
+                    return true;
+                }
+            }
         }
+
         return false;
     }
 
-    public function getDepartmentNonApprovedCoursesList(
-        $department_college_id,
-        $department = 1,
-        $role_id = '',
-        $current_acadamic_year = ''
-    ) {
 
-        //check to which department is assigned.
+    public function getDepartmentNonApprovedCoursesList(int $departmentCollegeId, int $department = 1, string $roleId = '', $currentAcademicYear = ''): array
+    {
         $yearsInPast = Configure::read('ExamGrade.Approval.yearsInPast');
-        $registrationAddMakeupIDs = array();
-        $results = array();
-        $ac_year = '%';
+        $registrationAddMakeupIDs = [];
+        $results = [];
+        $acYear = '%';
+        $freshmanDeptOrCollege = 'college_id';
 
-        $freshman_dept_or_college = 'college_id';
-
-        if (isset($role_id) && !empty($role_id)) {
-            if ($role_id == ROLE_DEPARTMENT) {
-                $freshman_dept_or_college = 'given_by_department_id';
-            } else {
-                $freshman_dept_or_college = 'college_id';
-            }
+        if (!empty($roleId)) {
+            $freshmanDeptOrCollege = $roleId == 'ROLE_DEPARTMENT' ? 'given_by_department_id' : 'college_id';
         }
 
-        if (isset($current_acadamic_year) && !empty($current_acadamic_year)) {
-            if (is_array($current_acadamic_year)) {
-                $ac_year = "'" . implode("', '", $current_acadamic_year) . "'";
-            } else {
-                $ac_year = "'" . $current_acadamic_year . "'";
-            }
+        if (!empty($currentAcademicYear)) {
+            $acYear = is_array($currentAcademicYear) ? "'" . implode("', '", $currentAcademicYear) . "'" : "'" . $currentAcademicYear . "'";
         }
 
         if ($department == 1) {
-            /* $resultsRegistration = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_registration_id
-            ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
+            $resultsRegistration = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY course_registration_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
+                INNER JOIN course_registrations AS course_registrations ON course_registrations.id = exam_grades.course_registration_id
+                INNER JOIN students AS students ON students.id = course_registrations.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = course_registrations.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.given_by_department_id = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
-            WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(),INTERVAL $yearsInPast YEAR))
-            AND (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-            )
-            AND exam_grades.course_registration_id IN (
-                SELECT id FROM course_registrations WHERE published_course_id IN (
-                    SELECT id  FROM published_courses WHERE academic_year IN ($ac_year) AND given_by_department_id = " . $department_college_id . "
-                )
-            )"); */
+            $resultsAdds = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY course_add_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
+                INNER JOIN course_adds AS course_adds ON course_adds.id = exam_grades.course_add_id
+                INNER JOIN students AS students ON students.id = course_adds.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = course_adds.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.given_by_department_id = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
-
-            $resultsRegistration = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-				WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_registration_id
-			) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN course_registrations AS course_registrations ON course_registrations.id = exam_grades.course_registration_id
-			INNER JOIN students AS students ON students.id = course_registrations.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = course_registrations.published_course_id
-
-            WHERE students.graduated = 0 AND published_courses.academic_year IN ($ac_year) AND published_courses.given_by_department_id = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-			)"
-            );
-
-
-            /* $resultsAdds = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_add_id
-            ) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
-
-            WHERE (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-            ) AND exam_grades.course_add_id IN (
-                SELECT id FROM course_adds WHERE published_course_id IN (
-                    SELECT id FROM published_courses WHERE academic_year IN ($ac_year) AND given_by_department_id = " . $department_college_id . "
-                )
-            )"); */
-
-
-            $resultsAdds = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_add_id
-			) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN course_adds AS course_adds ON course_adds.id = exam_grades.course_add_id
-			INNER JOIN students AS students ON students.id = course_adds.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = course_adds.published_course_id
-
-            WHERE students.graduated = 0 AND published_courses.academic_year IN ($ac_year) AND published_courses.given_by_department_id = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-			)"
-            );
-
-
-            /* $resultsMakeup = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY makeup_exam_id
-            ) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
-
-            WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(), INTERVAL $yearsInPast YEAR))
-            AND (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-            )
-            AND exam_grades.makeup_exam_id IN (
-                SELECT id FROM makeup_exams WHERE published_course_id IN (
-                    SELECT id FROM published_courses WHERE academic_year IN ($ac_year) AND given_by_department_id = " . $department_college_id . "
-                )
-            )"); */
-
-
-            $resultsMakeup = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-            	SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-				WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY makeup_exam_id
-			) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN makeup_exams AS makeup_exams ON makeup_exams.id = exam_grades.makeup_exam_id
-			INNER JOIN students AS students ON students.id = makeup_exams.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = makeup_exams.published_course_id
-
-			WHERE students.graduated = 0 AND published_courses.academic_year IN ($ac_year) AND published_courses.given_by_department_id = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-			)"
-            );
-
-            //$results = $resultsMakeup + $resultsAdds + $resultsRegistration;
-
-            debug($resultsRegistration);
-            debug($resultsMakeup);
-            debug($resultsAdds);
+            $resultsMakeup = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY makeup_exam_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
+                INNER JOIN makeup_exams AS makeup_exams ON makeup_exams.id = exam_grades.makeup_exam_id
+                INNER JOIN students AS students ON students.id = makeup_exams.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = makeup_exams.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.given_by_department_id = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
             $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
         } else {
-            /* $resultsRegistration = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, MAX(created) AS latest, department_approval,registrar_approval
-                FROM exam_grades WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_registration_id
-            ) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
+            $resultsRegistration = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY course_registration_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
+                INNER JOIN course_registrations AS course_registrations ON course_registrations.id = exam_grades.course_registration_id
+                INNER JOIN students AS students ON students.id = course_registrations.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = course_registrations.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.department_id IS NULL
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.$freshmanDeptOrCollege = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
-            WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(), INTERVAL $yearsInPast YEAR))
-            AND  (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1  and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1  and exam_grades.department_reply = 1)
-            )
-            AND exam_grades.course_registration_id IN (
-                SELECT id FROM course_registrations WHERE published_course_id IN (
-                    SELECT id FROM published_courses WHERE department_id IS NULL AND academic_year IN ($ac_year) AND college_id = " . $department_college_id . "
-                )
-            )"); */
+            $resultsAdds = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY course_add_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
+                INNER JOIN course_adds AS course_adds ON course_adds.id = exam_grades.course_add_id
+                INNER JOIN students AS students ON students.id = course_adds.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = course_adds.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.department_id IS NULL
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.$freshmanDeptOrCollege = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
-
-            $resultsRegistration = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, MAX(created) AS latest, department_approval,registrar_approval
-                FROM exam_grades WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_registration_id
-			) AS t2 ON ( exam_grades.id = t2.id AND exam_grades.course_registration_id = t2.course_registration_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN course_registrations AS course_registrations ON course_registrations.id = exam_grades.course_registration_id
-			INNER JOIN students AS students ON students.id = course_registrations.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = course_registrations.published_course_id
-
-            WHERE students.graduated = 0 AND published_courses.department_id IS NULL AND published_courses.academic_year IN ($ac_year) AND published_courses.$freshman_dept_or_college = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1  and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1  and exam_grades.department_reply = 1)
-			)"
-            );
-
-
-            /* $resultsAdds = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_add_id
-            ) AS t2 ON ( exam_grades.id = t2.id AND  exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
-
-            WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(), INTERVAL $yearsInPast YEAR))
-            AND (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-            )
-            AND exam_grades.course_add_id IN (
-                SELECT id FROM course_adds WHERE published_course_id IN (
-                    SELECT id  FROM published_courses WHERE department_id IS NULL AND academic_year IN ($ac_year) AND college_id = " . $department_college_id . "
-                )
-            )"); */
-
-
-            $resultsAdds = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, course_add_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-				WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY course_add_id
-			) AS t2 ON ( exam_grades.id = t2.id AND  exam_grades.course_add_id = t2.course_add_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN course_adds AS course_adds ON course_adds.id = exam_grades.course_add_id
-			INNER JOIN students AS students ON students.id = course_adds.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = course_adds.published_course_id
-
-            WHERE students.graduated = 0 AND published_courses.department_id IS NULL AND published_courses.academic_year IN ($ac_year) AND published_courses.$freshman_dept_or_college = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-			)"
-            );
-
-
-            /* $resultsMakeup = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY makeup_exam_id
-            ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
-
-            WHERE (DATE(exam_grades.created) > DATE_SUB(curdate(), INTERVAL $yearsInPast YEAR))
-            AND (
-                (exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-                (exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-                (exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-            )
-            AND exam_grades.makeup_exam_id IN (
-                SELECT id  FROM makeup_exams WHERE published_course_id IN (
-                    SELECT id FROM published_courses WHERE department_id IS NULL AND academic_year IN ($ac_year) AND college_id = " . $department_college_id . "
-                )
-            )"); */
-
-
-            $resultsMakeup = $this->query(
-                "SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
-            FROM exam_grades exam_grades
-            INNER JOIN (
-                SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval FROM exam_grades
-                WHERE registrar_approval = -1 OR department_approval IS NULL GROUP BY makeup_exam_id
-			) AS t2 ON (exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
-
-			INNER JOIN makeup_exams AS makeup_exams ON makeup_exams.id = exam_grades.makeup_exam_id
-			INNER JOIN students AS students ON students.id = makeup_exams.student_id
-			INNER JOIN published_courses AS published_courses ON published_courses.id = makeup_exams.published_course_id
-
-        	WHERE students.graduated = 0 AND published_courses.department_id IS NULL AND published_courses.academic_year IN ($ac_year) AND published_courses.$freshman_dept_or_college = $department_college_id
-			AND (
-				(exam_grades.department_approval is null and exam_grades.registrar_approval is null) OR
-				(exam_grades.department_approval = 1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1) OR
-				(exam_grades.department_approval = -1 and exam_grades.registrar_approval = -1 and exam_grades.department_reply = 1)
-			)"
-            );
-
-            //$results = $resultsMakeup + $resultsAdds + $resultsRegistration;
-
-            debug($resultsRegistration);
-            debug($resultsMakeup);
-            debug($resultsAdds);
+            $resultsMakeup = $this->query("SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.registrar_approval, exam_grades.department_approval, exam_grades.course_add_id, exam_grades.makeup_exam_id
+                FROM exam_grades exam_grades
+                INNER JOIN (
+                    SELECT id, course_registration_id, makeup_exam_id, MAX(created) AS latest, department_approval, registrar_approval
+                    FROM exam_grades
+                    WHERE registrar_approval = -1 OR department_approval IS NULL
+                    GROUP BY makeup_exam_id
+                ) AS t2 ON (exam_grades.id = t2.id AND exam_grades.makeup_exam_id = t2.makeup_exam_id AND exam_grades.created = t2.latest)
+                INNER JOIN makeup_exams AS makeup_exams ON makeup_exams.id = exam_grades.makeup_exam_id
+                INNER JOIN students AS students ON students.id = makeup_exams.student_id
+                INNER JOIN published_courses AS published_courses ON published_courses.id = makeup_exams.published_course_id
+                WHERE students.graduated = 0
+                AND published_courses.department_id IS NULL
+                AND published_courses.academic_year IN ($acYear)
+                AND published_courses.$freshmanDeptOrCollege = $departmentCollegeId
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                    OR (exam_grades.department_approval = -1 AND exam_grades.registrar_approval = -1 AND exam_grades.department_reply = 1)
+                )")->fetchAll('assoc');
 
             $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
         }
 
         if (!empty($results)) {
-            foreach ($results as $k => $value) {
+            foreach ($results as $value) {
                 if (!empty($value['exam_grades']['course_registration_id'])) {
                     if ($value['exam_grades']['registrar_approval'] == -1) {
                         $registrationAddMakeupIDs['registerRejected'][] = $value['exam_grades']['course_registration_id'];
@@ -4027,206 +2772,134 @@ class ExamGradesTable extends Table
                 }
             }
         }
-        // debug($registrationAddMakeupIDs);
 
-        debug($freshman_dept_or_college);
-
-        $publication_ids = array();
-        $publication_ids_rejected = array();
+        $publicationIds = [];
+        $publicationIdsRejected = [];
 
         if (!empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'fields' => array('CourseRegistration.published_course_id'),
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register'])
-            ));
-
-            $publication_ids = $publication_ids + $publication_ids_register;
+            $publicationIdsRegister = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['register']])
+                ->select(['CourseRegistrations.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsRegister);
         }
 
         if (!empty($registrationAddMakeupIDs['registerRejected'])) {
-            $publication_ids_register_rejected = $this->CourseRegistration->find('list', array(
-                'fields' => array('CourseRegistration.published_course_id'),
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['registerRejected'])
-            ));
-
-            $publication_ids_rejected = $publication_ids_rejected + $publication_ids_register_rejected;
+            $publicationIdsRegisterRejected = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['registerRejected']])
+                ->select(['CourseRegistrations.published_course_id'])
+                ->toArray();
+            $publicationIdsRejected = array_merge($publicationIdsRejected, $publicationIdsRegisterRejected);
         }
 
         if (!empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'fields' => array('CourseAdd.published_course_id'),
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add'])
-            ));
-
-            $publication_ids += $publication_ids_add;
+            $publicationIdsAdd = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['add']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsAdd);
         }
 
         if (!empty($registrationAddMakeupIDs['addRejected'])) {
-            $publication_ids_add_rejected = $this->CourseAdd->find('list', array(
-                'fields' => array('CourseAdd.published_course_id'),
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['addRejected'])
-            ));
-
-            $publication_ids_rejected += $publication_ids_add_rejected;
+            $publicationIdsAddRejected = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['addRejected']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIdsRejected = array_merge($publicationIdsRejected, $publicationIdsAddRejected);
         }
 
         if (!empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'fields' => array('MakeupExam.published_course_id'),
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup'])
-            ));
-
-            $publication_ids += $publication_ids_makeup;
+            $publicationIdsMakeup = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeup']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsMakeup);
         }
 
         if (!empty($registrationAddMakeupIDs['makeupRejected'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'fields' => array('MakeupExam.published_course_id'),
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeupRejected'])
-            ));
-
-            $publication_ids_rejected += $publication_ids_makeup;
+            $publicationIdsMakeupRejected = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeupRejected']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIdsRejected = array_merge($publicationIdsRejected, $publicationIdsMakeupRejected);
         }
 
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
-        }
+        $distinctPublicationIds = !empty($publicationIds) ? array_unique($publicationIds) : [];
+        $distinctPublicationIdsRejected = !empty($publicationIdsRejected) ? array_unique($publicationIdsRejected) : [];
 
-        if (isset($publication_ids_rejected) && !empty($publication_ids_rejected)) {
-            $distinct_publication_ids_rejected = array_unique($publication_ids_rejected);
-        }
+        $coursesForApproval = ['from_instructor' => [], 'from_registrars' => []];
 
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            if ($department == 1) {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        //'PublishedCourse.given_by_department_id' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'GivenByDepartment' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    )
-                ));
-
-                $published_courses_rejected = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids_rejected,
-                        //'PublishedCourse.given_by_department_id' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'GivenByDepartment' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    )
-                ));
-            } else {
-                $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids,
-                        'PublishedCourse.' . $freshman_dept_or_college . '' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'GivenByDepartment' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    )
-                ));
-
-                $published_courses_rejected = $this->CourseRegistration->PublishedCourse->find('all', array(
-                    'conditions' => array(
-                        'PublishedCourse.id' => $distinct_publication_ids_rejected,
-                        'PublishedCourse.' . $freshman_dept_or_college . '' => $department_college_id
-                    ),
-                    'contain' => array(
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'CourseInstructorAssignment' => array(
-                            'fields' => array('id', 'published_course_id', 'staff_id'),
-                            'Staff' => array(
-                                'fields' => array('id', 'full_name', 'user_id'),
-                                'Position',
-                                'Title',
-                            ),
-                            'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                        ),
-                        'Course' => array(
-                            'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                            'Curriculum' => array('id', 'type_credit'),
-                        )
-                    )
-                ));
+        if (!empty($distinctPublicationIds)) {
+            $conditions = ['PublishedCourses.id IN' => $distinctPublicationIds];
+            if ($department != 1) {
+                $conditions['PublishedCourses.' . $freshmanDeptOrCollege] = $departmentCollegeId;
             }
+
+            $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'GivenByDepartments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'CourseInstructorAssignments' => [
+                        'fields' => ['id', 'published_course_id', 'staff_id'],
+                        'Staffs' => [
+                            'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                            'Positions' => ['fields' => ['id', 'position']],
+                            'Titles' => ['fields' => ['id', 'title']]
+                        ],
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                    ],
+                    'Courses' => [
+                        'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                        'Curriculums' => ['fields' => ['id', 'type_credit']]
+                    ]
+                ])
+                ->toArray();
+
+            $coursesForApproval['from_instructor'] = $publishedCourses;
         }
 
-        if (isset($published_courses)) {
-            $courses_for_approval['from_instructor'] = $published_courses;
-        } else {
-            $courses_for_approval['from_instructor'] = array();
+        if (!empty($distinctPublicationIdsRejected)) {
+            $conditions = ['PublishedCourses.id IN' => $distinctPublicationIdsRejected];
+            if ($department != 1) {
+                $conditions['PublishedCourses.' . $freshmanDeptOrCollege] = $departmentCollegeId;
+            }
+
+            $publishedCoursesRejected = $this->CourseRegistrations->PublishedCourses->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'GivenByDepartments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'CourseInstructorAssignments' => [
+                        'fields' => ['id', 'published_course_id', 'staff_id'],
+                        'Staffs' => [
+                            'fields' => ['id','first_name', 'middle_name', 'last_name', 'user_id'],
+                            'Positions' => ['fields' => ['id', 'position']],
+                            'Titles' => ['fields' => ['id', 'title']]
+                        ],
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                    ],
+                    'Courses' => [
+                        'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                        'Curriculums' => ['fields' => ['id', 'type_credit']]
+                    ]
+                ])
+                ->toArray();
+
+            $coursesForApproval['from_registrars'] = $publishedCoursesRejected;
         }
 
-        if (isset($published_courses_rejected)) {
-            $courses_for_approval['from_registrars'] = $published_courses_rejected;
-        } else {
-            $courses_for_approval['from_registrars'] = array();
-        }
-
-        return $courses_for_approval;
+        return $coursesForApproval;
     }
 
-    //
     public function getRegistrarNonApprovedCoursesList(
         $departmentIds = null,
         $collegeIds = null,
@@ -4362,26 +3035,243 @@ class ExamGradesTable extends Table
             ->enableHydration(false)
             ->toArray();
     }
+    public function getRegistrarNonApprovedCoursesList2(?array $departmentIds = null, ?array $collegeIds = null, string $academicYear = '', string $semester = '', ?array $programId = null, ?array $programTypeId = null, array $acyRanges = []): array
+    {
+        $registrationAddMakeupIDs = [];
+        $queryPs = 'id IS NOT NULL';
+        $queryPss = 'published_courses.id IS NOT NULL';
 
-    //It returns list of courses from each department and freshman program that the registrar is supposed to confirm the grade submission
+        if (!empty($acyRanges)) {
+            $acyRangesByComaQuoted = "'" . implode("', '", $acyRanges) . "'";
+            $queryPs .= " AND published_courses.academic_year IN ($acyRangesByComaQuoted)";
+            $queryPss .= " AND published_courses.academic_year IN ($acyRangesByComaQuoted)";
+        }
 
-    function getRegistrarNonApprovedPublishedCourseList(
-        $department_ids = null,
-        $college_ids = null,
-        $semester,
-        $program_id,
-        $program_type_id,
-        $academic_year,
-        $year_level_id = null
-    ) {
+        if (!empty($academicYear)) {
+            $queryPs .= " AND published_courses.academic_year LIKE '$academicYear'";
+            $queryPss .= " AND published_courses.academic_year LIKE '$academicYear'";
+        }
 
-        //check to which department is assigned.
-        $registrationAddMakeupIDs = array();
-        $results = array();
+        if (!empty($semester)) {
+            $queryPs .= " AND published_courses.semester LIKE '$semester'";
+            $queryPss .= " AND published_courses.semester LIKE '$semester'";
+        }
 
-        if (!empty($department_ids)) {
-            $dept_ids = implode(', ', $department_ids);
+        if (!empty($programId)) {
+            $prgIds = implode(', ', $programId);
+            $queryPs .= " AND program_id IN ($prgIds)";
+            $queryPss .= " AND published_courses.program_id IN ($prgIds)";
+        }
 
+        if (!empty($programTypeId)) {
+            $prgTypeIds = implode(', ', $programTypeId);
+            $queryPs .= " AND program_type_id IN ($prgTypeIds)";
+            $queryPss .= " AND published_courses.program_type_id IN ($prgTypeIds)";
+        }
+
+        if (!empty($departmentIds)) {
+            $deptIds = implode(', ', $departmentIds);
+            $queryPs .= " AND department_id IN ($deptIds)";
+            $queryPss .= " AND published_courses.department_id IN ($deptIds)";
+        }
+
+        if (!empty($collegeIds) && empty($departmentIds)) {
+            $collegeIdsStr = implode(', ', $collegeIds);
+            $queryPs .= " AND college_id IN ($collegeIdsStr) AND department_id IS NULL";
+            $queryPss .= " AND published_courses.college_id IN ($collegeIdsStr) AND published_courses.department_id IS NULL";
+        }
+
+        $results = [];
+
+        if (!empty($queryPs) && !empty($queryPss)) {
+            $resultsRegistration = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
+                INNER JOIN students ON course_registrations.student_id = students.id
+                INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
+                WHERE students.graduated = 0
+                AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = -1))
+                AND exam_grades.registrar_approval IS NULL
+                AND $queryPss
+                GROUP BY exam_grades.course_registration_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsRegistration)) {
+                foreach ($resultsRegistration as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.course_registration_id' => $value['exam_grades']['course_registration_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsRegistration[$key]);
+                    }
+                }
+            }
+
+            $resultsAdds = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
+                INNER JOIN students ON course_adds.student_id = students.id
+                INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
+                WHERE students.graduated = 0
+                AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1))
+                AND exam_grades.registrar_approval IS NULL
+                AND $queryPss
+                GROUP BY exam_grades.course_add_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsAdds)) {
+                foreach ($resultsAdds as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.course_add_id' => $value['exam_grades']['course_add_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsAdds[$key]);
+                    }
+                }
+            }
+
+            $resultsMakeup = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
+                INNER JOIN students ON makeup_exams.student_id = students.id
+                INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
+                WHERE students.graduated = 0
+                AND (exam_grades.department_approval = 1 OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1))
+                AND exam_grades.registrar_approval IS NULL
+                AND $queryPss
+                GROUP BY exam_grades.makeup_exam_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsMakeup)) {
+                foreach ($resultsMakeup as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.makeup_exam_id' => $value['exam_grades']['makeup_exam_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsMakeup[$key]);
+                    }
+                }
+            }
+
+            $results = array_merge($resultsRegistration, $resultsAdds, $resultsMakeup);
+        }
+
+        if (!empty($results)) {
+            foreach ($results as $value) {
+                if (!empty($value['exam_grades']['course_registration_id'])) {
+                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
+                } elseif (!empty($value['exam_grades']['course_add_id'])) {
+                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
+                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
+                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
+                }
+            }
+        }
+
+        $publicationIds = [];
+
+        if (!empty($registrationAddMakeupIDs['register'])) {
+            $publicationIdsRegister = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['register']])
+                ->select(['CourseRegistrations.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsRegister);
+        }
+
+        if (!empty($registrationAddMakeupIDs['add'])) {
+            $publicationIdsAdd = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['add']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsAdd);
+        }
+
+        if (!empty($registrationAddMakeupIDs['makeup'])) {
+            $publicationIdsMakeup = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeup']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsMakeup);
+        }
+
+        $distinctPublicationIds = !empty($publicationIds) ? array_unique($publicationIds) : [];
+        $publishedCourses = [];
+
+        if (!empty($distinctPublicationIds)) {
+            $conditions = ['PublishedCourses.id IN' => $distinctPublicationIds];
+
+            if (!empty($collegeIds) && empty($departmentIds)) {
+                $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                    ->where($conditions)
+                    ->contain([
+                        'Programs' => ['fields' => ['id', 'name']],
+                        'ProgramTypes' => ['fields' => ['id', 'name']],
+                        'Sections' => ['fields' => ['id', 'name']],
+                        'Departments' => ['fields' => ['id', 'name', 'type']],
+                        'GivenByDepartments' => ['fields' => ['id', 'name', 'type']],
+                        'Colleges' => ['fields' => ['id', 'name', 'type']],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']],
+                                'Users' => ['fields' => ['id', 'username', 'email', 'active', 'email_verified']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ],
+                        'Courses' => [
+                            'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                            'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']]
+                        ]
+                    ])
+                    ->order(['PublishedCourses.academic_year' => 'DESC', 'PublishedCourses.semester' => 'DESC'])
+                    ->toArray();
+            } elseif (!empty($departmentIds)) {
+                $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                    ->where($conditions)
+                    ->contain([
+                        'Programs' => ['fields' => ['id', 'name']],
+                        'ProgramTypes' => ['fields' => ['id', 'name']],
+                        'Sections' => ['fields' => ['id', 'name']],
+                        'Departments' => ['fields' => ['id', 'name', 'type']],
+                        'GivenByDepartments' => ['fields' => ['id', 'name', 'type']],
+                        'Colleges' => ['fields' => ['id', 'name', 'type']],
+                        'YearLevels' => ['fields' => ['id', 'name']],
+                        'CourseInstructorAssignments' => [
+                            'fields' => ['id', 'published_course_id', 'staff_id'],
+                            'Staffs' => [
+                                'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                                'Positions' => ['fields' => ['id', 'position']],
+                                'Titles' => ['fields' => ['id', 'title']],
+                                'Users' => ['fields' => ['id', 'username', 'email', 'active', 'email_verified']]
+                            ],
+                            'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                        ],
+                        'Courses' => [
+                            'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                            'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']]
+                        ]
+                    ])
+                    ->order(['PublishedCourses.academic_year' => 'DESC', 'PublishedCourses.semester' => 'DESC'])
+                    ->toArray();
+            }
+        }
+
+        return $publishedCourses;
+    }
+
+    public function getRegistrarNonApprovedPublishedCourseList(?array $departmentIds = null, ?array $collegeIds = null, string $semester, array $programId, array $programTypeId, string $academicYear, ?int $yearLevelId = null): array
+    {
+        $registrationAddMakeupIDs = [];
+        $results = [];
+
+        if (!empty($departmentIds)) {
+            $deptIds = implode(', ', $departmentIds);
             $resultsRegistration = $this->query(
                 "
 			SELECT exam_grades.id, exam_grades.course_registration_id, exam_grades.course_add_id, exam_grades.makeup_exam_id FROM exam_grades exam_grades
@@ -4395,13 +3285,13 @@ class ExamGradesTable extends Table
 				SELECT id FROM course_registrations
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE department_id IN ($dept_ids) and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE department_id IN ($deptIds) and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ")  and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
@@ -4420,13 +3310,13 @@ class ExamGradesTable extends Table
 				SELECT id FROM course_adds
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE department_id IN ($dept_ids) and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE department_id IN ($deptIds) and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ")  and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
@@ -4445,22 +3335,23 @@ class ExamGradesTable extends Table
 				SELECT id FROM makeup_exams
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE department_id IN ($dept_ids) and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE department_id IN ($deptIds) and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ") and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
 
             $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
+
         }
 
-        if (!empty($college_ids)) {
-            $college_ids = implode(', ', $college_ids);
+        if (!empty($collegeIds)) {
+            $collegeIdsStr = implode(', ', $collegeIds);
 
             $resultsRegistration = $this->query(
                 "
@@ -4475,13 +3366,13 @@ class ExamGradesTable extends Table
 				SELECT id FROM course_registrations
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE college_id IN ($college_ids) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE college_id IN ($collegeIdsStr) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ") and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
@@ -4500,13 +3391,13 @@ class ExamGradesTable extends Table
 				SELECT id FROM course_adds
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE college_id IN ($college_ids) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE college_id IN ($collegeIdsStr) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ") and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
@@ -4525,22 +3416,24 @@ class ExamGradesTable extends Table
 				SELECT id FROM makeup_exams
 				WHERE published_course_id IN (
 					SELECT id FROM published_courses
-					WHERE college_id IN ($college_ids) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
+					WHERE college_id IN ($collegeIdsStr) and department_id is null and semester='" . $semester . "' and program_id in (" . implode(
                     ', ',
-                    $program_id
+                    $programId
                 ) . ") and program_type_id in (" . implode(
                     ', ',
-                    $program_type_id
-                ) . ") and academic_year='" . $academic_year . "'
+                    $programTypeId
+                ) . ") and academic_year='" . $academicYear . "'
 				)
 			) "
             );
 
             $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
+
+            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
         }
 
         if (!empty($results)) {
-            foreach ($results as $k => $value) {
+            foreach ($results as $value) {
                 if (!empty($value['exam_grades']['course_registration_id'])) {
                     $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
                 } elseif (!empty($value['exam_grades']['course_add_id'])) {
@@ -4550,689 +3443,791 @@ class ExamGradesTable extends Table
                 }
             }
         }
-        // debug($registrationAddMakeupIDs);
 
-        $publication_ids = array();
+        $publicationIds = [];
+
         if (!empty($registrationAddMakeupIDs['register'])) {
-            $publication_ids_register = $this->CourseRegistration->find('list', array(
-                'conditions' => array('CourseRegistration.id' => $registrationAddMakeupIDs['register']),
-                'fields' => array('CourseRegistration.published_course_id')
-            ));
-            $publication_ids = $publication_ids + $publication_ids_register;
+            $publicationIdsRegister = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['register']])
+                ->select(['CourseRegistrations.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsRegister);
         }
 
         if (!empty($registrationAddMakeupIDs['add'])) {
-            $publication_ids_add = $this->CourseAdd->find('list', array(
-                'conditions' => array('CourseAdd.id' => $registrationAddMakeupIDs['add']),
-                'fields' => array('CourseAdd.published_course_id')
-            ));
-            $publication_ids += $publication_ids_add;
+            $publicationIdsAdd = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['add']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsAdd);
         }
 
         if (!empty($registrationAddMakeupIDs['makeup'])) {
-            $publication_ids_makeup = $this->MakeupExam->find('list', array(
-                'conditions' => array('MakeupExam.id' => $registrationAddMakeupIDs['makeup']),
-                'fields' => array('MakeupExam.published_course_id')
-            ));
-            $publication_ids += $publication_ids_makeup;
+            $publicationIdsMakeup = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeup']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsMakeup);
         }
 
-        if (isset($publication_ids) && !empty($publication_ids)) {
-            $distinct_publication_ids = array_unique($publication_ids);
+        $distinctPublicationIds = !empty($publicationIds) ? array_unique($publicationIds) : [];
+        $publishedCourses = [];
+
+        if (!empty($distinctPublicationIds)) {
+            $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                ->where(['PublishedCourses.id IN' => $distinctPublicationIds])
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'CourseInstructorAssignments' => [
+                        'fields' => ['id', 'published_course_id', 'staff_id'],
+                        'Staffs' => [
+                            'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                            'Positions' => ['fields' => ['id', 'position']],
+                            'Titles' => ['fields' => ['id', 'title']]
+                        ],
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                    ],
+                    'Courses' => [
+                        'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                        'Curriculums' => ['fields' => ['id', 'type_credit']]
+                    ]
+                ])
+                ->toArray();
         }
 
-        if (isset($publication_ids) && !empty($distinct_publication_ids)) {
-            $published_courses = $this->CourseRegistration->PublishedCourse->find('all', array(
-                'conditions' => array(
-                    'PublishedCourse.id' => $distinct_publication_ids
-                ),
-                'contain' => array(
-                    'Program' => array('id', 'name'),
-                    'ProgramType' => array('id', 'name'),
-                    'Section' => array('id', 'name'),
-                    'Department' => array('id', 'name'),
-                    'YearLevel' => array('id', 'name'),
-                    'CourseInstructorAssignment' => array(
-                        'fields' => array('id', 'published_course_id', 'staff_id'),
-                        'Staff' => array(
-                            'fields' => array('id', 'full_name', 'user_id'),
-                            'Position',
-                            'Title',
-                        ),
-                        'conditions' => array('CourseInstructorAssignment.isprimary' => 1)
-                    ),
-                    'Course' => array(
-                        'fields' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit'),
-                        'Curriculum' => array('id', 'type_credit'),
-                    )
-                )
-            ));
-        }
-
-        return $published_courses;
+        return $publishedCourses;
     }
 
-    // src/Model/Table/ExamGradesTable.php
-
-    public function getRejectedOrNonApprovedPublishedCourseList(
-        $department_id,
-        $acadamic_year = '',
-        $semester = '',
-        $year_level = [],
-        $program_ids = [],
-        $program_type_ids = [],
-        $acy_ranges = [],
-        $role_id = ROLE_DEPARTMENT,
-        $freshman = 0
-    ) {
-        $conn = $this->getConnection();
-        $publication_ids = [];
+    public function getRejectedOrNonApprovedPublishedCourseList(int $departmentCollegeId, int $department = 1, string $academicYear = '', string $semester = '', array $programIds = [], array $programTypeIds = [], array $acyRanges = []): array
+    {
+        $registrationAddMakeupIDs = [];
         $results = [];
-        $given_by = 'given_by_department_id';
+        $queryPss = $department == 1
+            ? "published_courses.id IS NOT NULL AND (published_courses.year_level_id IS NOT NULL OR published_courses.year_level_id != 0 OR published_courses.year_level_id != '') AND published_courses.given_by_department_id = $departmentCollegeId"
+            : "published_courses.id IS NOT NULL AND (published_courses.year_level_id IS NULL OR published_courses.year_level_id = 0 OR published_courses.year_level_id = '') AND published_courses.program_id = 1 AND published_courses.program_type_id = 1 AND department_id IS NULL AND published_courses.given_by_department_id = $departmentCollegeId";
 
-        if (empty($department_id)) return [];
+        if (!empty($acyRanges)) {
+            $acyRangesByComaQuoted = "'" . implode("', '", $acyRanges) . "'";
+            $queryPss .= " AND published_courses.academic_year IN ($acyRangesByComaQuoted)";
+        }
 
-        if ($role_id === ROLE_DEPARTMENT) {
-            $queryPss = "published_courses.given_by_department_id IN (" . implode(',', (array)$department_id) . ")";
-        } elseif ($role_id === ROLE_COLLEGE) {
-            $queryPss = "published_courses.college_id IN (" . implode(',', (array)$department_id) . ")";
-            $given_by = 'college_id';
+        if (!empty($academicYear)) {
+            $queryPss .= " AND published_courses.academic_year LIKE '$academicYear'";
+        }
+
+        if (!empty($semester)) {
+            $queryPss .= " AND published_courses.semester LIKE '$semester'";
+        }
+
+        if (!empty($programIds)) {
+            $programIdsStr = "'" . implode("', '", $programIds) . "'";
+            $queryPss .= " AND published_courses.program_id IN ($programIdsStr)";
+        }
+
+        if (!empty($programTypeIds)) {
+            $programTypeIdsStr = "'" . implode("', '", $programTypeIds) . "'";
+            $queryPss .= " AND published_courses.program_type_id IN ($programTypeIdsStr)";
+        }
+
+        if (!empty($queryPss)) {
+            $resultsRegistrationNR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
+                INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
+                WHERE exam_grades.department_approval IS NULL
+                AND $queryPss
+                AND exam_grades.course_registration_id NOT IN (
+                    SELECT exam_grades.course_registration_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.course_registration_id IS NOT NULL
+                    GROUP BY exam_grades.course_registration_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsRegistrationR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
+                INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
+                WHERE exam_grades.registrar_approval = -1
+                AND exam_grades.department_approval = 1
+                AND $queryPss
+                AND exam_grades.course_registration_id NOT IN (
+                    SELECT exam_grades.course_registration_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.course_registration_id IS NOT NULL
+                    GROUP BY exam_grades.course_registration_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsRegistration = array_merge($resultsRegistrationNR, $resultsRegistrationR);
+
+            $resultsAddsNR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
+                INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
+                WHERE exam_grades.department_approval IS NULL
+                AND $queryPss
+                AND exam_grades.course_add_id NOT IN (
+                    SELECT exam_grades.course_add_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.course_add_id IS NOT NULL
+                    GROUP BY exam_grades.course_add_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsAddsR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
+                INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
+                WHERE exam_grades.registrar_approval = -1
+                AND exam_grades.department_approval = 1
+                AND $queryPss
+                AND exam_grades.course_add_id NOT IN (
+                    SELECT exam_grades.course_add_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.course_add_id IS NOT NULL
+                    GROUP BY exam_grades.course_add_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsAdds = array_merge($resultsAddsNR, $resultsAddsR);
+
+            $resultsMakeupNR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
+                INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
+                WHERE exam_grades.department_approval IS NULL
+                AND $queryPss
+                AND exam_grades.makeup_exam_id NOT IN (
+                    SELECT exam_grades.makeup_exam_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.makeup_exam_id IS NOT NULL
+                    GROUP BY exam_grades.makeup_exam_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsMakeupR = $this->query("SELECT DISTINCT exam_grades.*
+                FROM exam_grades
+                INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
+                INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
+                WHERE exam_grades.registrar_approval = -1
+                AND exam_grades.department_approval = 1
+                AND $queryPss
+                AND exam_grades.makeup_exam_id NOT IN (
+                    SELECT exam_grades.makeup_exam_id
+                    FROM exam_grades
+                    WHERE exam_grades.registrar_approval = 1
+                    AND exam_grades.department_approval = 1
+                    AND exam_grades.makeup_exam_id IS NOT NULL
+                    GROUP BY exam_grades.makeup_exam_id
+                    ORDER BY exam_grades.id DESC
+                )")->fetchAll('assoc');
+
+            $resultsMakeup = array_merge($resultsMakeupNR, $resultsMakeupR);
+            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
+        }
+
+        if (!empty($results)) {
+            foreach ($results as $value) {
+                if (!empty($value['exam_grades']['course_registration_id'])) {
+                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
+                } elseif (!empty($value['exam_grades']['course_add_id'])) {
+                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
+                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
+                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
+                }
+            }
+        }
+
+        $publicationIds = [];
+
+        if (!empty($registrationAddMakeupIDs['register'])) {
+            $publicationIdsRegister = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['register']])
+                ->select(['CourseRegistrations.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsRegister);
+        }
+
+        if (!empty($registrationAddMakeupIDs['add'])) {
+            $publicationIdsAdd = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['add']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsAdd);
+        }
+
+        if (!empty($registrationAddMakeupIDs['makeup'])) {
+            $publicationIdsMakeup = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeup']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsMakeup);
+        }
+
+        $distinctPublicationIds = !empty($publicationIds) ? array_unique($publicationIds) : [];
+        $publishedCourses = [];
+
+        if (!empty($distinctPublicationIds)) {
+            $conditions = [
+                'PublishedCourses.id IN' => $distinctPublicationIds,
+                $department == 1 ? 'PublishedCourses.given_by_department_id' : 'PublishedCourses.college_id' => $departmentCollegeId
+            ];
+
+            $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'CourseInstructorAssignments' => [
+                        'fields' => ['id', 'published_course_id', 'staff_id'],
+                        'Staffs' => [
+                            'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                            'Positions' => ['fields' => ['id', 'position']],
+                            'Titles' => ['fields' => ['id', 'title']]
+                        ],
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                    ],
+                    'Courses' => [
+                        'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']]
+                    ]
+                ])
+                ->toArray();
+        }
+
+        return $publishedCourses;
+    }
+
+
+    public function getRejectedOrNonApprovedPublishedCourseList2($departmentId, string $academicYear = '', string $semester = '', array $yearLevel = [], array $programIds = [], array $programTypeIds = [], array $acyRanges = [], string $roleId = 'ROLE_DEPARTMENT', int $freshman = 0): array
+    {
+        $registrationAddMakeupIDs = [];
+        $results = [];
+        $givenBy = 'given_by_department_id';
+
+        if (!empty($departmentId) && $roleId === 'ROLE_DEPARTMENT') {
+            $deptsByComaQuoted = is_array($departmentId) ? "'" . implode("', '", $departmentId) . "'" : "'$departmentId'";
+            $queryPss = "published_courses.id IS NOT NULL AND published_courses.given_by_department_id IN ($deptsByComaQuoted)";
+        } elseif (!empty($departmentId) && $roleId === 'ROLE_COLLEGE') {
+            $deptsByComaQuoted = is_array($departmentId) ? "'" . implode("', '", $departmentId) . "'" : "'$departmentId'";
+            $queryPss = "published_courses.id IS NOT NULL AND published_courses.college_id IN ($deptsByComaQuoted)";
+            $givenBy = 'college_id';
         } else {
             return [];
         }
 
-        if (!empty($acy_ranges)) {
-            $quoted = implode("','", $acy_ranges);
-            $queryPss .= " AND published_courses.academic_year IN ('$quoted')";
+        if (!empty($acyRanges)) {
+            $acyRangesByComaQuoted = "'" . implode("', '", $acyRanges) . "'";
+            $queryPss .= " AND published_courses.academic_year IN ($acyRangesByComaQuoted)";
         }
 
-        if (!empty($acadamic_year)) {
-            $queryPss .= " AND published_courses.academic_year = '$acadamic_year'";
+        if (!empty($academicYear)) {
+            $queryPss .= " AND published_courses.academic_year LIKE '$academicYear'";
         }
 
         if (!empty($semester)) {
-            $queryPss .= " AND published_courses.semester = '$semester'";
+            $queryPss .= " AND published_courses.semester LIKE '$semester'";
         }
 
-        // Year level filtering
-        if (!$freshman && !empty($year_level)) {
-            $yearLevelTbl = TableRegistry::getTableLocator()->get('YearLevels');
-            $year_level_ids = $yearLevelTbl->find('list')
-                ->where(['YearLevels.name IN' => $year_level])
+        if (!$freshman) {
+            if (!empty($yearLevel) && !empty($departmentId) && $roleId === 'ROLE_DEPARTMENT') {
+                $publishedDeptIds = $this->CourseRegistrations->PublishedCourses->find('list')
+                    ->where([
+                        'PublishedCourses.given_by_department_id IN' => is_array($departmentId) ? $departmentId : [$departmentId],
+                        'PublishedCourses.academic_year IN' => !empty($acyRanges) ? $acyRanges : [$academicYear]
+                    ])
+                    ->group(['PublishedCourses.department_id'])
+                    ->select(['PublishedCourses.department_id'])
+                    ->toArray();
+
+                $yearLevelIds = TableRegistry::getTableLocator()->get('YearLevels')->find('list')
+                    ->where(['YearLevels.department_id IN' => array_keys($publishedDeptIds), 'YearLevels.name IN' => $yearLevel])
+                    ->select(['YearLevels.id'])
+                    ->toArray();
+
+                if (!empty($yearLevelIds)) {
+                    $yearLevelsComaQuoted = "'" . implode("', '", array_keys($yearLevelIds)) . "'";
+                    $queryPss .= " AND (published_courses.year_level_id IN ($yearLevelsComaQuoted) OR ((published_courses.year_level_id IS NULL OR published_courses.year_level_id = '' OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL))";
+                }
+            }
+        } else {
+            $queryPss .= " AND (published_courses.year_level_id IS NULL OR published_courses.year_level_id = '' OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL";
+        }
+
+        if (!empty($programIds)) {
+            $programIdsComaQuoted = is_array($programIds) ? "'" . implode("', '", $programIds) . "'" : "'$programIds'";
+            $queryPss .= " AND published_courses.program_id IN ($programIdsComaQuoted)";
+        }
+
+        if (!empty($programTypeIds)) {
+            $programTypeIdsComaQuoted = is_array($programTypeIds) ? "'" . implode("', '", $programTypeIds) . "'" : "'$programTypeIds'";
+            $queryPss .= " AND published_courses.program_type_id IN ($programTypeIdsComaQuoted)";
+        }
+
+        if (!empty($queryPss)) {
+            $resultsRegistration = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
+                INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
+                INNER JOIN students ON course_registrations.student_id = students.id
+                WHERE students.graduated = 0
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                    OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                )
+                AND $queryPss
+                GROUP BY exam_grades.course_registration_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsRegistration)) {
+                foreach ($resultsRegistration as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.course_registration_id' => $value['exam_grades']['course_registration_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsRegistration[$key]);
+                    }
+                }
+            }
+
+            $resultsAdds = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
+                INNER JOIN students ON course_adds.student_id = students.id
+                INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
+                WHERE students.graduated = 0
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                    OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                )
+                AND $queryPss
+                GROUP BY exam_grades.course_add_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsAdds)) {
+                foreach ($resultsAdds as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.course_add_id' => $value['exam_grades']['course_add_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsAdds[$key]);
+                    }
+                }
+            }
+
+            $resultsMakeup = $this->query("SELECT exam_grades.*
+                FROM exam_grades
+                INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
+                INNER JOIN students ON makeup_exams.student_id = students.id
+                INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
+                WHERE students.graduated = 0
+                AND (
+                    (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
+                    OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                    OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
+                )
+                AND $queryPss
+                GROUP BY exam_grades.makeup_exam_id
+                ORDER BY exam_grades.id DESC")->fetchAll('assoc');
+
+            if (!empty($resultsMakeup)) {
+                foreach ($resultsMakeup as $key => $value) {
+                    if ($this->find()->where([
+                        'ExamGrades.makeup_exam_id' => $value['exam_grades']['makeup_exam_id'],
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])->count()) {
+                        unset($resultsMakeup[$key]);
+                    }
+                }
+            }
+
+            $results = array_merge($resultsRegistration, $resultsMakeup, $resultsAdds);
+        }
+
+        if (!empty($results)) {
+            foreach ($results as $value) {
+                if (!empty($value['exam_grades']['course_registration_id'])) {
+                    $registrationAddMakeupIDs['register'][] = $value['exam_grades']['course_registration_id'];
+                } elseif (!empty($value['exam_grades']['course_add_id'])) {
+                    $registrationAddMakeupIDs['add'][] = $value['exam_grades']['course_add_id'];
+                } elseif (!empty($value['exam_grades']['makeup_exam_id'])) {
+                    $registrationAddMakeupIDs['makeup'][] = $value['exam_grades']['makeup_exam_id'];
+                }
+            }
+        }
+
+        $publicationIds = [];
+
+        if (!empty($registrationAddMakeupIDs['register'])) {
+            $publicationIdsRegister = $this->CourseRegistrations->find('list')
+                ->where(['CourseRegistrations.id IN' => $registrationAddMakeupIDs['register']])
+                ->select(['CourseRegistrations.published_course_id'])
                 ->toArray();
-
-            if (!empty($year_level_ids)) {
-                $ids = implode(',', array_keys($year_level_ids));
-                $queryPss .= " AND (published_courses.year_level_id IN ($ids) OR ((published_courses.year_level_id IS NULL OR published_courses.year_level_id = 0) AND published_courses.college_id IS NOT NULL))";
-            }
+            $publicationIds = array_merge($publicationIds, $publicationIdsRegister);
         }
 
-        if (!empty($program_ids)) {
-            $queryPss .= " AND published_courses.program_id IN (" . implode(',', (array)$program_ids) . ")";
+        if (!empty($registrationAddMakeupIDs['add'])) {
+            $publicationIdsAdd = $this->CourseAdds->find('list')
+                ->where(['CourseAdds.id IN' => $registrationAddMakeupIDs['add']])
+                ->select(['CourseAdds.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsAdd);
         }
 
-        if (!empty($program_type_ids)) {
-            $queryPss .= " AND published_courses.program_type_id IN (" . implode(',', (array)$program_type_ids) . ")";
+        if (!empty($registrationAddMakeupIDs['makeup'])) {
+            $publicationIdsMakeup = $this->MakeupExams->find('list')
+                ->where(['MakeupExams.id IN' => $registrationAddMakeupIDs['makeup']])
+                ->select(['MakeupExams.published_course_id'])
+                ->toArray();
+            $publicationIds = array_merge($publicationIds, $publicationIdsMakeup);
         }
 
-        // Shared WHERE condition
-        $whereClause = "students.graduated = 0 AND (
-        (exam_grades.department_approval IS NULL AND exam_grades.registrar_approval IS NULL)
-        OR (exam_grades.department_reply = 1 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
-        OR (exam_grades.department_reply = 0 AND exam_grades.department_approval = 1 AND exam_grades.registrar_approval = -1)
-    ) AND $queryPss";
+        $distinctPublicationIds = !empty($publicationIds) ? array_unique($publicationIds) : [];
+        $publishedCourses = [];
 
-        // Fetch from CourseRegistration
-        $sql1 = "SELECT exam_grades.* FROM exam_grades
-        INNER JOIN course_registrations ON exam_grades.course_registration_id = course_registrations.id
-        INNER JOIN students ON course_registrations.student_id = students.id
-        INNER JOIN published_courses ON course_registrations.published_course_id = published_courses.id
-        WHERE $whereClause
-        GROUP BY exam_grades.course_registration_id
-        ORDER BY exam_grades.id DESC";
+        if (!empty($distinctPublicationIds)) {
+            $conditions = [
+                'PublishedCourses.id IN' => $distinctPublicationIds,
+                "PublishedCourses.$givenBy IN" => is_array($departmentId) ? $departmentId : [$departmentId]
+            ];
 
-        $resultsRegistration = $conn->execute($sql1)->fetchAll('assoc');
-
-        // Fetch from CourseAdd
-        $sql2 = "SELECT exam_grades.* FROM exam_grades
-        INNER JOIN course_adds ON exam_grades.course_add_id = course_adds.id
-        INNER JOIN students ON course_adds.student_id = students.id
-        INNER JOIN published_courses ON course_adds.published_course_id = published_courses.id
-        WHERE $whereClause
-        GROUP BY exam_grades.course_add_id
-        ORDER BY exam_grades.id DESC";
-
-        $resultsAdds = $conn->execute($sql2)->fetchAll('assoc');
-
-        // Fetch from MakeupExam
-        $sql3 = "SELECT exam_grades.* FROM exam_grades
-        INNER JOIN makeup_exams ON exam_grades.makeup_exam_id = makeup_exams.id
-        INNER JOIN students ON makeup_exams.student_id = students.id
-        INNER JOIN published_courses ON makeup_exams.published_course_id = published_courses.id
-        WHERE $whereClause
-        GROUP BY exam_grades.makeup_exam_id
-        ORDER BY exam_grades.id DESC";
-
-        $resultsMakeup = $conn->execute($sql3)->fetchAll('assoc');
-
-        // Filter: keep only unapproved ones
-        $results = array_merge($resultsRegistration, $resultsAdds, $resultsMakeup);
-
-        foreach ($results as $row) {
-            if (!empty($row['course_registration_id'])) {
-                $publication_ids[] = $this->CourseRegistrations->get($row['course_registration_id'])->published_course_id;
-            } elseif (!empty($row['course_add_id'])) {
-                $publication_ids[] = $this->CourseAdds->get($row['course_add_id'])->published_course_id;
-            } elseif (!empty($row['makeup_exam_id'])) {
-                $publication_ids[] = $this->MakeupExams->get($row['makeup_exam_id'])->published_course_id;
-            }
+            $publishedCourses = $this->CourseRegistrations->PublishedCourses->find()
+                ->where($conditions)
+                ->contain([
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name', 'type']],
+                    'GivenByDepartments' => ['fields' => ['id', 'name', 'type']],
+                    'Colleges' => ['fields' => ['id', 'name', 'type']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'CourseInstructorAssignments' => [
+                        'fields' => ['id', 'published_course_id', 'staff_id'],
+                        'Staffs' => [
+                            'fields' => ['id', 'first_name', 'middle_name', 'last_name', 'user_id'],
+                            'Positions' => ['fields' => ['id', 'position']],
+                            'Titles' => ['fields' => ['id', 'title']],
+                            'Users' => ['fields' => ['id', 'username', 'email', 'active', 'email_verified']]
+                        ],
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1]
+                    ],
+                    'Courses' => [
+                        'fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit'],
+                        'Curriculums' => ['fields' => ['id', 'name', 'year_introduced', 'type_credit', 'active']]
+                    ]
+                ])
+                ->toArray();
         }
 
-        $publication_ids = array_unique($publication_ids);
+        return $publishedCourses;
+    }
 
-        if (empty($publication_ids)) return [];
-
-        $PublishedCoursesTbl = TableRegistry::getTableLocator()->get('PublishedCourses');
-        $courses = $PublishedCoursesTbl->find()
-            ->enableHydration(false)
-            ->where(['PublishedCourses.id IN' => $publication_ids])
-            ->contain([
-                'Program', 'ProgramType', 'Section', 'Department',
-                'GivenByDepartment', 'College', 'YearLevel',
-                'CourseInstructorAssignments' => function ($q) {
-                    return $q->where(['CourseInstructorAssignments.isprimary' => 1])
-                        ->contain([
-                            'Staff' => ['Positions', 'Titles', 'Users']
-                        ]);
-                },
-                'Course' => ['Curriculum']
+    public function getAddSemester(?int $studentId = null, ?string $currentAcademicYear = null): array
+    {
+        $firstAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
             ])
+            ->order(['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC'])
+            ->first();
+
+        $lastAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+            ->first();
+
+        if (empty($firstAdded) && empty($lastAdded)) {
+            return [];
+        }
+
+        return $this->CourseRegistrations->getLastestStudentSemesterAndAcademicYear($studentId, $currentAcademicYear);
+    }
+
+    public function getTotalCreditAndPointDeduction(?int $studentId = null, array $allAySList = []): array
+    {
+        $processedCourseReg = [];
+        $processedCourseAdd = [];
+        $deductCreditHourSum = 0;
+        $deductGradePointSum = 0;
+        $mDeductCreditHourSum = 0;
+        $mDeductGradePointSum = 0;
+        $creditAndPointDeduction = [];
+
+        if (!empty($allAySList)) {
+            foreach ($allAySList as $ayAndS) {
+                $courseAndGrades = $this->getStudentCoursesAndFinalGrade($studentId, $ayAndS['academic_year'], $ayAndS['semester']);
+
+                if (!empty($courseAndGrades)) {
+                    foreach ($courseAndGrades as $registeredAddedCourse) {
+                        if (isset($registeredAddedCourse['grade']) && (strcasecmp($registeredAddedCourse['grade'], 'I') === 0 || strcasecmp($registeredAddedCourse['grade'], 'W') === 0)) {
+                            continue;
+                        }
+
+                        if (isset($registeredAddedCourse['grade']) && strcasecmp($registeredAddedCourse['grade'], 'W') !== 0 && strcasecmp($registeredAddedCourse['grade'], 'I') !== 0 && isset($registeredAddedCourse['used_in_gpa']) && $registeredAddedCourse['used_in_gpa']) {
+                            if ($registeredAddedCourse['repeated_new'] === true) {
+                                $previousAyAndS2 = $this->getListOfAyAndSemester($studentId, $ayAndS['academic_year'], $ayAndS['semester']);
+                                $courseRegistrations = $this->CourseRegistrations->Students->CourseRegistrations->getCourseRegistrations($studentId, $previousAyAndS2, $registeredAddedCourse['course_id'], 1, 1);
+                                $courseAdds = $this->CourseAdds->getCourseAdds($studentId, $previousAyAndS2, $registeredAddedCourse['course_id'], 1);
+
+                                if (!empty($courseRegistrations)) {
+                                    foreach ($courseRegistrations as $crValue) {
+                                        if (!in_array($crValue['CourseRegistration']['id'], $processedCourseReg)) {
+                                            $gradeDetail = $this->getApprovedGrade($crValue['CourseRegistration']['id'], 1);
+
+                                            if (isset($gradeDetail['grade']) && (strcasecmp($gradeDetail['grade'], 'I') === 0 || strcasecmp($gradeDetail['grade'], 'W') === 0)) {
+                                                continue;
+                                            }
+
+                                            $deductCreditHourSum += $crValue['PublishedCourse']['Course']['credit'];
+                                            if (!empty($gradeDetail)) {
+                                                $deductGradePointSum += ($gradeDetail['point_value'] * $crValue['PublishedCourse']['Course']['credit']);
+                                            }
+
+                                            if ($crValue['PublishedCourse']['Course']['major'] == 1) {
+                                                $mDeductCreditHourSum += $crValue['PublishedCourse']['Course']['credit'];
+                                                if (!empty($gradeDetail)) {
+                                                    $mDeductGradePointSum += ($gradeDetail['point_value'] * $crValue['PublishedCourse']['Course']['credit']);
+                                                }
+                                            }
+
+                                            $processedCourseReg[] = $crValue['CourseRegistration']['id'];
+                                        }
+                                    }
+                                }
+
+                                if (!empty($courseAdds)) {
+                                    foreach ($courseAdds as $caValue) {
+                                        if (!in_array($caValue['CourseAdd']['id'], $processedCourseAdd)) {
+                                            $gradeDetail = $this->getApprovedGrade($caValue['CourseAdd']['id'], 0);
+
+                                            if (isset($gradeDetail['grade']) && (strcasecmp($gradeDetail['grade'], 'I') === 0 || strcasecmp($gradeDetail['grade'], 'W') === 0)) {
+                                                continue;
+                                            }
+
+                                            $deductCreditHourSum += $caValue['PublishedCourse']['Course']['credit'];
+                                            if (!empty($gradeDetail)) {
+                                                $deductGradePointSum += ($gradeDetail['point_value'] * $caValue['PublishedCourse']['Course']['credit']);
+                                            }
+
+                                            if ($caValue['PublishedCourse']['Course']['major'] == 1) {
+                                                $mDeductCreditHourSum += $caValue['PublishedCourse']['Course']['credit'];
+                                                if (!empty($gradeDetail)) {
+                                                    $mDeductGradePointSum += ($gradeDetail['point_value'] * $caValue['PublishedCourse']['Course']['credit']);
+                                                }
+                                            }
+
+                                            $processedCourseAdd[] = $caValue['CourseAdd']['id'];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $creditAndPointDeduction['deduct_credit_hour_sum'] = $deductCreditHourSum;
+        $creditAndPointDeduction['deduct_grade_point_sum'] = $deductGradePointSum;
+        $creditAndPointDeduction['m_deduct_credit_hour_sum'] = $mDeductCreditHourSum;
+        $creditAndPointDeduction['m_deduct_grade_point_sum'] = $mDeductGradePointSum;
+
+        return $creditAndPointDeduction;
+    }
+
+    public function getTotalCreditPointDeduction(?int $studentId = null): array
+    {
+        $processedCourseReg = [];
+        $processedCourseAdd = [];
+        $deductCreditHourSum = 0;
+        $deductGradePointSum = 0;
+        $mDeductCreditHourSum = 0;
+        $mDeductGradePointSum = 0;
+        $creditAndPointDeduction = [];
+
+        $allAySList = $this->getListOfAyAndSemester($studentId);
+
+        if (!empty($allAySList)) {
+            foreach ($allAySList as $ayAndS) {
+                $courseAndGrades = $this->getStudentCoursesAndFinalGrade($studentId, $ayAndS['academic_year'], $ayAndS['semester']);
+
+                if (!empty($courseAndGrades)) {
+                    foreach ($courseAndGrades as $registeredAddedCourse) {
+                        if (isset($registeredAddedCourse['grade']) && (strcasecmp($registeredAddedCourse['grade'], 'I') === 0 || strcasecmp($registeredAddedCourse['grade'], 'W') === 0)) {
+                            continue;
+                        }
+
+                        if (strcasecmp($registeredAddedCourse['grade'], 'I') !== 0 && $registeredAddedCourse['used_in_gpa']) {
+                            if ($registeredAddedCourse['repeated_new'] === true) {
+                                $previousAyAndS2 = $this->getListOfAyAndSemester($studentId, $ayAndS['academic_year'], $ayAndS['semester']);
+                                $courseRegistrations = $this->CourseRegistrations->Students->CourseRegistrations->getCourseRegistrations($studentId, $previousAyAndS2, $registeredAddedCourse['course_id'], 1, 1);
+                                $courseAdds = $this->CourseAdds->getCourseAdds($studentId, $previousAyAndS2, $registeredAddedCourse['course_id'], 1);
+
+                                if (!empty($courseRegistrations)) {
+                                    foreach ($courseRegistrations as $crValue) {
+                                        if (!in_array($crValue['CourseRegistration']['id'], $processedCourseReg)) {
+                                            $gradeDetail = $this->getApprovedGrade($crValue['CourseRegistration']['id'], 1);
+
+                                            $deductCreditHourSum += $crValue['PublishedCourse']['Course']['credit'];
+                                            if (!empty($gradeDetail)) {
+                                                $deductGradePointSum += ($gradeDetail['point_value'] * $crValue['PublishedCourse']['Course']['credit']);
+                                            }
+
+                                            if ($crValue['PublishedCourse']['Course']['major'] == 1) {
+                                                $mDeductCreditHourSum += $crValue['PublishedCourse']['Course']['credit'];
+                                                if (!empty($gradeDetail)) {
+                                                    $mDeductGradePointSum += ($gradeDetail['point_value'] * $crValue['PublishedCourse']['Course']['credit']);
+                                                }
+                                            }
+
+                                            $processedCourseReg[] = $crValue['CourseRegistration']['id'];
+                                        }
+                                    }
+                                }
+
+                                if (!empty($courseAdds)) {
+                                    foreach ($courseAdds as $caValue) {
+                                        if (!in_array($caValue['CourseAdd']['id'], $processedCourseAdd)) {
+                                            $gradeDetail = $this->getApprovedGrade($caValue['CourseAdd']['id'], 0);
+
+                                            $deductCreditHourSum += $caValue['PublishedCourse']['Course']['credit'];
+                                            if (!empty($gradeDetail)) {
+                                                $deductGradePointSum += ($gradeDetail['point_value'] * $caValue['PublishedCourse']['Course']['credit']);
+                                            }
+
+                                            if ($caValue['PublishedCourse']['Course']['major'] == 1) {
+                                                $mDeductCreditHourSum += $caValue['PublishedCourse']['Course']['credit'];
+                                                if (!empty($gradeDetail)) {
+                                                    $mDeductGradePointSum += ($gradeDetail['point_value'] * $caValue['PublishedCourse']['Course']['credit']);
+                                                }
+                                            }
+
+                                            $processedCourseAdd[] = $caValue['CourseAdd']['id'];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $creditAndPointDeduction['deduct_credit_hour_sum'] = $deductCreditHourSum;
+        $creditAndPointDeduction['deduct_grade_point_sum'] = $deductGradePointSum;
+        $creditAndPointDeduction['m_deduct_credit_hour_sum'] = $mDeductCreditHourSum;
+        $creditAndPointDeduction['m_deduct_grade_point_sum'] = $mDeductGradePointSum;
+
+        return $creditAndPointDeduction;
+    }
+
+    public function getStudentAllCoursesAndFinalGrade(?int $studentId = null, ?string $currentAcademicYear = null, int $includeExempted = 0): array
+    {
+        $coursesAndGrades = [];
+
+        $courseRegistered = $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses'])
+            ->order(['CourseRegistrations.academic_year' => 'ASC', 'CourseRegistrations.semester' => 'ASC', 'CourseRegistrations.id' => 'ASC'])
             ->toArray();
 
-        return $courses;
-    }
+        $courseAdded = $this->CourseAdds->find()
+            ->where(['CourseAdds.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses'])
+            ->order(['CourseAdds.academic_year' => 'ASC', 'CourseAdds.semester' => 'ASC', 'CourseAdds.id' => 'ASC'])
+            ->toArray();
 
-
-
-
-
-
-    function getAddSemester($student_id = null, $current_academic_year = null)
-    {
-
-        $first_added = $this->CourseAdd->find('first', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseAdd.created ASC')
-            'order' => array('CourseAdd.academic_year' => 'ASC', 'CourseAdd.semester' => 'ASC', 'CourseAdd.id' => 'ASC')
-        ));
-
-        $last_added = $this->CourseAdd->find('first', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'recursive' => -1,
-            //'order' => array('CourseAdd.created DESC')
-            'order' => array(
-                'CourseAdd.academic_year' => 'DESC',
-                'CourseAdd.semester' => 'DESC',
-                'CourseAdd.id' => 'DESC'
-            )
-        ));
-
-        //If there is no registration and add (fresh student for the first time)
-        if (empty($first_added) && empty($last_added)) {
-            return array();
-        } else {
-            //getLastestStudentSemesterAndAcademicYear
-            return $this->CourseRegistration->getLastestStudentSemesterAndAcademicYear(
-                $student_id,
-                $current_academic_year
-            );
-            //return $this->getListOfAyAndSemester($student_id);
-        }
-    }
-
-    function getTotalCreditAndPointDeduction($student_id = null, $all_ay_s_list = array())
-    {
-
-        $processed_course_reg = array();
-        $processed_course_add = array();
-        $deduct_credit_hour_sum = 0;
-        $deduct_grade_point_sum = 0;
-        $m_deduct_credit_hour_sum = 0;
-        $m_deduct_grade_point_sum = 0;
-        $credit_and_point_deduction = array();
-
-        if (!empty($all_ay_s_list)) {
-            foreach ($all_ay_s_list as $ays_key => $ay_and_s) {
-                $course_and_grades = $this->getStudentCoursesAndFinalGrade(
-                    $student_id,
-                    $ay_and_s['academic_year'],
-                    $ay_and_s['semester']
-                );
-
-                /* if ($ay_and_s['academic_year'] == "2017/18" && $ay_and_s['semester'] == "I") {
-                    debug($course_and_grades);
-                } */
-
-                if (!empty($course_and_grades)) {
-                    foreach ($course_and_grades as $key => $registered_added_course) {
-                        /* if(!(isset($registered_added_course['grade']) && (isset($registered_added_course['point_value']) || strcasecmp($registered_added_course['grade'], 'I') == 0))) {
-                            break 2;
-                        } */
-
-                        if ((isset($registered_added_course['grade']) && (strcasecmp(
-                                    $registered_added_course['grade'],
-                                    'I'
-                                ) == 0 || strcasecmp(
-                                    $registered_added_course['grade'],
-                                    'W'
-                                ) == 0 /* || strcasecmp($registered_added_course['grade'], 'NG') == 0 */))) {
-                            continue;
-                        }
-
-                        if (isset($registered_added_course['grade']) && (strcasecmp(
-                                    $registered_added_course['grade'],
-                                    'W'
-                                ) != 0 || strcasecmp(
-                                    $registered_added_course['grade'],
-                                    'I'
-                                ) != 0 /* || strcasecmp($registered_added_course['grade'], 'NG') != 0 */) && isset($registered_added_course['used_in_gpa']) && $registered_added_course['used_in_gpa']) {
-                            //Begin: credit hour and grade point deduction sum
-
-                            if ($registered_added_course['repeated_new'] == true) {
-                                /*** Get list of registration and add for the current course or
-                                 * substituted course excluding current academic year and semester ***/
-
-                                /** The returned AY and semester list is till the current round of AY and Semester. It is used to consider repeated courses within the same pattern AY and Semester **/
-
-                                $previous_ay_and_s2 = $this->getListOfAyAndSemester(
-                                    $student_id,
-                                    $ay_and_s['academic_year'],
-                                    $ay_and_s['semester']
-                                );
-
-                                debug($previous_ay_and_s2);
-                                $course_registrations = $this->CourseRegistration->Student->CourseRegistration->getCourseRegistrations(
-                                    $student_id,
-                                    $previous_ay_and_s2,
-                                    $registered_added_course['course_id'],
-                                    1,
-                                    1
-                                );
-                                //debug($course_registrations);
-                                $course_adds = $this->CourseAdd->getCourseAdds(
-                                    $student_id,
-                                    $previous_ay_and_s2,
-                                    $registered_added_course['course_id'],
-                                    1
-                                );
-
-                                debug($course_adds);
-                                debug($course_registrations);
-                                debug($processed_course_reg);
-                                //Add repeated courses credit hour and grade point
-
-                                if (!empty($course_registrations)) {
-                                    foreach ($course_registrations as $cr_key => $cr_value) {
-                                        //To avoid double sum
-                                        //debug($processed_course_reg);
-                                        if (!in_array($cr_value['CourseRegistration']['id'], $processed_course_reg)) {
-                                            $grade_detail = $this->getApprovedGrade(
-                                                $cr_value['CourseRegistration']['id'],
-                                                1
-                                            );
-
-                                            if ((isset($grade_detail['grade']) && (strcasecmp(
-                                                        $grade_detail['grade'],
-                                                        'I'
-                                                    ) == 0 || strcasecmp($grade_detail['grade'], 'W') == 0))) {
-                                                continue;
-                                            }
-
-                                            debug($grade_detail);
-                                            debug($cr_value['PublishedCourse']);
-
-                                            $deduct_credit_hour_sum += $cr_value['PublishedCourse']['Course']['credit'];
-
-                                            if (!empty($grade_detail)) {
-                                                $deduct_grade_point_sum += ($grade_detail['point_value'] * $cr_value['PublishedCourse']['Course']['credit']);
-                                            }
-
-                                            if ($cr_value['PublishedCourse']['Course']['major'] == 1) {
-                                                $m_deduct_credit_hour_sum += $cr_value['PublishedCourse']['Course']['credit'];
-
-                                                if (!empty($grade_detail)) {
-                                                    $m_deduct_grade_point_sum += ($grade_detail['point_value'] * $cr_value['PublishedCourse']['Course']['credit']);
-                                                }
-                                            }
-
-                                            $processed_course_reg[] = $cr_value['CourseRegistration']['id'];
-                                        }
-                                    }
-                                }
-
-                                debug($deduct_credit_hour_sum);
-                                debug($deduct_grade_point_sum);
-                                debug($processed_course_reg);
-
-                                if (!empty($course_adds)) {
-                                    foreach ($course_adds as $cr_key => $ca_value) {
-                                        if (!in_array($ca_value['CourseAdd']['id'], $processed_course_add)) {
-                                            $grade_detail = $this->getApprovedGrade($ca_value['CourseAdd']['id'], 0);
-                                            debug($grade_detail);
-
-                                            if ((isset($grade_detail['grade']) && (strcasecmp(
-                                                        $grade_detail['grade'],
-                                                        'I'
-                                                    ) == 0 || strcasecmp($grade_detail['grade'], 'W') == 0))) {
-                                                continue;
-                                            }
-
-                                            $deduct_credit_hour_sum += $ca_value['PublishedCourse']['Course']['credit'];
-
-                                            if (!empty($grade_detail)) {
-                                                $deduct_grade_point_sum += ($grade_detail['point_value'] * $ca_value['PublishedCourse']['Course']['credit']);
-                                            }
-
-                                            if ($ca_value['PublishedCourse']['Course']['major'] == 1) {
-                                                $m_deduct_credit_hour_sum += $ca_value['PublishedCourse']['Course']['credit'];
-
-                                                if (!empty($grade_detail)) {
-                                                    $m_deduct_grade_point_sum += ($grade_detail['point_value'] * $ca_value['PublishedCourse']['Course']['credit']);
-                                                }
-                                            }
-
-                                            $processed_course_add[] = $ca_value['CourseAdd']['id'];
-                                        }
-                                    }
-                                }
-                            }
-                            //End of credit hour and grade point deduction sum
-                        }
-                    }
+        if (!empty($courseAdded)) {
+            foreach ($courseAdded as $key => $caValue) {
+                if (!($caValue->published_course->add == 1 || ($caValue->department_approval == 1 && $caValue->registrar_confirmation == 1))) {
+                    unset($courseAdded[$key]);
                 }
             }
         }
 
-        $credit_and_point_deduction['deduct_credit_hour_sum'] = $deduct_credit_hour_sum;
-        //Sufiya Case Fix here but I have to see the effect with repeated course before apply to remove
+        $studentDetail = $this->CourseAdds->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
 
-        /* if ($deduct_credit_hour_sum > 0 && $deduct_grade_point_sum == 0){
-            $credit_and_point_deduction['deduct_credit_hour_sum'] = 0;
-        } */
+        $studentLevel = $this->CourseAdds->Students->StudentExamStatuses->studentYearAndSemesterLevelOfStatus($studentId, $currentAcademicYear, null);
 
-        $credit_and_point_deduction['deduct_grade_point_sum'] = $deduct_grade_point_sum;
-        $credit_and_point_deduction['m_deduct_credit_hour_sum'] = $m_deduct_credit_hour_sum;
-        $credit_and_point_deduction['m_deduct_grade_point_sum'] = $m_deduct_grade_point_sum;
+        $yearLevels = [
+            1 => '1st',
+            2 => '2nd',
+            3 => '3rd'
+        ];
+        $studentYearLevel = isset($yearLevels[$studentLevel['year']]) ? $yearLevels[$studentLevel['year']] : 'th';
 
-        return $credit_and_point_deduction;
-    }
-
-    function getTotalCreditPointDeduction($student_id)
-    {
-
-        $processed_course_reg = array();
-        $processed_course_add = array();
-        $deduct_credit_hour_sum = 0;
-        $deduct_grade_point_sum = 0;
-        $m_deduct_credit_hour_sum = 0;
-        $m_deduct_grade_point_sum = 0;
-        $credit_and_point_deduction = array();
-
-        $all_ay_s_list = $this->getListOfAyAndSemester($student_id);
-        debug($all_ay_s_list);
-
-        if (!empty($all_ay_s_list)) {
-            foreach ($all_ay_s_list as $ays_key => $ay_and_s) {
-                $course_and_grades = $this->getStudentCoursesAndFinalGrade(
-                    $student_id,
-                    $ay_and_s['academic_year'],
-                    $ay_and_s['semester']
-                );
-
-                if (!empty($course_and_grades)) {
-                    foreach ($course_and_grades as $key => $registered_added_course) {
-                        /* if (!(isset($registered_added_course['grade']) && (isset($registered_added_course['point_value']) || strcasecmp($registered_added_course['grade'],
-                            'I') == 0))) {
-                            break 2;
-                        } */
-
-                        if (
-                            (isset($registered_added_course['grade']) && (strcasecmp(
-                                        $registered_added_course['grade'],
-                                        'I'
-                                    ) == 0 || strcasecmp($registered_added_course['grade'], 'W') == 0))
-                        ) {
-                            continue;
-                        }
-
-                        if (strcasecmp(
-                                $registered_added_course['grade'],
-                                'I'
-                            ) != 0 && $registered_added_course['used_in_gpa']) {
-                            //Begin: credit hour and grade point deduction sum
-
-                            if ($registered_added_course['repeated_new'] == true) {
-                                /*** Get list of registration and add for the current course or
-                                 * substituted course excluding current academic year and semester ***/
-
-                                /** The returned AY and semester list is till the current round of AY and Semester. It is used to consider repeated courses within the same pattern AY and Semester **/
-
-                                $previous_ay_and_s2 = $this->getListOfAyAndSemester(
-                                    $student_id,
-                                    $ay_and_s['academic_year'],
-                                    $ay_and_s['semester']
-                                );
-
-                                $course_registrations = $this->CourseRegistration->Student->CourseRegistration->getCourseRegistrations(
-                                    $student_id,
-                                    $previous_ay_and_s2,
-                                    $registered_added_course['course_id'],
-                                    1,
-                                    1
-                                );
-                                debug($course_registrations);
-
-                                $course_adds = $this->CourseAdd->getCourseAdds(
-                                    $student_id,
-                                    $previous_ay_and_s2,
-                                    $registered_added_course['course_id'],
-                                    1
-                                );
-                                debug($course_adds);
-
-                                //Add repeated courses credit hour and grade point
-                                if (!empty($course_registrations)) {
-                                    foreach ($course_registrations as $cr_key => $cr_value) {
-                                        //To avoid double sum
-                                        //debug($processed_course_reg);
-                                        if (!in_array($cr_value['CourseRegistration']['id'], $processed_course_reg)) {
-                                            $grade_detail = $this->getApprovedGrade(
-                                                $cr_value['CourseRegistration']['id'],
-                                                1
-                                            );
-
-                                            $deduct_credit_hour_sum += $cr_value['PublishedCourse']['Course']['credit'];
-
-                                            if (!empty($grade_detail)) {
-                                                $deduct_grade_point_sum += ($grade_detail['point_value'] * $cr_value['PublishedCourse']['Course']['credit']);
-                                            }
-
-                                            if ($cr_value['PublishedCourse']['Course']['major'] == 1) {
-                                                $m_deduct_credit_hour_sum += $cr_value['PublishedCourse']['Course']['credit'];
-
-                                                if (!empty($grade_detail)) {
-                                                    $m_deduct_grade_point_sum += ($grade_detail['point_value'] * $cr_value['PublishedCourse']['Course']['credit']);
-                                                }
-                                            }
-
-                                            $processed_course_reg[] = $cr_value['CourseRegistration']['id'];
-                                        }
-                                    }
-                                }
-
-                                if (!empty($course_adds)) {
-                                    foreach ($course_adds as $cr_key => $ca_value) {
-                                        if (!in_array($ca_value['CourseAdd']['id'], $processed_course_add)) {
-                                            $grade_detail = $this->getApprovedGrade($ca_value['CourseAdd']['id'], 0);
-
-                                            $deduct_credit_hour_sum += $ca_value['PublishedCourse']['Course']['credit'];
-
-                                            if (!empty($grade_detail)) {
-                                                $deduct_grade_point_sum += ($grade_detail['point_value'] * $ca_value['PublishedCourse']['Course']['credit']);
-                                            }
-
-                                            if ($ca_value['PublishedCourse']['Course']['major'] == 1) {
-                                                $m_deduct_credit_hour_sum += $ca_value['PublishedCourse']['Course']['credit'];
-                                                if (!empty($grade_detail)) {
-                                                    $m_deduct_grade_point_sum += ($grade_detail['point_value'] * $ca_value['PublishedCourse']['Course']['credit']);
-                                                }
-                                            }
-
-                                            $processed_course_add[] = $ca_value['CourseAdd']['id'];
-                                        }
-                                    }
-                                }
-                            }
-                            //End of credit hour and grade point deduction sum
-                        }
-                    }
-                }
-            }
+        $yearLevelId = null;
+        if (!empty($studentDetail->department_id) && is_numeric($studentDetail->department_id)) {
+            $yearLevelId = TableRegistry::getTableLocator()->get('YearLevels')->find()
+                ->where(['YearLevels.department_id' => $studentDetail->department_id, 'YearLevels.name' => $studentYearLevel])
+                ->select(['YearLevels.id'])
+                ->first();
         }
 
-        $credit_and_point_deduction['deduct_credit_hour_sum'] = $deduct_credit_hour_sum;
-        $credit_and_point_deduction['deduct_grade_point_sum'] = $deduct_grade_point_sum;
-        $credit_and_point_deduction['m_deduct_credit_hour_sum'] = $m_deduct_credit_hour_sum;
-        $credit_and_point_deduction['m_deduct_grade_point_sum'] = $m_deduct_grade_point_sum;
+        if (!empty($studentDetail->curriculum_id)) {
+            $coursesToBeGiven = $this->CourseAdds->PublishedCourses->Courses->find()
+                ->where([
+                    'Courses.curriculum_id' => $studentDetail->curriculum_id,
+                    'Courses.year_level_id' => $yearLevelId ? $yearLevelId->id : null
+                ])
+                ->toArray();
 
-        return $credit_and_point_deduction;
-    }
+            if ($includeExempted == 1) {
+                $allExemptedCourses = $this->CourseAdds->Students->CourseExemptions->find()
+                    ->where([
+                        'CourseExemptions.student_id' => $studentDetail->id,
+                        'CourseExemptions.department_accept_reject' => 1,
+                        'CourseExemptions.registrar_confirm_deny' => 1
+                    ])
+                    ->toArray();
 
-    //////////////////////////////////////////////////////////////////////////
-
-    //used for student profile will be modified
-    function getStudentAllCoursesAndFinalGrade($student_id = null, $current_academic_year = null, $include_exempted = 0)
-    {
-
-        $courses_and_grades = array();
-
-        $course_registered = $this->CourseRegistration->find('all', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            ),
-            'order' => array(
-                'CourseRegistration.academic_year' => 'ASC',
-                'CourseRegistration.semester' => 'ASC',
-                'CourseRegistration.id' => 'ASC'
-            )
-        ));
-
-        $course_added = $this->CourseAdd->find('all', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            ),
-            'order' => array('CourseAdd.academic_year' => 'ASC', 'CourseAdd.semester' => 'ASC', 'CourseAdd.id' => 'ASC')
-        ));
-
-
-        if (!empty($course_added)) {
-            foreach ($course_added as $ca_key => $ca_value) {
-                if (!($ca_value['PublishedCourse']['add'] == 1 || ($ca_value['CourseAdd']['department_approval'] == 1 && $ca_value['CourseAdd']['registrar_confirmation'] == 1))) {
-                    unset($course_added[$ca_key]);
-                }
-            }
-        }
-
-        $student_detail = $this->CourseAdd->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
-
-        $exempted_courses = array();
-
-        $student_level = $this->CourseAdd->Student->StudentExamStatus->studentYearAndSemesterLevelOfStatus(
-            $student_id,
-            $current_academic_year,
-            null
-        );
-
-        if ($student_level['year'] == 1) {
-            $student_year_level = '1st';
-        } elseif ($student_level['year'] == 2) {
-            $student_year_level = '2nd';
-        } elseif ($student_level['year'] == 3) {
-            $student_year_level = '3rd';
-        } else {
-            $student_year_level = 'th';
-        }
-
-        $year_level_id = null;
-
-        if (isset($student_detail['Student']['department_id']) && is_numeric(
-                $student_detail['Student']['department_id']
-            ) && $student_detail['Student']['department_id']) {
-            $year_level_id = ClassRegistry::init('YearLevel')->field(
-                'id',
-                array(
-                    'YearLevel.department_id' => $student_detail['Student']['department_id'],
-                    'YearLevel.name' => $student_year_level
-                )
-            );
-        }
-
-
-        if (!empty($student_detail['Student']['curriculum_id'])) {
-            $courses_to_be_given = $this->CourseAdd->PublishedCourse->Course->find('all', array(
-                'conditions' => array(
-                    'Course.curriculum_id' => $student_detail['Student']['curriculum_id'],
-                    'Course.year_level_id' => $year_level_id,
-                ),
-                'recursive' => -1
-            ));
-
-            if ($include_exempted == 1) {
-                $all_exempted_courses = $this->CourseAdd->Student->CourseExemption->find('all', array(
-                    'conditions' => array(
-                        'CourseExemption.student_id' => $student_detail['Student']['id'],
-                        'CourseExemption.department_accept_reject' => 1,
-                        'CourseExemption.registrar_confirm_deny' => 1,
-                    ),
-                    'recursive' => -1
-                ));
-
-                if (!empty($all_exempted_courses)) {
-                    foreach ($all_exempted_courses as $ex_key => $exempted_course) {
-                        foreach ($courses_to_be_given as $c_key => $course_to_be_given) {
-                            if ($course_to_be_given['Course']['id'] == $exempted_course['CourseExemption']['course_id']) {
-                                $index = count($courses_and_grades);
-                                $courses_and_grades[$index]['course_title'] = $course_to_be_given['Course']['course_title'];
-                                $courses_and_grades[$index]['course_code'] = $course_to_be_given['Course']['course_code'];
-                                $courses_and_grades[$index]['course_id'] = $course_to_be_given['Course']['id'];
-                                $courses_and_grades[$index]['major'] = $course_to_be_given['Course']['major'];
-                                $courses_and_grades[$index]['credit'] = $course_to_be_given['Course']['credit'];
-                                $courses_and_grades[$index]['thesis'] = $course_to_be_given['Course']['thesis'];
-                                $courses_and_grades[$index]['grade'] = 'EX';
-                                $courses_and_grades[$index]['exit_exam'] = $course_to_be_given['Course']['exit_exam'];
-                                $courses_and_grades[$index]['elective'] = $course_to_be_given['Course']['elective'];
+                if (!empty($allExemptedCourses)) {
+                    foreach ($allExemptedCourses as $exemptedCourse) {
+                        foreach ($coursesToBeGiven as $courseToBeGiven) {
+                            if ($courseToBeGiven->id == $exemptedCourse->course_id) {
+                                $index = count($coursesAndGrades);
+                                $coursesAndGrades[$index] = [
+                                    'course_title' => $courseToBeGiven->course_title,
+                                    'course_code' => $courseToBeGiven->course_code,
+                                    'course_id' => $courseToBeGiven->id,
+                                    'major' => $courseToBeGiven->major,
+                                    'credit' => $courseToBeGiven->credit,
+                                    'thesis' => $courseToBeGiven->thesis,
+                                    'grade' => 'EX',
+                                    'exit_exam' => $courseToBeGiven->exit_exam,
+                                    'elective' => $courseToBeGiven->elective
+                                ];
                             }
                         }
                     }
@@ -5240,1156 +4235,879 @@ class ExamGradesTable extends Table
             }
         }
 
-        if (!empty($course_registered)) {
-            foreach ($course_registered as $key => $value) {
-                if (!$this->CourseRegistration->isCourseDroped($value['CourseRegistration']['id'])) {
-                    $index = count($courses_and_grades);
-                    $courses_and_grades[$index]['course_title'] = $value['PublishedCourse']['Course']['course_title'];
-                    $courses_and_grades[$index]['course_code'] = $value['PublishedCourse']['Course']['course_code'];
-                    $courses_and_grades[$index]['course_id'] = $value['PublishedCourse']['Course']['id'];
-                    $courses_and_grades[$index]['major'] = $value['PublishedCourse']['Course']['major'];
-                    $courses_and_grades[$index]['credit'] = $value['PublishedCourse']['Course']['credit'];
-                    $courses_and_grades[$index]['thesis'] = $value['PublishedCourse']['Course']['thesis'];
-                    $courses_and_grades[$index]['exit_exam'] = $value['PublishedCourse']['Course']['exit_exam'];
-                    $courses_and_grades[$index]['elective'] = $value['PublishedCourse']['Course']['elective'];
+        if (!empty($courseRegistered)) {
+            foreach ($courseRegistered as $value) {
+                if (!$this->CourseRegistrations->isCourseDropped($value->id)) {
+                    $index = count($coursesAndGrades);
+                    $coursesAndGrades[$index] = [
+                        'course_title' => $value->published_course->course->course_title,
+                        'course_code' => $value->published_course->course->course_code,
+                        'course_id' => $value->published_course->course->id,
+                        'major' => $value->published_course->course->major,
+                        'credit' => $value->published_course->course->credit,
+                        'thesis' => $value->published_course->course->thesis,
+                        'exit_exam' => $value->published_course->course->exit_exam,
+                        'elective' => $value->published_course->course->elective
+                    ];
 
-                    $grade_detail = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                    debug($grade_detail);
+                    $gradeDetail = $this->getApprovedGrade($value->id, 1);
 
-                    if (!empty($grade_detail)) {
-                        $courses_and_grades[$index]['grade'] = $grade_detail['grade'];
-                        if (isset($grade_detail['point_value'])) {
-                            $courses_and_grades[$index]['point_value'] = $grade_detail['point_value'];
-                            $courses_and_grades[$index]['pass_grade'] = $grade_detail['pass_grade'];
-                            $courses_and_grades[$index]['used_in_gpa'] = $grade_detail['used_in_gpa'];
+                    if (!empty($gradeDetail)) {
+                        $coursesAndGrades[$index]['grade'] = $gradeDetail['grade'];
+                        if (isset($gradeDetail['point_value'])) {
+                            $coursesAndGrades[$index]['point_value'] = $gradeDetail['point_value'];
+                            $coursesAndGrades[$index]['pass_grade'] = $gradeDetail['pass_grade'];
+                            $coursesAndGrades[$index]['used_in_gpa'] = $gradeDetail['used_in_gpa'];
                         }
                     }
 
-                    //To determine if a student registered more than once for the same course
+                    $matchingCourses = [];
+                    $cId = $value->published_course->course->id;
+                    if (!empty($studentDetail->curriculum_id)) {
+                        $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($cId, $studentDetail->curriculum_id);
+                    }
+                    $matchingCourses[$cId] = $cId;
 
-                    $matching_courses = array();
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
 
-                    $cID = $value['PublishedCourse']['Course']['id'];
-
-                    $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                        $cID,
-                        $student_detail['Student']['curriculum_id']
-                    );
-                    $matching_courses[$cID] = $cID;
-                    $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                        $matching_courses,
-                        $student_detail['Student']['id']
-                    );
-
-                    //If the student add or register once
-                    if (count($register_and_add_freq) <= 1) {
-                        $courses_and_grades[$index]['repeated_old'] = false;
-                        $courses_and_grades[$index]['repeated_new'] = false;
+                    if (count($registerAndAddFreq) <= 1) {
+                        $coursesAndGrades[$index]['repeated_old'] = false;
+                        $coursesAndGrades[$index]['repeated_new'] = false;
                     } else {
-                        //If the student has multiple registration and/or add
-                        $rep = $this->repeatationLabeling(
-                            $register_and_add_freq,
-                            'register',
-                            $value['CourseRegistration']['id'],
-                            $student_detail,
-                            $courses_and_grades[$index]['course_id']
-                        );
-                        $courses_and_grades[$index]['repeated_old'] = $rep['repeated_old'];
-                        $courses_and_grades[$index]['repeated_new'] = $rep['repeated_new'];
+                        $rep = $this->repeatationLabeling($registerAndAddFreq, 'register', $value->id, ['Student' => $studentDetail->toArray()], $coursesAndGrades[$index]['course_id']);
+                        $coursesAndGrades[$index]['repeated_old'] = $rep['repeated_old'];
+                        $coursesAndGrades[$index]['repeated_new'] = $rep['repeated_new'];
                     }
                 }
             }
         }
 
-        if (!empty($course_added)) {
-            foreach ($course_added as $key => $value) {
-                $index = count($courses_and_grades);
+        if (!empty($courseAdded)) {
+            foreach ($courseAdded as $value) {
+                $index = count($coursesAndGrades);
+                $coursesAndGrades[$index] = [
+                    'course_title' => $value->published_course->course->course_title,
+                    'course_code' => $value->published_course->course->course_code,
+                    'course_id' => $value->published_course->course->id,
+                    'major' => $value->published_course->course->major,
+                    'credit' => $value->published_course->course->credit,
+                    'thesis' => $value->published_course->course->thesis,
+                    'exit_exam' => $value->published_course->course->exit_exam,
+                    'elective' => $value->published_course->course->elective
+                ];
 
-                $courses_and_grades[$index]['course_title'] = $value['PublishedCourse']['Course']['course_title'];
-                $courses_and_grades[$index]['course_code'] = $value['PublishedCourse']['Course']['course_code'];
-                $courses_and_grades[$index]['course_id'] = $value['PublishedCourse']['Course']['id'];
-                $courses_and_grades[$index]['major'] = $value['PublishedCourse']['Course']['major'];
-                $courses_and_grades[$index]['credit'] = $value['PublishedCourse']['Course']['credit'];
-                $courses_and_grades[$index]['thesis'] = $value['PublishedCourse']['Course']['thesis'];
+                $gradeDetail = $this->getApprovedGrade($value->id, 0);
 
-                $grade_detail = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
-
-                if (!empty($grade_detail)) {
-                    $courses_and_grades[$index]['grade'] = $grade_detail['grade'];
-                    if (isset($grade_detail['point_value'])) {
-                        $courses_and_grades[$index]['point_value'] = $grade_detail['point_value'];
-                        $courses_and_grades[$index]['pass_grade'] = $grade_detail['pass_grade'];
-                        $courses_and_grades[$index]['used_in_gpa'] = $grade_detail['used_in_gpa'];
+                if (!empty($gradeDetail)) {
+                    $coursesAndGrades[$index]['grade'] = $gradeDetail['grade'];
+                    if (isset($gradeDetail['point_value'])) {
+                        $coursesAndGrades[$index]['point_value'] = $gradeDetail['point_value'];
+                        $coursesAndGrades[$index]['pass_grade'] = $gradeDetail['pass_grade'];
+                        $coursesAndGrades[$index]['used_in_gpa'] = $gradeDetail['used_in_gpa'];
                     }
                 }
-                //To determine if a student registered more than once for the same course
 
-                $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                    $matching_courses,
-                    $student_detail['Student']['id']
-                );
-                $courses_and_grades[$index]['repeated_old'] = $rep['repeated_old'];
-                $courses_and_grades[$index]['repeated_new'] = $rep['repeated_new'];
-                $courses_and_grades[$index]['exit_exam'] = $value['PublishedCourse']['Course']['exit_exam'];
-                $courses_and_grades[$index]['elective'] = $value['PublishedCourse']['Course']['elective'];
+                $matchingCourses = [];
+                $cId = $value->published_course->course->id;
+                if (!empty($studentDetail->curriculum_id)) {
+                    $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($cId, $studentDetail->curriculum_id);
+                }
+                $matchingCourses[$cId] = $cId;
 
-                //If the student add or register once
-                if (count($register_and_add_freq) <= 1) {
-                    $courses_and_grades[$index]['repeated_old'] = false;
-                    $courses_and_grades[$index]['repeated_new'] = false;
+                $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
+
+                if (count($registerAndAddFreq) <= 1) {
+                    $coursesAndGrades[$index]['repeated_old'] = false;
+                    $coursesAndGrades[$index]['repeated_new'] = false;
                 } else {
-                    //If the student has multiple registration and/or add
-                    $rep = $this->repeatationLabeling(
-                        $register_and_add_freq,
-                        'add',
-                        $value['CourseAdd']['id'],
-                        $student_detail,
-                        $courses_and_grades[$index]['course_id']
-                    );
-                    $courses_and_grades[$index]['repeated_old'] = $rep['repeated_old'];
-                    $courses_and_grades[$index]['repeated_new'] = $rep['repeated_new'];
+                    $rep = $this->repeatationLabeling($registerAndAddFreq, 'add', $value->id, ['Student' => $studentDetail->toArray()], $coursesAndGrades[$index]['course_id']);
+                    $coursesAndGrades[$index]['repeated_old'] = $rep['repeated_old'];
+                    $coursesAndGrades[$index]['repeated_new'] = $rep['repeated_new'];
                 }
             }
         }
 
-        return $courses_and_grades;
+        return $coursesAndGrades;
     }
 
-    function getPublishedCourseIfExist(
-        $department_id,
-        $academic_year,
-        $semester,
-        $program_id,
-        $program_type_id,
-        $studentDetail,
-        $admissionAcademicYear,
-        $currentAcademicYear = null
-    ) {
+    public function getPublishedCourseIfExist(int $departmentId, string $academicYear, string $semester, int $programId, int $programTypeId, array $studentDetail, string $admissionAcademicYear, ?string $currentAcademicYear = null): array
+    {
+        $section = [];
+        $studentAyAndS = $this->CourseRegistrations->Students->StudentExamStatuses->getStudentFirstAyAndSemester($studentDetail['Student']['id'], $admissionAcademicYear);
+        $studentAyAndSList = $this->getListOfAyAndSemester($studentDetail['Student']['id']);
+        $studentAyAndSLists = [];
 
-        //debug($studentDetail);
-
-        $section = array();
-
-        //find the section and yearlevel of the student
-        $student_ay_and_s = $this->CourseRegistration->Student->StudentExamStatus->getStudentFirstAyAndSemester(
-            $studentDetail['Student']['id'],
-            $admissionAcademicYear
-        );
-
-        $student_ay_and_s_list = $this->getListOfAyAndSemester($studentDetail['Student']['id']);
-        // debug($student_ay_and_s_list);
-
-        if (!empty($student_ay_and_s_list)) {
-            foreach ($student_ay_and_s_list as $k => &$v) {
-                $withdrawlAfterRegistration = $this->CourseRegistration->Student->Clearance->withDrawaAfterRegistration(
-                    $studentDetail['Student']['id'],
-                    $v['academic_year'],
-                    $v['semester']
-                );
-                if (!$withdrawlAfterRegistration) {
-                    //unset($student_ay_and_s_list[$k]);
-                    $student_ay_and_s_lists[] = $v;
+        if (!empty($studentAyAndSList)) {
+            foreach ($studentAyAndSList as $v) {
+                $withdrawalAfterRegistration = $this->CourseRegistrations->Students->Clearances->withDrawaAfterRegistration($studentDetail['Student']['id'], $v['academic_year'], $v['semester']);
+                if (!$withdrawalAfterRegistration) {
+                    $studentAyAndSLists[] = $v;
                 }
             }
+            $studentAyAndSList = $studentAyAndSLists;
         }
 
-        if (!empty($student_ay_and_s_lists)) {
-            $student_ay_and_s_list = $student_ay_and_s_lists;
-        }
-
-        if (!empty($student_ay_and_s_list)) {
-            $lastKey = count($student_ay_and_s_list) - 1;
-            $student_ay_and_s['academic_year'] = $student_ay_and_s_list[$lastKey]['academic_year'];
-            $student_ay_and_s['semester'] = $student_ay_and_s_list[$lastKey]['semester'];
-            $next_academic_year_semester = $this->CourseRegistration->Student->StudentExamStatus->getNextSemster(
-                $student_ay_and_s['academic_year'],
-                $student_ay_and_s['semester']
-            );
+        if (!empty($studentAyAndSList)) {
+            $lastKey = count($studentAyAndSList) - 1;
+            $studentAyAndS['academic_year'] = $studentAyAndSList[$lastKey]['academic_year'];
+            $studentAyAndS['semester'] = $studentAyAndSList[$lastKey]['semester'];
+            $nextAcademicYearSemester = $this->CourseRegistrations->Students->StudentExamStatuses->getNextSemester($studentAyAndS['academic_year'], $studentAyAndS['semester']);
         } else {
-            //$student_ay_and_s_list = $student_ay_and_s;
-            $next_academic_year_semester = $student_ay_and_s;
+            $nextAcademicYearSemester = $studentAyAndS;
         }
 
-        if (!empty($student_ay_and_s_list)) {
-            foreach ($student_ay_and_s_list as $ay) {
-                if (($ay['semester'] == $semester && $ay['academic_year'] == $academic_year)) {
-                    $next_academic_year_semester = $ay;
+        if (!empty($studentAyAndSList)) {
+            foreach ($studentAyAndSList as $ay) {
+                if ($ay['semester'] == $semester && $ay['academic_year'] == $academicYear) {
+                    $nextAcademicYearSemester = $ay;
                     break;
                 }
             }
         }
-        //debug($next_academic_year_semester);
-        debug($student_ay_and_s);
 
-        if (!empty($student_ay_and_s)) {
-            $status_level = $this->CourseRegistration->Student->StudentExamStatus->studentYearAndSemesterLevel(
-                $studentDetail['Student']['id'],
-                $student_ay_and_s['academic_year'],
-                $student_ay_and_s['semester']
-            );
-            $yearLevelId = $this->CourseRegistration->YearLevel->find(
-                'first',
-                array(
-                    'conditions' => array(
-                        'YearLevel.name' => $status_level['year'],
-                        'YearLevel.department_id' => $studentDetail['Student']['department_id']
-                    ),
-                    'recursive' => -1
-                )
-            );
-            //debug($student_ay_and_s['academic_year']);
-            //$student_section = ClassRegistry::init('StudentsSection')->find('first',array('conditions' => array('StudentsSection.student_id' => $studentDetail['Student']['id']),'order' => array('StudentsSection.section_id DESC')));
+        if (!empty($studentAyAndS)) {
+            $statusLevel = $this->CourseRegistrations->Students->StudentExamStatuses->studentYearAndSemesterLevel($studentDetail['Student']['id'], $studentAyAndS['academic_year'], $studentAyAndS['semester']);
+            $yearLevel = $this->CourseRegistrations->YearLevels->find()
+                ->where(['YearLevels.name' => $statusLevel['year'], 'YearLevels.department_id' => $studentDetail['Student']['department_id']])
+                ->first();
 
-            $sectionfil = $this->CourseRegistration->find('first', array(
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $studentDetail['Student']['id'],
-                    'CourseRegistration.semester' => $student_ay_and_s['semester'],
-                    'CourseRegistration.academic_year' => $student_ay_and_s['academic_year']
-                ),
-                'contain' => array('Section'),
-                'recursive' => -1
-            ));
+            $sectionFil = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.student_id' => $studentDetail['Student']['id'],
+                    'CourseRegistrations.semester' => $studentAyAndS['semester'],
+                    'CourseRegistrations.academic_year' => $studentAyAndS['academic_year']
+                ])
+                ->contain(['Sections'])
+                ->first();
 
-            //debug($sectionfil);
-
-            if (!empty($sectionfil)) {
-                $student_section = $this->CourseRegistration->Section->StudentsSection->find('first', array(
-                    'conditions' => array(
-                        'StudentsSection.student_id' => $studentDetail['Student']['id'],
-                        'StudentsSection.section_id' => $sectionfil['Section']['id']
-                    )
-                ));
-                //debug($student_section);
+            if (!empty($sectionFil)) {
+                $studentSection = $this->CourseRegistrations->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $studentDetail['Student']['id'],
+                        'StudentsSections.section_id' => $sectionFil->section->id
+                    ])
+                    ->first();
             } else {
-                $student_section = $this->CourseRegistration->Section->StudentsSection->find('first', array(
-                    'conditions' => array(
-                        'StudentsSection.student_id' => $studentDetail['Student']['id']
-                    ),
-                    'order' => array('StudentsSection.section_id' => 'DESC')
-                ));
-                //debug($student_section);
+                $studentSection = $this->CourseRegistrations->Sections->StudentsSections->find()
+                    ->where(['StudentsSections.student_id' => $studentDetail['Student']['id']])
+                    ->order(['StudentsSections.section_id' => 'DESC'])
+                    ->first();
             }
 
-            if (!empty($student_section)) {
-                $section = $this->CourseRegistration->Section->find('first', array(
-                    'conditions' => array(
-                        //'Section.department_id' => $department_id,
-                        //'Section.program_id' => $studentDetail['Student']['program_id'],
-                        //'Section.program_type_id' => $studentDetail['Student']['program_type_id'],
-                        'Section.id' => $student_section['StudentsSection']['section_id']
-                    ),
-                    'recursive' => -1
-                ));
-                debug($section);
+            if (!empty($studentSection)) {
+                $section = $this->CourseRegistrations->Sections->find()
+                    ->where(['Sections.id' => $studentSection->section_id])
+                    ->first();
 
-                if ($section['Section']['academicyear'] != $academic_year) {
-                    $studentSectionnns = $this->CourseRegistration->Section->StudentsSection->find('first', array(
-                        'conditions' => array(
-                            'StudentsSection.student_id' => $studentDetail['Student']['id'],
-                            'StudentsSection.section_id in (select id from sections where academicyear = "' . $academic_year . '")'
-                        ),
-                        'order' => array('StudentsSection.id' => 'DESC', 'StudentsSection.section_id' => 'DESC'),
-                    ));
-
-                    //debug($studentSectionnns);
+                if ($section->academicyear != $academicYear) {
+                    $studentSectionnns = $this->CourseRegistrations->Sections->StudentsSections->find()
+                        ->where([
+                            'StudentsSections.student_id' => $studentDetail['Student']['id'],
+                            'StudentsSections.section_id IN' => $this->CourseRegistrations->Sections->find()->where(['Sections.academicyear' => $academicYear])->select(['Sections.id'])
+                        ])
+                        ->order(['StudentsSections.id' => 'DESC', 'StudentsSections.section_id' => 'DESC'])
+                        ->first();
 
                     if (!empty($studentSectionnns)) {
-                        $section = $this->CourseRegistration->Section->find('first', array(
-                            'conditions' => array(
-                                /*'Section.department_id' => $department_id,
-                                'Section.program_id' => $studentDetail['Student']['program_id'],
-                                'Section.program_type_id' => $studentDetail['Student']['program_type_id'],
-                                */
-                                'Section.id' => $studentSectionnns['StudentsSection']['section_id']
-                            ),
-                            'recursive' => -1
-                        ));
-                        //debug($section);
+                        $section = $this->CourseRegistrations->Sections->find()
+                            ->where(['Sections.id' => $studentSectionnns->section_id])
+                            ->first();
                     }
                 }
             } else {
-                $section = $this->CourseRegistration->Section->find('first', array(
-                    'conditions' => array(
-                        'Section.department_id' => $department_id,
-                        'Section.program_id' => $studentDetail['Student']['program_id'],
-                        'Section.program_type_id' => $studentDetail['Student']['program_type_id'],
-                        'Section.year_level_id' => $yearLevelId['YearLevel']['id'],
-                        'Section.academicyear' => $student_ay_and_s['academic_year']
-                    ),
-                    'recursive' => -1
-                ));
-                debug($section);
+                $section = $this->CourseRegistrations->Sections->find()
+                    ->where([
+                        'Sections.department_id' => $departmentId,
+                        'Sections.program_id' => $studentDetail['Student']['program_id'],
+                        'Sections.program_type_id' => $studentDetail['Student']['program_type_id'],
+                        'Sections.year_level_id' => $yearLevel ? $yearLevel->id : null,
+                        'Sections.academicyear' => $studentAyAndS['academic_year']
+                    ])
+                    ->first();
             }
 
-            if (isset($section['Section']['academicyear']) && !empty($section['Section']['academicyear'])) {
-                if ($next_academic_year_semester['academic_year'] != $section['Section']['academicyear'] && $yearLevelId['YearLevel']['name'] == $status_level['year'] && $next_academic_year_semester['academic_year'] != $currentAcademicYear) {
-                    $next_academic_year_semester['academic_year'] = $section['Section']['academicyear'];
-                    $next_academic_year_semester['semester'] = 'I';
+            if (!empty($section->academicyear)) {
+                if ($nextAcademicYearSemester['academic_year'] != $section->academicyear && $yearLevel && $yearLevel->name == $statusLevel['year'] && $nextAcademicYearSemester['academic_year'] != $currentAcademicYear) {
+                    $nextAcademicYearSemester['academic_year'] = $section->academicyear;
+                    $nextAcademicYearSemester['semester'] = 'I';
                 }
             }
 
-            $student_section_id = null;
+            $studentSectionId = null;
 
-            if (isset($section['Section']['id']) && isset($studentDetail['Student']['id'])) {
-                $student_section = $this->CourseRegistration->Section->StudentsSection->find('first', array(
-                    'conditions' => array(
-                        'StudentsSection.student_id' => $studentDetail['Student']['id'],
-                        'StudentsSection.section_id' => $section['Section']['id']
-                    ),
-                    'order' => array('StudentsSection.created' => 'DESC')
-                ));
-
-                debug($student_section);
+            if (!empty($section->id) && !empty($studentDetail['Student']['id'])) {
+                $studentSection = $this->CourseRegistrations->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $studentDetail['Student']['id'],
+                        'StudentsSections.section_id' => $section->id
+                    ])
+                    ->order(['StudentsSections.created' => 'DESC'])
+                    ->first();
             }
 
-            // check if the student has section ?
-            if (empty($student_section) && !empty($section)) {
-                // Does the student has curriculum ?
+            if (empty($studentSection) && !empty($section)) {
                 if (!empty($studentDetail['Student']['curriculum_id'])) {
-                    if (!empty($section)) {
-                        $student_section['StudentsSection']['student_id'] = $studentDetail['Student']['id'];
-                        $student_section['StudentsSection']['section_id'] = $section['Section']['id'];
-
-                        if ($currentAcademicYear == $next_academic_year_semester['academic_year']) {
-                            $student_section['StudentsSection']['archive'] = 0;
-                        } else {
-                            $student_section['StudentsSection']['archive'] = 0;
-                        }
-
-                        ClassRegistry::init('StudentsSection')->create();
-                        ClassRegistry::init('StudentsSection')->save($student_section);
-
-                        $student_sections = ClassRegistry::init('StudentsSection')->find('first', array(
-                            'conditions' => array('StudentsSection.id' => ClassRegistry::init('StudentsSection')->id)
-                        ));
-
-                        $student_section_id = $student_sections['StudentsSection']['section_id'];
-                    }
+                    $studentSectionEntity = $this->CourseRegistrations->Sections->StudentsSections->newEntity([
+                        'student_id' => $studentDetail['Student']['id'],
+                        'section_id' => $section->id,
+                        'archive' => ($currentAcademicYear == $nextAcademicYearSemester['academic_year']) ? 0 : 0
+                    ]);
+                    $this->CourseRegistrations->Sections->StudentsSections->save($studentSectionEntity);
+                    $studentSectionId = $studentSectionEntity->section_id;
                 }
             } else {
-                // the student has already section, check for upgrade ?
-                if (isset($student_section['StudentsSection'])) {
-                    $student_section_id = $student_section['StudentsSection']['section_id'];
-                    debug($student_section_id);
+                if (!empty($studentSection)) {
+                    $studentSectionId = $studentSection->section_id;
                 }
             }
 
-            $options = array();
-            //$options['conditions']['PublishedCourse.department_id'] = $department_id;
+            $options = [];
+            $options['conditions'] = [
+                'PublishedCourses.program_id' => !empty($section->program_id) ? $section->program_id : $programId,
+                'PublishedCourses.program_type_id' => !empty($section->program_type_id) ? $section->program_type_id : $programTypeId
+            ];
 
-            //if the student mistakenly placed to wrong program type
-            if (isset($section['Section']['program_id']) && !empty($section['Section']['program_id'])) {
-                $options['conditions']['PublishedCourse.program_id'] = $section['Section']['program_id'];
+            if (!empty($academicYear) && !empty($semester)) {
+                $sectionId = $this->CourseRegistrations->Sections->StudentsSections->find()
+                    ->where([
+                        'StudentsSections.student_id' => $studentDetail['Student']['id'],
+                        'StudentsSections.section_id IN' => $this->CourseRegistrations->Sections->find()->where(['Sections.academicyear' => $academicYear])->select(['Sections.id'])
+                    ])
+                    ->select(['StudentsSections.section_id'])
+                    ->first();
+
+                $options['conditions']['PublishedCourses.semester'] = $semester;
+                $options['conditions']['PublishedCourses.academic_year'] = $academicYear;
+                $options['conditions']['PublishedCourses.section_id'] = $studentSectionId ?? ($sectionId->section_id ?? 0);
             } else {
-                $options['conditions']['PublishedCourse.program_id'] = $program_id;
+                $options['conditions']['PublishedCourses.semester'] = $nextAcademicYearSemester['semester'];
+                $options['conditions']['PublishedCourses.academic_year'] = $nextAcademicYearSemester['academic_year'];
+                $options['conditions']['PublishedCourses.section_id'] = $studentSectionId ?? 0;
             }
 
-            //if the student mistakenly placed to wrong section type
-            if (isset($section['Section']['program_type_id']) && !empty($section['Section']['program_type_id'])) {
-                $options['conditions']['PublishedCourse.program_type_id'] = $section['Section']['program_type_id'];
-            } else {
-                $options['conditions']['PublishedCourse.program_type_id'] = $program_type_id;
-            }
-
-            if (!empty($academic_year) && !empty($semester)) {
-                $section_id = $this->CourseRegistration->Section->StudentsSection->find('first', array(
-                    'conditions' => array(
-                        'StudentsSection.student_id' => $studentDetail['Student']['id'],
-                        'StudentsSection.section_id in (select id from sections where academicyear = "' . $academic_year . '") '
-                    )
-                ));
-
-                debug($section_id);
-
-                $options['conditions']['PublishedCourse.semester'] = $semester;
-                $options['conditions']['PublishedCourse.academic_year'] = $academic_year;
-                $options['conditions']['PublishedCourse.section_id'] = (!empty($student_section_id) ? $student_section_id : (!empty($section_id['StudentsSection']['section_id']) ? $section_id['StudentsSection']['section_id'] : 0));
-            } else {
-                $options['conditions']['PublishedCourse.semester'] = $next_academic_year_semester['semester'];
-                $options['conditions']['PublishedCourse.academic_year'] = $next_academic_year_semester['academic_year'];
-                $options['conditions']['PublishedCourse.section_id'] = (!empty($student_section_id) ? $student_section_id : 0);
-            }
-
-
-            $options['contain'] = array(
-                'Course' => array(
-                    'fields' => array('id', 'course_title', 'course_code', 'credit'),
-                    'Prerequisite',
-                    'GradeType' => array(
-                        'Grade' => array(
-                            'fields' => array('id', 'grade')
-                        )
-                    )
-                ),
-                'CourseInstructorAssignment' => array(
-                    'Staff' => array(
-                        'fields' => array('id', 'full_name', 'first_name', 'middle_name', 'last_name'),
-                        'Title' => array('id', 'title'),
-                        'College' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'Position' => array('id', 'position'),
-                    ),
-                    'order' => array('isprimary' => 'DESC'),
+            $options['contain'] = [
+                'Courses' => [
+                    'fields' => ['id', 'course_title', 'course_code', 'credit'],
+                    'Prerequisites',
+                    'GradeTypes.Grades' => ['fields' => ['id', 'grade']]
+                ],
+                'CourseInstructorAssignments' => [
+                    'Staffs' => [
+                        'fields' => ['id',  'first_name', 'middle_name', 'last_name'],
+                        'Titles' => ['fields' => ['id', 'title']],
+                        'Colleges' => ['fields' => ['id', 'name']],
+                        'Departments' => ['fields' => ['id', 'name']],
+                        'Positions' => ['fields' => ['id', 'position']]
+                    ],
+                    'order' => ['isprimary' => 'DESC'],
                     'limit' => 1
-                )
-            );
+                ]
+            ];
 
-            $options['fields'] = array(
-                'DISTINCT PublishedCourse.course_id',
-                'PublishedCourse.department_id',
-                'PublishedCourse.academic_year',
-                'PublishedCourse.semester',
-                'PublishedCourse.program_id',
-                'PublishedCourse.program_type_id',
-                'PublishedCourse.id',
-                'PublishedCourse.section_id',
-                'PublishedCourse.grade_scale_id',
-                'PublishedCourse.year_level_id'
-            );
+            $options['fields'] = [
+                'DISTINCT PublishedCourses.course_id',
+                'PublishedCourses.department_id',
+                'PublishedCourses.academic_year',
+                'PublishedCourses.semester',
+                'PublishedCourses.program_id',
+                'PublishedCourses.program_type_id',
+                'PublishedCourses.id',
+                'PublishedCourses.section_id',
+                'PublishedCourses.grade_scale_id',
+                'PublishedCourses.year_level_id'
+            ];
 
-            $student_course_registrations['courses'] = $this->CourseRegistration->PublishedCourse->find(
-                'all',
-                $options
-            );
+            $studentCourseRegistrations['courses'] = $this->CourseRegistrations->PublishedCourses->find()
+                ->where($options['conditions'])
+                ->contain($options['contain'])
+                ->select($options['fields'])
+                ->toArray();
 
-            //debug($options);
-            //debug($student_course_registrations['courses']);
+            if (!empty($studentCourseRegistrations['courses'])) {
+                foreach ($studentCourseRegistrations['courses'] as &$value) {
+                    $failedAnyPrerequisite = ['freq' => 0];
+                    $isGradeSubmitted = $this->isGradeSubmittedForPublishedCourseGivenStudentId($studentDetail['Student']['id'], $value->id);
 
-            $freq = array();
-
-            if (!empty($student_course_registrations['courses'])) {
-                foreach ($student_course_registrations['courses'] as $k => &$value) {
-                    $failedAnyPrerequistie['freq'] = 0;
-
-                    $is_grade_submitted = $this->isGradeSubmittedForPublishedCourseGivenStudentId(
-                        $studentDetail['Student']['id'],
-                        $value['PublishedCourse']['id']
-                    );
-
-                    $registeredOrAddCourse = $this->CourseRegistration->find('first', array(
-                        'conditions' => array(
-                            'CourseRegistration.student_id' => $studentDetail['Student']['id'],
-                            'CourseRegistration.published_course_id' => $value['PublishedCourse']['id']
-                        ),
-                        'recursive' => -1
-                    ));
-                    //debug($registeredOrAddCourse);
+                    $registeredOrAddCourse = $this->CourseRegistrations->find()
+                        ->where([
+                            'CourseRegistrations.student_id' => $studentDetail['Student']['id'],
+                            'CourseRegistrations.published_course_id' => $value->id
+                        ])
+                        ->first();
 
                     if (!empty($registeredOrAddCourse)) {
-                        $value['PublishedCourse']['grade'] = $this->getApprovedGrade(
-                            $registeredOrAddCourse['CourseRegistration']['id'],
-                            1
-                        );
-                        $value['CourseRegistration'] = $registeredOrAddCourse['CourseRegistration'];
+                        $value->grade = $this->getApprovedGrade($registeredOrAddCourse->id, 1);
+                        $value->course_registration = $registeredOrAddCourse;
                     } else {
-                        $registeredOrAddCourse = $this->CourseAdd->find('first', array(
-                            'conditions' => array(
-                                'CourseAdd.student_id' => $studentDetail['Student']['id'],
-                                'CourseAdd.published_course_id' => $value['PublishedCourse']['id']
-                            ),
-                            'recursive' => -1
-                        ));
+                        $registeredOrAddCourse = $this->CourseAdds->find()
+                            ->where([
+                                'CourseAdds.student_id' => $studentDetail['Student']['id'],
+                                'CourseAdds.published_course_id' => $value->id
+                            ])
+                            ->first();
 
                         if (!empty($registeredOrAddCourse)) {
-                            $value['PublishedCourse']['grade'] = $this->getApprovedGrade(
-                                $registeredOrAddCourse['CourseAdd']['id'],
-                                0
-                            );
-                            $value['CourseAdd'] = $registeredOrAddCourse['CourseAdd'];
+                            $value->grade = $this->getApprovedGrade($registeredOrAddCourse->id, 0);
+                            $value->course_add = $registeredOrAddCourse;
                         }
                     }
 
-                    if (!empty($value['Course']['Prerequisite'])) {
-                        foreach ($value['Course']['Prerequisite'] as $preValue) {
-                            $failed = ClassRegistry::init('CourseDrop')->prequisite_taken(
-                                $studentDetail['Student']['id'],
-                                $preValue['prerequisite_course_id']
-                            );
-                            if ($failed == 0 && $preValue['co_requisite'] != true) {
-                                $failedAnyPrerequistie['freq']++;
+                    if (!empty($value->course->prerequisites)) {
+                        foreach ($value->course->prerequisites as $preValue) {
+                            $failed = TableRegistry::getTableLocator()->get('CourseDrops')->prerequisiteTaken($studentDetail['Student']['id'], $preValue->prerequisite_course_id);
+                            if ($failed == 0 && !$preValue->co_requisite) {
+                                $failedAnyPrerequisite['freq']++;
                             }
                         }
                     }
 
-                    if ($failedAnyPrerequistie['freq'] > 0) {
-                        $value['PublishedCourse']['prerequisiteFailed'] = true;
-                    } else {
-                        $value['PublishedCourse']['prerequisiteFailed'] = 0;
-                    }
+                    $value->prerequisite_failed = $failedAnyPrerequisite['freq'] > 0;
+                    $value->read_only = $isGradeSubmitted;
 
-                    if ($is_grade_submitted) {
-                        $value['PublishedCourse']['readOnly'] = true;
-                        //$value['Course']['achievedgrade'] = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-                    } else {
-                        $value['PublishedCourse']['readOnly'] = false;
-                    }
-
-                    if (!empty($value['CourseInstructorAssignment'])) {
-                        //debug($value['CourseInstructorAssignment']);
-                        $value['PublishedCourse']['haveAssignedIntructor'] = true;
-                        //$value['PublishedCourse']['AssignedIntructor'] = $value['CourseInstructorAssignment'][0]['Staff'];
-                    } else {
-                        $value['PublishedCourse']['haveAssignedIntructor'] = false;
-                        //$value['PublishedCourse']['AssignedIntructor'] = array();
-                    }
-
-                    $value['Course']['grade_scale_id'] = ClassRegistry::init(
-                        'GradeScale'
-                    )->getGradeScaleIdGivenPublishedCourse($value['PublishedCourse']['id']);
+                    $value->have_assigned_instructor = !empty($value->course_instructor_assignments);
+                    $value->course->grade_scale_id = TableRegistry::getTableLocator()->get('GradeScales')->getGradeScaleIdGivenPublishedCourse($value->id);
                 }
             }
         }
 
-        return $student_course_registrations;
+        return $studentCourseRegistrations;
     }
 
-    function getPublishedCourseGradeGradeScale($id)
+    public function getPublishedCourseGradeGradeScale(int $id): int
     {
+        $courseRegistration = $this->CourseRegistrations->find()
+            ->where([
+                'CourseRegistrations.published_course_id' => $id,
+                'CourseRegistrations.id IN' => $this->find()
+                    ->where([
+                        'ExamGrades.grade_scale_id IS NOT NULL',
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1,
+                        'ExamGrades.registrar_reason NOT IN' => ['Via backend data entry interface']
+                    ])
+                    ->select(['ExamGrades.course_registration_id'])
+            ])
+            ->contain(['ExamGrades'])
+            ->first();
 
-        $courseRegistration = $this->CourseRegistration->find('first', array(
-            'conditions' => array(
-                'CourseRegistration.published_course_id' => $id,
-                'CourseRegistration.id in (select course_registration_id from exam_grades where grade_scale_id is not null and department_approval = 1 and registrar_approval = 1 and registrar_reason != "Via backend data entry interface" and registrar_reason != "Via backend data entry interface")'
-            ),
-            'contain' => array('ExamGrade')
-        ));
-
-        if (isset($courseRegistration['CourseRegistration']) && !empty($courseRegistration['CourseRegistration']) && isset($courseRegistration['ExamGrade'])) {
-            return $courseRegistration['ExamGrade'][0]['grade_scale_id'];
+        if (!empty($courseRegistration) && !empty($courseRegistration->exam_grades)) {
+            return $courseRegistration->exam_grades[0]->grade_scale_id;
         }
 
-        $courseAdd = $this->CourseAdd->find(
-            'first',
-            array(
-                'conditions' => array(
-                    'CourseAdd.published_course_id' => $id,
-                    'CourseAdd.id in (select course_add_id from exam_grades where grade_scale_id is not null and department_approval = 1 and registrar_approval = 1)'
-                ),
-                'contain' => array('ExamGrade')
-            )
-        );
+        $courseAdd = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.published_course_id' => $id,
+                'CourseAdds.id IN' => $this->find()
+                    ->where([
+                        'ExamGrades.grade_scale_id IS NOT NULL',
+                        'ExamGrades.department_approval' => 1,
+                        'ExamGrades.registrar_approval' => 1
+                    ])
+                    ->select(['ExamGrades.course_add_id'])
+            ])
+            ->contain(['ExamGrades'])
+            ->first();
 
-        if (isset($courseAdd['CourseAdd']) && !empty($courseAdd['CourseAdd']) && isset($courseAdd['ExamGrade'])) {
-            return $courseAdd['ExamGrade'][0]['grade_scale_id'];
+        if (!empty($courseAdd) && !empty($courseAdd->exam_grades)) {
+            return $courseAdd->exam_grades[0]->grade_scale_id;
         }
 
-        return 0;   //debug($courseRegistration);
-    }
-
-
-    function isGradeSubmittedForPublishedCourseGivenStudentId($studentId, $published_course_ids)
-    {
-
-        $published_courses_student_registred_score_grade = 0;
-
-        $grade_submitted_registred_courses = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.published_course_id' => $published_course_ids,
-                'CourseRegistration.student_id' => $studentId
-            ),
-            'fields' => array('CourseRegistration.id')
-        ));
-
-        if (!empty($grade_submitted_registred_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_registration_id' => $grade_submitted_registred_courses))
-            );
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
-            }
-        }
-
-        //check course adds
-        $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-            'conditions' => array(
-                'CourseAdd.published_course_id' => $published_course_ids,
-                'CourseAdd.student_id' => $studentId,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'fields' => array('CourseAdd.id')
-        ));
-
-        if (!empty($grade_submitted_add_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_add_id' => $grade_submitted_add_courses))
-            );
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
-            }
-        }
-
-        return $published_courses_student_registred_score_grade;
-    }
-
-
-    //used for student profile will be modified
-    function getCourseRepetation($course_reg_add_id, $student_id, $registered = 1)
-    {
-
-        $student_detail = $this->CourseRegistration->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
-
-        $course_added = array();
-        $course_registered = array();
-
-        $courses_and_grades = array();
-
-        if ($registered == 1) {
-            $course_registered = $this->CourseRegistration->find('all', array(
-                'conditions' => array(
-                    //'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.id' => $course_reg_add_id,
-                    'CourseRegistration.id not in (select course_registration_id from course_drops where registrar_confirmation = 1 and department_approval = 1)',
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Course'
-                    )
-                )
-            ));
-            //debug($course_registered);
-        } else {
-            $course_added = $this->CourseAdd->find('all', array(
-                'conditions' => array(
-                    //'CourseAdd.student_id' => $student_id,
-                    'CourseAdd.id' => $course_reg_add_id,
-                    'CourseAdd.department_approval = 1',
-                    'CourseAdd.registrar_confirmation = 1'
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Course'
-                    )
-                )
-            ));
-        }
-
-        if (!empty($course_registered)) {
-            foreach ($course_registered as $key => $value) {
-                if (isset($value['CourseRegistration']['id']) && !$this->CourseRegistration->isCourseDroped(
-                        $value['CourseRegistration']['id']
-                    )) {
-                    if (isset($value['PublishedCourse']['Course']['id']) && !empty($value['PublishedCourse']['Course']['id'])) {
-                        //$index = count($courses_and_grades);
-                        $courses_and_grades['course_title'] = $value['PublishedCourse']['Course']['course_title'];
-                        $courses_and_grades['course_code'] = $value['PublishedCourse']['Course']['course_code'];
-                        $courses_and_grades['course_id'] = $value['PublishedCourse']['Course']['id'];
-                        $courses_and_grades['major'] = $value['PublishedCourse']['Course']['major'];
-                        $courses_and_grades['credit'] = $value['PublishedCourse']['Course']['credit'];
-                        $courses_and_grades['thesis'] = $value['PublishedCourse']['Course']['thesis'];
-
-                        $grade_detail = $this->getApprovedGrade($value['CourseRegistration']['id'], 1);
-
-                        if (!empty($grade_detail)) {
-                            $courses_and_grades['grade'] = $grade_detail['grade'];
-                            if (isset($grade_detail['point_value'])) {
-                                $courses_and_grades['point_value'] = $grade_detail['point_value'];
-                                $courses_and_grades['pass_grade'] = $grade_detail['pass_grade'];
-                                $courses_and_grades['used_in_gpa'] = $grade_detail['used_in_gpa'];
-                            }
-                        }
-
-                        //To determine if a student registered more than once for the same course
-                        $matching_courses = array();
-
-                        $cID = $value['PublishedCourse']['Course']['id'];
-
-                        if (isset($student_detail['Student']['curriculum_id']) && !empty($student_detail['Student']['curriculum_id'])) {
-                            $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                                $cID,
-                                $student_detail['Student']['curriculum_id'],
-                                0
-                            );
-                        }
-
-                        $matching_courses[$cID] = $cID;
-
-                        $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                            $matching_courses,
-                            $student_detail['Student']['id']
-                        );
-                        //debug($register_and_add_freq);
-
-                        //If the student add or register once
-                        if (count($register_and_add_freq) <= 1) {
-                            $courses_and_grades['repeated_old'] = false;
-                            $courses_and_grades['repeated_new'] = false;
-                        } else {
-                            //If the student has multiple registration and/or add
-                            $rep = $this->repeatationLabeling(
-                                $register_and_add_freq,
-                                'register',
-                                $value['CourseRegistration']['id'],
-                                $student_detail,
-                                $courses_and_grades['course_id']
-                            );
-                            $courses_and_grades['repeated_old'] = $rep['repeated_old'];
-                            $courses_and_grades['repeated_new'] = $rep['repeated_new'];
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!empty($course_added)) {
-            foreach ($course_added as $key => $value) {
-                if (isset($value['PublishedCourse']['Course']['id']) && !empty($value['PublishedCourse']['Course']['id'])) {
-                    $index = count($courses_and_grades);
-
-                    $courses_and_grades['course_title'] = $value['PublishedCourse']['Course']['course_title'];
-                    $courses_and_grades['course_code'] = $value['PublishedCourse']['Course']['course_code'];
-                    $courses_and_grades['course_id'] = $value['PublishedCourse']['Course']['id'];
-                    $courses_and_grades['major'] = $value['PublishedCourse']['Course']['major'];
-                    $courses_and_grades['credit'] = $value['PublishedCourse']['Course']['credit'];
-                    $courses_and_grades['thesis'] = $value['PublishedCourse']['Course']['thesis'];
-
-
-                    $grade_detail = $this->getApprovedGrade($value['CourseAdd']['id'], 0);
-
-                    if (!empty($grade_detail)) {
-                        $courses_and_grades[$index]['grade'] = $grade_detail['grade'];
-                        if (isset($grade_detail['point_value'])) {
-                            $courses_and_grades['point_value'] = $grade_detail['point_value'];
-                            $courses_and_grades['pass_grade'] = $grade_detail['pass_grade'];
-                            $courses_and_grades['used_in_gpa'] = $grade_detail['used_in_gpa'];
-                        }
-                    }
-
-                    //To determine if a student registered more than once for the same course
-                    $matching_courses = array();
-
-                    $cID = $value['PublishedCourse']['Course']['id'];
-
-                    if (isset($student_detail['Student']['curriculum_id']) && !empty($student_detail['Student']['curriculum_id'])) {
-                        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-                            $cID,
-                            $student_detail['Student']['curriculum_id']
-                        );
-                    }
-
-                    $matching_courses[$cID] = $cID;
-
-                    $register_and_add_freq = $this->getCourseFrequenceRegAdds(
-                        $matching_courses,
-                        $student_detail['Student']['id']
-                    );
-
-                    //If the student add or register once
-                    if (count($register_and_add_freq) <= 1) {
-                        $courses_and_grades['repeated_old'] = false;
-                        $courses_and_grades['repeated_new'] = false;
-                    } else {
-                        //If the student has multiple registration and/or add
-                        $rep = $this->repeatationLabeling(
-                            $register_and_add_freq,
-                            'add',
-                            $value['CourseAdd']['id'],
-                            $student_detail,
-                            $courses_and_grades['course_id']
-                        );
-                        $courses_and_grades['repeated_old'] = $rep['repeated_old'];
-                        $courses_and_grades['repeated_new'] = $rep['repeated_new'];
-                    }
-                }
-            }
-        }
-
-        return $courses_and_grades;
-    }
-
-    function gradeSubmittedForAYSem($student_id, $AY, $Sem)
-    {
-
-        $grade_submitted_registred_courses = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-                'CourseRegistration.semester' => $Sem,
-                'CourseRegistration.academic_year' => $AY
-            ),
-            'fields' => array('CourseRegistration.id')
-        ));
-
-        if (!empty($grade_submitted_registred_courses)) {
-            foreach ($grade_submitted_registred_courses as $k => $v) {
-                $grade_detail = $this->getApprovedGrade($v, 1);
-                if (isset($grade_detail['grade']) && $grade_detail['grade'] != 'W') {
-                    return 1;
-                }
-            }
-        }
-
-        $grade_submitted_added_courses = $this->CourseAdd->find('list', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.semester' => $Sem,
-                'CourseAdd.academic_year' => $AY
-            ),
-            'fields' => array('CourseAdd.id')
-        ));
-
-
-        if (!empty($grade_submitted_added_courses)) {
-            foreach ($grade_submitted_added_courses as $k => $v) {
-                $grade_detail = $this->getApprovedGrade($v, 0);
-                if (isset($grade_detail['grade']) && $grade_detail['grade'] != 'W') {
-                    return 1;
-                }
-            }
-        }
         return 0;
     }
 
-
-    function checkCourseFrequencyTaken($student_id, $acadamic_year, $semester, $course_id)
+    public function isGradeSubmittedForPublishedCourseGivenStudentId(int $studentId, $publishedCourseIds): int
     {
+        $publishedCoursesStudentRegisteredScoreGrade = 0;
 
-        $courses_and_grades = array();
+        $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+            ->where([
+                'CourseRegistrations.published_course_id' => is_array($publishedCourseIds) ? $publishedCourseIds : [$publishedCourseIds],
+                'CourseRegistrations.student_id' => $studentId
+            ])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
-        $matching_courses = ClassRegistry::init('Course')->getTakenEquivalentCourses($student_id, $course_id);
-
-        $student_detail = $this->CourseAdd->Student->find('first', array(
-            'conditions' => array(
-                'Student.id' => $student_id,
-            ),
-            'recursive' => -1
-        ));
-
-        $course_registered = $this->CourseRegistration->find('all', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $student_id,
-                'CourseRegistration.academic_year' => $acadamic_year,
-                'CourseRegistration.semester' => $semester
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            )
-        ));
-
-        $course_added = $this->CourseAdd->find('all', array(
-            'conditions' => array(
-                'CourseAdd.student_id' => $student_id,
-                'CourseAdd.academic_year' => $acadamic_year,
-                'CourseAdd.semester' => $semester
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            )
-        ));
-
-        if (!empty($course_added)) {
-            foreach ($course_added as $ca_key => $ca_value) {
-                if (!($ca_value['PublishedCourse']['add'] == 1 || ($ca_value['CourseAdd']['department_approval'] == 1 && $ca_value['CourseAdd']['registrar_confirmation'] == 1))) {
-                    unset($course_added[$ca_key]);
-                }
+        if (!empty($gradeSubmittedRegisteredCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $gradeSubmittedRegisteredCourses])
+                ->count();
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
         }
 
-        $registration_and_course_add_merged = array_merge($course_added, $course_registered);
-        //debug($registration_and_course_add_merged);
+        $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+            ->where([
+                'CourseAdds.published_course_id' => is_array($publishedCourseIds) ? $publishedCourseIds : [$publishedCourseIds],
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->select(['CourseAdds.id'])
+            ->toArray();
 
-        if (!empty($registration_and_course_add_merged)) {
-            foreach ($registration_and_course_add_merged as $k => $value) {
-                $register_and_add_freq = $this->getCourseFrequenceRegAdds($matching_courses, $student_id);
-                //If the student add or register once
-                if (count($register_and_add_freq) <= 1) {
-                    $courses_and_grades[$acadamic_year]['repeated_old'] = false;
-                    $courses_and_grades[$acadamic_year]['repeated_new'] = false;
-                } else {
-                    //If the student has multiple registration and/or add
-                    $rept = $this->repeatationLabeling(
-                        $register_and_add_freq,
-                        'add',
-                        $value['CourseAdd']['id'],
-                        $student_detail,
-                        $value['PublishedCourse']['course_id']
-                    );
-
-                    $courses_and_grades[$acadamic_year]['repeated_old'] = $rept['repeated_old'];
-                    $courses_and_grades[$acadamic_year]['repeated_new'] = $rept['repeated_new'];
-                }
+        if (!empty($gradeSubmittedAddCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->count();
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
         }
 
-        debug($courses_and_grades);
-        return $courses_and_grades;
+        return $publishedCoursesStudentRegisteredScoreGrade;
     }
 
-
-    function getListOfSubmittedGradeForDepartmentApproval($col_dpt_id = null, $department = 1)
+    public function getCourseRepetation(int $courseRegAddId, int $studentId, int $registered = 1): array
     {
+        $studentDetail = $this->CourseRegistrations->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
 
-        $department_action_required_list = $this->find('all', array(
-            'conditions' => array(
-                'ExamGrade.department_approval IS null',
-                'ExamGrade.registrar_approval IS null',
-            ),
-            'contain' => array(
-                'CourseRegistration' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-                'CourseAdd' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-                'MakeupExam' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-            ),
-            //'order' => array('ExamGrade.created' => 'DESC') // will interfere with backdated grade entry, Neway
-            'order' => array('ExamGrade.id' => 'DESC')
-        ));
+        $coursesAndGrades = [];
+        $courseRegistered = [];
+        $courseAdded = [];
 
-        $publishedCourses = array();
-
-        if (!empty($department_action_required_list)) {
-            foreach ($department_action_required_list as $key => $grade_change_detail) {
-                //Grade change for student course registration
-                if (isset($grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']) && $grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "" && (($department == 1 && $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'] == $col_dpt_id) || ($department == 0 && $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] == $col_dpt_id))) {
-                    $publishedCourses[] = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse'];
-                }
-            }
+        if ($registered == 1) {
+            $courseRegistered = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.id' => $courseRegAddId,
+                    'CourseRegistrations.id NOT IN' => $this->CourseRegistrations->CourseDrops->find()
+                        ->where(['CourseDrops.registrar_confirmation' => 1, 'CourseDrops.department_approval' => 1])
+                        ->select(['CourseDrops.course_registration_id'])
+                ])
+                ->contain(['PublishedCourses.Courses'])
+                ->toArray();
+        } else {
+            $courseAdded = $this->CourseAdds->find()
+                ->where([
+                    'CourseAdds.id' => $courseRegAddId,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1
+                ])
+                ->contain(['PublishedCourses.Courses'])
+                ->toArray();
         }
 
-        return $publishedCourses;
-    }
+        if (!empty($courseRegistered)) {
+            foreach ($courseRegistered as $value) {
+                if (!$this->CourseRegistrations->isCourseDropped($value->id) && !empty($value->published_course->course->id)) {
+                    $coursesAndGrades = [
+                        'course_title' => $value->published_course->course->course_title,
+                        'course_code' => $value->published_course->course->course_code,
+                        'course_id' => $value->published_course->course->id,
+                        'major' => $value->published_course->course->major,
+                        'credit' => $value->published_course->course->credit,
+                        'thesis' => $value->published_course->course->thesis
+                    ];
 
+                    $gradeDetail = $this->getApprovedGrade($value->id, 1);
 
-    //Registrar grade  approval
-    function getListOfGradeForRegistrarApproval($department_ids = null, $college_ids = null)
-    {
-
-        $registrar_action_required_list = $this->find('all', array(
-            'conditions' => array(
-                'ExamGrade.department_approval = 1',
-                'ExamGrade.registrar_approval IS null',
-            ),
-            'contain' => array(
-                'CourseRegistration' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-                'CourseAdd' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-                'MakeupExam' => array(
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'CourseInstructorAssignment.isprimary' => 1
-                            ),
-                            'Staff'
-                        ),
-                        'Program' => array('id', 'name'),
-                        'ProgramType' => array('id', 'name'),
-                        'Section' => array('id', 'name'),
-                        'Department' => array('id', 'name'),
-                        'YearLevel' => array('id', 'name'),
-                        'Course' => array('id', 'course_title', 'course_code', 'course_detail_hours', 'credit')
-                    )
-                ),
-            ),
-            //'order' => array('ExamGrade.created' => 'DESC') // will interfere with backdated grade entry, Neway
-            'order' => array('ExamGrade.id' => 'DESC')
-        ));
-
-        $count = 0;
-        $publishedCourses = array();
-
-        if (!empty($registrar_action_required_list)) {
-            foreach ($registrar_action_required_list as $key => $grade_detail) {
-                if (empty($grade_detail['ExamGrade']['registrar_approval']) && $grade_detail['ExamGrade']['department_approval'] == 1) {
-                    //Grade change for student course registration
-                    if (isset($grade_detail['CourseRegistration']) && !empty($grade_detail['CourseRegistration']) && $grade_detail['CourseRegistration']['id'] != "") {
-                        if ((!empty($department_ids) && isset($grade_detail['CourseRegistration']['PublishedCourse']['Department']['id']) && in_array(
-                                    $grade_detail['CourseRegistration']['PublishedCourse']['Department']['id'],
-                                    $department_ids
-                                )) || (!empty($college_ids) && !empty($grade_detail['CourseRegistration']['PublishedCourse']['college_id']) && in_array(
-                                    $grade_detail['CourseRegistration']['PublishedCourse']['college_id'],
-                                    $college_ids
-                                ))) {
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['PublishedCourse'] = $grade_detail['CourseRegistration']['PublishedCourse'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['Course'] = $grade_detail['CourseRegistration']['PublishedCourse']['Course'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['Program'] = $grade_detail['CourseRegistration']['PublishedCourse']['Program'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['ProgramType'] = $grade_detail['CourseRegistration']['PublishedCourse']['ProgramType'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['Section'] = $grade_detail['CourseRegistration']['PublishedCourse']['Section'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['YearLevel'] = $grade_detail['CourseRegistration']['PublishedCourse']['YearLevel'];
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['Department'] = $grade_detail['CourseRegistration']['PublishedCourse']['Department'];
-
-                            $publishedCourses[$grade_detail['CourseRegistration']['PublishedCourse']['id']]['CourseInstructorAssignment'] = $grade_detail['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'];
-                        }
-                    } else {
-                        if ((!empty($department_ids) && isset($grade_detail['CourseAdd']['PublishedCourse']['Department']['id']) && in_array(
-                                    $grade_detail['CourseAdd']['PublishedCourse']['Department']['id'],
-                                    $department_ids
-                                )) || (!empty($college_ids) && !empty($grade_detail['CourseAdd']['PublishedCourse']['college_id']) && in_array(
-                                    $grade_detail['CourseAdd']['PublishedCourse']['college_id'],
-                                    $college_ids
-                                ))) {
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['PublishedCourse'] = $grade_detail['CourseAdd']['PublishedCourse'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['Course'] = $grade_detail['CourseAdd']['PublishedCourse']['Course'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['Program'] = $grade_detail['CourseAdd']['PublishedCourse']['Program'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['ProgramType'] = $grade_detail['CourseAdd']['PublishedCourse']['ProgramType'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['Section'] = $grade_detail['CourseAdd']['PublishedCourse']['Section'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['YearLevel'] = $grade_detail['CourseAdd']['PublishedCourse']['YearLevel'];
-
-
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['CourseInstructorAssignment'] = $grade_detail['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'];
-                            $publishedCourses[$grade_detail['CourseAdd']['PublishedCourse']['id']]['Department'] = $grade_detail['CourseAdd']['PublishedCourse']['Department'];
+                    if (!empty($gradeDetail)) {
+                        $coursesAndGrades['grade'] = $gradeDetail['grade'];
+                        if (isset($gradeDetail['point_value'])) {
+                            $coursesAndGrades['point_value'] = $gradeDetail['point_value'];
+                            $coursesAndGrades['pass_grade'] = $gradeDetail['pass_grade'];
+                            $coursesAndGrades['used_in_gpa'] = $gradeDetail['used_in_gpa'];
                         }
                     }
+
+                    $matchingCourses = [];
+                    $cId = $value->published_course->course->id;
+                    if (!empty($studentDetail->curriculum_id)) {
+                        $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($cId, $studentDetail->curriculum_id, 0);
+                    }
+                    $matchingCourses[$cId] = $cId;
+
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
+
+                    if (count($registerAndAddFreq) <= 1) {
+                        $coursesAndGrades['repeated_old'] = false;
+                        $coursesAndGrades['repeated_new'] = false;
+                    } else {
+                        $rep = $this->repeatationLabeling($registerAndAddFreq, 'register', $value->id, ['Student' => $studentDetail->toArray()], $coursesAndGrades['course_id']);
+                        $coursesAndGrades['repeated_old'] = $rep['repeated_old'];
+                        $coursesAndGrades['repeated_new'] = $rep['repeated_new'];
+                    }
                 }
-                $count++;
             }
         }
+
+        if (!empty($courseAdded)) {
+            foreach ($courseAdded as $value) {
+                if (!empty($value->published_course->course->id)) {
+                    $coursesAndGrades = [
+                        'course_title' => $value->published_course->course->course_title,
+                        'course_code' => $value->published_course->course->course_code,
+                        'course_id' => $value->published_course->course->id,
+                        'major' => $value->published_course->course->major,
+                        'credit' => $value->published_course->course->credit,
+                        'thesis' => $value->published_course->course->thesis
+                    ];
+
+                    $gradeDetail = $this->getApprovedGrade($value->id, 0);
+
+                    if (!empty($gradeDetail)) {
+                        $coursesAndGrades['grade'] = $gradeDetail['grade'];
+                        if (isset($gradeDetail['point_value'])) {
+                            $coursesAndGrades['point_value'] = $gradeDetail['point_value'];
+                            $coursesAndGrades['pass_grade'] = $gradeDetail['pass_grade'];
+                            $coursesAndGrades['used_in_gpa'] = $gradeDetail['used_in_gpa'];
+                        }
+                    }
+
+                    $matchingCourses = [];
+                    $cId = $value->published_course->course->id;
+                    if (!empty($studentDetail->curriculum_id)) {
+                        $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($cId, $studentDetail->curriculum_id);
+                    }
+                    $matchingCourses[$cId] = $cId;
+
+                    $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentDetail->id);
+
+                    if (count($registerAndAddFreq) <= 1) {
+                        $coursesAndGrades['repeated_old'] = false;
+                        $coursesAndGrades['repeated_new'] = false;
+                    } else {
+                        $rep = $this->repeatationLabeling($registerAndAddFreq, 'add', $value->id, ['Student' => $studentDetail->toArray()], $coursesAndGrades['course_id']);
+                        $coursesAndGrades['repeated_old'] = $rep['repeated_old'];
+                        $coursesAndGrades['repeated_new'] = $rep['repeated_new'];
+                    }
+                }
+            }
+        }
+
+        return $coursesAndGrades;
+    }
+
+    public function gradeSubmittedForAYSem(int $studentId, string $academicYear, string $semester): int
+    {
+        $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+            ->where([
+                'CourseRegistrations.student_id' => $studentId,
+                'CourseRegistrations.semester' => $semester,
+                'CourseRegistrations.academic_year' => $academicYear
+            ])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
+
+        if (!empty($gradeSubmittedRegisteredCourses)) {
+            foreach ($gradeSubmittedRegisteredCourses as $v) {
+                $gradeDetail = $this->getApprovedGrade($v, 1);
+                if (isset($gradeDetail['grade']) && $gradeDetail['grade'] != 'W') {
+                    return 1;
+                }
+            }
+        }
+
+        $gradeSubmittedAddedCourses = $this->CourseAdds->find('list')
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.semester' => $semester,
+                'CourseAdds.academic_year' => $academicYear
+            ])
+            ->select(['CourseAdds.id'])
+            ->toArray();
+
+        if (!empty($gradeSubmittedAddedCourses)) {
+            foreach ($gradeSubmittedAddedCourses as $v) {
+                $gradeDetail = $this->getApprovedGrade($v, 0);
+                if (isset($gradeDetail['grade']) && $gradeDetail['grade'] != 'W') {
+                    return 1;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    public function checkCourseFrequencyTaken(int $studentId, string $academicYear, string $semester, int $courseId): array
+    {
+        $coursesAndGrades = [];
+        $matchingCourses = TableRegistry::getTableLocator()->get('Courses')->getTakenEquivalentCourses($studentId, $courseId);
+
+        $studentDetail = $this->CourseAdds->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
+
+        $courseRegistered = $this->CourseRegistrations->find()
+            ->where([
+                'CourseRegistrations.student_id' => $studentId,
+                'CourseRegistrations.academic_year' => $academicYear,
+                'CourseRegistrations.semester' => $semester
+            ])
+            ->contain(['PublishedCourses.Courses'])
+            ->toArray();
+
+        $courseAdded = $this->CourseAdds->find()
+            ->where([
+                'CourseAdds.student_id' => $studentId,
+                'CourseAdds.academic_year' => $academicYear,
+                'CourseAdds.semester' => $semester
+            ])
+            ->contain(['PublishedCourses.Courses'])
+            ->toArray();
+
+        if (!empty($courseAdded)) {
+            foreach ($courseAdded as $key => $caValue) {
+                if (!($caValue->published_course->add == 1 || ($caValue->department_approval == 1 && $caValue->registrar_confirmation == 1))) {
+                    unset($courseAdded[$key]);
+                }
+            }
+        }
+
+        $registrationAndCourseAddMerged = array_merge($courseAdded, $courseRegistered);
+
+        if (!empty($registrationAndCourseAddMerged)) {
+            foreach ($registrationAndCourseAddMerged as $value) {
+                $registerAndAddFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentId);
+
+                if (count($registerAndAddFreq) <= 1) {
+                    $coursesAndGrades[$academicYear]['repeated_old'] = false;
+                    $coursesAndGrades[$academicYear]['repeated_new'] = false;
+                } else {
+                    $rept = $this->repeatationLabeling(
+                        $registerAndAddFreq,
+                        'add',
+                        $value->id ?? $value->course_add->id,
+                        ['Student' => $studentDetail->toArray()],
+                        $value->published_course->course_id
+                    );
+                    $coursesAndGrades[$academicYear]['repeated_old'] = $rept['repeated_old'];
+                    $coursesAndGrades[$academicYear]['repeated_new'] = $rept['repeated_new'];
+                }
+            }
+        }
+
+        return $coursesAndGrades;
+    }
+
+
+
+    public function getListOfSubmittedGradeForDepartmentApproval(?int $colDptId = null, int $department = 1): array
+    {
+        $departmentActionRequiredList = $this->find()
+            ->where([
+                'ExamGrades.department_approval IS NULL',
+                'ExamGrades.registrar_approval IS NULL'
+            ])
+            ->contain([
+                'CourseRegistrations.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ],
+                'CourseAdds.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ],
+                'MakeupExams.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ]
+            ])
+            ->order(['ExamGrades.id' => 'DESC'])
+            ->toArray();
+
+        $publishedCourses = [];
+
+        if (!empty($departmentActionRequiredList)) {
+            foreach ($departmentActionRequiredList as $gradeChangeDetail) {
+                if (
+                    !empty($gradeChangeDetail->course_registration) &&
+                    $gradeChangeDetail->course_registration->id &&
+                    (
+                        ($department == 1 && $gradeChangeDetail->course_registration->published_course->given_by_department_id == $colDptId) ||
+                        ($department == 0 && $gradeChangeDetail->course_registration->published_course->college_id == $colDptId)
+                    )
+                ) {
+                    $publishedCourses[] = $gradeChangeDetail->course_registration->published_course;
+                }
+            }
+        }
+
         return $publishedCourses;
     }
 
-    public function getMostApprovedGradeForSMS($phoneNumber)
+    public function getListOfGradeForRegistrarApproval(?array $departmentIds = null, ?array $collegeIds = null): array
     {
+        $registrarActionRequiredList = $this->find()
+            ->where([
+                'ExamGrades.department_approval' => 1,
+                'ExamGrades.registrar_approval IS NULL'
+            ])
+            ->contain([
+                'CourseRegistrations.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ],
+                'CourseAdds.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ],
+                'MakeupExams.PublishedCourses' => [
+                    'CourseInstructorAssignments' => [
+                        'conditions' => ['CourseInstructorAssignments.isprimary' => 1],
+                        'Staffs'
+                    ],
+                    'Programs' => ['fields' => ['id', 'name']],
+                    'ProgramTypes' => ['fields' => ['id', 'name']],
+                    'Sections' => ['fields' => ['id', 'name']],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'YearLevels' => ['fields' => ['id', 'name']],
+                    'Courses' => ['fields' => ['id', 'course_title', 'course_code', 'course_detail_hours', 'credit']]
+                ]
+            ])
+            ->order(['ExamGrades.id' => 'DESC'])
+            ->toArray();
 
-        $studentDetail = ClassRegistry::init('Student')->find(
-            'first',
-            array('conditions' => array('Student.phone_mobile' => $phoneNumber), 'contain' => array('User'))
-        );
-        $gradeDetails = '';
+        $publishedCourses = [];
 
-        if (!empty($studentDetail)) {
-            $mostRecentRegistration = $this->getMostRecentRegistrationDetail($studentDetail['Student']['id']);
-            $coursesTaken = $this->getStudentCoursesAndFinalGrade(
-                $studentDetail['Student']['id'],
-                $mostRecentRegistration['CourseRegistration']['academic_year'],
-                $mostRecentRegistration['CourseRegistration']['semester'],
-                1
-            );
-            return $this->formateGradeForSMS($coursesTaken, $studentDetail);
-        } else {
-            // parent phone number ? what if the parent has more than one child ?
-            $parentPhone = ClassRegistry::init('Contact')->find(
-                'all',
-                array('conditions' => array('Contact.phone_mobile' => $phoneNumber), 'contain' => array('Student'))
-            );
-
-            if (!empty($parentPhone)) {
-                $allofTheirKids = 'Your child ';
-                foreach ($parentPhone as $k => $pv) {
-                    $mostRecentRegistration = $this->getMostRecentRegistrationDetail($pv['Student']['id']);
-                    $coursesTaken = $this->getStudentCoursesAndFinalGrade(
-                        $pv['Contact']['student_id'],
-                        $mostRecentRegistration['CourseRegistration']['academic_year'],
-                        $mostRecentRegistration['CourseRegistration']['semester'],
-                        1
-                    );
-                    $allofTheirKids .= $this->formateGradeForSMS($coursesTaken, $pv);
+        if (!empty($registrarActionRequiredList)) {
+            foreach ($registrarActionRequiredList as $gradeDetail) {
+                if (empty($gradeDetail->registrar_approval) && $gradeDetail->department_approval == 1) {
+                    if (
+                        !empty($gradeDetail->course_registration) &&
+                        $gradeDetail->course_registration->id &&
+                        (
+                            (!empty($departmentIds) && !empty($gradeDetail->course_registration->published_course->department->id) && in_array($gradeDetail->course_registration->published_course->department->id, $departmentIds)) ||
+                            (!empty($collegeIds) && !empty($gradeDetail->course_registration->published_course->college_id) && in_array($gradeDetail->course_registration->published_course->college_id, $collegeIds))
+                        )
+                    ) {
+                        $publishedCourses[$gradeDetail->course_registration->published_course->id] = [
+                            'PublishedCourse' => $gradeDetail->course_registration->published_course,
+                            'Course' => $gradeDetail->course_registration->published_course->course,
+                            'Program' => $gradeDetail->course_registration->published_course->program,
+                            'ProgramType' => $gradeDetail->course_registration->published_course->program_type,
+                            'Section' => $gradeDetail->course_registration->published_course->section,
+                            'YearLevel' => $gradeDetail->course_registration->published_course->year_level,
+                            'Department' => $gradeDetail->course_registration->published_course->department,
+                            'CourseInstructorAssignment' => $gradeDetail->course_registration->published_course->course_instructor_assignments
+                        ];
+                    } elseif (
+                        !empty($gradeDetail->course_add) &&
+                        (
+                            (!empty($departmentIds) && !empty($gradeDetail->course_add->published_course->department->id) && in_array($gradeDetail->course_add->published_course->department->id, $departmentIds)) ||
+                            (!empty($collegeIds) && !empty($gradeDetail->course_add->published_course->college_id) && in_array($gradeDetail->course_add->published_course->college_id, $collegeIds))
+                        )
+                    ) {
+                        $publishedCourses[$gradeDetail->course_add->published_course->id] = [
+                            'PublishedCourse' => $gradeDetail->course_add->published_course,
+                            'Course' => $gradeDetail->course_add->published_course->course,
+                            'Program' => $gradeDetail->course_add->published_course->program,
+                            'ProgramType' => $gradeDetail->course_add->published_course->program_type,
+                            'Section' => $gradeDetail->course_add->published_course->section,
+                            'YearLevel' => $gradeDetail->course_add->published_course->year_level,
+                            'Department' => $gradeDetail->course_add->published_course->department,
+                            'CourseInstructorAssignment' => $gradeDetail->course_add->published_course->course_instructor_assignments
+                        ];
+                    }
                 }
-                return $allofTheirKids;
             }
         }
-        return "You dont have the privilage to view grade.";
+
+        return $publishedCourses;
     }
 
-    public function getMostRecentRegistrationDetail($studentId)
+    public function getMostApprovedGradeForSMS(string $phoneNumber): string
     {
+        $studentDetail = TableRegistry::getTableLocator()->get('Students')->find()
+            ->where(['Students.phone_mobile' => $phoneNumber])
+            ->contain(['Users'])
+            ->first();
 
-        $mostRecentRegistration = $this->CourseRegistration->find('first', array(
-            'conditions' => array(
-                'CourseRegistration.student_id' => $studentId
-            ),
-            'contain' => array(
-                'PublishedCourse' => array(
-                    'Course'
-                )
-            ),
-            'order' => array(
-                //'CourseRegistration.created' => 'DESC', Interfares with Backdated Grade Entry, Neway
-                'CourseRegistration.id' => 'DESC',
-                'CourseRegistration.academic_year' => 'DESC',
-                'CourseRegistration.semester DESC'
-            )
-        ));
+        if (!empty($studentDetail)) {
+            $mostRecentRegistration = $this->getMostRecentRegistrationDetail($studentDetail->id);
+            $coursesTaken = $this->getStudentCoursesAndFinalGrade(
+                $studentDetail->id,
+                $mostRecentRegistration->academic_year,
+                $mostRecentRegistration->semester,
+                1
+            );
+            return $this->formateGradeForSMS($coursesTaken, $studentDetail->toArray());
+        } else {
+            $parentPhone = TableRegistry::getTableLocator()->get('Contacts')->find()
+                ->where(['Contacts.phone_mobile' => $phoneNumber])
+                ->contain(['Students'])
+                ->toArray();
 
-        return $mostRecentRegistration;
+            if (!empty($parentPhone)) {
+                $allOfTheirKids = 'Your child ';
+                foreach ($parentPhone as $pv) {
+                    $mostRecentRegistration = $this->getMostRecentRegistrationDetail($pv->student->id);
+                    $coursesTaken = $this->getStudentCoursesAndFinalGrade(
+                        $pv->student->id,
+                        $mostRecentRegistration->academic_year,
+                        $mostRecentRegistration->semester,
+                        1
+                    );
+                    $allOfTheirKids .= $this->formateGradeForSMS($coursesTaken, $pv->toArray());
+                }
+                return $allOfTheirKids;
+            }
+        }
+
+        return "You don't have the privilege to view grades.";
     }
 
-    public function formateGradeForSMS($gradeLists, $studentDetail)
+    public function getMostRecentRegistrationDetail(int $studentId)
     {
+        return $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.student_id' => $studentId])
+            ->contain(['PublishedCourses.Courses'])
+            ->order([
+                'CourseRegistrations.id' => 'DESC',
+                'CourseRegistrations.academic_year' => 'DESC',
+                'CourseRegistrations.semester' => 'DESC'
+            ])
+            ->first();
+    }
 
-        $display = '';
-        $display .= $studentDetail['Student']['first_name'] . ' ' . $studentDetail['Student']['last_name'] . '(' . $studentDetail['Student']['studentnumber'] . ') has scored :-';
+    public function formateGradeForSMS(array $gradeLists, array $studentDetail): string
+    {
+        $display = $studentDetail['Student']['first_name'] . ' ' . $studentDetail['Student']['last_name'] . '(' . $studentDetail['Student']['studentnumber'] . ') has scored :-';
 
-        if (isset($gradeLists) && !empty($gradeLists)) {
-            foreach ($gradeLists as $k => $value) {
+        if (!empty($gradeLists)) {
+            foreach ($gradeLists as $value) {
                 $display .= $value['course_title'] . ' => ' . $value['grade'] . '  ';
             }
         }
@@ -6397,168 +5115,122 @@ class ExamGradesTable extends Table
         return $display;
     }
 
-    public function getGradeDetailsForEmailNotification($exam_grade_id)
+    public function getGradeDetailsForEmailNotification(int $examGradeId): array
     {
+        $details = $this->find()
+            ->where(['ExamGrades.id' => $examGradeId])
+            ->contain([
+                'CourseAdds' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'CourseInstructorAssignments.Staffs'
+                    ]
+                ],
+                'MakeupExams' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'CourseInstructorAssignments.Staffs'
+                    ]
+                ],
+                'CourseRegistrations' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'CourseInstructorAssignments.Staffs'
+                    ]
+                ]
+            ])
+            ->first();
 
-        $details = $this->find('first', array(
-            'conditions' => array(
-                'ExamGrade.id' => $exam_grade_id
-            ),
-            'contain' => array(
-                'CourseAdd' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'Course',
-                        'CourseInstructorAssignment' => array('Staff')
-                    )
-                ),
-                'MakeupExam' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'Course',
-                        'CourseInstructorAssignment' => array('Staff')
-                    )
-                ),
-                'CourseRegistration' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'Course',
-                        'CourseInstructorAssignment' => array('Staff')
-                    )
-                )
-            )
-        ));
-
-        return $details;
+        return $details ? $details->toArray() : [];
     }
 
-    public function getLetterGradeStatistics($publishedCourseID)
+    public function getLetterGradeStatistics(int $publishedCourseId): array
     {
-
-        if (empty($publishedCourseID)) {
-            return array();
+        if (empty($publishedCourseId)) {
+            return [];
         }
 
-        $graph['data'] = array();
-        $graph['series'] = array();
-        $graph['labels'] = array();
-        $gradestats['statistics'] = array();
+        $graph = ['data' => [], 'series' => [], 'labels' => ['Grade']];
+        $gradeStats = ['statistics' => []];
 
-        $publishedCourses_reg = $this->CourseRegistration->find('all', array(
-            'conditions' => array(
-                "CourseRegistration.published_course_id" => $publishedCourseID
-            ),
-            'contain' => array(
-                'Student',
-                'ExamGrade',
-                'PublishedCourse' => array(
-                    'Section',
-                    'YearLevel',
-                    'Program',
-                    'ProgramType',
-                    'Course',
-                    'Department'
-                )
-            )
-        ));
+        $publishedCoursesReg = $this->CourseRegistrations->find()
+            ->where(['CourseRegistrations.published_course_id' => $publishedCourseId])
+            ->contain([
+                'Students',
+                'ExamGrades',
+                'PublishedCourses' => [
+                    'Sections',
+                    'YearLevels',
+                    'Programs',
+                    'ProgramTypes',
+                    'Courses',
+                    'Departments'
+                ]
+            ])
+            ->toArray();
 
-        $publishedCourses_add = $this->CourseAdd->find('all', array(
-            'conditions' => array(
-                "CourseAdd.published_course_id" => $publishedCourseID
-            ),
-            'contain' => array(
-                'Student',
-                'ExamGrade',
-                'PublishedCourse' => array(
-                    'Section',
-                    'YearLevel',
-                    'Program',
-                    'ProgramType',
-                    'Course',
-                    'Department'
-                )
-            )
-        ));
+        $publishedCoursesAdd = $this->CourseAdds->find()
+            ->where(['CourseAdds.published_course_id' => $publishedCourseId])
+            ->contain([
+                'Students',
+                'ExamGrades',
+                'PublishedCourses' => [
+                    'Sections',
+                    'YearLevels',
+                    'Programs',
+                    'ProgramTypes',
+                    'Courses',
+                    'Departments'
+                ]
+            ])
+            ->toArray();
 
-        $publishedCourses = array_merge($publishedCourses_reg, $publishedCourses_add);
-
-        $organized_Published_courses_by_sections = array();
-        $graph['labels'][0] = "Grade";
-        //$graph['labels'][1] = "Frequency";
+        $publishedCourses = array_merge($publishedCoursesReg, $publishedCoursesAdd);
 
         if (!empty($publishedCourses)) {
-            foreach ($publishedCourses as $key => $published_course) {
-                if (isset($published_course['CourseRegistration']['id'])) {
-                    $gradee = $this->CourseRegistration->ExamGrade->getGradeForStats(
-                        $published_course['CourseRegistration']['id'],
-                        1
-                    );
-                } elseif (isset($published_course['CourseAdd']['id'])) {
-                    $gradee = $this->CourseRegistration->ExamGrade->getGradeForStats(
-                        $published_course['CourseAdd']['id'],
-                        0
-                    );
-                }
+            foreach ($publishedCourses as $publishedCourse) {
+                $gradee = !empty($publishedCourse->course_registration)
+                    ? $this->CourseRegistrations->ExamGrades->getGradeForStats($publishedCourse->course_registration->id, 1)
+                    : $this->CourseRegistrations->ExamGrades->getGradeForStats($publishedCourse->course_add->id, 0);
+
                 if (!empty($gradee['grade'])) {
                     $graph['series'][$gradee['grade']] = $gradee['grade'];
-                    if (isset($graph['data'][$gradee['grade']][0])) {
-                        $graph['data'][$gradee['grade']][0] += 1;
-                    } else {
-                        $graph['data'][$gradee['grade']][0] = 1;
-                    }
-                    if (isset($gradestats['statistics'][$gradee['grade']])) {
-                        $gradestats['statistics'][$gradee['grade']] += 1;
-                    } else {
-                        $gradestats['statistics'][$gradee['grade']] = 1;
-                    }
+                    $graph['data'][$gradee['grade']][0] = ($graph['data'][$gradee['grade']][0] ?? 0) + 1;
+                    $gradeStats['statistics'][$gradee['grade']] = ($gradeStats['statistics'][$gradee['grade']] ?? 0) + 1;
                 }
-                //debug($gradestats['statistics']);
             }
         }
 
-        $gradestats['graph'] = $graph;
-        return $gradestats;
+        $gradeStats['graph'] = $graph;
+        return $gradeStats;
     }
 
-    //event management system, observer pattern raising event
-    public function afterSave($created, $options = array())
+    public function afterSave($entity, $options = [])
     {
-        /* parent::afterSave($created, $options);
-        if ($created === true) {
-            $Event = new Event('Model.ExamGrade.createdModified', $this, array(
-                'id' => $this->id,
-                // 'data' => $this->data[$this->alias]
-            ));
-            $this->getEventManager()->dispatch($Event);
-        } */
+        parent::afterSave($entity, $options);
+        if ($entity->isNew()) {
+            $event = new Event('Model.ExamGrade.createdModified', $this, ['id' => $entity->id]);
+            $this->getEventManager()->dispatch($event);
+        }
     }
 
-    function repeatationLabeling($register_and_add_freq, $type = 'add', $add_reg_value, $student_detail, $course_id)
+    public function repeatationLabeling(array $registerAndAddFreq, string $type = 'add', int $addRegValue, array $studentDetail, int $courseId): array
     {
+        $rep = ['repeated_old' => false, 'repeated_new' => false];
 
-        $rep['repeated_old'] = false;
-        $rep['repeated_new'] = false;
+        $matchingCourses = TableRegistry::getTableLocator()->get('EquivalentCourses')->validEquivalentCourse($courseId, $studentDetail['Student']['curriculum_id']);
+        $matchingCourses[$courseId] = $courseId;
 
-        $matching_courses = ClassRegistry::init('EquivalentCourse')->validEquivalentCourse(
-            $course_id,
-            $student_detail['Student']['curriculum_id']
-        );
-        $matching_courses[$course_id] = $course_id;
+        $isLastRegistration = $this->isTheLastRegOrAdd($matchingCourses, $studentDetail['Student']['id'], $courseId, $addRegValue);
 
-        $isLastRegistration = $this->isTheLastRegOrAdd(
-            $matching_courses,
-            $student_detail['Student']['id'],
-            $course_id,
-            $add_reg_value
-        );
-        //strike all repetation
-
-        if (!empty($register_and_add_freq)) {
-            foreach ($register_and_add_freq as $k) {
-                if ($k['id'] == $add_reg_value && strcasecmp($k['type'], $type) == 0 && !$isLastRegistration) {
+        if (!empty($registerAndAddFreq)) {
+            foreach ($registerAndAddFreq as $k) {
+                if ($k['id'] == $addRegValue && strcasecmp($k['type'], $type) === 0 && !$isLastRegistration) {
                     $rep['repeated_old'] = true;
                     $rep['repeated_new'] = false;
-                    //return $rep;
                 }
             }
         }
@@ -6567,470 +5239,410 @@ class ExamGradesTable extends Table
         return $rep;
     }
 
-    function isTheLastRegOrAdd($matching_courses, $student_id, $course_id, $add_reg_value)
+    public function isTheLastRegOrAdd(array $matchingCourses, int $studentId, int $courseId, int $addRegValue): bool
     {
-
-        //$courses_separated_by_coma = join(',', $matching_courses);
-        $add_reg_freq = $this->getCourseFrequenceRegAdds($matching_courses, $student_id);
-        debug($add_reg_value);
-
-        $lastElement = $add_reg_freq[count($add_reg_freq) - 1];
-        debug($lastElement['course_id'] == $course_id && $add_reg_value == $lastElement['id']);
-
-        if ($lastElement['course_id'] == $course_id && $add_reg_value == $lastElement['id']) {
-            return true;
-        }
-        return false;
+        $addRegFreq = $this->getCourseFrequenceRegAdds($matchingCourses, $studentId);
+        $lastElement = end($addRegFreq);
+        return $lastElement['course_id'] == $courseId && $addRegValue == $lastElement['id'];
     }
 
-    function getCourseFrequenceRegAdds($matching_courses, $student_id)
+    public function getCourseFrequenceRegAdds(array $matchingCourses, int $studentId): array
     {
+        $coursesSeparatedByComa = implode(',', $matchingCourses);
+        $addFreq = [];
+        $registrationFreq = [];
+        $registerAndAddFreq = [];
 
-        $courses_separated_by_coma = join(',', $matching_courses);
-        //$courses_separated_by_coma = "'" . implode ( "', '", $matching_courses ) . "'";
+        if (!empty($coursesSeparatedByComa)) {
+            $registrationFreq = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.student_id' => $studentId,
+                    'CourseRegistrations.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                        ->where(['PublishedCourses.course_id IN' => $matchingCourses])
+                        ->select(['PublishedCourses.id']),
+                    'CourseRegistrations.id NOT IN' => $this->CourseRegistrations->CourseDrops->find()
+                        ->where(['CourseDrops.registrar_confirmation' => 1, 'CourseDrops.department_approval' => 1])
+                        ->select(['CourseDrops.course_registration_id'])
+                ])
+                ->contain(['PublishedCourses'])
+                ->order(['CourseRegistrations.id' => 'ASC'])
+                ->toArray();
 
-        //debug($courses_separated_by_coma);
-
-        $add_freq = array();
-        $registration_freq = array();
-        $register_and_add_freq = array();
-
-        if (isset($matching_courses) && !empty($courses_separated_by_coma)) {
-            $registration_freq = $this->CourseRegistration->find('all', array(
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.published_course_id in (select id from published_courses where course_id in (' . $courses_separated_by_coma . '))',
-                    'CourseRegistration.id not in (select course_registration_id from course_drops where registrar_confirmation = 1 and department_approval = 1)',
-                ),
-                'contain' => array('PublishedCourse'),
-                //'order' => array('CourseRegistration.created' => 'ASC'), // Grade Entry effect, Neway
-                'order' => array('CourseRegistration.id' => 'ASC')
-            ));
-
-            $add_freq = $this->CourseAdd->find('all', array(
-                'conditions' => array(
-                    'CourseAdd.student_id' => $student_id,
-                    'CourseAdd.department_approval = 1',
-                    'CourseAdd.registrar_confirmation = 1',
-                    'CourseAdd.published_course_id in (select id from published_courses where course_id in (' . $courses_separated_by_coma . '))'
-                ),
-                'contain' => array('PublishedCourse'),
-                //'order' => array('CourseAdd.created' => 'ASC'), // Grade Entry effect, Neway
-                'order' => array('CourseAdd.id' => 'ASC')
-            ));
+            $addFreq = $this->CourseAdds->find()
+                ->where([
+                    'CourseAdds.student_id' => $studentId,
+                    'CourseAdds.department_approval' => 1,
+                    'CourseAdds.registrar_confirmation' => 1,
+                    'CourseAdds.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                        ->where(['PublishedCourses.course_id IN' => $matchingCourses])
+                        ->select(['PublishedCourses.id'])
+                ])
+                ->contain(['PublishedCourses'])
+                ->order(['CourseAdds.id' => 'ASC'])
+                ->toArray();
         }
 
-        $register_and_add_course_registration = array();
-        //merging course registration and add
+        $registerAndAddCourseRegistration = [];
 
-        if (!empty($registration_freq)) {
-            foreach ($registration_freq as $key2 => $value2) {
-                if (!empty($value2['PublishedCourse']['id']) && !$this->CourseRegistration->isCourseDroped(
-                        $value2['CourseRegistration']['id']
-                    )) {
-                    $m_index = count($register_and_add_freq);
-                    $raacr = $this->getApprovedGrade($value2['CourseRegistration']['id'], 1);
+        if (!empty($registrationFreq)) {
+            foreach ($registrationFreq as $value) {
+                if (!empty($value->published_course->id) && !$this->CourseRegistrations->isCourseDropped($value->id)) {
+                    $mIndex = count($registerAndAddFreq);
+                    $raacr = $this->getApprovedGrade($value->id, 1);
 
-                    if (isset($raacr) && !empty($raacr)) {
-                        $register_and_add_course_registration[$value2['PublishedCourse']['course_id']]['register'][$value2['CourseRegistration']['id']] = $raacr['grade'];
+                    if (!empty($raacr)) {
+                        $registerAndAddCourseRegistration[$value->published_course->course_id]['register'][$value->id] = $raacr['grade'];
                     }
 
-                    $register_and_add_freq[$m_index]['id'] = $value2['CourseRegistration']['id'];
-                    $register_and_add_freq[$m_index]['type'] = 'register';
-                    $register_and_add_freq[$m_index]['course_id'] = $value2['PublishedCourse']['course_id'];
-                    $register_and_add_freq[$m_index]['created'] = $value2['CourseRegistration']['created'];
+                    $registerAndAddFreq[$mIndex] = [
+                        'id' => $value->id,
+                        'type' => 'register',
+                        'course_id' => $value->published_course->course_id,
+                        'created' => $value->created
+                    ];
                 }
             }
         }
 
-        if (!empty($add_freq)) {
-            foreach ($add_freq as $key2 => $value2) {
-                if (!empty($value2['PublishedCourse']['id'])) {
-                    $m_index = count($register_and_add_freq);
-                    $raaca = $this->getApprovedGrade($value2['CourseAdd']['id'], 0);
+        if (!empty($addFreq)) {
+            foreach ($addFreq as $value) {
+                if (!empty($value->published_course->id)) {
+                    $mIndex = count($registerAndAddFreq);
+                    $raaca = $this->getApprovedGrade($value->id, 0);
 
-                    if (isset($raaca) && !empty($raaca)) {
-                        $register_and_add_course_registration[$value2['PublishedCourse']['course_id']]['add'][$value2['CourseAdd']['id']] = $raaca['grade'];
+                    if (!empty($raaca)) {
+                        $registerAndAddCourseRegistration[$value->published_course->course_id]['add'][$value->id] = $raaca['grade'];
                     }
 
-                    $register_and_add_freq[$m_index]['id'] = $value2['CourseAdd']['id'];
-                    $register_and_add_freq[$m_index]['type'] = 'add';
-                    $register_and_add_freq[$m_index]['course_id'] = $value2['PublishedCourse']['course_id'];
-                    $register_and_add_freq[$m_index]['created'] = $value2['CourseAdd']['created'];
+                    $registerAndAddFreq[$mIndex] = [
+                        'id' => $value->id,
+                        'type' => 'add',
+                        'course_id' => $value->published_course->course_id,
+                        'created' => $value->created
+                    ];
                 }
             }
         }
 
-        //Sorting by date
-        if (!empty($register_and_add_freq)) {
-            for ($i = 0; $i < count($register_and_add_freq); $i++) {
-                for ($j = $i + 1; $j < count($register_and_add_freq); $j++) {
-                    if ($register_and_add_freq[$i]['created'] > $register_and_add_freq[$j]['created']) {
-                        $tmp = $register_and_add_freq[$i];
-                        $register_and_add_freq[$i] = $register_and_add_freq[$j];
-                        $register_and_add_freq[$j] = $tmp;
-                    }
-                }
-            }
-        }
+        usort($registerAndAddFreq, function ($a, $b) {
+            return $a['created'] <=> $b['created'];
+        });
 
-        return $register_and_add_freq;
+        return $registerAndAddFreq;
     }
 
-    function getApprovedThesisGrade($student_id)
+    public function getApprovedThesisGrade(int $studentId): array
     {
+        $curr = $this->CourseRegistrations->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
 
-        $curr = $this->CourseRegistration->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
+        $studentCurriculumAttachments = TableRegistry::getTableLocator()->get('CurriculumAttachments')->find('list')
+            ->where(['CurriculumAttachments.student_id' => $studentId])
+            ->group(['CurriculumAttachments.student_id', 'CurriculumAttachments.curriculum_id'])
+            ->select(['CurriculumAttachments.curriculum_id'])
+            ->toArray();
 
-        $student_curriculum_attachments = ClassRegistry::init('CurriculumAttachment')->find(
-            'list',
-            array(
-                'conditions' => array('CurriculumAttachment.student_id' => $student_id),
-                'fields' => array('CurriculumAttachment.curriculum_id', 'CurriculumAttachment.curriculum_id'),
-                'group' => array('CurriculumAttachment.student_id', 'CurriculumAttachment.curriculum_id')
-            )
-        );
-
-        if (!empty($curr) && isset($curr['Student']['curriculum_id']) && !empty($curr['Student']['curriculum_id'])) {
-            $curriculums_to_look = array();
-
-            $curriculums_to_look[] = $curr['Student']['curriculum_id'];
-
-            if (!empty($student_curriculum_attachments)) {
-                $curriculums_to_look = $curriculums_to_look + $student_curriculum_attachments;
+        if (!empty($curr) && !empty($curr->curriculum_id)) {
+            $curriculumsToLook = [$curr->curriculum_id];
+            if (!empty($studentCurriculumAttachments)) {
+                $curriculumsToLook = array_merge($curriculumsToLook, $studentCurriculumAttachments);
             }
 
-            $thesisCourse = $this->CourseRegistration->PublishedCourse->Course->find('list', array(
-                'conditions' => array(
-                    'Course.thesis' => 1,
-                    'Course.curriculum_id' => $curriculums_to_look
-                ),
-                'fields' => array('Course.id', 'Course.id'),
-            ));
+            $thesisCourse = $this->CourseRegistrations->PublishedCourses->Courses->find('list')
+                ->where(['Courses.thesis' => 1, 'Courses.curriculum_id IN' => $curriculumsToLook])
+                ->select(['Courses.id'])
+                ->toArray();
 
-            $CourseIdList = implode(', ', $thesisCourse);
+            $courseIdList = implode(', ', $thesisCourse);
 
             if (!empty($thesisCourse)) {
-                $registration = $this->CourseRegistration->find('first', array(
-                    'conditions' => array(
-                        'CourseRegistration.student_id' => $student_id,
-                        'CourseRegistration.published_course_id in (select id from published_courses where course_id in (' . $CourseIdList . '))'
-                    ),
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'DESC',
-                        'CourseRegistration.semester' => 'DESC',
-                        'CourseRegistration.id' => 'DESC'
-                    ),
-                    'contain' => array('PublishedCourse' => array('Course'))
-                ));
-            }
-        }
-
-        if (isset($registration) && !empty($registration)) {
-            $grade = $this->getApprovedGrade($registration['CourseRegistration']['id'], 1);
-            return $grade;
-        } else {
-            //TO DO: Check from course adds
-            return array();
-        }
-    }
-
-    function getApprovedThesisTitleAndGrade($student_id)
-    {
-
-        $curr = $this->CourseRegistration->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
-
-        $student_curriculum_attachments = ClassRegistry::init('CurriculumAttachment')->find(
-            'list',
-            array(
-                'conditions' => array('CurriculumAttachment.student_id' => $student_id),
-                'fields' => array('CurriculumAttachment.curriculum_id', 'CurriculumAttachment.curriculum_id'),
-                'group' => array('CurriculumAttachment.student_id', 'CurriculumAttachment.curriculum_id')
-            )
-        );
-
-        $thesisCourse = array();
-
-        if (!empty($curr) && isset($curr['Student']['curriculum_id']) && !empty($curr['Student']['curriculum_id'])) {
-            $curriculums_to_look = array();
-
-            $curriculums_to_look[] = $curr['Student']['curriculum_id'];
-
-            if (!empty($student_curriculum_attachments)) {
-                $curriculums_to_look = $curriculums_to_look + $student_curriculum_attachments;
-            }
-
-            $thesisCourse = $this->CourseRegistration->PublishedCourse->Course->find('list', array(
-                'conditions' => array(
-                    'Course.thesis' => 1,
-                    'Course.curriculum_id' => $curriculums_to_look
-                ),
-                'fields' => array('Course.id', 'Course.id'),
-            ));
-
-            $CourseIdList = implode(', ', $thesisCourse);
-
-            if (!empty($thesisCourse)) {
-                $registration = $this->CourseRegistration->find('first', array(
-                    'conditions' => array(
-                        'CourseRegistration.student_id' => $student_id,
-                        'CourseRegistration.published_course_id in (select id from published_courses where course_id in (' . $CourseIdList . '))'
-                    ),
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'DESC',
-                        'CourseRegistration.semester' => 'DESC',
-                        'CourseRegistration.id' => 'DESC'
-                    ),
-                    'contain' => array('PublishedCourse' => array('Course'))
-                ));
-            }
-        }
-
-        if (isset($registration) && !empty($registration)) {
-            $grade = $this->getApprovedGrade($registration['CourseRegistration']['id'], 1);
-            if (!empty($grade) && !empty($thesisCourse)) {
-                $graduationWork = ClassRegistry::init('GraduationWork')->find('first', array(
-                    'conditions' => array(
-                        'GraduationWork.student_id' => $student_id,
-                        'GraduationWork.course_id' => $thesisCourse
-                    ),
-                    'fields' => array('GraduationWork.id', 'GraduationWork.type', 'GraduationWork.title'),
-                    'order' => array('GraduationWork.modified' => 'DESC', 'GraduationWork.id' => 'DESC'),
-                    'recursive' => -1
-                ));
-
-                if (!empty($graduationWork)) {
-                    return array_merge($grade, $graduationWork);
-                } else {
-                    return $grade;
-                }
-            } elseif (!empty($grade)) {
-                return $grade;
-            } else {
-                return array();
-            }
-        } else {
-            //TO DO: Check from course adds
-            return array();
-        }
-    }
-
-    function getApprovedExitExamGrade($student_id)
-    {
-
-        $registration = array();
-        $courseAdd = array();
-
-        $curr = $this->CourseRegistration->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'recursive' => -1)
-        );
-
-        $student_curriculum_attachments = ClassRegistry::init('CurriculumAttachment')->find(
-            'list',
-            array(
-                'conditions' => array('CurriculumAttachment.student_id' => $student_id),
-                'fields' => array('CurriculumAttachment.curriculum_id', 'CurriculumAttachment.curriculum_id'),
-                'group' => array('CurriculumAttachment.student_id', 'CurriculumAttachment.curriculum_id')
-            )
-        );
-
-        if (!empty($curr) && isset($curr['Student']['curriculum_id']) && !empty($curr['Student']['curriculum_id'])) {
-            $curriculums_to_look = array();
-
-            $curriculums_to_look[] = $curr['Student']['curriculum_id'];
-
-            if (!empty($student_curriculum_attachments)) {
-                $curriculums_to_look = $curriculums_to_look + $student_curriculum_attachments;
-            }
-
-            $exitExamCourse = $this->CourseRegistration->PublishedCourse->Course->find('list', array(
-                'conditions' => array(
-                    'Course.exit_exam' => 1,
-                    'Course.curriculum_id' => $curriculums_to_look
-                ),
-                'fields' => array('Course.id', 'Course.id'),
-            ));
-
-            $CourseIdList = implode(', ', $exitExamCourse);
-
-            if (!empty($exitExamCourse)) {
-                $registration = $this->CourseRegistration->find('first', array(
-                    'conditions' => array(
-                        'CourseRegistration.student_id' => $student_id,
-                        'CourseRegistration.published_course_id in (select id from published_courses where course_id in (' . $CourseIdList . '))'
-                    ),
-                    'order' => array(
-                        'CourseRegistration.academic_year' => 'DESC',
-                        'CourseRegistration.semester' => 'DESC',
-                        'CourseRegistration.id' => 'DESC'
-                    ),
-                    'contain' => array('PublishedCourse' => array('Course'))
-                ));
-
-                isset($registration['PublishedCourse']['course_id']) ? debug(
-                    'ExitRegCourseID: ' . $registration['PublishedCourse']['course_id']
-                ) : '';
+                $registration = $this->CourseRegistrations->find()
+                    ->where([
+                        'CourseRegistrations.student_id' => $studentId,
+                        'CourseRegistrations.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                            ->where(['PublishedCourses.course_id IN' => $thesisCourse])
+                            ->select(['PublishedCourses.id'])
+                    ])
+                    ->contain(['PublishedCourses.Courses'])
+                    ->order(['CourseRegistrations.academic_year' => 'DESC', 'CourseRegistrations.semester' => 'DESC', 'CourseRegistrations.id' => 'DESC'])
+                    ->first();
 
                 if (empty($registration)) {
-                    $courseAdd = $this->CourseAdd->find('first', array(
-                        'conditions' => array(
-                            'CourseAdd.student_id' => $student_id,
-                            'CourseAdd.department_approval = 1',
-                            'CourseAdd.registrar_confirmation = 1',
-                            'CourseAdd.published_course_id in (select id from published_courses where course_id in (' . $CourseIdList . '))'
-                        ),
-                        'order' => array(
-                            'CourseAdd.academic_year' => 'DESC',
-                            'CourseAdd.semester' => 'DESC',
-                            'CourseAdd.id' => 'DESC'
-                        ),
-                        'contain' => array('PublishedCourse' => array('Course'))
-                    ));
-
-                    isset($courseAdd['PublishedCourse']['course_id']) ? debug(
-                        'ExitAddCourseID: ' . $courseAdd['PublishedCourse']['course_id']
-                    ) : '';
+                    $thesisFromAdd = $this->CourseAdds->find()
+                        ->where([
+                            'CourseAdds.student_id' => $studentId,
+                            'CourseAdds.registrar_confirmation' => 1
+                        ])
+                        ->contain([
+                            'PublishedCourses.Courses' => [
+                                'conditions' => [
+                                    'OR' => [
+                                        'Courses.id IN' => $thesisCourse,
+                                        'Courses.thesis' => 1
+                                    ]
+                                ]
+                            ]
+                        ])
+                        ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+                        ->first();
                 }
             }
         }
 
         if (!empty($registration)) {
-            $grade = $this->getApprovedGrade($registration['CourseRegistration']['id'], 1);
-            $grade = $grade + $registration['PublishedCourse'];
-            return $grade;
-        } elseif (!empty($courseAdd)) {
-            $grade = $this->getApprovedGrade($courseAdd['CourseAdd']['id'], 0);
-            $grade = $grade + $courseAdd['PublishedCourse'];
-            return $grade;
+            return $this->getApprovedGrade($registration->id, 1);
+        } elseif (!empty($thesisFromAdd)) {
+            return $this->getApprovedGrade($thesisFromAdd->id, 0);
         }
 
-        return array();
+        return [];
     }
 
-    public function getListOfFXGradeChangeForStudentChoice(
-        $student_id,
-        $academic_year = null,
-        $semester = null,
-        $department_id = null
-    ) {
+    public function getApprovedThesisTitleAndGrade(int $studentId): array
+    {
+        $curr = $this->CourseRegistrations->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
 
-        $fxGrade = array();
+        $studentCurriculumAttachments = TableRegistry::getTableLocator()->get('CurriculumAttachments')->find('list')
+            ->where(['CurriculumAttachments.student_id' => $studentId])
+            ->group(['CurriculumAttachments.student_id', 'CurriculumAttachments.curriculum_id'])
+            ->select(['CurriculumAttachments.curriculum_id'])
+            ->toArray();
 
-        if (isset($student_id) && !empty($student_id)) {
-            $fx_grade_list_course_reg = $this->CourseRegistration->find('all', array(
-                'conditions' => array(
-                    'CourseRegistration.student_id' => $student_id,
-                    'CourseRegistration.id in (select course_registration_id from exam_grades where grade = "Fx" and registrar_approval = 1 and registrar_approval = 1)'
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Course',
-                        'CourseInstructorAssignment'
-                    ),
-                    'Student',
-                    'ExamGrade'
-                )
-            ));
+        $thesisCourse = [];
 
-            //debug($fx_grade_list_course_reg);
-            $fx_grade_list_course_add = $this->CourseAdd->find('all', array(
-                'conditions' => array(
-                    'CourseAdd.student_id' => $student_id,
-                    'CourseAdd.id in (select course_add_id from exam_grades where grade = "Fx" and registrar_approval = 1 and registrar_approval = 1)'
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Course'
-                    ),
-                    'Student',
-                    'ExamGrade'
-                )
-            ));
-            debug($fx_grade_list_course_add);
-        } elseif (isset($academic_year) && isset($semester) && isset($department_id)) {
-            $fx_grade_list_course_reg = $this->CourseRegistration->find('all', array(
-                'conditions' => array(
-                    'CourseRegistration.academic_year' => $academic_year,
-                    'CourseRegistration.semester' => $semester,
-                    'PublishedCourse.department_id' => $department_id,
-                    'CourseRegistration.id in (select course_registration_id from exam_grades where grade = "Fx" and registrar_approval = 1 and registrar_approval = 1 )'
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Course',
-                        'CourseInstructorAssignment'
-                    ),
-                    'Student',
-                    'ExamGrade'
-                )
-            ));
+        if (!empty($curr) && !empty($curr->curriculum_id)) {
+            $curriculumsToLook = [$curr->curriculum_id];
+            if (!empty($studentCurriculumAttachments)) {
+                $curriculumsToLook = array_merge($curriculumsToLook, $studentCurriculumAttachments);
+            }
 
-            $fx_grade_list_course_add = $this->CourseAdd->find('all', array(
-                'conditions' => array(
-                    'CourseAdd.semester' => $semester,
-                    'PublishedCourse.department_id' => $department_id,
-                    'CourseAdd.id in (select course_add_id from exam_grades where grade = "Fx" and registrar_approval = 1 and registrar_approval = 1 )'
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array('Course'),
-                    'Student',
-                    'ExamGrade'
-                )
-            ));
-        }
+            $thesisCourse = $this->CourseRegistrations->PublishedCourses->Courses->find('list')
+                ->where(['Courses.thesis' => 1, 'Courses.curriculum_id IN' => $curriculumsToLook])
+                ->select(['Courses.id'])
+                ->toArray();
 
-        if (isset($fx_grade_list_course_reg) && !empty($fx_grade_list_course_reg)) {
-            foreach ($fx_grade_list_course_reg as $fk => $fv) {
-                $grade = $this->getApprovedGrade($fv['CourseRegistration']['id'], 1);
-                $latestGrade['LatestGradeDetail'] = $this->CourseRegistration->getCourseRegistrationLatestGradeDetail(
-                    $fv['CourseRegistration']['id']
-                );
+            $courseIdList = implode(', ', $thesisCourse);
 
-                if (isset($latestGrade['LatestGradeDetail']['type']) && $latestGrade['LatestGradeDetail']['type'] == "Change") {
-                    debug($grade);
-                    /*  $fv['Student']['applied_id'] = ClassRegistry::init('FxResitRequest')->fxresetId($fv['CourseRegistration']['id'],0);
-                    $fv['Student']['fxgradesubmitted'] = true;
-                    $fxGrade[] = $fv; */
-                } else {
-                    if (isset($grade) && !empty($grade) && ($grade['grade'] == "FX" || $grade['grade'] == "Fx")) {
-                        $fv['Student']['applied_id'] = ClassRegistry::init('FxResitRequest')->fxresetId(
-                            $fv['CourseRegistration']['id'],
-                            1
-                        );
-                        $fv['Student']['fxgradesubmitted'] = false;
-                        $fxGrade[] = $fv;
-                    }
+            if (!empty($thesisCourse)) {
+                $registration = $this->CourseRegistrations->find()
+                    ->where([
+                        'CourseRegistrations.student_id' => $studentId,
+                        'CourseRegistrations.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                            ->where(['PublishedCourses.course_id IN' => $thesisCourse])
+                            ->select(['PublishedCourses.id'])
+                    ])
+                    ->contain(['PublishedCourses.Courses'])
+                    ->order(['CourseRegistrations.academic_year' => 'DESC', 'CourseRegistrations.semester' => 'DESC', 'CourseRegistrations.id' => 'DESC'])
+                    ->first();
+
+                if (empty($registration)) {
+                    $thesisFromAdd = $this->CourseAdds->find()
+                        ->where([
+                            'CourseAdds.student_id' => $studentId,
+                            'CourseAdds.registrar_confirmation' => 1
+                        ])
+                        ->contain([
+                            'PublishedCourses.Courses' => [
+                                'conditions' => [
+                                    'OR' => [
+                                        'Courses.id IN' => $thesisCourse,
+                                        'Courses.thesis' => 1
+                                    ]
+                                ]
+                            ]
+                        ])
+                        ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+                        ->first();
                 }
             }
         }
 
-        if (isset($fx_grade_list_course_add) && !empty($fx_grade_list_course_add)) {
-            foreach ($fx_grade_list_course_add as $fk => $fv) {
-                $grade = $this->getApprovedGrade($fv['CourseAdd']['id'], 0);
-                $latestGrade['LatestGradeDetail'] = $this->CourseAdd->getCourseAddLatestGradeDetail(
-                    $fv['CourseAdd']['id']
-                );
-                debug($latestGrade);
-                if (isset($latestGrade['LatestGradeDetail']['type']) && $latestGrade['LatestGradeDetail']['type'] == "Change") {
-                    /* $fv['Student']['applied_id'] = ClassRegistry::init('FxResitRequest')->fxresetId($fv['CourseAdd']['id'],0);
-                    $fv['Student']['fxgradesubmitted'] = true;
-                    $fxGrade[] = $fv; */
-                } else {
-                    if (isset($grade) && !empty($grade) && $grade['grade'] == "Fx") {
-                        $fv['Student']['applied_id'] = ClassRegistry::init('FxResitRequest')->fxresetId(
-                            $fv['CourseAdd']['id'],
-                            0
-                        );
-                        $fv['Student']['fxgradesubmitted'] = false;
-                        $fxGrade[] = $fv;
-                    }
+        if (!empty($registration)) {
+            $grade = $this->getApprovedGrade($registration->id, 1);
+            if (!empty($grade) && !empty($thesisCourse)) {
+                $graduationWork = TableRegistry::getTableLocator()->get('GraduationWorks')->find()
+                    ->where([
+                        'GraduationWorks.student_id' => $studentId,
+                        'GraduationWorks.course_id IN' => $thesisCourse
+                    ])
+                    ->select(['id', 'type', 'title'])
+                    ->order(['GraduationWorks.modified' => 'DESC', 'GraduationWorks.id' => 'DESC'])
+                    ->first();
+
+                if (!empty($graduationWork)) {
+                    $graduationWork->title = trim(str_replace('  ', ' ', $graduationWork->title));
+                    return array_merge($grade, ['GraduationWork' => $graduationWork->toArray()]);
+                }
+                return $grade;
+            }
+            return !empty($grade) ? $grade : [];
+        } elseif (!empty($thesisFromAdd)) {
+            $grade = $this->getApprovedGrade($thesisFromAdd->id, 0);
+            if (!empty($grade) && !empty($thesisCourse)) {
+                $graduationWork = TableRegistry::getTableLocator()->get('GraduationWorks')->find()
+                    ->where([
+                        'GraduationWorks.student_id' => $studentId,
+                        'GraduationWorks.course_id IN' => $thesisCourse
+                    ])
+                    ->select(['id', 'type', 'title'])
+                    ->order(['GraduationWorks.modified' => 'DESC', 'GraduationWorks.id' => 'DESC'])
+                    ->first();
+
+                if (!empty($graduationWork)) {
+                    $graduationWork->title = trim(str_replace('  ', ' ', $graduationWork->title));
+                    return array_merge($grade, ['GraduationWork' => $graduationWork->toArray()]);
+                }
+                return $grade;
+            }
+            return !empty($grade) ? $grade : [];
+        }
+
+        return [];
+    }
+
+    public function getApprovedExitExamGrade(int $studentId): array
+    {
+        $curr = $this->CourseRegistrations->Students->find()
+            ->where(['Students.id' => $studentId])
+            ->first();
+
+        $studentCurriculumAttachments = TableRegistry::getTableLocator()->get('CurriculumAttachments')->find('list')
+            ->where(['CurriculumAttachments.student_id' => $studentId])
+            ->group(['CurriculumAttachments.student_id', 'CurriculumAttachments.curriculum_id'])
+            ->select(['CurriculumAttachments.curriculum_id'])
+            ->toArray();
+
+        if (!empty($curr) && !empty($curr->curriculum_id)) {
+            $curriculumsToLook = [$curr->curriculum_id];
+            if (!empty($studentCurriculumAttachments)) {
+                $curriculumsToLook = array_merge($curriculumsToLook, $studentCurriculumAttachments);
+            }
+
+            $exitExamCourse = $this->CourseRegistrations->PublishedCourses->Courses->find('list')
+                ->where(['Courses.exit_exam' => 1, 'Courses.curriculum_id IN' => $curriculumsToLook])
+                ->select(['Courses.id'])
+                ->toArray();
+
+            $courseIdList = implode(', ', $exitExamCourse);
+
+            if (!empty($exitExamCourse)) {
+                $registration = $this->CourseRegistrations->find()
+                    ->where([
+                        'CourseRegistrations.student_id' => $studentId,
+                        'CourseRegistrations.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                            ->where(['PublishedCourses.course_id IN' => $exitExamCourse])
+                            ->select(['PublishedCourses.id'])
+                    ])
+                    ->contain(['PublishedCourses.Courses'])
+                    ->order(['CourseRegistrations.academic_year' => 'DESC', 'CourseRegistrations.semester' => 'DESC', 'CourseRegistrations.id' => 'DESC'])
+                    ->first();
+
+                if (empty($registration)) {
+                    $courseAdd = $this->CourseAdds->find()
+                        ->where([
+                            'CourseAdds.student_id' => $studentId,
+                            'CourseAdds.department_approval' => 1,
+                            'CourseAdds.registrar_confirmation' => 1,
+                            'CourseAdds.published_course_id IN' => $this->CourseRegistrations->PublishedCourses->find()
+                                ->where(['PublishedCourses.course_id IN' => $exitExamCourse])
+                                ->select(['PublishedCourses.id'])
+                        ])
+                        ->contain(['PublishedCourses.Courses'])
+                        ->order(['CourseAdds.academic_year' => 'DESC', 'CourseAdds.semester' => 'DESC', 'CourseAdds.id' => 'DESC'])
+                        ->first();
+                }
+            }
+        }
+
+        if (!empty($registration)) {
+            $grade = $this->getApprovedGrade($registration->id, 1);
+            return array_merge($grade, ['PublishedCourse' => $registration->published_course->toArray()]);
+        } elseif (!empty($courseAdd)) {
+            $grade = $this->getApprovedGrade($courseAdd->id, 0);
+            return array_merge($grade, ['PublishedCourse' => $courseAdd->published_course->toArray()]);
+        }
+
+        return [];
+    }
+
+    public function getListOfFXGradeChangeForStudentChoice(?int $studentId = null, ?string $academicYear = null, ?string $semester = null, ?int $departmentId = null): array
+    {
+        $fxGrade = [];
+
+        if (!empty($studentId)) {
+            $fxGradeListCourseReg = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.student_id' => $studentId,
+                    'CourseRegistrations.id IN' => $this->find()
+                        ->where(['ExamGrades.grade' => 'Fx', 'ExamGrades.registrar_approval' => 1])
+                        ->select(['ExamGrades.course_registration_id'])
+                ])
+                ->contain(['PublishedCourses' => ['Courses', 'CourseInstructorAssignments'], 'Students', 'ExamGrades'])
+                ->toArray();
+
+            $fxGradeListCourseAdd = $this->CourseAdds->find()
+                ->where([
+                    'CourseAdds.student_id' => $studentId,
+                    'CourseAdds.id IN' => $this->find()
+                        ->where(['ExamGrades.grade' => 'Fx', 'ExamGrades.registrar_approval' => 1])
+                        ->select(['ExamGrades.course_add_id'])
+                ])
+                ->contain(['PublishedCourses.Courses', 'Students', 'ExamGrades'])
+                ->toArray();
+        } elseif (!empty($academicYear) && !empty($semester) && !empty($departmentId)) {
+            $fxGradeListCourseReg = $this->CourseRegistrations->find()
+                ->where([
+                    'CourseRegistrations.academic_year' => $academicYear,
+                    'CourseRegistrations.semester' => $semester,
+                    'PublishedCourses.department_id' => $departmentId,
+                    'CourseRegistrations.id IN' => $this->find()
+                        ->where(['ExamGrades.grade' => 'Fx', 'ExamGrades.registrar_approval' => 1])
+                        ->select(['ExamGrades.course_registration_id'])
+                ])
+                ->contain(['PublishedCourses' => ['Courses', 'CourseInstructorAssignments'], 'Students', 'ExamGrades'])
+                ->toArray();
+
+            $fxGradeListCourseAdd = $this->CourseAdds->find()
+                ->where([
+                    'CourseAdds.semester' => $semester,
+                    'PublishedCourses.department_id' => $departmentId,
+                    'CourseAdds.id IN' => $this->find()
+                        ->where(['ExamGrades.grade' => 'Fx', 'ExamGrades.registrar_approval' => 1])
+                        ->select(['ExamGrades.course_add_id'])
+                ])
+                ->contain(['PublishedCourses.Courses', 'Students', 'ExamGrades'])
+                ->toArray();
+        }
+
+        if (!empty($fxGradeListCourseReg)) {
+            foreach ($fxGradeListCourseReg as $fv) {
+                $grade = $this->getApprovedGrade($fv->id, 1);
+                $latestGrade = $this->CourseRegistrations->getCourseRegistrationLatestGradeDetail($fv->id);
+
+                if (!empty($latestGrade['LatestGradeDetail']['type']) && $latestGrade['LatestGradeDetail']['type'] === 'Change') {
+                    continue;
+                } elseif (!empty($grade) && in_array($grade['grade'], ['FX', 'Fx'])) {
+                    $fv->student->applied_id = TableRegistry::getTableLocator()->get('FxResitRequests')->fxresetId($fv->id, 1);
+                    $fv->student->fxgradesubmitted = false;
+                    $fxGrade[] = $fv;
+                }
+            }
+        }
+
+        if (!empty($fxGradeListCourseAdd)) {
+            foreach ($fxGradeListCourseAdd as $fv) {
+                $grade = $this->getApprovedGrade($fv->id, 0);
+                $latestGrade = $this->CourseAdds->getCourseAddLatestGradeDetail($fv->id);
+
+                if (!empty($latestGrade['LatestGradeDetail']['type']) && $latestGrade['LatestGradeDetail']['type'] === 'Change') {
+                    continue;
+                } elseif (!empty($grade) && $grade['grade'] === 'Fx') {
+                    $fv->student->applied_id = TableRegistry::getTableLocator()->get('FxResitRequests')->fxresetId($fv->id, 0);
+                    $fv->student->fxgradesubmitted = false;
+                    $fxGrade[] = $fv;
                 }
             }
         }
@@ -7038,223 +5650,165 @@ class ExamGradesTable extends Table
         return $fxGrade;
     }
 
-    //Automatically converted
-    function getListOfNGGrade(
-        $academicyear,
-        $semester,
-        $department_id,
-        $program_id,
-        $program_type_id,
-        $gradeConverted,
-        $type = 0
-    ) {
+    public function getListOfNGGrade(string $academicYear, string $semester, int $departmentId, int $programId, int $programTypeId, ?array $gradeConverted = null, int $type = 0): array
+    {
+        $conditions = [
+            'PublishedCourses.semester' => $semester,
+            'PublishedCourses.academic_year' => $academicYear,
+            'PublishedCourses.program_id' => $programId,
+            'PublishedCourses.program_type_id' => $programTypeId
+        ];
 
         if ($type == 1) {
-            $publishedCourseLists = ClassRegistry::init('PublishedCourse')->find('all', array(
-                'conditions' => array(
-                    'PublishedCourse.semester' => $semester,
-                    'PublishedCourse.academic_year' => $academicyear,
-                    'PublishedCourse.program_id' => $program_id,
-                    'PublishedCourse.program_type_id' => $program_type_id,
-                    'PublishedCourse.college_id' => $department_id
-                ),
-                'contain' => array(
-                    'Course',
-                    'Program',
-                    'ProgramType',
-                    'Department' => array('College'),
-                    'College',
-                    'CourseAdd' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'conditions' => array(
-                                'ExamResult.course_add' => 0
-                            ),
-                            'order' => array('ExamResult.result' => 'ASC'),
-                            'limit' => 1
-                        ),
-                    ),
-                    'CourseRegistration' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'order' => array('ExamResult.result' => 'ASC'),
-                            'limit' => 1
-                        )
-                    ),
-                    'MakeupExam' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'limit' => 1
-                        ),
-                    )
-                )
-            ));
+            $conditions['PublishedCourses.college_id'] = $departmentId;
         } else {
-            $publishedCourseLists = ClassRegistry::init('PublishedCourse')->find('all', array(
-                'conditions' => array(
-                    'PublishedCourse.semester' => $semester,
-                    'PublishedCourse.academic_year' => $academicyear,
-                    'PublishedCourse.program_id' => $program_id,
-                    'PublishedCourse.program_type_id' => $program_type_id,
-                    'PublishedCourse.department_id' => $department_id
-                ),
-                'contain' => array(
-                    'Course',
-                    'Program',
-                    'ProgramType',
-                    'Department' => array('College'),
-                    'CourseAdd' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'conditions' => array(
-                                'ExamResult.course_add' => 0
-                            ),
-                            'order' => array('ExamResult.result' => 'ASC'),
-                            'limit' => 1
-                        ),
-                    ),
-                    'CourseRegistration' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'order' => array('ExamResult.result' => 'ASC'),
-                            'limit' => 1
-                        )
-                    ),
-                    'MakeupExam' => array(
-                        'Student',
-                        'ExamResult' => array(
-                            'limit' => 1
-                        ),
-                    )
-                )
-            ));
+            $conditions['PublishedCourses.department_id'] = $departmentId;
         }
 
-        $autoConvertedGradeLists = array();
+        $publishedCourseLists = TableRegistry::getTableLocator()->get('PublishedCourses')->find()
+            ->where($conditions)
+            ->contain([
+                'Courses',
+                'Programs',
+                'ProgramTypes',
+                'Departments.Colleges',
+                'Colleges',
+                'CourseAdds' => [
+                    'Students',
+                    'ExamResults' => [
+                        'conditions' => ['ExamResults.course_add' => 0],
+                        'order' => ['ExamResults.result' => 'ASC'],
+                        'limit' => 1
+                    ]
+                ],
+                'CourseRegistrations' => [
+                    'Students',
+                    'ExamResults' => [
+                        'order' => ['ExamResults.result' => 'ASC'],
+                        'limit' => 1
+                    ]
+                ],
+                'MakeupExams' => [
+                    'Students',
+                    'ExamResults' => ['limit' => 1]
+                ]
+            ])
+            ->toArray();
 
-        $applicable_grades = array(
-            'I' => 'I',
-            'DO' => 'DO',
-            'W' => 'W',
-            'F' => 'F'
-        );
+        $autoConvertedGradeLists = [];
+        $applicableGrades = ['I', 'DO', 'W', 'F'];
 
         if (!empty($publishedCourseLists)) {
-            foreach ($publishedCourseLists as $pk => $pv) {
-                if (!empty($pv['CourseRegistration'])) {
-                    foreach ($pv['CourseRegistration'] as $crk => $crv) {
-                        if ($crv['Student']['graduated'] == 0) {
-                            $autoChange = $this->find('first', array(
-                                'conditions' => array(
-                                    'ExamGrade.course_registration_id' => $crv['id'],
-                                    'ExamGrade.grade' => 'NG',
-                                ),
-                                'contain' => array(
-                                    'ExamGradeChange' => array(
-                                        'conditions' => array(
-                                            'ExamGradeChange.grade' => (!empty($gradeConverted) ? $gradeConverted : $applicable_grades),
-                                            'OR' => array(
-                                                'ExamGradeChange.manual_ng_conversion' => 1,
-                                                'ExamGradeChange.auto_ng_conversion' => 1,
-                                            )
-                                        ),
-                                        'order' => array('ExamGradeChange.id' => 'DESC')
-                                    )
-                                )
-                            ));
+            foreach ($publishedCourseLists as $pv) {
+                if (!empty($pv->course_registrations)) {
+                    foreach ($pv->course_registrations as $crv) {
+                        if ($crv->student->graduated == 0) {
+                            $autoChange = $this->find()
+                                ->where([
+                                    'ExamGrades.course_registration_id' => $crv->id,
+                                    'ExamGrades.grade' => 'NG'
+                                ])
+                                ->contain([
+                                    'ExamGradeChanges' => [
+                                        'conditions' => [
+                                            'ExamGradeChanges.grade IN' => !empty($gradeConverted) ? $gradeConverted : $applicableGrades,
+                                            'OR' => [
+                                                'ExamGradeChanges.manual_ng_conversion' => 1,
+                                                'ExamGradeChanges.auto_ng_conversion' => 1
+                                            ]
+                                        ],
+                                        'order' => ['ExamGradeChanges.id' => 'DESC']
+                                    ]
+                                ])
+                                ->first();
 
-                            if (isset($autoChange['ExamGradeChange']) && !empty($autoChange['ExamGradeChange'])) {
-                                $crv['Student']['haveAssesmentData'] = (isset($crv['ExamResult']) && !empty($crv['ExamResult']) ? true : false);
-                                $crv['Student']['p_crs_id'] = $pv['PublishedCourse']['id'];
+                            if (!empty($autoChange->exam_grade_changes)) {
+                                $crv->student->haveAssesmentData = !empty($crv->exam_results);
+                                $crv->student->p_crs_id = $pv->id;
+                                $autoChange->course = $pv->course;
+                                $autoChange->student = $crv->student;
 
-                                $autoChange['Course'] = $pv['Course'];
-                                $autoChange['Student'] = $crv['Student'];
+                                $key = !empty($pv->department->name)
+                                    ? "{$pv->department->college->name}~{$pv->department->name}~{$pv->program->name}~{$pv->program_type->name}"
+                                    : "{$pv->college->name}~" . ($crv->student->program_id == 1 ? 'Remedial Program' : 'Freshman') . "~{$pv->program->name}~{$pv->program_type->name}";
 
-                                if (isset($pv['Department']['name']) && !empty($pv['Department']['name'])) {
-                                    $autoConvertedGradeLists[$pv['Department']['College']['name'] . '~' . $pv['Department']['name'] . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                } else {
-                                    $autoConvertedGradeLists[$pv/* ['Department'] */
-                                    ['College']['name'] . '~' . ($crv['Student']['program_id'] == PROGRAM_REMEDIAL ? 'Remedial Program' : 'Freshman') . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                }
+                                $autoConvertedGradeLists[$key][] = $autoChange;
                             }
                         }
                     }
                 }
 
+                if (!empty($pv->course_adds)) {
+                    foreach ($pv->course_adds as $cadv) {
+                        if ($cadv->student->graduated == 0) {
+                            $autoChange = $this->find()
+                                ->where([
+                                    'ExamGrades.course_add_id' => $cadv->id,
+                                    'ExamGrades.grade' => 'NG'
+                                ])
+                                ->contain([
+                                    'ExamGradeChanges' => [
+                                        'conditions' => [
+                                            'ExamGradeChanges.grade IN' => !empty($gradeConverted) ? $gradeConverted : $applicableGrades,
+                                            'OR' => [
+                                                'ExamGradeChanges.manual_ng_conversion' => 1,
+                                                'ExamGradeChanges.auto_ng_conversion' => 1
+                                            ]
+                                        ],
+                                        'order' => ['ExamGradeChanges.id' => 'DESC']
+                                    ]
+                                ])
+                                ->first();
 
-                if (!empty($pv['CourseAdd'])) {
-                    foreach ($pv['CourseAdd'] as $cadk => $cadv) {
-                        if ($cadv['Student']['graduated'] == 0) {
-                            $autoChange = $this->find('first', array(
-                                'conditions' => array(
-                                    'ExamGrade.course_add_id' => $cadv['id'],
-                                    'ExamGrade.grade' => 'NG',
-                                ),
-                                'contain' => array(
-                                    'ExamGradeChange' => array(
-                                        'conditions' => array(
-                                            'ExamGradeChange.grade' => (!empty($gradeConverted) ? $gradeConverted : $applicable_grades),
-                                            'OR' => array(
-                                                'ExamGradeChange.manual_ng_conversion' => 1,
-                                                'ExamGradeChange.auto_ng_conversion' => 1,
-                                            )
-                                        ),
-                                        'order' => array('ExamGradeChange.id' => 'DESC')
-                                    )
-                                )
-                            ));
+                            if (!empty($autoChange->exam_grade_changes)) {
+                                $cadv->student->haveAssesmentData = !empty($cadv->exam_results);
+                                $cadv->student->p_crs_id = $pv->id;
+                                $autoChange->course = $pv->course;
+                                $autoChange->student = $cadv->student;
 
-                            if (isset($autoChange['ExamGradeChange']) && !empty($autoChange['ExamGradeChange'])) {
-                                $cadv['Student']['haveAssesmentData'] = (isset($cadv['ExamResult']) && !empty($cadv['ExamResult']) ? true : false);
-                                $cadv['Student']['p_crs_id'] = $pv['PublishedCourse']['id'];
+                                $key = !empty($pv->department->name)
+                                    ? "{$pv->department->college->name}~{$pv->department->name}~{$pv->program->name}~{$pv->program_type->name}"
+                                    : "{$pv->college->name}~Freshman~{$pv->program->name}~{$pv->program_type->name}";
 
-                                $autoChange['Course'] = $pv['Course'];
-                                $autoChange['Student'] = $cadv['Student'];
-
-                                if (isset($pv['Department']['name']) && !empty($pv['Department']['name'])) {
-                                    $autoConvertedGradeLists[$pv['Department']['College']['name'] . '~' . $pv['Department']['name'] . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                } else {
-                                    $autoConvertedGradeLists[$pv['Department']['College']['name'] . '~' . 'Freshman' . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                }
+                                $autoConvertedGradeLists[$key][] = $autoChange;
                             }
                         }
                     }
                 }
 
-                if (!empty($pv['MakeupExam'])) {
-                    foreach ($pv['MakeupExam'] as $mkpk => $mkpv) {
-                        if ($mkpv['Student']['graduated'] == 0) {
-                            $autoChange = $this->find('first', array(
-                                'conditions' => array(
-                                    'ExamGrade.makeup_exam_id' => $mkpv['id'],
-                                    'ExamGrade.grade' => 'NG',
-                                ),
-                                'contain' => array(
-                                    'ExamGradeChange' => array(
-                                        'conditions' => array(
-                                            'ExamGradeChange.grade' => (!empty($gradeConverted) ? $gradeConverted : $applicable_grades),
-                                            'OR' => array(
-                                                'ExamGradeChange.manual_ng_conversion' => 1,
-                                                'ExamGradeChange.auto_ng_conversion' => 1,
-                                            )
-                                        ),
-                                        'order' => array('ExamGradeChange.id' => 'DESC')
-                                    )
-                                )
-                            ));
+                if (!empty($pv->makeup_exams)) {
+                    foreach ($pv->makeup_exams as $mkpv) {
+                        if ($mkpv->student->graduated == 0) {
+                            $autoChange = $this->find()
+                                ->where([
+                                    'ExamGrades.makeup_exam_id' => $mkpv->id,
+                                    'ExamGrades.grade' => 'NG'
+                                ])
+                                ->contain([
+                                    'ExamGradeChanges' => [
+                                        'conditions' => [
+                                            'ExamGradeChanges.grade IN' => !empty($gradeConverted) ? $gradeConverted : $applicableGrades,
+                                            'OR' => [
+                                                'ExamGradeChanges.manual_ng_conversion' => 1,
+                                                'ExamGradeChanges.auto_ng_conversion' => 1
+                                            ]
+                                        ],
+                                        'order' => ['ExamGradeChanges.id' => 'DESC']
+                                    ]
+                                ])
+                                ->first();
 
-                            if (isset($autoChange['ExamGradeChange']) && !empty($autoChange['ExamGradeChange'])) {
-                                $mkpv['Student']['haveAssesmentData'] = (isset($mkpv['ExamResult']) && !empty($mkpv['ExamResult']) ? true : false);
-                                $mkpv['Student']['p_crs_id'] = $pv['PublishedCourse']['id'];
+                            if (!empty($autoChange->exam_grade_changes)) {
+                                $mkpv->student->haveAssesmentData = !empty($mkpv->exam_results);
+                                $mkpv->student->p_crs_id = $pv->id;
+                                $autoChange->course = $pv->course;
+                                $autoChange->student = $mkpv->student;
 
-                                $autoChange['Course'] = $pv['Course'];
-                                $autoChange['Student'] = $mkpv['Student'];
+                                $key = !empty($pv->department->name)
+                                    ? "{$pv->department->college->name}~{$pv->department->name}~{$pv->program->name}~{$pv->program_type->name}"
+                                    : "{$pv->college->name}~Freshman~{$pv->program->name}~{$pv->program_type->name}";
 
-                                if (isset($pv['Department']['name']) && !empty($pv['Department']['name'])) {
-                                    $autoConvertedGradeLists[$pv['Department']['College']['name'] . '~' . $pv['Department']['name'] . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                } else {
-                                    $autoConvertedGradeLists[$pv['Department']['College']['name'] . '~' . 'Freshman' . '~' . $pv['Program']['name'] . '~' . $pv['ProgramType']['name']][] = $autoChange;
-                                }
+                                $autoConvertedGradeLists[$key][] = $autoChange;
                             }
                         }
                     }
@@ -7265,286 +5819,226 @@ class ExamGradesTable extends Table
         return $autoConvertedGradeLists;
     }
 
-    function isGradeSubmittedForPublishedCourse($published_course_ids)
+    public function isGradeSubmittedForPublishedCourse($publishedCourseIds): int
     {
+        $publishedCoursesStudentRegisteredScoreGrade = 0;
 
-        $published_courses_student_registred_score_grade = 0;
+        $gradeSubmittedRegisteredCourses = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.published_course_id' => is_array($publishedCourseIds) ? $publishedCourseIds : [$publishedCourseIds]])
+            ->select(['CourseRegistrations.id'])
+            ->toArray();
 
-        $grade_submitted_registred_courses = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.published_course_id' => $published_course_ids,
-            ),
-            'fields' => array('CourseRegistration.id')
-        ));
-
-        if (!empty($grade_submitted_registred_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_registration_id' => $grade_submitted_registred_courses))
-            );
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+        if (!empty($gradeSubmittedRegisteredCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_registration_id IN' => $gradeSubmittedRegisteredCourses])
+                ->count();
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
         }
 
-        //check course adds
-        $grade_submitted_add_courses = $this->CourseAdd->find('list', array(
-            'conditions' => array(
-                'CourseAdd.published_course_id' => $published_course_ids,
-                'CourseAdd.department_approval = 1',
-                'CourseAdd.registrar_confirmation = 1'
-            ),
-            'fields' => array('CourseAdd.id')
-        ));
+        $gradeSubmittedAddCourses = $this->CourseAdds->find('list')
+            ->where([
+                'CourseAdds.published_course_id' => is_array($publishedCourseIds) ? $publishedCourseIds : [$publishedCourseIds],
+                'CourseAdds.department_approval' => 1,
+                'CourseAdds.registrar_confirmation' => 1
+            ])
+            ->select(['CourseAdds.id'])
+            ->toArray();
 
-        if (!empty($grade_submitted_add_courses)) {
-            $published_courses_student_registred_score_grade = $this->find(
-                'count',
-                array('conditions' => array('ExamGrade.course_add_id' => $grade_submitted_add_courses))
-            );
-            if ($published_courses_student_registred_score_grade > 0) {
-                return $published_courses_student_registred_score_grade;
+        if (!empty($gradeSubmittedAddCourses)) {
+            $publishedCoursesStudentRegisteredScoreGrade = $this->find()
+                ->where(['ExamGrades.course_add_id IN' => $gradeSubmittedAddCourses])
+                ->count();
+            if ($publishedCoursesStudentRegisteredScoreGrade > 0) {
+                return $publishedCoursesStudentRegisteredScoreGrade;
             }
         }
 
-        return $published_courses_student_registred_score_grade;
+        return $publishedCoursesStudentRegisteredScoreGrade;
     }
 
-    function getMasterSheetRemedial($section_id = null, $academic_year = null, $semester = null)
+    public function getMasterSheetRemedial(?int $sectionId = null, ?string $academicYear = null, ?string $semester = null): array
     {
+        $studentsAndGrades = [];
+        $registeredCourses = [];
 
-        $students_and_grades = array();
+        $studentsInSection = $this->CourseRegistrations->Students->Sections->StudentsSections->find()
+            ->where(['StudentsSections.section_id' => $sectionId])
+            ->group(['StudentsSections.student_id', 'StudentsSections.section_id'])
+            ->toArray();
 
-        $students_in_section = $this->CourseRegistration->Student->Section->StudentsSection->find('all', array(
-            'conditions' => array(
-                'StudentsSection.section_id' => $section_id
-            ),
-            'group' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.section_id'
-            ),
-            'recursive' => -1,
-        ));
+        $studentsInSectionIds = $this->CourseRegistrations->Students->Sections->StudentsSections->find('list')
+            ->where(['StudentsSections.section_id' => $sectionId])
+            ->group(['StudentsSections.student_id', 'StudentsSections.section_id'])
+            ->select(['StudentsSections.student_id'])
+            ->toArray();
 
-        $students_in_section_ids = $this->CourseRegistration->Student->Section->StudentsSection->find('list', array(
-            'conditions' => array(
-                'StudentsSection.section_id' => $section_id
-            ),
-            'group' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.section_id'
-            ),
-            'fields' => array(
-                'StudentsSection.student_id',
-                'StudentsSection.student_id'
-            ),
-            'recursive' => -1,
-        ));
+        $studentRegisteredCourseForSection = $this->CourseRegistrations->find('list')
+            ->where(['CourseRegistrations.section_id' => $sectionId])
+            ->select(['CourseRegistrations.student_id', 'CourseRegistrations.section_id'])
+            ->toArray();
 
-        $studentRegisteredCourseForSection = $this->CourseRegistration->find('list', array(
-            'conditions' => array(
-                'CourseRegistration.section_id' => $section_id
-            ),
-            'fields' => array(
-                'CourseRegistration.student_id',
-                'CourseRegistration.section_id'
-            ),
-            'recursive' => -1,
-        ));
-
-        $count = count($students_in_section);
+        $count = count($studentsInSection);
 
         if (!empty($studentRegisteredCourseForSection)) {
             foreach ($studentRegisteredCourseForSection as $stuId => $sectId) {
-                if (!in_array($stuId, $students_in_section_ids) && $sectId == $section_id) {
-                    $students_in_section[$count]['StudentsSection']['student_id'] = $stuId;
-                    $students_in_section[$count]['StudentsSection']['section_id'] = $sectId;
+                if (!in_array($stuId, $studentsInSectionIds) && $sectId == $sectionId) {
+                    $studentsInSection[$count] = [
+                        'StudentsSection' => [
+                            'student_id' => $stuId,
+                            'section_id' => $sectId
+                        ]
+                    ];
                     $count++;
                 }
             }
         }
 
-        /* Get each student pattern, AY & Semester and list of courses s/he registered and add within the returned AY and semester */
-        $registered_courses = array();
-        $added_courses = array();
+        if (!empty($studentsInSection)) {
+            foreach ($studentsInSection as $sectionStudent) {
+                $studentDetail = $this->CourseAdds->Students->find()
+                    ->where(['Students.id' => $sectionStudent['StudentsSection']['student_id']])
+                    ->first();
 
-        if (!empty($students_in_section)) {
-            foreach ($students_in_section as $key => $section_student) {
-                $student_detail = $this->CourseAdd->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $section_student['StudentsSection']['student_id']
-                    ),
-                    'recursive' => -1
-                ));
-
-                $program_type_id = $this->CourseAdd->Student->ProgramTypeTransfer->getStudentProgramType(
-                    $student_detail['Student']['id'],
-                    $academic_year,
+                $programTypeId = $this->CourseAdds->Students->ProgramTypeTransfers->getStudentProgramType(
+                    $studentDetail->id,
+                    $academicYear,
                     $semester
                 );
-
-                $program_type_id = $this->CourseAdd->Student->ProgramType->getParentProgramType($program_type_id);
-                $pattern = $this->CourseAdd->Student->ProgramType->StudentStatusPattern->getProgramTypePattern(
-                    $student_detail['Student']['program_id'],
-                    $program_type_id,
-                    $academic_year
+                $programTypeId = $this->CourseAdds->Students->ProgramTypes->getParentProgramType($programTypeId);
+                $pattern = $this->CourseAdds->Students->ProgramTypes->StudentStatusPatterns->getProgramTypePattern(
+                    $studentDetail->program_id,
+                    $programTypeId,
+                    $academicYear
                 );
 
-                //Retrieving AY and Semester list based on pattern for status
-                $ay_and_s_list = array();
+                $ayAndSList = [];
 
                 if ($pattern <= 1) {
-                    $ay_and_s_list[0]['academic_year'] = $academic_year;
-                    $ay_and_s_list[0]['semester'] = $semester;
+                    $ayAndSList[] = ['academic_year' => $academicYear, 'semester' => $semester];
                 } else {
-                    $status_prepared = $this->CourseAdd->Student->StudentExamStatus->find('count', array(
-                        'conditions' => array(
-                            'StudentExamStatus.student_id' => $student_detail['Student']['id'],
-                            'StudentExamStatus.academic_year' => $academic_year,
-                            'StudentExamStatus.semester' => $semester
-                        ),
-                        //'order' => array('StudentExamStatus.created' => 'DESC'),
-                        'order' => array(
-                            'StudentExamStatus.academic_year' => 'DESC',
-                            'StudentExamStatus.semester' => 'DESC',
-                            'StudentExamStatus.created' => 'DESC'
-                        ),
-                        'recursive' => -1,
-                    ));
+                    $statusPrepared = $this->CourseAdds->Students->StudentExamStatuses->find()
+                        ->where([
+                            'StudentExamStatuses.student_id' => $studentDetail->id,
+                            'StudentExamStatuses.academic_year' => $academicYear,
+                            'StudentExamStatuses.semester' => $semester
+                        ])
+                        ->count();
 
-                    if ($status_prepared == 0) {
-                        $ay_and_s_list_draft = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToGenerateStatus(
-                            $student_detail['Student']['id'],
-                            $academic_year,
+                    if ($statusPrepared == 0) {
+                        $ayAndSListDraft = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToGenerateStatus(
+                            $studentDetail->id,
+                            $academicYear,
                             $semester
                         );
-                        //If there are lots of semester without status generation. It is to avoid including other semester/s in the current pattern
-                        if (count($ay_and_s_list_draft) > $pattern) {
-                            for ($i = 0; $i < $pattern; $i++) {
-                                $ay_and_s_list[$i] = $ay_and_s_list_draft[$i];
-                            }
+                        if (count($ayAndSListDraft) > $pattern) {
+                            $ayAndSList = array_slice($ayAndSListDraft, 0, $pattern);
                         } else {
-                            $ay_and_s_list = $ay_and_s_list_draft;
+                            $ayAndSList = $ayAndSListDraft;
                         }
                     } else {
-                        $ay_and_s_list = $this->CourseAdd->Student->StudentExamStatus->getAcadamicYearAndSemesterListToUpdateStatus(
-                            $student_detail['Student']['id'],
-                            $academic_year,
+                        $ayAndSList = $this->CourseAdds->Students->StudentExamStatuses->getAcademicYearAndSemesterListToUpdateStatus(
+                            $studentDetail->id,
+                            $academicYear,
                             $semester
                         );
                     }
                 }
 
-                //Get list of courses a student registered within the pattern AY and semester list
-                $options = array();
+                $options = [
+                    'conditions' => ['CourseRegistrations.student_id' => $studentDetail->id],
+                    'contain' => [
+                        'PublishedCourses' => [
+                            'Courses',
+                            'ExamTypes' => ['order' => ['ExamTypes.order' => 'ASC']]
+                        ]
+                    ]
+                ];
 
-                if (!empty($ay_and_s_list)) {
-                    foreach ($ay_and_s_list as $key => $ay_s) {
-                        $options['conditions']['OR'][] = array(
-                            'CourseRegistration.academic_year' => $ay_s['academic_year'],
-                            'CourseRegistration.semester' => $ay_s['semester'],
-                        );
+                if (!empty($ayAndSList)) {
+                    foreach ($ayAndSList as $ayS) {
+                        $options['conditions']['OR'][] = [
+                            'CourseRegistrations.academic_year' => $ayS['academic_year'],
+                            'CourseRegistrations.semester' => $ayS['semester']
+                        ];
                     }
                 }
 
-                $options['conditions']['CourseRegistration.student_id'] = $student_detail['Student']['id'];
+                $studentCourseRegistrations = $this->CourseRegistrations->find('all', $options)->toArray();
 
-                $options['contain'] = array(
-                    'PublishedCourse' => array(
-                        'Course',
-                        'ExamType' => array('order' => 'ExamType.order')
-                    )
-                );
-
-                $student_course_registrations = $this->CourseRegistration->find('all', $options);
-
-                //List courses the section registered for
-                if (!empty($student_course_registrations)) {
-                    foreach ($student_course_registrations as $key => $student_course_registration) {
-                        if ($student_course_registration['PublishedCourse']['drop'] == 0) {
-                            //Avoiding repeated data
-                            foreach ($registered_courses as $key2 => $registered_course) {
-                                if ($registered_course['id'] == $student_course_registration['PublishedCourse']['Course']['id']) {
+                if (!empty($studentCourseRegistrations)) {
+                    foreach ($studentCourseRegistrations as $studentCourseRegistration) {
+                        if ($studentCourseRegistration->published_course->drop == 0) {
+                            foreach ($registeredCourses as $registeredCourse) {
+                                if ($registeredCourse['id'] == $studentCourseRegistration->published_course->course->id) {
                                     continue 2;
                                 }
                             }
 
-                            $r_index = count($registered_courses);
-
-                            $registered_courses[$r_index]['id'] = $student_course_registration['PublishedCourse']['Course']['id'];
-                            $registered_courses[$r_index]['course_title'] = $student_course_registration['PublishedCourse']['Course']['course_title'];
-                            $registered_courses[$r_index]['course_id'] = $student_course_registration['PublishedCourse']['Course']['id'];
-                            $registered_courses[$r_index]['course_code'] = $student_course_registration['PublishedCourse']['Course']['course_code'];
-                            $registered_courses[$r_index]['credit'] = $student_course_registration['PublishedCourse']['Course']['credit'];
-                            $registered_courses[$r_index]['published_course_id'] = $student_course_registration['CourseRegistration']['published_course_id'];
-                            $registered_courses[$r_index]['exam_type'] = $student_course_registration['PublishedCourse']['ExamType'];
+                            $rIndex = count($registeredCourses);
+                            $registeredCourses[$rIndex] = [
+                                'id' => $studentCourseRegistration->published_course->course->id,
+                                'course_title' => $studentCourseRegistration->published_course->course->course_title,
+                                'course_id' => $studentCourseRegistration->published_course->course->id,
+                                'course_code' => $studentCourseRegistration->published_course->course->course_code,
+                                'credit' => $studentCourseRegistration->published_course->course->credit,
+                                'published_course_id' => $studentCourseRegistration->published_course_id,
+                                'exam_type' => $studentCourseRegistration->published_course->exam_types
+                            ];
                         }
                     }
                 }
-                //List courses the section added for
             }
         }
 
-        //Compiling each registered course grade
-        if (!empty($students_in_section)) {
-            foreach ($students_in_section as $key => $value) {
-                $index = count($students_and_grades);
+        if (!empty($studentsInSection)) {
+            foreach ($studentsInSection as $value) {
+                $index = count($studentsAndGrades);
 
-                $student_detail = $this->CourseRegistration->Student->find('first', array(
-                    'conditions' => array(
-                        'Student.id' => $value['StudentsSection']['student_id']
-                    ),
-                    'recursive' => -1
-                ));
+                $studentDetail = $this->CourseRegistrations->Students->find()
+                    ->where(['Students.id' => $value['StudentsSection']['student_id']])
+                    ->first();
 
-                $students_and_grades[$index]['student_id'] = $value['StudentsSection']['student_id'];
-                $students_and_grades[$index]['full_name'] = $student_detail['Student']['first_name'] . ' ' . $student_detail['Student']['middle_name'] . ' ' . $student_detail['Student']['last_name'];
-                $students_and_grades[$index]['studentnumber'] = $student_detail['Student']['studentnumber'];
-                $students_and_grades[$index]['gender'] = $student_detail['Student']['gender'];
+                $studentsAndGrades[$index] = [
+                    'student_id' => $value['StudentsSection']['student_id'],
+                    'full_name' => $studentDetail->first_name . ' ' . $studentDetail->middle_name . ' ' . $studentDetail->last_name,
+                    'studentnumber' => $studentDetail->studentnumber,
+                    'gender' => $studentDetail->gender
+                ];
 
-                //Exam grade for each course a student registered
-                if (!empty($registered_courses)) {
-                    foreach ($registered_courses as $key2 => $registered_course) {
-                        $registration_id = $this->CourseRegistration->field('id', array(
-                            'CourseRegistration.published_course_id' => $registered_course['published_course_id'],
-                            'CourseRegistration.student_id' => $value['StudentsSection']['student_id'],
-                        ));
+                if (!empty($registeredCourses)) {
+                    foreach ($registeredCourses as $registeredCourse) {
+                        $registrationId = $this->CourseRegistrations->find()
+                            ->where([
+                                'CourseRegistrations.published_course_id' => $registeredCourse['published_course_id'],
+                                'CourseRegistrations.student_id' => $value['StudentsSection']['student_id']
+                            ])
+                            ->select(['CourseRegistrations.id'])
+                            ->first();
 
-                        if (!empty($registration_id)) {
-                            //debug($this->getApprovedGrade($registration_id, 1));
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']] = $this->getApprovedGrade(
-                                $registration_id,
-                                1
-                            );
-                            //$students_and_grades[$index]['courses']['r-' . $registered_course['id']]['Assesment'] = $this->getExamTypeTranspose($registration_id, $registered_course['published_course_id'], 1);
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['Assesment'] = ClassRegistry::init(
-                                'ExamType'
-                            )->getAssessementDetailTypeRemedialMasterSheet($registration_id, 1);
-
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['registration_id'] = $registration_id;
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['published_c_id'] = $registered_course['published_course_id'];
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['credit'] = $registered_course['credit'];
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['registered'] = true;
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['droped'] = $this->CourseRegistration->isCourseDroped(
-                                $registration_id
-                            );
+                        if (!empty($registrationId)) {
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']] = $this->getApprovedGrade($registrationId->id, 1);
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['Assesment'] = TableRegistry::getTableLocator()->get('ExamTypes')->getAssessementDetailTypeRemedialMasterSheet($registrationId->id, 1);
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['registration_id'] = $registrationId->id;
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['published_c_id'] = $registeredCourse['published_course_id'];
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['credit'] = $registeredCourse['credit'];
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['registered'] = true;
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']]['droped'] = $this->CourseRegistrations->isCourseDropped($registrationId->id);
                         } else {
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']] = array();
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['Assesment'] = array();
-                            $students_and_grades[$index]['courses']['r-' . $registered_course['id']]['registered'] = false;
+                            $studentsAndGrades[$index]['courses']['r-' . $registeredCourse['id']] = [
+                                'Assesment' => [],
+                                'registered' => false
+                            ];
                         }
                     }
                 }
             }
         }
 
-        $master_sheet = array();
-        $master_sheet['registered_courses'] = $registered_courses;
-        //$master_sheet['added_courses'] = $added_courses;
-        $master_sheet['students_and_grades'] = $students_and_grades;
-
-        //debug($master_sheet);
-
-        return $master_sheet;
+        return [
+            'registered_courses' => $registeredCourses,
+            'students_and_grades' => $studentsAndGrades
+        ];
     }
 }

@@ -1,1127 +1,852 @@
 <?php
-
 namespace App\Controller;
+
 
 use App\Controller\AppController;
 
-use Cake\Event\Event;
+use Cake\Event\EventInterface;
+use Cake\I18n\Time;
 use Cake\ORM\TableRegistry;
-use Cake\Core\Configure;
+use App\Controller\Component\AcademicYearComponent;
 
 class ExamGradeChangesController extends AppController
 {
+    /**
+     * @var AcademicYearComponent
+     */
+    protected $AcademicYear;
 
-    public $name = 'ExamGradeChanges';
-
-
-    public $menuOptions = array(
+    protected $menuOptions = [
         'parent' => 'examGrades',
         'controllerButton' => false,
-        'exclude' => array('*'), //array('index'),
-        'alias' => array(
-            'manage_department_grade_change' => 'Approve Grade Change',
-            'manage_college_grade_change' => 'Manage Grade Change',
-            'manage_registrar_grade_change' => 'Manage Grade Change',
-            'department_makeup_exam_result' => 'Supplementary Exam',
-            'freshman_makeup_exam_result' => 'Freshman Supplementary Exam',
-            'manage_freshman_grade_change' => 'Manage Freshman Grade Change',
-            'cancel_auto_grade_change' => 'Cancel Auto Grade Change'
-        )
-    );
+        'exclude' => ['*'],
+        'alias' => [
+            'manageDepartmentGradeChange' => 'Approve Grade Change',
+            'manageCollegeGradeChange' => 'Manage Grade Change',
+            'manageRegistrarGradeChange' => 'Manage Grade Change',
+            'departmentMakeupExamResult' => 'Supplementary Exam',
+            'freshmanMakeupExamResult' => 'Freshman Supplementary Exam',
+            'manageFreshmanGradeChange' => 'Manage Freshman Grade Change',
+            'cancelAutoGradeChange' => 'Cancel Auto Grade Change'
+        ]
+    ];
 
-    public $paginate = [];
-
-    public function initialize()
+    public function initialize(): void
     {
-
         parent::initialize();
-        $this->loadComponent('AcademicYear');
         $this->loadComponent('Paginator'); // Ensure Paginator is loaded
-
+        $this->AcademicYear = $this->loadComponent('AcademicYear');
     }
 
-    public function beforeFilter(Event $event)
+    public function beforeFilter(EventInterface $event)
     {
-
         parent::beforeFilter($event);
+        // No Auth->allow needed as per original commented-out code
     }
 
-    public function beforeRender(Event $event)
+    public function beforeRender(EventInterface $event)
     {
-
         parent::beforeRender($event);
 
-        $defaultacademicyear = $this->AcademicYear->currentAcademicYear();
+        $defaultAcademicYear = $this->AcademicYear->currentAcademicYear();
+        $currAcYearExploded = explode('/', $defaultAcademicYear);
+        $previousAcademicYear = $defaultAcademicYear;
 
-        $curr_ac_year_expoded = explode('/', $defaultacademicyear);
-
-        $previous_academicyear = $defaultacademicyear;
-
-        if (!empty($curr_ac_year_expoded)) {
-            $previous_academicyear = ($curr_ac_year_expoded[0] - 1) . '/' . ($curr_ac_year_expoded[1] - 1);
+        if (!empty($currAcYearExploded)) {
+            $previousAcademicYear = ($currAcYearExploded[0] - 1) . '/' . ($currAcYearExploded[1] - 1);
         }
 
-        //debug($previous_academicyear);
+        // debug($previousAcademicYear);
 
-        $acyear_array_data = $this->AcademicYear->academicYearInArray(
+        $acYearArrayData = $this->AcademicYear->academicYearInArray(
             APPLICATION_START_YEAR,
-            (explode('/', $defaultacademicyear)[0])
-        );
-        //debug($acyear_array_data);
-
-        //$this->set('defaultacademicyear', $defaultacademicyear);
-
-
-        $programs = ClassRegistry::init('Program')->find('list', array('conditions' => array('Program.active' => 1)));
-        $program_types = $programTypes = ClassRegistry::init('ProgramType')->find(
-            'list',
-            array('conditions' => array('ProgramType.active' => 1))
+            (int)explode('/', $defaultAcademicYear)[0]
         );
 
-        $depts_for_year_level = ClassRegistry::init('Department')->find(
-            'list',
-            array('conditions' => array('Department.active' => 1))
-        );
+        $programsTable = TableRegistry::getTableLocator()->get('Programs');
+        $programTypesTable = TableRegistry::getTableLocator()->get('ProgramTypes');
+        $departmentsTable = TableRegistry::getTableLocator()->get('Departments');
+        $yearLevelsTable = TableRegistry::getTableLocator()->get('YearLevels');
 
-        //$yearLevels = $this->year_levels;
-        $yearLevels = ClassRegistry::init('YearLevel')->distinct_year_level_based_on_role(
+        $programs = $programsTable->find('list', [
+            'conditions' => ['Programs.active' => 1],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
+
+        $programTypes = $programTypesTable->find('list', [
+            'conditions' => ['ProgramTypes.active' => 1],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
+
+        $deptsForYearLevel = $departmentsTable->find('list', [
+            'conditions' => ['Departments.active' => 1],
+            'keyField' => 'id',
+            'valueField' => 'name'
+        ])->toArray();
+
+        $yearLevels = $yearLevelsTable->distinctYearLevelBasedOnRole(
             null,
             null,
-            array_keys($depts_for_year_level),
+            array_keys($deptsForYearLevel),
             array_keys($programs)
         );
-        //debug($yearLevels);
 
-        if ($this->role_id == ROLE_DEPARTMENT) {
-            //$yearLevels = ClassRegistry::init('YearLevel')->find('list', array('conditions' => array('YearLevel.department_id' => $this->department_id, 'YearLevel.name' => $yearLevels)));
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        $departmentId = $this->request->getSession()->read('Auth.User.department_id');
+        $programIds = $this->request->getSession()->read('Auth.User.program_ids');
+        $programTypeIds = $this->request->getSession()->read('Auth.User.program_type_ids');
+        $isAdmin = $this->request->getSession()->read('Auth.User.is_admin');
+
+        if ($roleId == ROLE_DEPARTMENT) {
+            // Year levels already filtered by distinctYearLevelBasedOnRole
         }
 
-        if (($this->role_id == ROLE_REGISTRAR || $this->role_id == ROLE_COLLEGE) && $this->Session->read(
-                'Auth.User'
-            )['is_admin'] == 0) {
-            $programs = ClassRegistry::init('Program')->find(
-                'list',
-                array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-            );
-            $program_types = $programTypes = ClassRegistry::init('ProgramType')->find(
-                'list',
-                array('conditions' => array('ProgramType.id' => $this->program_type_ids, 'ProgramType.active' => 1))
-            );
+        if (($roleId == ROLE_REGISTRAR || $roleId == ROLE_COLLEGE) && $isAdmin == 0) {
+            $programs = $programsTable->find('list', [
+                'conditions' => ['Programs.id IN' => $programIds, 'Programs.active' => 1],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
+
+            $programTypes = $programTypesTable->find('list', [
+                'conditions' => ['ProgramTypes.id IN' => $programTypeIds, 'ProgramTypes.active' => 1],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
         }
 
-        //$academicYearRange = new AcademicYearComponent(new ComponentCollection);
-        $academicYearRange = new $this->AcademicYear(new ComponentCollection());
-        $years_to_look_list_for_display = $academicYearRange->academicYearInArray(
-            ((explode('/', $defaultacademicyear)[0]) - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL),
-            (explode('/', $defaultacademicyear)[0])
+        $yearsToLookListForDisplay = $this->AcademicYear->academicYearInArray(
+            ((int)explode('/', $defaultAcademicYear)[0]) - ACY_BACK_FOR_GRADE_CHANGE_APPROVAL,
+            (int)explode('/', $defaultAcademicYear)[0]
         );
 
-        if (count($years_to_look_list_for_display) >= 2) {
-            // $years_to_look_list_for_display = array_values($years_to_look_list_for_display);
-            // $endYear = $years_to_look_list_for_display[0];
-            // $startYear = end($years_to_look_list_for_display);
-            $startYr = array_pop($years_to_look_list_for_display);
-            $endYr = reset($years_to_look_list_for_display);
-            $years_to_look_list_for_display = 'from ' . $startYr . ' up to ' . $endYr;
+        if (count($yearsToLookListForDisplay) >= 2) {
+            $startYr = array_pop($yearsToLookListForDisplay);
+            $endYr = reset($yearsToLookListForDisplay);
+            $yearsToLookListForDisplay = 'from ' . $startYr . ' up to ' . $endYr;
+        } elseif (count($yearsToLookListForDisplay) == 1) {
+            $yearsToLookListForDisplay = ' on ' . $defaultAcademicYear;
         } else {
-            if (count($years_to_look_list_for_display) == 1) {
-                $years_to_look_list_for_display = ' on ' . $defaultacademicyear;
-            } else {
-                $years_to_look_list_for_display = '';
-            }
+            $yearsToLookListForDisplay = '';
         }
 
-        debug($years_to_look_list_for_display);
+        // debug($yearsToLookListForDisplay);
 
-        //debug($yearLevels);
+        $this->set(compact(
+            'acYearArrayData',
+            'programTypes',
+            'defaultAcademicYear',
+            'previousAcademicYear',
+            'programs',
+            'yearLevels',
+            'yearsToLookListForDisplay'
+        ));
 
-        $this->set(
-            compact(
-                'acyear_array_data',
-                'program_types',
-                'defaultacademicyear',
-                'previous_academicyear',
-                'programTypes',
-                'programs',
-                'yearLevels',
-                'years_to_look_list_for_display'
-            )
-        );
-
-        unset($this->request->data['User']['password']);
+        if (isset($this->request->getData()['User']['password'])) {
+            $requestData = $this->request->getData();
+            unset($requestData['User']['password']);
+            $this->request = $this->request->withData($requestData);
+        }
     }
 
     public function index()
     {
-
-        if ($this->Acl->check($this->Auth->user(), 'controllers/examGrades/freshman_grade_view')) {
-            return $this->redirect(array('controller' => 'exam_grades', 'action' => 'freshman_grade_view'));
-        } else {
-            return $this->redirect(array('controller' => 'exam_grades', 'action' => 'department_grade_view'));
+        if ($this->Acl->check($this->Auth->user(), 'controllers/ExamGrades/freshman_grade_view')) {
+            return $this->redirect(['controller' => 'ExamGrades', 'action' => 'freshman_grade_view']);
         }
+        return $this->redirect(['controller' => 'ExamGrades', 'action' => 'department_grade_view']);
     }
 
-    //College Freshman
     public function manageFreshmanGradeChange()
     {
-
-        $this->__manageGradeChange(0);
+        $this->manageGradeChange(0);
         $this->render('manage_department_grade_change');
     }
 
-    //DEPARTMENT
     public function manageDepartmentGradeChange()
     {
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                'Auth.User'
-            )['role_id'] == ROLE_COLLEGE) {
-            $this->__manageGradeChange(1);
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE) {
+            $this->manageGradeChange(1);
             $this->render('manage_department_grade_change');
         } else {
-            $this->Flash->error(
-                'You need to have department role to access exam grade change management area. Please contact your system administrator to get department role.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('You need to have department role to access exam grade change management area. Please contact your system administrator to get department role.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
-    //DEPARTMENT and COLLEGE freshman grade change (common)
-    private function __manageGradeChange($department = 1)
+    protected function manageGradeChange($department = 1)
     {
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE) {
+            $departmentId = $this->department_id;
+            $collegeId = $this->college_id;
+            $departmentIds = $this->department_ids ?: [$departmentId];
 
-        $departmentIDs = array();
+            $colOrDptId = $department ? $departmentId : $collegeId;
 
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                'Auth.User'
-            )['role_id'] == ROLE_COLLEGE) {
-            if ($department) {
-                $col_or_dpt_id = $this->department_id;
-                $departmentIDs[] = $this->department_id;
-            } else {
-                $col_or_dpt_id = $this->college_id;
-                $departmentIDs = $this->department_ids;
-            }
+            $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+            $requestData = $this->request->getData();
+            if (!empty($requestData) && !isset($requestData['ApproveAllGradeChangeByDepartment'])) {
+                if (isset($requestData['ExamGradeChange']['grade_change_count']) && $requestData['ExamGradeChange']['grade_change_count'] != 0) {
+                    $approvalsCount = 0;
+                    $rejectionsCount = 0;
+                    $rejectedRejections = 0;
+                    $acceptedRejections = 0;
 
+                    for ($i = 1; $i <= $requestData['ExamGradeChange']['grade_change_count']; $i++) {
+                        if (isset($requestData['approveGradeChangeByDepartment_' . $i])) {
+                            $examGradeChangeDetail = $examGradeChangesTable->find()
+                                ->where(['ExamGradeChanges.id' => $requestData['ExamGradeChange'][$i]['id']])
+                                ->contain([
+                                    'ExamGrades' => [
+                                        'CourseRegistrations' => ['PublishedCourses'],
+                                        'CourseAdds' => ['PublishedCourses']
+                                    ]
+                                ])
+                                ->first();
 
-            debug($departmentIDs);
-            debug($col_or_dpt_id);
-
-            $exam_grade_changes = $this->ExamGradeChange->getListOfGradeChangeForDepartmentApproval(
-                $col_or_dpt_id,
-                $department,
-                $departmentIDs
-            );
-
-            //getListOfGradeChangeForCollegeApproval
-            //debug($exam_grade_changes);
-
-            $makeup_exam_grade_changes = $this->ExamGradeChange->getListOfMakeupGradeChangeForDepartmentApproval(
-                $col_or_dpt_id,
-                0,
-                $department,
-                $departmentIDs
-            );
-            $rejected_makeup_exam_grade_changes = $this->ExamGradeChange->getListOfMakeupGradeChangeForDepartmentApproval(
-                $col_or_dpt_id,
-                1,
-                $department,
-                $departmentIDs
-            );
-            $rejected_department_makeup_exam_grade_changes = $this->ExamGradeChange->getMakeupGradesAskedByDepartmentRejectedByRegistrar(
-                $col_or_dpt_id,
-                $department,
-                $departmentIDs
-            );
-            //debug($this->request->data);
-
-            if (isset($this->request->data) && !isset($this->request->data['ApproveAllGradeChangeByDepartment'])) {
-                if (isset($this->request->data['ExamGradeChange']['grade_change_count']) && $this->request->data['ExamGradeChange']['grade_change_count'] != 0) {
-                    $approvals_count = 0;
-                    $rejections_count = 0;
-                    $rejected_rejections = 0;
-                    $accepted_rejections = 0;
-
-                    for ($i = 1; $i <= $this->request->data['ExamGradeChange']['grade_change_count']; $i++) {
-                        if (isset($this->request->data['approveGradeChangeByDepartment_' . $i])) {
-                            $exam_grade_change_detail = $this->ExamGradeChange->find('first', array(
-                                'conditions' => array('ExamGradeChange.id' => $this->request->data['ExamGradeChange'][$i]['id']),
-                                'contain' => array(
-                                    'ExamGrade' => array(
-                                        'CourseRegistration' => array('PublishedCourse'),
-                                        'CourseAdd' => array('PublishedCourse')
+                            if (empty($examGradeChangeDetail)) {
+                                $this->Flash->error(__('The system unable to find the exam grade change request. It happens when the grade change request is canceled in the middle of approval process. Please try again.'));
+                            } elseif (
+                                (
+                                    !empty($examGradeChangeDetail->exam_grade->course_registration) &&
+                                    $examGradeChangeDetail->exam_grade->course_registration->id != "" &&
+                                    (
+                                        ($department == 1 && $colOrDptId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id) ||
+                                        ($department == 0 && !in_array($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id, $departmentIds))
+                                    )
+                                ) ||
+                                (
+                                    !empty($examGradeChangeDetail->exam_grade->course_add) &&
+                                    $examGradeChangeDetail->exam_grade->course_add->id != "" &&
+                                    (
+                                        ($department == 1 && $colOrDptId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department_id) ||
+                                        ($department == 0 && !in_array($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department_id, $departmentIds))
                                     )
                                 )
-                            ));
-
-                            if (empty($exam_grade_change_detail)) {
-                                $this->Flash->error(
-                                    'The system unable to find the exam grade change request. It happens when the grade change request is canceled in the middle of approval process. Please try again.'
-                                );
+                            ) {
+                                // debug($examGradeChangeDetail);
+                                $this->Flash->error(__('You are not authorized to manage the selected exam grade change request.'));
+                            } elseif ($examGradeChangeDetail->department_approval == 1 && ($examGradeChangeDetail->registrar_approval == 1 || $examGradeChangeDetail->registrar_approval === null)) {
+                                $this->Flash->error(__('The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'));
+                                return $this->redirect(['action' => 'index']);
                             } else {
-                                if ((isset($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "" && (($department == 1 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'])
-                                            //|| ($department == 0 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'])))
-                                            || ($department == 0 && !in_array(
-                                                    $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                                    $departmentIDs
-                                                ))))
-                                    || (isset($exam_grade_change_detail['ExamGrade']['CourseAdd']) && !empty($exam_grade_change_detail['ExamGrade']['CourseAdd']) && $exam_grade_change_detail['ExamGrade']['CourseAdd']['id'] != "" && (($department == 1 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'])
-                                            //|| ($department == 0 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id'])))
-                                            || ($department == 0 && !in_array(
-                                                    $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                                    $departmentIDs
-                                                ))))
-                                ) {
-                                    debug($exam_grade_change_detail);
-                                    debug($department);
-                                    $this->Flash->error(
-                                        'You are not authorized to manage the selected exam grade change request.'
-                                    );
-                                } else {
-                                    if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] == 1 && ($exam_grade_change_detail['ExamGradeChange']['registrar_approval'] == 1 || $exam_grade_change_detail['ExamGradeChange']['registrar_approval'] == null)) {
-                                        $this->Flash->error(
-                                            'The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'
-                                        );
-                                        return $this->redirect(array('action' => 'index'));
-                                    } else {
-                                        $department_grade_change_approval = array();
+                                $departmentGradeChangeApproval = [];
 
-                                        if (is_null(
-                                            $exam_grade_change_detail['ExamGradeChange']['department_approval']
-                                        )) {
-                                            $department_grade_change_approval['id'] = $this->request->data['ExamGradeChange'][$i]['id'];
-                                            $department_grade_change_approval['department_approval'] = (isset($this->request->data['ExamGradeChange'][$i]['department_approval']) ? ($this->request->data['ExamGradeChange'][$i]['department_approval'] == 1 ? 1 : -1) : -1);
-                                            $department_grade_change_approval['department_reason'] = trim(
-                                                $this->request->data['ExamGradeChange'][$i]['department_reason']
-                                            );
-                                            $department_grade_change_approval['department_approval_date'] = date(
-                                                'Y-m-d H:i:s'
-                                            );
-                                            $department_grade_change_approval['department_approved_by'] = $this->Auth->user(
-                                                'id'
-                                            );
+                                if ($examGradeChangeDetail->department_approval === null) {
+                                    $departmentGradeChangeApproval = [
+                                        'id' => $requestData['ExamGradeChange'][$i]['id'],
+                                        'department_approval' => isset($requestData['ExamGradeChange'][$i]['department_approval']) ? ($requestData['ExamGradeChange'][$i]['department_approval'] == 1 ? 1 : -1) : -1,
+                                        'department_reason' => trim($requestData['ExamGradeChange'][$i]['department_reason'] ?? ''),
+                                        'department_approval_date' => date('Y-m-d H:i:s'),
+                                        'department_approved_by' => $this->Auth->user('id')
+                                    ];
 
-                                            if ($department_grade_change_approval['department_approval'] == 1) {
-                                                $approvals_count++;
-                                            } else {
-                                                if ($department_grade_change_approval['department_approval'] == -1) {
-                                                    $rejections_count++;
-                                                }
-                                            }
-                                        } else {
-                                            if (!empty($exam_grade_change_detail['ExamGradeChange']['grade'])) {
-                                                $department_grade_change_approval['exam_grade_id'] = $exam_grade_change_detail['ExamGradeChange']['exam_grade_id'];
-                                                $department_grade_change_approval['grade'] = $exam_grade_change_detail['ExamGradeChange']['grade'];
-                                                $department_grade_change_approval['minute_number'] = (isset($exam_grade_change_detail['ExamGradeChange']['minute_number']) && !empty($exam_grade_change_detail['ExamGradeChange']['minute_number']) ? trim(
-                                                    $exam_grade_change_detail['ExamGradeChange']['minute_number']
-                                                ) : '');
-                                                $department_grade_change_approval['makeup_exam_id'] = (isset($exam_grade_change_detail['ExamGradeChange']['makeup_exam_id']) && !empty($exam_grade_change_detail['ExamGradeChange']['makeup_exam_id']) ? $exam_grade_change_detail['ExamGradeChange']['makeup_exam_id'] : null);
-                                                $department_grade_change_approval['makeup_exam_result'] = (isset($exam_grade_change_detail['ExamGradeChange']['makeup_exam_result']) && (!empty($exam_grade_change_detail['ExamGradeChange']['makeup_exam_result']) || $exam_grade_change_detail['ExamGradeChange']['makeup_exam_result'] == 0) ? $exam_grade_change_detail['ExamGradeChange']['makeup_exam_result'] : null);
-                                                $department_grade_change_approval['initiated_by_department'] = (isset($exam_grade_change_detail['ExamGradeChange']['initiated_by_department']) && !empty($exam_grade_change_detail['ExamGradeChange']['initiated_by_department']) ? $exam_grade_change_detail['ExamGradeChange']['initiated_by_department'] : 0);
-                                                $department_grade_change_approval['result'] = (isset($exam_grade_change_detail['ExamGradeChange']['result']) && !empty($exam_grade_change_detail['ExamGradeChange']['result']) ? $exam_grade_change_detail['ExamGradeChange']['result'] : null);
-                                                $department_grade_change_approval['department_reply'] = 1;
-                                                $department_grade_change_approval['department_approval'] = (isset($this->request->data['ExamGradeChange'][$i]['department_approval']) ? ($this->request->data['ExamGradeChange'][$i]['department_approval'] == 1 ? 1 : -1) : -1);
-                                                $department_grade_change_approval['department_reason'] = (isset($this->request->data['ExamGradeChange'][$i]['department_reason']) && !empty($this->request->data['ExamGradeChange'][$i]['department_reason']) ? trim(
-                                                    $this->request->data['ExamGradeChange'][$i]['department_reason']
-                                                ) : '');
-                                                $department_grade_change_approval['department_approval_date'] = date(
-                                                    'Y-m-d H:i:s'
-                                                );
-                                                $department_grade_change_approval['department_approved_by'] = $this->Auth->user(
-                                                    'id'
-                                                );
-
-                                                if (isset($department_grade_change_approval['department_reason']) && !empty($department_grade_change_approval['department_reason'])) {
-                                                    $department_grade_change_approval['reason'] = $department_grade_change_approval['department_reason'];
-                                                } else {
-                                                    if (isset($exam_grade_change_detail['ExamGradeChange']['reason']) && empty($exam_grade_change_detail['ExamGradeChange']['reason'])) {
-                                                        $department_grade_change_approval['reason'] = $exam_grade_change_detail['ExamGradeChange']['reason'];
-                                                    } else {
-                                                        $department_grade_change_approval['reason'] = '';
-                                                    }
-                                                }
-
-                                                if ($department_grade_change_approval['department_approval'] == 1) {
-                                                    $approvals_count++;
-                                                    $accepted_rejections++;
-                                                } else {
-                                                    if ($department_grade_change_approval['department_approval'] == -1) {
-                                                        $rejections_count++;
-                                                        $rejected_rejections++;
-                                                    }
-                                                }
-
-                                                if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                                                    if (isset($department_grade_change_approval['department_reason']) && !empty($department_grade_change_approval['department_reason'])) {
-                                                        $department_grade_change_approval['college_reason'] = $department_grade_change_approval['department_reason'];
-                                                    } else {
-                                                        if (isset($exam_grade_change_detail['ExamGradeChange']['reason']) && empty($exam_grade_change_detail['ExamGradeChange']['reason'])) {
-                                                            $department_grade_change_approval['reason'] = $exam_grade_change_detail['ExamGradeChange']['reason'];
-                                                            $department_grade_change_approval['college_reason'] = '';
-                                                        } else {
-                                                            $department_grade_change_approval['college_reason'] = '';
-                                                        }
-                                                    }
-
-                                                    $department_grade_change_approval['college_approval'] = $department_grade_change_approval['department_approval'];
-                                                    $department_grade_change_approval['college_approval_date'] = $department_grade_change_approval['department_approval_date'];
-                                                    $department_grade_change_approval['college_approved_by'] = $department_grade_change_approval['department_approved_by'];
-                                                } else {
-                                                    $department_grade_change_approval['college_reason'] = '';
-                                                    $department_grade_change_approval['college_approval'] = null;
-                                                    $department_grade_change_approval['college_approval_date'] = null;
-                                                    $department_grade_change_approval['college_approved_by'] = '';
-                                                }
-
-                                                $department_grade_change_approval['registrar_reason'] = '';
-                                                $department_grade_change_approval['registrar_approval'] = null;
-                                                $department_grade_change_approval['registrar_approval_date'] = null;
-                                                $department_grade_change_approval['registrar_approved_by'] = '';
-                                            }
-                                        }
-
-                                        if (!empty($department_grade_change_approval)) {
-                                            if ($this->ExamGradeChange->save(
-                                                $department_grade_change_approval,
-                                                array('validate' => false)
-                                            )) {
-                                                //Notifications
-                                                ClassRegistry::init(
-                                                    'AutoMessage'
-                                                )->sendNotificationOnDepartmentGradeChangeApproval(
-                                                    $department_grade_change_approval
-                                                );
-                                                //$this->Flash->success('Your exam grade change request approval was successful.');
-                                                if ($rejections_count == 0 && $rejected_rejections == 0) {
-                                                    $this->Flash->success(
-                                                        'Your exam grade change request approval was successful.'
-                                                    );
-                                                } else {
-                                                    if ($rejections_count != 0) {
-                                                        $this->Flash->success(
-                                                            'Your exam grade change request approval/rejection was successful.'
-                                                        );
-                                                    } else {
-                                                        if ($rejected_rejections != 0) {
-                                                            $this->Flash->success(
-                                                                'Your exam grade change request approval/rejecting rejections was successful.'
-                                                            );
-                                                        }
-                                                    }
-                                                }
-                                                return $this->redirect(
-                                                    array('action' => ($department == 1 ? 'manage_department_grade_change' : 'manage_freshman_grade_change'))
-                                                );
-                                            } else {
-                                                $this->Flash->error(
-                                                    'The system is unable to complete your exam grade change request approval. Please try again.'
-                                                );
-                                                return $this->redirect(
-                                                    array('action' => ($department == 1 ? 'manage_department_grade_change' : 'manage_freshman_grade_change'))
-                                                );
-                                            }
-                                        } else {
-                                            $this->Flash->error(
-                                                'The system is unable to complete your exam grade change request approval. Please try again.'
-                                            );
-                                            return $this->redirect(
-                                                array('action' => ($department == 1 ? 'manage_department_grade_change' : 'manage_freshman_grade_change'))
-                                            );
-                                        }
+                                    if ($departmentGradeChangeApproval['department_approval'] == 1) {
+                                        $approvalsCount++;
+                                    } elseif ($departmentGradeChangeApproval['department_approval'] == -1) {
+                                        $rejectionsCount++;
                                     }
+                                } else {
+                                    if (!empty($examGradeChangeDetail->grade)) {
+                                        $departmentGradeChangeApproval = [
+                                            'exam_grade_id' => $examGradeChangeDetail->exam_grade_id,
+                                            'grade' => $examGradeChangeDetail->grade,
+                                            'minute_number' => !empty($examGradeChangeDetail->minute_number) ? trim($examGradeChangeDetail->minute_number) : '',
+                                            'makeup_exam_id' => !empty($examGradeChangeDetail->makeup_exam_id) ? $examGradeChangeDetail->makeup_exam_id : null,
+                                            'makeup_exam_result' => isset($examGradeChangeDetail->makeup_exam_result) ? $examGradeChangeDetail->makeup_exam_result : null,
+                                            'initiated_by_department' => !empty($examGradeChangeDetail->initiated_by_department) ? $examGradeChangeDetail->initiated_by_department : 0,
+                                            'result' => !empty($examGradeChangeDetail->result) ? $examGradeChangeDetail->result : null,
+                                            'department_reply' => 1,
+                                            'department_approval' => isset($requestData['ExamGradeChange'][$i]['department_approval']) ? ($requestData['ExamGradeChange'][$i]['department_approval'] == 1 ? 1 : -1) : -1,
+                                            'department_reason' => !empty($requestData['ExamGradeChange'][$i]['department_reason']) ? trim($requestData['ExamGradeChange'][$i]['department_reason']) : '',
+                                            'department_approval_date' => date('Y-m-d H:i:s'),
+                                            'department_approved_by' => $this->Auth->user('id')
+                                        ];
+
+                                        $departmentGradeChangeApproval['reason'] = !empty($departmentGradeChangeApproval['department_reason']) ? $departmentGradeChangeApproval['department_reason'] :
+                                            (!empty($examGradeChangeDetail->reason) ? $examGradeChangeDetail->reason : '');
+
+                                        if ($departmentGradeChangeApproval['department_approval'] == 1) {
+                                            $approvalsCount++;
+                                            $acceptedRejections++;
+                                        } elseif ($departmentGradeChangeApproval['department_approval'] == -1) {
+                                            $rejectionsCount++;
+                                            $rejectedRejections++;
+                                        }
+
+                                        if ($roleId == ROLE_COLLEGE) {
+                                            $departmentGradeChangeApproval['college_reason'] = !empty($departmentGradeChangeApproval['department_reason']) ? $departmentGradeChangeApproval['department_reason'] :
+                                                (!empty($examGradeChangeDetail->reason) ? $examGradeChangeDetail->reason : '');
+                                            $departmentGradeChangeApproval['college_approval'] = $departmentGradeChangeApproval['department_approval'];
+                                            $departmentGradeChangeApproval['college_approval_date'] = $departmentGradeChangeApproval['department_approval_date'];
+                                            $departmentGradeChangeApproval['college_approved_by'] = $departmentGradeChangeApproval['department_approved_by'];
+                                        } else {
+                                            $departmentGradeChangeApproval['college_reason'] = '';
+                                            $departmentGradeChangeApproval['college_approval'] = null;
+                                            $departmentGradeChangeApproval['college_approval_date'] = null;
+                                            $departmentGradeChangeApproval['college_approved_by'] = '';
+                                        }
+
+                                        $departmentGradeChangeApproval['registrar_reason'] = '';
+                                        $departmentGradeChangeApproval['registrar_approval'] = null;
+                                        $departmentGradeChangeApproval['registrar_approval_date'] = null;
+                                        $departmentGradeChangeApproval['registrar_approved_by'] = '';
+                                    }
+                                }
+
+                                if (!empty($departmentGradeChangeApproval)) {
+                                    $entity = $examGradeChangesTable->newEntity($departmentGradeChangeApproval);
+                                    if ($examGradeChangesTable->save($entity, ['validate' => false])) {
+                                        $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                        $autoMessagesTable->sendNotificationOnDepartmentGradeChangeApproval($departmentGradeChangeApproval);
+                                        if ($rejectionsCount == 0 && $rejectedRejections == 0) {
+                                            $this->Flash->success(__('Your exam grade change request approval was successful.'));
+                                        } elseif ($rejectionsCount != 0) {
+                                            $this->Flash->success(__('Your exam grade change request approval/rejection was successful.'));
+                                        } elseif ($rejectedRejections != 0) {
+                                            $this->Flash->success(__('Your exam grade change request approval/rejecting rejections was successful.'));
+                                        }
+                                        return $this->redirect(['action' => $department == 1 ? 'manageDepartmentGradeChange' : 'manageFreshmanGradeChange']);
+                                    } else {
+                                        $this->Flash->error(__('The system is unable to complete your exam grade change request approval. Please try again.'));
+                                        return $this->redirect(['action' => $department == 1 ? 'manageDepartmentGradeChange' : 'manageFreshmanGradeChange']);
+                                    }
+                                } else {
+                                    $this->Flash->error(__('The system is unable to complete your exam grade change request approval. Please try again.'));
+                                    return $this->redirect(['action' => $department == 1 ? 'manageDepartmentGradeChange' : 'manageFreshmanGradeChange']);
                                 }
                             }
                         }
                     }
-                }
-            } else {
-                if (isset($this->request->data) && isset($this->request->data['ApproveAllGradeChangeByDepartment'])) {
-                    if (isset($this->request->data['Mass']['ExamGradeChange']['select_all'])) {
-                        unset($this->request->data['Mass']['ExamGradeChange']['select_all']);
+                } elseif (isset($requestData['ApproveAllGradeChangeByDepartment'])) {
+                    if (isset($requestData['Mass']['ExamGradeChange']['select_all'])) {
+                        unset($requestData['Mass']['ExamGradeChange']['select_all']);
                     }
 
-                    $sucessfulapproval = 0;
-
-                    if (!empty($this->request->data['Mass']['ExamGradeChange'])) {
-                        foreach ($this->request->data['Mass']['ExamGradeChange'] as $grk => $grv) {
+                    $successfulApproval = 0;
+                    if (!empty($requestData['Mass']['ExamGradeChange'])) {
+                        foreach ($requestData['Mass']['ExamGradeChange'] as $grk => $grv) {
                             if ($grv['gp'] == 1) {
-                                $exam_grade_change_detail = $this->ExamGradeChange->find('first', array(
-                                    'conditions' => array('ExamGradeChange.id' => $grv['id']),
-                                    'contain' => array(
-                                        'ExamGrade' => array(
-                                            'CourseRegistration' => array('PublishedCourse'),
-                                            'CourseAdd' => array('PublishedCourse')
+                                $examGradeChangeDetail = $examGradeChangesTable->find()
+                                    ->where(['ExamGradeChanges.id' => $grv['id']])
+                                    ->contain([
+                                        'ExamGrades' => [
+                                            'CourseRegistrations' => ['PublishedCourses'],
+                                            'CourseAdds' => ['PublishedCourses']
+                                        ]
+                                    ])
+                                    ->first();
+
+                                if (empty($examGradeChangeDetail)) {
+                                    continue;
+                                } elseif (
+                                    (
+                                        !empty($examGradeChangeDetail->exam_grade->course_registration) &&
+                                        $examGradeChangeDetail->exam_grade->course_registration->id != "" &&
+                                        (
+                                            ($department == 1 && $colOrDptId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id) ||
+                                            ($department == 0 && !in_array($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id, $departmentIds))
+                                        )
+                                    ) ||
+                                    (
+                                        !empty($examGradeChangeDetail->exam_grade->course_add) &&
+                                        $examGradeChangeDetail->exam_grade->course_add->id != "" &&
+                                        (
+                                            ($department == 1 && $colOrDptId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department_id) ||
+                                            ($department == 0 && !in_array($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department_id, $departmentIds))
                                         )
                                     )
-                                ));
-
-                                if (empty($exam_grade_change_detail)) {
-                                    //request grade change cancelled
+                                ) {
+                                    continue;
+                                } elseif ($examGradeChangeDetail->department_approval == 1 && ($examGradeChangeDetail->registrar_approval == 1 || $examGradeChangeDetail->registrar_approval === null)) {
+                                    continue;
                                 } else {
-                                    if ((isset($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "" && (($department == 1 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'])
-                                                //|| ($department == 0 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'])))
-                                                || ($department == 0 && !in_array(
-                                                        $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                                        $departmentIDs
-                                                    ))))
-                                        || (isset($exam_grade_change_detail['ExamGrade']['CourseAdd']) && !empty($exam_grade_change_detail['ExamGrade']['CourseAdd']) && $exam_grade_change_detail['ExamGrade']['CourseAdd']['id'] != "" && (($department == 1 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'])
-                                                //|| ($department == 0 && $col_or_dpt_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['college_id'])))
-                                                || ($department == 0 && !in_array(
-                                                        $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['given_by_department_id'],
-                                                        $departmentIDs
-                                                    ))))
-                                    ) {
-                                        //not authorized
-                                    } else {
-                                        if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] == 1 && ($exam_grade_change_detail['ExamGradeChange']['registrar_approval'] == 1 || $exam_grade_change_detail['ExamGradeChange']['registrar_approval'] == null)) {
-                                            //already approved
-                                        } else {
-                                            $department_grade_change_approval = array();
+                                    $departmentGradeChangeApproval = [
+                                        'id' => $grv['id'],
+                                        'department_approval' => $grv['department_approval'] ?? 1,
+                                        'department_reason' => 'Teacher reason accepted!',
+                                        'department_approval_date' => date('Y-m-d H:i:s'),
+                                        'department_approved_by' => $this->Auth->user('id')
+                                    ];
 
-                                            if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] == null) {
-                                                $department_grade_change_approval['id'] = $grv['id'];
-                                                $department_grade_change_approval['department_approval'] = $grv['department_approval'];
-                                                $department_grade_change_approval['department_reason'] = "Teacher reason accepted!";
-                                                $department_grade_change_approval['department_approval_date'] = date(
-                                                    'Y-m-d H:i:s'
-                                                );
-                                                $department_grade_change_approval['department_approved_by'] = $this->Auth->user(
-                                                    'id'
-                                                );
-                                            }
-
-                                            if (!empty($department_grade_change_approval)) {
-                                                if ($this->ExamGradeChange->save(
-                                                    $department_grade_change_approval,
-                                                    array('validate' => false)
-                                                )) {
-                                                    $sucessfulapproval++;
-                                                    //Notifications
-                                                    ClassRegistry::init(
-                                                        'AutoMessage'
-                                                    )->sendNotificationOnDepartmentGradeChangeApproval(
-                                                        $department_grade_change_approval
-                                                    );
-                                                }
-                                            } else {
-                                                $this->Flash->error(
-                                                    'The system is unable to complete your exam grade change request approval. Please try again.'
-                                                );
-                                                return $this->redirect(
-                                                    array('action' => ($department == 1 ? 'manage_department_grade_change' : 'manage_freshman_grade_change'))
-                                                );
-                                            }
-                                        }
+                                    $entity = $examGradeChangesTable->newEntity($departmentGradeChangeApproval);
+                                    if ($examGradeChangesTable->save($entity, ['validate' => false])) {
+                                        $successfulApproval++;
+                                        $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                        $autoMessagesTable->sendNotificationOnDepartmentGradeChangeApproval($departmentGradeChangeApproval);
                                     }
                                 }
                             }
                         }
                     }
 
-                    if ($sucessfulapproval) {
-                        $this->Flash->success(
-                            'You have approved the selected exam grade change requests successfully.'
-                        );
-                        return $this->redirect(
-                            array('action' => ($department == 1 ? 'manage_department_grade_change' : 'manage_freshman_grade_change'))
-                        );
+                    if ($successfulApproval) {
+                        $this->Flash->success(__('You have approved the selected exam grade change requests successfully.'));
+                        return $this->redirect(['action' => $department == 1 ? 'manageDepartmentGradeChange' : 'manageFreshmanGradeChange']);
                     }
                 }
             }
 
-            $this->set(
-                compact(
-                    'exam_grade_changes',
-                    'makeup_exam_grade_changes',
-                    'rejected_makeup_exam_grade_changes',
-                    'rejected_department_makeup_exam_grade_changes'
-                )
-            );
+            $examGradeChanges = $examGradeChangesTable->getListOfGradeChangeForDepartmentApproval($colOrDptId, $department, $departmentIds);
+            $makeupExamGradeChanges = $examGradeChangesTable->getListOfMakeupGradeChangeForDepartmentApproval($colOrDptId, 0, $department, $departmentIds);
+            $rejectedMakeupExamGradeChanges = $examGradeChangesTable->getListOfMakeupGradeChangeForDepartmentApproval($colOrDptId, 1, $department, $departmentIds);
+            $rejectedDepartmentMakeupExamGradeChanges = $examGradeChangesTable->getMakeupGradesAskedByDepartmentRejectedByRegistrar($colOrDptId, $department, $departmentIds);
+
+
+            $this->set(compact('examGradeChanges', 'makeupExamGradeChanges', 'rejectedMakeupExamGradeChanges', 'rejectedDepartmentMakeupExamGradeChanges'));
         } else {
-            $this->Flash->error(
-                'NOT AUTHORIZED!! You need to have either college or department role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('NOT AUTHORIZED! You need to have either college or department role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
-    //COLLEGE
     public function manageCollegeGradeChange()
     {
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_COLLEGE) {
+            $collegeId = $this->request->getSession()->read('Auth.User.college_id');
+            $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+            $departmentsTable= TableRegistry::getTableLocator()->get('Departments');
+            $examGradeChanges = $examGradeChangesTable->getListOfGradeChangeForCollegeApproval($collegeId);
 
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-            $exam_grade_changes = $this->ExamGradeChange->getListOfGradeChangeForCollegeApproval($this->college_id);
+            $requestData = $this->request->getData();
+            if (!empty($requestData) && !isset($requestData['ApproveAllGradeChangeByCollege'])) {
+                if (isset($requestData['ExamGradeChange']['grade_change_count']) && $requestData['ExamGradeChange']['grade_change_count'] != 0) {
+                    for ($i = 1; $i <= $requestData['ExamGradeChange']['grade_change_count']; $i++) {
+                        if (isset($requestData['approveGradeChangeByCollege_' . $i])) {
+                            $examGradeChangeDetail = $examGradeChangesTable->find()
+                                ->where(['ExamGradeChanges.id' => $requestData['ExamGradeChange'][$i]['id']])
+                                ->contain([
+                                    'ExamGrades' => [
+                                        'CourseRegistrations' => ['PublishedCourses' => ['Departments', 'GivenByDepartments']],
+                                        'CourseAdds' => ['PublishedCourses' => ['Departments', 'GivenByDepartments']]
+                                    ]
+                                ])
+                                ->first();
 
-            if (isset($this->request->data) && !isset($this->request->data['ApproveAllGradeChangeByCollege'])) {
-                if (isset($this->request->data['ExamGradeChange']['grade_change_count']) && $this->request->data['ExamGradeChange']['grade_change_count'] != 0) {
-                    for ($i = 1; $i <= $this->request->data['ExamGradeChange']['grade_change_count']; $i++) {
-                        if (isset($this->request->data['approveGradeChangeByCollege_' . $i])) {
-                            $exam_grade_change_detail = $this->ExamGradeChange->find('first', array(
-                                'conditions' => array('ExamGradeChange.id' => $this->request->data['ExamGradeChange'][$i]['id']),
-                                'contain' => array(
-                                    'ExamGrade' => array(
-                                        'CourseRegistration' => array(
-                                            'PublishedCourse' => array('Department', 'GivenByDepartment')
-                                        ),
-                                        'CourseAdd' => array(
-                                            'PublishedCourse' => array('Department', 'GivenByDepartment')
-                                        )
+                            $departmentsTable = TableRegistry::getTableLocator()->get('Departments');
+                            $givenByDeptIds = $departmentsTable->find('list', [
+                                'conditions' => [
+                                    'Departments.college_id' => $examGradeChangeDetail->exam_grade->course_registration
+                                        ? $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id
+                                        : $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id
+                                ],
+                                'keyField' => 'id',
+                                'valueField' => 'id'
+                            ])->toArray();
+
+                            if (empty($examGradeChangeDetail)) {
+                                $this->Flash->error(__('The system unable to find the exam grade change request. It happens when the grade change request is cancelled in the middle of the approval process. Please try again.'));
+                            } elseif (
+                                (
+                                    !empty($examGradeChangeDetail->exam_grade->course_registration) &&
+                                    $examGradeChangeDetail->exam_grade->course_registration->id != "" &&
+                                    (
+                                        (!empty($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department) &&
+                                            $collegeId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id) ||
+                                        (!empty($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id) &&
+                                            $collegeId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id ||
+                                            !in_array($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id, $givenByDeptIds))
+                                    )
+                                ) ||
+                                (
+                                    !empty($examGradeChangeDetail->exam_grade->course_add) &&
+                                    $examGradeChangeDetail->exam_grade->course_add->id != "" &&
+                                    (
+                                        (!empty($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department) &&
+                                            $collegeId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id) ||
+                                        (!empty($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id) &&
+                                            $collegeId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id)
                                     )
                                 )
-                            ));
-
-                            $given_by_dept_ids = ClassRegistry::init('Department')->find('list', array(
-                                'conditions' => array('Department.college_id' => $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id']),
-                                'fields' => array('Department.id', 'Department.id')
-                            ));
-
-                            debug($exam_grade_change_detail);
-
-                            if (empty($exam_grade_change_detail)) {
-                                $this->Flash->error(
-                                    'The system unable to find the exam grade change request. It happens when the grade change request is cancelled in the middle of the approval process. Please try again.'
-                                );
+                            ) {
+                                // debug($examGradeChangeDetail);
+                                $this->Flash->error(__('You are not authorized to manage the selected exam grade change request.'));
+                            } elseif ($examGradeChangeDetail->department_approval != 1) {
+                                $this->Flash->error(__('The selected grade change request is being processed by the department. Please try again later.'));
+                                return $this->redirect(['action' => 'index']);
+                            } elseif ($examGradeChangeDetail->college_approval !== null) {
+                                $this->Flash->error(__('The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'));
+                                return $this->redirect(['action' => 'index']);
                             } else {
-                                if ((isset($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "" && ((!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id'])
-                                            || (!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id'] != $this->college_id
-                                                || !in_array(
-                                                    $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                                    $given_by_dept_ids
-                                                ))))
-                                    || (isset($exam_grade_change_detail['ExamGrade']['CourseAdd']) && !empty($exam_grade_change_detail['ExamGrade']['CourseAdd']) && $exam_grade_change_detail['ExamGrade']['CourseAdd']['id'] != "" && ((!empty($exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['Department']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id'])
-                                            || (!empty($exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id'])))
-                                ) {
-                                    debug(
-                                        (!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id']) || (!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] != $this->college_id || !in_array(
-                                                $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                                $given_by_dept_ids
-                                            ))
-                                    );
-                                    debug(
-                                        (!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id'])
-                                    );
-                                    debug(
-                                        !empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] != $this->college_id
-                                    );
-                                    debug(
-                                        !in_array(
-                                            $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                            $given_by_dept_ids
-                                        )
-                                    );
-                                    debug(
-                                        $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'] != $this->college_id
-                                    );
-                                    debug(
-                                        strcasecmp(
-                                            $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id'],
-                                            $this->college_id
-                                        ) != 0
-                                    );
-                                    debug(
-                                        $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']
-                                    );
-                                    debug($this->college_id);
-                                    debug($exam_grade_change_detail);
-                                    debug($given_by_dept_ids);
+                                $collegeGradeChangeApproval = [
+                                    'id' => $requestData['ExamGradeChange'][$i]['id'],
+                                    'college_approval' => isset($requestData['ExamGradeChange'][$i]['college_approval']) ? ($requestData['ExamGradeChange'][$i]['college_approval'] == 1 ? 1 : -1) : -1,
+                                    'college_reason' => $requestData['ExamGradeChange'][$i]['college_reason'] ?? '',
+                                    'college_approval_date' => date('Y-m-d H:i:s'),
+                                    'college_approved_by' => $this->Auth->user('id')
+                                ];
 
-                                    $this->Flash->error(
-                                        'You are not authorized to manage the selected exam grade change request.'
-                                    );
+                                $entity = $examGradeChangesTable->newEntity($collegeGradeChangeApproval);
+                                if ($examGradeChangesTable->save($entity, ['validate' => false])) {
+                                    $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                    $autoMessagesTable->sendNotificationOnCollegeGradeChangeApproval($collegeGradeChangeApproval);
+                                    $this->Flash->success(__('Your exam grade change request approval is successfully done.'));
+                                    return $this->redirect(['action' => 'manageCollegeGradeChange']);
                                 } else {
-                                    if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] != 1) {
-                                        $this->Flash->error(
-                                            'The selected grade change request is being processed by the departement. Please try again later.'
-                                        );
-                                        return $this->redirect(array('action' => 'index'));
-                                    } else {
-                                        if ($exam_grade_change_detail['ExamGradeChange']['college_approval'] != null) {
-                                            $this->Flash->error(
-                                                'The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'
-                                            );
-                                            return $this->redirect(array('action' => 'index'));
-                                        } else {
-                                            $college_grade_change_approval = array();
-                                            $college_grade_change_approval['id'] = $this->request->data['ExamGradeChange'][$i]['id'];
-                                            $college_grade_change_approval['college_approval'] = (isset($this->request->data['ExamGradeChange'][$i]['college_approval']) ? ($this->request->data['ExamGradeChange'][$i]['college_approval'] == 1 ? 1 : -1) : -1);
-                                            $college_grade_change_approval['college_reason'] = $this->request->data['ExamGradeChange'][$i]['college_reason'];
-                                            $college_grade_change_approval['college_approval_date'] = date(
-                                                'Y-m-d H:i:s'
-                                            );
-                                            $college_grade_change_approval['college_approved_by'] = $this->Auth->user(
-                                                'id'
-                                            );
-
-                                            if ($this->ExamGradeChange->save(
-                                                $college_grade_change_approval,
-                                                array('validate' => false)
-                                            )) {
-                                                //Notifications
-                                                ClassRegistry::init(
-                                                    'AutoMessage'
-                                                )->sendNotificationOnCollegeGradeChangeApproval(
-                                                    $college_grade_change_approval
-                                                );
-                                                $this->Flash->success(
-                                                    'Your exam grade change request approval is successfully done.'
-                                                );
-                                                return $this->redirect(array('action' => 'manage_college_grade_change')
-                                                );
-                                            } else {
-                                                $this->Flash->error(
-                                                    'The system is unable to complete your exam grade change request approval. Please try again.'
-                                                );
-                                                return $this->redirect(array('action' => 'manage_college_grade_change')
-                                                );
-                                            }
-                                        }
-                                    }
+                                    $this->Flash->error(__('The system is unable to complete your exam grade change request approval. Please try again.'));
+                                    return $this->redirect(['action' => 'manageCollegeGradeChange']);
                                 }
                             }
                         }
                     }
-                }
-            } else {
-                if (isset($this->request->data['ApproveAllGradeChangeByCollege'])) {
-                    if (isset($this->request->data['Mass']['ExamGradeChange']['select_all'])) {
-                        unset($this->request->data['Mass']['ExamGradeChange']['select_all']);
+                } elseif (isset($requestData['ApproveAllGradeChangeByCollege'])) {
+                    if (isset($requestData['Mass']['ExamGradeChange']['select_all'])) {
+                        unset($requestData['Mass']['ExamGradeChange']['select_all']);
                     }
-                    $sucessfulapproval = 0;
 
-                    if (!empty($this->request->data['Mass']['ExamGradeChange'])) {
-                        foreach ($this->request->data['Mass']['ExamGradeChange'] as $grk => $grv) {
+                    $successfulApproval = 0;
+                    if (!empty($requestData['Mass']['ExamGradeChange'])) {
+                        foreach ($requestData['Mass']['ExamGradeChange'] as $grk => $grv) {
                             if ($grv['gp'] == 1) {
-                                $exam_grade_change_detail = $this->ExamGradeChange->find('first', array(
-                                    'conditions' => array('ExamGradeChange.id' => $grv['id']),
-                                    'contain' => array(
-                                        'ExamGrade' => array(
-                                            'CourseRegistration' => array(
-                                                'PublishedCourse' => array('Department', 'GivenByDepartment')
-                                            ),
-                                            'CourseAdd' => array(
-                                                'PublishedCourse' => array('Department', 'GivenByDepartment')
-                                            )
+                                $examGradeChangeDetail = $examGradeChangesTable->find()
+                                    ->where(['ExamGradeChanges.id' => $grv['id']])
+                                    ->contain([
+                                        'ExamGrades' => [
+                                            'CourseRegistrations' => ['PublishedCourses' => ['Departments', 'GivenByDepartments']],
+                                            'CourseAdds' => ['PublishedCourses' => ['Departments', 'GivenByDepartments']]
+                                        ]
+                                    ])
+                                    ->first();
+
+                                $givenByDeptIds = $departmentsTable->find('list', [
+                                    'conditions' => [
+                                        'Departments.college_id' => $examGradeChangeDetail->exam_grade->course_registration
+                                            ? $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id
+                                            : $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id
+                                    ],
+                                    'keyField' => 'id',
+                                    'valueField' => 'id'
+                                ])->toArray();
+
+                                if (empty($examGradeChangeDetail)) {
+                                    continue;
+                                } elseif (
+                                    (
+                                        !empty($examGradeChangeDetail->exam_grade->course_registration) &&
+                                        $examGradeChangeDetail->exam_grade->course_registration->id != "" &&
+                                        (
+                                            (!empty($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department) &&
+                                                $collegeId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id) ||
+                                            (!empty($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id) &&
+                                                $collegeId != $examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department->college_id ||
+                                                !in_array($examGradeChangeDetail->exam_grade->course_registration->published_course->given_by_department_id, $givenByDeptIds))
+                                        )
+                                    ) ||
+                                    (
+                                        !empty($examGradeChangeDetail->exam_grade->course_add) &&
+                                        $examGradeChangeDetail->exam_grade->course_add->id != "" &&
+                                        (
+                                            (!empty($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department) &&
+                                                $collegeId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id) ||
+                                            (!empty($examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id) &&
+                                                $collegeId != $examGradeChangeDetail->exam_grade->course_add->published_course->given_by_department->college_id)
                                         )
                                     )
-                                ));
-
-                                $given_by_dept_ids = ClassRegistry::init('Department')->find('list', array(
-                                    'conditions' => array('Department.college_id' => $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id']),
-                                    'fields' => array('Department.id', 'Department.id')
-                                ));
-
-
-                                if (empty($exam_grade_change_detail)) {
-                                    //request grade change cancelled
+                                ) {
+                                    continue;
+                                } elseif ($examGradeChangeDetail->department_approval != 1) {
+                                    continue;
+                                } elseif ($examGradeChangeDetail->college_approval !== null) {
+                                    continue;
                                 } else {
-                                    if ((isset($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "" && ((!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id'])
-                                                || (!empty($exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['college_id']) && $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['GivenByDepartment']['college_id'] != $this->college_id
-                                                    || !in_array(
-                                                        $exam_grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse']['given_by_department_id'],
-                                                        $given_by_dept_ids
-                                                    ))))
-                                        || (isset($exam_grade_change_detail['ExamGrade']['CourseAdd']) && !empty($exam_grade_change_detail['ExamGrade']['CourseAdd']) && $exam_grade_change_detail['ExamGrade']['CourseAdd']['id'] != "" && ((!empty($exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id'])
-                                                || (!empty($exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id']) && $this->college_id != $exam_grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse']['GivenByDepartment']['college_id'])))
-                                    ) {
-                                    } else {
-                                        if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] != 1) {
-                                        } else {
-                                            if ($exam_grade_change_detail['ExamGradeChange']['college_approval'] != null) {
-                                            } else {
-                                                $college_grade_change_approval = array();
-                                                $college_grade_change_approval['id'] = $grv['id'];
-                                                $college_grade_change_approval['college_approval'] = 1;
-                                                $college_grade_change_approval['college_reason'] = "Teacher reason accepted!";
-                                                $college_grade_change_approval['college_approval_date'] = date(
-                                                    'Y-m-d H:i:s'
-                                                );
-                                                $college_grade_change_approval['college_approved_by'] = $this->Auth->user(
-                                                    'id'
-                                                );
+                                    $collegeGradeChangeApproval = [
+                                        'id' => $grv['id'],
+                                        'college_approval' => 1,
+                                        'college_reason' => 'Teacher reason accepted!',
+                                        'college_approval_date' => date('Y-m-d H:i:s'),
+                                        'college_approved_by' => $this->Auth->user('id')
+                                    ];
 
-                                                if ($this->ExamGradeChange->save(
-                                                    $college_grade_change_approval,
-                                                    array('validate' => false)
-                                                )) {
-                                                    $sucessfulapproval++;
-                                                    //Notifications
-                                                    ClassRegistry::init(
-                                                        'AutoMessage'
-                                                    )->sendNotificationOnCollegeGradeChangeApproval(
-                                                        $college_grade_change_approval
-                                                    );
-                                                }
-                                            }
-                                        }
+                                    $entity = $examGradeChangesTable->newEntity($collegeGradeChangeApproval);
+                                    if ($examGradeChangesTable->save($entity, ['validate' => false])) {
+                                        $successfulApproval++;
+                                        $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                        $autoMessagesTable->sendNotificationOnCollegeGradeChangeApproval($collegeGradeChangeApproval);
                                     }
                                 }
                             }
                         }
                     }
 
-                    if ($sucessfulapproval) {
-                        $this->Flash->success(
-                            'You have approved the selected exam grade change requests successfully.'
-                        );
-                        return $this->redirect(array('action' => 'manage_college_grade_change'));
+                    if ($successfulApproval) {
+                        $this->Flash->success(__('You have approved the selected exam grade change requests successfully.'));
+                        return $this->redirect(['action' => 'manageCollegeGradeChange']);
                     }
                 }
             }
 
-            $this->set(compact('exam_grade_changes'));
+            $this->set(compact('examGradeChanges'));
         } else {
-            $this->Flash->error(
-                'NOT AUTHORIZED!! You need to have either college or department role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('NOT AUTHORIZED! You need to have college role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
     public function cancelAutoGradeChange()
     {
+        $requestData = $this->request->getData();
+        $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
 
-        if (isset($this->request->data) && !empty($this->request->data['cancelAutoGrade'])) {
-            $gradeToBeCancelled = array();
-
-            foreach ($this->request->data['ExamGradeChange'] as $key => $student) {
-                if (is_int($key) && $student['gp'] == 1) {
+        if (!empty($requestData) && !empty($requestData['cancelAutoGrade'])) {
+            $gradeToBeCancelled = [];
+            foreach ($requestData['ExamGradeChange'] as $key => $student) {
+                if (is_numeric($key) && $student['gp'] == 1) {
                     $gradeToBeCancelled[] = $student['id'];
                 }
             }
 
-            if (isset($gradeToBeCancelled) && !empty($gradeToBeCancelled)) {
-                if ($this->ExamGradeChange->deleteAll(array('ExamGradeChange.id' => $gradeToBeCancelled), false)) {
-                    $this->Flash->success(
-                        'You have cancelled ' . count($gradeToBeCancelled) . ' auto converted grades.'
-                    );
+            if (!empty($gradeToBeCancelled)) {
+                if ($examGradeChangesTable->deleteAll(['ExamGradeChanges.id IN' => $gradeToBeCancelled], false)) {
+                    $this->Flash->success(__('You have cancelled {0} auto converted grades.', count($gradeToBeCancelled)));
                 }
             }
         }
 
-        if (isset($this->request->data) && !empty($this->request->data['listPublishedCourses'])) {
-            if (isset($this->college_ids) && !empty($this->college_ids)) {
-                $type = 1;
-            } else {
-                if (isset($this->department_ids) && !empty($this->department_ids)) {
-                    $type = 0;
-                }
-            }
+        if (!empty($requestData) && !empty($requestData['listPublishedCourses'])) {
+            $type = !empty($this->request->getSession()->read('Auth.User.college_ids')) ? 1 : 0;
 
-            debug($this->request->data);
+            // debug($requestData);
 
-            $examGradeChanges = $this->ExamGradeChange->getListOfGradeAutomaticallyConverted(
-                $this->request->data['ExamGradeChange']['acadamic_year'],
-                $this->request->data['ExamGradeChange']['semester'],
-                $this->request->data['ExamGradeChange']['department_id'],
-                $this->request->data['ExamGradeChange']['program_id'],
-                $this->request->data['ExamGradeChange']['program_type_id'],
-                $this->request->data['ExamGradeChange']['grade'],
+            $examGradeChanges = $examGradeChangesTable->getListOfGradeAutomaticallyConverted(
+                $requestData['ExamGradeChange']['acadamic_year'] ?? '',
+                $requestData['ExamGradeChange']['semester'] ?? '',
+                $requestData['ExamGradeChange']['department_id'] ?? '',
+                $requestData['ExamGradeChange']['program_id'] ?? '',
+                $requestData['ExamGradeChange']['program_type_id'] ?? '',
+                $requestData['ExamGradeChange']['grade'] ?? '',
                 $type
             );
 
-            debug($examGradeChanges);
+            // debug($examGradeChanges);
             $this->set(compact('examGradeChanges'));
         }
 
-        if (isset($this->college_ids) && !empty($this->college_ids)) {
-            $departments = ClassRegistry::init('College')->find(
-                'list',
-                array('conditions' => array('College.id' => $this->college_ids, 'College.active' => 1))
-            );
-        } elseif (isset($this->department_ids) && !empty($this->department_ids)) {
-            $departments = ClassRegistry::init('Department')->find(
-                'list',
-                array('conditions' => array('Department.id' => $this->department_ids, 'Department.active' => 1))
-            );
+        $departments = [];
+        if (!empty($this->request->getSession()->read('Auth.User.college_ids'))) {
+            $collegesTable = TableRegistry::getTableLocator()->get('Colleges');
+            $departments = $collegesTable->find('list', [
+                'conditions' => ['Colleges.id IN' => $this->request->getSession()->read('Auth.User.college_ids'), 'Colleges.active' => 1],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
+        } elseif (!empty($this->request->getSession()->read('Auth.User.department_ids'))) {
+            $departmentsTable = TableRegistry::getTableLocator()->get('Departments');
+            $departments = $departmentsTable->find('list', [
+                'conditions' => ['Departments.id IN' => $this->request->getSession()->read('Auth.User.department_ids'), 'Departments.active' => 1],
+                'keyField' => 'id',
+                'valueField' => 'name'
+            ])->toArray();
         }
 
         $this->set(compact('departments'));
     }
 
-    //REGISTRAR
     public function manageRegistrarGradeChange()
     {
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_REGISTRAR) {
+            $departmentIds = $this->department_ids ?: [];
+            $collegeIds = $this->college_ids ?: [];
+            $programIds = $this->program_ids ?: [];
+            $programTypeIds = $this->program_type_ids ?: [];
+            $requestData = $this->request->getData();
+            $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
 
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR) {
-            $exam_grade_changes = $this->ExamGradeChange->getListOfGradeChangeForRegistrarApproval(
-                $this->department_ids,
-                $this->college_ids,
-                $this->program_ids,
-                $this->program_type_ids
-            );
-            $makeup_exam_grade_changes = $this->ExamGradeChange->getListOfMakeupGradeChangeForRegistrarApproval(
-                $this->department_ids,
-                $this->college_ids,
-                $this->program_ids,
-                $this->program_type_ids
-            );
-            $department_makeup_exam_grade_changes = $this->ExamGradeChange->getListOfMakeupGradeChangeByDepartmentForRegistrarApproval(
-                $this->department_ids,
-                $this->college_ids,
-                $this->program_ids,
-                $this->program_type_ids
-            );
+            if (!empty($requestData) && !isset($requestData['ApproveAllGradeChangeByRegistrar'])) {
 
-            if (isset($this->request->data) && !isset($this->request->data['ApproveAllGradeChangeByRegistrar'])) {
-                if (isset($this->request->data['ExamGradeChange']['grade_change_count']) && $this->request->data['ExamGradeChange']['grade_change_count'] != 0) {
-                    for ($i = 1; $i <= $this->request->data['ExamGradeChange']['grade_change_count']; $i++) {
-                        if (isset($this->request->data['approveGradeChangeByRegistrar_' . $i])) {
-                            $exam_grade_change_detail = $this->ExamGradeChange->find('first', array(
-                                'conditions' => array('ExamGradeChange.id' => $this->request->data['ExamGradeChange'][$i]['id']),
-                                'contain' => array(
-                                    'ExamGrade' => array(
-                                        'CourseRegistration' => array('PublishedCourse' => array('Department')),
-                                        'CourseAdd' => array('PublishedCourse' => array('Department'))
-                                    )
-                                )
-                            ));
+                if (isset($requestData['grade_change_count']) && $requestData['grade_change_count'] != 0) {
 
-                            if (empty($exam_grade_change_detail)) {
-                                $this->Flash->error(
-                                    'The system unable to find the exam grade change request. It happens when the grade change request is canceled in the middle of the approval process. Please try again.'
-                                );
-                            } elseif ($exam_grade_change_detail['ExamGradeChange']['department_approval'] != 1 || ($exam_grade_change_detail['ExamGradeChange']['makeup_exam_result'] == null && $exam_grade_change_detail['ExamGradeChange']['college_approval'] != 1)) {
-                                $this->Flash->error(
-                                    'The selected grade change request is being processed by the department and/or college. Please try again later.'
-                                );
-                                return $this->redirect(array('action' => 'index'));
-                            } elseif ($exam_grade_change_detail['ExamGradeChange']['registrar_approval'] != null) {
-                                $this->Flash->error(
-                                    'The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'
-                                );
-                                return $this->redirect(array('action' => 'index'));
+                    for ($i = 1; $i <= $requestData['grade_change_count']; $i++) {
+                        if (!empty($requestData['approveGradeChangeByRegistrar_' . $i])) {
+
+                            $examGradeChangeDetail = $examGradeChangesTable->find()
+                                ->where(['ExamGradeChanges.id' => $requestData['ExamGradeChange'][$i]['id']])
+                                ->contain([
+                                    'ExamGrades' => [
+                                        'CourseRegistrations' => ['PublishedCourses' => ['Departments']],
+                                        'CourseAdds' => ['PublishedCourses' => ['Departments']]
+                                    ]
+                                ])
+                                ->first();
+
+                            if (empty($examGradeChangeDetail)) {
+                                $this->Flash->error(__('The system unable to find the exam grade change request. It happens when the grade change request is canceled in the middle of the approval process. Please try again.'));
+                            } elseif ($examGradeChangeDetail->department_approval != 1 || ($examGradeChangeDetail->makeup_exam_result === null && $examGradeChangeDetail->college_approval != 1)) {
+                                $this->Flash->error(__('The selected grade change request is being processed by the department and/or college. Please try again later.'));
+                                return $this->redirect(['action' => 'index']);
+                            } elseif ($examGradeChangeDetail->registrar_approval !== null) {
+                                $this->Flash->error(__('The selected grade change request is already processed. Please use the following report tool to get details on the status of the grade change request.'));
+                                return $this->redirect(['action' => 'index']);
                             } else {
-                                $registrar_grade_change_approval = array();
-                                $registrar_grade_change_approval['id'] = $this->request->data['ExamGradeChange'][$i]['id'];
-                                $registrar_grade_change_approval['registrar_approval'] = (isset($this->request->data['ExamGradeChange'][$i]['registrar_approval']) ? ($this->request->data['ExamGradeChange'][$i]['registrar_approval'] == 1 ? 1 : -1) : -1);
-                                $registrar_grade_change_approval['registrar_reason'] = $this->request->data['ExamGradeChange'][$i]['registrar_reason'];
-                                $registrar_grade_change_approval['registrar_approval_date'] = date('Y-m-d H:i:s');
-                                $registrar_grade_change_approval['registrar_approved_by'] = $this->Auth->user('id');
 
-                                if ($this->ExamGradeChange->save(
-                                    $registrar_grade_change_approval,
-                                    array('validate' => false)
-                                )) {
-                                    //Notifications
-                                    ClassRegistry::init('AutoMessage')->sendNotificationOnRegistrarGradeChangeApproval(
-                                        $registrar_grade_change_approval
-                                    );
-                                    if ($registrar_grade_change_approval['registrar_approval'] == 1) {
-                                        //Check if status is generated or not
-                                        $grade_change_detail = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->CourseRegistration->ExamGrade->ExamGradeChange->find(
-                                            'first',
-                                            array(
-                                                'conditions' => array(
-                                                    'ExamGradeChange.id' => $registrar_grade_change_approval['id']
-                                                ),
-                                                'contain' => array(
-                                                    'ExamGrade' => array(
-                                                        'CourseRegistration' => array(
-                                                            'PublishedCourse',
-                                                            'Student'
-                                                        ),
-                                                        'CourseAdd' => array(
-                                                            'PublishedCourse',
-                                                            'Student'
-                                                        )
-                                                    )
-                                                )
-                                            )
-                                        );
 
-                                        if (isset($grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']) && $grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "") {
-                                            $student = $grade_change_detail['ExamGrade']['CourseRegistration']['Student'];
-                                            $published_course = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse'];
-                                        } else {
-                                            $student = $grade_change_detail['ExamGrade']['CourseAdd']['Student'];
-                                            $published_course = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse'];
-                                        }
+                                $registrarGradeChangeApproval = [
+                                    'id' => $requestData['ExamGradeChange'][$i]['id'],
+                                    'registrar_approval' => isset($requestData['ExamGradeChange'][$i]['registrar_approval']) ?
+                                        ($requestData['ExamGradeChange'][$i]['registrar_approval'] == 1 ? 1 : -1) : -1,
+                                    'registrar_reason' => $requestData['ExamGradeChange'][$i]['registrar_reason'] ?? '',
+                                    'registrar_approval_date' => (new Time())->setTimezone('UTC')->format('Y-m-d H:i:s'),
+                                    'registrar_approved_by' => $this->Auth->user('id')
+                                ];
 
-                                        // regenarate all status regardless if it not regenerated within 1 week
-                                        $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->regenerate_all_status_of_student_by_student_id(
-                                            $student['id']
-                                        );
 
-                                        if ($status_status == 3) {
-                                            // status is regenerated in last 1 week, so check if there is any changes are possible after that
+                                // Fetch the existing record
+                                $existingEntity = $examGradeChangesTable->get($requestData['ExamGradeChange'][$i]['id'], ['contain' => []]);
 
-                                            $previous_student_exam_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->find(
-                                                'first',
-                                                array(
-                                                    'conditions' => array(
-                                                        'StudentExamStatus.student_id' => $student['id'],
-                                                        'StudentExamStatus.academic_year' => $published_course['academic_year'],
-                                                        'StudentExamStatus.semester' => $published_course['semester']
-                                                    ),
-                                                    'recursive' => -1
-                                                )
-                                            );
-
-                                            if (!empty($previous_student_exam_status)) {
-                                                //Status is already generated
-                                                $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->updateAcdamicStatusForGradeChange(
-                                                    $registrar_grade_change_approval['id']
-                                                );
-                                            } else {
-                                                $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->updateAcdamicStatusByPublishedCourse(
-                                                    $published_course['id']
-                                                );
-                                            }
-                                        } else {
-                                            // all student status will be generated from begining by deleting all previous statuses generated if any.
-                                        }
-
-                                        if ($status_status) {
-                                            $this->Flash->success(
-                                                'Your exam grade change request approval is successfully done and academic status of the student is also updated.'
-                                            );
-                                        } else {
-                                            $this->Flash->warning(
-                                                'Your exam grade change request approval is successfully done but student academic status is not completed. Please regenarate student academic status.'
-                                            );
-                                        }
-                                    } else {
-                                        $this->Flash->success(
-                                            'Your exam grade change request approval is successfully done.'
-                                        );
-                                    }
-
-                                    if (isset($this->request->data['Mass']['ExamGradeChange']['select_all'])) {
-                                        unset($this->request->data['Mass']['ExamGradeChange']['select_all']); // to make sure, even if it is redirected
-                                    }
-
-                                    return $this->redirect(array('action' => 'manage_registrar_grade_change'));
-                                } else {
-                                    $this->Flash->error(
-                                        'The system is unable to complete your exam grade change request approval. Please try again.'
-                                    );
-                                    if (isset($this->request->data['Mass']['ExamGradeChange']['select_all'])) {
-                                        unset($this->request->data['Mass']['ExamGradeChange']['select_all']); // to make sure, even if it is redirected
-                                    }
-                                    return $this->redirect(array('action' => 'manage_registrar_grade_change'));
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                if (isset($this->request->data) && isset($this->request->data['ApproveAllGradeChangeByRegistrar'])) {
-                    if (isset($this->request->data['Mass']['ExamGradeChange']['select_all'])) {
-                        unset($this->request->data['Mass']['ExamGradeChange']['select_all']);
-                    }
-
-                    $sucessfulapproval = 0;
-
-                    if (!empty($this->request->data['Mass']['ExamGradeChange'])) {
-                        foreach ($this->request->data['Mass']['ExamGradeChange'] as $grk => $grv) {
-                            if ($grv['gp'] == 1) {
-                                $exam_grade_change_detail = $this->ExamGradeChange->find(
-                                    'first',
-                                    array(
-                                        'conditions' => array('ExamGradeChange.id' => $grv['id']),
-                                        'contain' => array(
-                                            'ExamGrade' => array(
-                                                'CourseRegistration' => array('PublishedCourse' => array('Department')),
-                                                'CourseAdd' => array('PublishedCourse' => array('Department'))
-                                            )
-                                        )
-                                    )
+                                // Update only the specified fields
+                                $entity = $examGradeChangesTable->patchEntity(
+                                    $existingEntity,
+                                    $registrarGradeChangeApproval,
                                 );
-                                if (empty($exam_grade_change_detail)) {
-                                } else {
-                                    if ($exam_grade_change_detail['ExamGradeChange']['department_approval'] != 1 || ($exam_grade_change_detail['ExamGradeChange']['makeup_exam_result'] == null && $exam_grade_change_detail['ExamGradeChange']['college_approval'] != 1)) {
-                                    } else {
-                                        if ($exam_grade_change_detail['ExamGradeChange']['registrar_approval'] != null) {
+
+
+                               // $entity = $examGradeChangesTable->newEntity($registrarGradeChangeApproval);
+                                if ($examGradeChangesTable->save($entity)) {
+
+                                    $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                    $autoMessagesTable->sendNotificationOnRegistrarGradeChangeApproval($registrarGradeChangeApproval);
+
+                                    if ($registrarGradeChangeApproval['registrar_approval'] == 1) {
+                                        $gradeChangeDetail = $examGradeChangesTable->find()
+                                            ->where(['ExamGradeChanges.id' => $registrarGradeChangeApproval['id']])
+                                            ->contain([
+                                                'ExamGrades' => [
+                                                    'CourseRegistrations' => ['PublishedCourses', 'Students'],
+                                                    'CourseAdds' => ['PublishedCourses', 'Students']
+                                                ]
+                                            ])
+                                            ->first();
+
+                                        $student = $gradeChangeDetail->exam_grade->course_registration
+                                            ? $gradeChangeDetail->exam_grade->course_registration->student
+                                            : $gradeChangeDetail->exam_grade->course_add->student;
+                                        $publishedCourse = $gradeChangeDetail->exam_grade->course_registration
+                                            ? $gradeChangeDetail->exam_grade->course_registration->published_course
+                                            : $gradeChangeDetail->exam_grade->course_add->published_course;
+
+                                        $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+                                        $statusStatus = $studentExamStatusTable->regenerateAllStatusOfStudentByStudentId($student->id);
+
+                                        if ($statusStatus == 3) {
+                                            $previousStudentExamStatus = $studentExamStatusTable->find()
+                                                ->where([
+                                                    'StudentExamStatuses.student_id' => $student->id,
+                                                    'StudentExamStatuses.academic_year' => $publishedCourse->academic_year,
+                                                    'StudentExamStatuses.semester' => $publishedCourse->semester
+                                                ])
+                                                ->first();
+
+                                            if (!empty($previousStudentExamStatus)) {
+                                                $statusStatus = $studentExamStatusTable->updateAcademicStatusForGradeChange($registrarGradeChangeApproval['id']);
+                                            } else {
+                                                $statusStatus = $studentExamStatusTable->updateAcademicStatusByPublishedCourse($publishedCourse->id);
+                                            }
+                                        }
+
+                                        if ($statusStatus) {
+                                            $this->Flash->success(__('Your exam grade change request approval is successfully done and academic status of the student is also updated.'));
                                         } else {
-                                            $registrar_grade_change_approval = array();
-                                            $registrar_grade_change_approval['id'] = $grv['id'];
-                                            $registrar_grade_change_approval['registrar_approval'] = 1;
-                                            $registrar_grade_change_approval['registrar_reason'] = "Teacher reason accepted!";
-                                            $registrar_grade_change_approval['registrar_approval_date'] = date(
-                                                'Y-m-d H:i:s'
-                                            );
-                                            $registrar_grade_change_approval['registrar_approved_by'] = $this->Auth->user(
-                                                'id'
-                                            );
+                                            $this->Flash->warning(__('Your exam grade change request approval is successfully done but student academic status is not completed. Please regenerate student academic status.'));
+                                        }
+                                    } else {
+                                        $this->Flash->success(__('Your exam grade change request approval is successfully done.'));
+                                    }
 
-                                            if ($this->ExamGradeChange->save(
-                                                $registrar_grade_change_approval,
-                                                array('validate' => false)
-                                            )) {
-                                                $sucessfulapproval++;
-                                                //Notifications
-                                                ClassRegistry::init(
-                                                    'AutoMessage'
-                                                )->sendNotificationOnRegistrarGradeChangeApproval(
-                                                    $registrar_grade_change_approval
-                                                );
-                                                if ($registrar_grade_change_approval['registrar_approval'] == 1) {
-                                                    //Check if status is generated or not
-                                                    $grade_change_detail = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->CourseRegistration->ExamGrade->ExamGradeChange->find(
-                                                        'first',
-                                                        array(
-                                                            'conditions' => array(
-                                                                'ExamGradeChange.id' => $registrar_grade_change_approval['id']
-                                                            ),
-                                                            'contain' => array(
-                                                                'ExamGrade' => array(
-                                                                    'CourseRegistration' => array(
-                                                                        'PublishedCourse',
-                                                                        'Student'
-                                                                    ),
-                                                                    'CourseAdd' => array(
-                                                                        'PublishedCourse',
-                                                                        'Student'
-                                                                    )
-                                                                )
-                                                            )
-                                                        )
-                                                    );
+                                    if (isset($requestData['Mass']['ExamGradeChange']['select_all'])) {
+                                        unset($requestData['Mass']['ExamGradeChange']['select_all']);
+                                    }
 
-                                                    if (isset($grade_change_detail['ExamGrade']['CourseRegistration']) && !empty($grade_change_detail['ExamGrade']['CourseRegistration']) && $grade_change_detail['ExamGrade']['CourseRegistration']['id'] != "") {
-                                                        $student = $grade_change_detail['ExamGrade']['CourseRegistration']['Student'];
-                                                        $published_course = $grade_change_detail['ExamGrade']['CourseRegistration']['PublishedCourse'];
-                                                    } else {
-                                                        $student = $grade_change_detail['ExamGrade']['CourseAdd']['Student'];
-                                                        $published_course = $grade_change_detail['ExamGrade']['CourseAdd']['PublishedCourse'];
-                                                    }
+                                    return $this->redirect(['action' => 'manageRegistrarGradeChange']);
+                                } else {
 
 
-                                                    // regenarate all status regardless if it not regenerated within 1 week
-                                                    $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->regenerate_all_status_of_student_by_student_id(
-                                                        $student['id']
-                                                    );
+                                    $this->Flash->error(__('The system is unable to complete your exam grade change request approval. Please try again.'));
+                                    if (isset($requestData['Mass']['ExamGradeChange']['select_all'])) {
+                                        unset($requestData['Mass']['ExamGradeChange']['select_all']);
+                                    }
+                                    return $this->redirect(['action' => 'manageRegistrarGradeChange']);
+                                }
+                            }
+                        }
+                    }
+                } elseif (isset($requestData['ApproveAllGradeChangeByRegistrar'])) {
+                    if (isset($requestData['Mass']['ExamGradeChange']['select_all'])) {
+                        unset($requestData['Mass']['ExamGradeChange']['select_all']);
+                    }
 
-                                                    if ($status_status == 3) {
-                                                        // status is regenerated in last 1 week, so check if there is any changes are possible after that
+                    $successfulApproval = 0;
+                    if (!empty($requestData['Mass']['ExamGradeChange'])) {
+                        foreach ($requestData['Mass']['ExamGradeChange'] as $grk => $grv) {
+                            if ($grv['gp'] == 1) {
+                                $examGradeChangeDetail = $examGradeChangesTable->find()
+                                    ->where(['ExamGradeChanges.id' => $grv['id']])
+                                    ->contain([
+                                        'ExamGrades' => [
+                                            'CourseRegistrations' => ['PublishedCourses' => ['Departments']],
+                                            'CourseAdds' => ['PublishedCourses' => ['Departments']]
+                                        ]
+                                    ])
+                                    ->first();
 
-                                                        $previous_student_exam_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->find(
-                                                            'first',
-                                                            array(
-                                                                'conditions' => array(
-                                                                    'StudentExamStatus.student_id' => $student['id'],
-                                                                    'StudentExamStatus.academic_year' => $published_course['academic_year'],
-                                                                    'StudentExamStatus.semester' => $published_course['semester']
-                                                                ),
-                                                                'recursive' => -1
-                                                            )
-                                                        );
+                                if (empty($examGradeChangeDetail)) {
+                                    continue;
+                                } elseif ($examGradeChangeDetail->department_approval != 1 || ($examGradeChangeDetail->makeup_exam_result === null && $examGradeChangeDetail->college_approval != 1)) {
+                                    continue;
+                                } elseif ($examGradeChangeDetail->registrar_approval !== null) {
+                                    continue;
+                                } else {
+                                    $registrarGradeChangeApproval = [
+                                        'id' => $grv['id'],
+                                        'registrar_approval' => 1,
+                                        'registrar_reason' => 'Teacher reason accepted!',
+                                        'registrar_approval_date' => date('Y-m-d H:i:s'),
+                                        'registrar_approved_by' => $this->Auth->user('id')
+                                    ];
 
-                                                        if (!empty($previous_student_exam_status)) {
-                                                            //Status is already generated
-                                                            $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->updateAcdamicStatusForGradeChange(
-                                                                $registrar_grade_change_approval['id']
-                                                            );
-                                                            //debug($status_status);
-                                                        } else {
-                                                            $status_status = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->StudentExamStatus->updateAcdamicStatusByPublishedCourse(
-                                                                $published_course['id']
-                                                            );
-                                                        }
-                                                    } else {
-                                                        // all student status will be generated from begining by deleting all previous statuses generated if any.
-                                                    }
-                                                }
+                                    $entity = $examGradeChangesTable->newEntity($registrarGradeChangeApproval);
+                                    if ($examGradeChangesTable->save($entity, ['validate' => false])) {
+                                        $successfulApproval++;
+                                        $autoMessagesTable = TableRegistry::getTableLocator()->get('AutoMessages');
+                                        $autoMessagesTable->sendNotificationOnRegistrarGradeChangeApproval($registrarGradeChangeApproval);
+
+                                        $gradeChangeDetail = $examGradeChangesTable->find()
+                                            ->where(['ExamGradeChanges.id' => $registrarGradeChangeApproval['id']])
+                                            ->contain([
+                                                'ExamGrades' => [
+                                                    'CourseRegistrations' => ['PublishedCourses', 'Students'],
+                                                    'CourseAdds' => ['PublishedCourses', 'Students']
+                                                ]
+                                            ])
+                                            ->first();
+
+                                        $student = $gradeChangeDetail->exam_grade->course_registration
+                                            ? $gradeChangeDetail->exam_grade->course_registration->student
+                                            : $gradeChangeDetail->exam_grade->course_add->student;
+                                        $publishedCourse = $gradeChangeDetail->exam_grade->course_registration
+                                            ? $gradeChangeDetail->exam_grade->course_registration->published_course
+                                            : $gradeChangeDetail->exam_grade->course_add->published_course;
+
+                                        $studentExamStatusTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+                                        $statusStatus = $studentExamStatusTable->regenerateAllStatusOfStudentByStudentId($student->id);
+
+                                        if ($statusStatus == 3) {
+                                            $previousStudentExamStatus = $studentExamStatusTable->find()
+                                                ->where([
+                                                    'StudentExamStatuses.student_id' => $student->id,
+                                                    'StudentExamStatuses.academic_year' => $publishedCourse->academic_year,
+                                                    'StudentExamStatuses.semester' => $publishedCourse->semester
+                                                ])
+                                                ->first();
+
+                                            if (!empty($previousStudentExamStatus)) {
+                                                $statusStatus = $studentExamStatusTable->updateAcademicStatusForGradeChange($registrarGradeChangeApproval['id']);
+                                            } else {
+                                                $statusStatus = $studentExamStatusTable->updateAcademicStatusByPublishedCourse($publishedCourse->id);
                                             }
                                         }
                                     }
@@ -1130,575 +855,315 @@ class ExamGradeChangesController extends AppController
                         }
                     }
 
-                    if ($sucessfulapproval) {
-                        $this->Flash->success('Your exam grade change request approval is successfully done.');
-                        return $this->redirect(array('action' => 'manage_registrar_grade_change'));
+                    if ($successfulApproval) {
+                        $this->Flash->success(__('Your exam grade change request approval is successfully done.'));
+                        return $this->redirect(['action' => 'manageRegistrarGradeChange']);
                     }
                 }
             }
 
-            $this->set(
-                compact('exam_grade_changes', 'makeup_exam_grade_changes', 'department_makeup_exam_grade_changes')
-            );
+            $examGradeChanges = $examGradeChangesTable->getListOfGradeChangeForRegistrarApproval($departmentIds, $collegeIds, $programIds, $programTypeIds)['summary'];
+            $makeupExamGradeChanges = $examGradeChangesTable->getListOfMakeupGradeChangeForRegistrarApproval($departmentIds, $collegeIds, $programIds, $programTypeIds)['summary'];
+            $departmentMakeupExamGradeChanges = $examGradeChangesTable->getListOfMakeupGradeChangeByDepartmentForRegistrarApproval($departmentIds, $collegeIds, $programIds, $programTypeIds)['summary'];
+
+
+            $this->set(compact('examGradeChanges', 'makeupExamGradeChanges', 'departmentMakeupExamGradeChanges'));
         } else {
-            $this->Flash->error(
-                'NOT AUTHORIZED!! You need to have registrar role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('NOT AUTHORIZED! You need to have registrar role to access exam grade change management area. Please contact your system administrator if you feel this message is not right.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
     public function freshmanMakeupExamResult()
     {
-
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-            $this->__makeupExamResult(0);
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_COLLEGE) {
+            $this->makeupExamResult(0);
             $this->render('makeup_exam_result');
         } else {
-            $this->Flash->error(
-                'You need to have a college role to access Freshman Supplemetary/Makeup exam administration. Please contact your system administrator.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('You need to have a college role to access Freshman Supplementary/Makeup exam administration. Please contact your system administrator.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
     public function departmentMakeupExamResult()
     {
-
-
-        if ($this->Session->read(
-                'Auth.User'
-            )['role_id'] == ROLE_DEPARTMENT /* || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE */) {
-            $this->__makeupExamResult(1);
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_DEPARTMENT) {
+            $this->makeupExamResult(1);
             $this->render('makeup_exam_result');
         } else {
-            $this->Flash->error(
-                'You need to have department role to access Supplemetary/Makeup exam administration. Please contact your system administrator.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('You need to have department role to access Supplementary/Makeup exam administration. Please contact your system administrator.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
-    //TODO: Reject grade change when there is other submitted grade which is on process (DONE)
-    private function __makeupExamResult($departement = 1)
+    protected function makeupExamResult($department = 1)
     {
+        $roleId = $this->request->getSession()->read('Auth.User.role_id');
+        if ($roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE) {
+            $departmentId = $this->request->getSession()->read('Auth.User.department_id');
+            $collegeId = $this->request->getSession()->read('Auth.User.college_id');
+            $programIds = $this->request->getSession()->read('Auth.User.program_ids') ?: [];
 
-        $grade_history = array();
-        $register_or_add = array();
-        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                'Auth.User'
-            )['role_id'] == ROLE_COLLEGE) {
-            if (!empty($this->request->data)) {
-                //debug($this->request->data);
-                $save_is_ok = true;
+            $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+            $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+            $courseAddsTable = TableRegistry::getTableLocator()->get('CourseAdds');
+            $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+            $sectionsTable = TableRegistry::getTableLocator()->get('Sections');
+            $programsTable = TableRegistry::getTableLocator()->get('Programs');
 
-                if ($this->request->data['ExamGradeChange']['course_registration_id'] != "0") {
-                    $register_or_add = explode('~', $this->request->data['ExamGradeChange']['course_registration_id']);
+            $requestData = $this->request->getData();
+            if (!empty($requestData)) {
+                $saveIsOk = true;
+                $gradeHistory = [];
+                $registerOrAdd = [];
+                $gradeId = 0;
+                $student = [];
+                $publishedCourseId = 0;
+                $courseTitleCode = '';
+                $studentNameStudentNumber = '';
 
-                    $grade_id = 0;
-                    $student = array();
-                    $published_course_id = 0;
+                if ($requestData['ExamGradeChange']['course_registration_id'] != "0") {
+                    $registerOrAdd = explode('~', $requestData['ExamGradeChange']['course_registration_id']);
+                    $type = $registerOrAdd[1] == 'add' ? 'course_add' : 'course_registration';
 
-                    if (strcasecmp($register_or_add[1], 'add') == 0) {
-                        $grade_id = $this->ExamGradeChange->ExamGrade->find('first', array(
-                            'fields' => array('ExamGrade.id'),
-                            'conditions' => array(
-                                'ExamGrade.course_add_id' => $register_or_add[0]
-                            ),
-                            'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                            'recursive' => -1
-                        ));
+                    $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+                    $gradeId = $examGradesTable->find()
+                        ->select(['exam_grade_id'])
+                        ->where([$type == 'course_add' ? 'ExamGrades.course_add_id' : 'ExamGrades.course_registration_id' => $registerOrAdd[0]])
+                        ->order(['ExamGrades.exam_grade_id' => 'DESC', 'ExamGrades.created' => 'DESC'])
+                        ->first();
 
-                        if (!empty($grade_id)) {
-                            $grade_id = $grade_id['ExamGrade']['id'];
-                        }
+                    $gradeId = $gradeId ? $gradeId->exam_grade_id : 0;
 
-                        $published_course_id = $this->ExamGradeChange->ExamGrade->CourseAdd->field(
-                            'published_course_id',
-                            array('id' => $register_or_add[0])
-                        );
-                        $grade_history = $this->ExamGradeChange->ExamGrade->CourseAdd->getCourseAddGradeHistory(
-                            $register_or_add[0]
-                        );
+                    $publishedCourseId = $type == 'course_add'
+                        ? $courseAddsTable->find()->select(['published_course_id'])->where(['id' => $registerOrAdd[0]])->first()->published_course_id
+                        : $courseRegistrationsTable->find()->select(['published_course_id'])->where(['id' => $registerOrAdd[0]])->first()->published_course_id;
 
-                        $student = $this->ExamGradeChange->ExamGrade->CourseAdd->find('first', array(
-                            'conditions' => array('CourseAdd.id' => $register_or_add[0]),
-                            'contain' => array('Student')
-                        ));
+                    $gradeHistory = $type == 'course_add'
+                        ? $courseAddsTable->getCourseAddGradeHistory($registerOrAdd[0])
+                        : $courseRegistrationsTable->getCourseRegistrationGradeHistory($registerOrAdd[0]);
 
-                        if (!empty($student)) {
-                            $student = $student['Student'];
-                        }
+                    $studentData = $type == 'course_add'
+                        ? $courseAddsTable->find()->where(['CourseAdds.id' => $registerOrAdd[0]])->contain(['Students'])->first()
+                        : $courseRegistrationsTable->find()->where(['CourseRegistrations.id' => $registerOrAdd[0]])->contain(['Students'])->first();
 
-                        $on_progress = $this->ExamGradeChange->ExamGrade->CourseAdd->isAnyGradeOnProcess(
-                            $register_or_add[0]
-                        );
-                    } else {
-                        $grade_id = $this->ExamGradeChange->ExamGrade->find('first', array(
-                            'fields' => array('ExamGrade.id'),
-                            'conditions' => array(
-                                'ExamGrade.course_registration_id' => $register_or_add[0]
-                            ),
-                            'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC'),
-                            'recursive' => -1
-                        ));
+                    $student = $studentData ? (array)$studentData->student : [];
 
-                        if (!empty($grade_id)) {
-                            $grade_id = $grade_id['ExamGrade']['id'];
-                        }
+                    $onProgress = $type == 'course_add'
+                        ? $courseAddsTable->isAnyGradeOnProcess($registerOrAdd[0])
+                        : $courseRegistrationsTable->isAnyGradeOnProcess($registerOrAdd[0]);
 
-                        $published_course_id = $this->ExamGradeChange->ExamGrade->CourseRegistration->field(
-                            'published_course_id',
-                            array('id' => $register_or_add[0])
-                        );
-                        $grade_history = $this->ExamGradeChange->ExamGrade->CourseRegistration->getCourseRegistrationGradeHistory(
-                            $register_or_add[0]
-                        );
-
-                        $student = $this->ExamGradeChange->ExamGrade->CourseRegistration->find('first', array(
-                            'conditions' => array('CourseRegistration.id' => $register_or_add[0]),
-                            'contain' => array('Student')
-                        ));
-
-                        if (!empty($student)) {
-                            $student = $student['Student'];
-                        }
-
-                        $on_progress = $this->ExamGradeChange->ExamGrade->CourseRegistration->isAnyGradeOnProcess(
-                            $register_or_add[0]
-                        );
-                    }
-
-                    $course_title_code = '';
-                    $student_name_student_number = '';
-
-                    if (!empty($published_course_id)) {
-                        $pc_crs_id = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->field(
-                            'PublishedCourse.course_id',
-                            array('PublishedCourse.id' => $published_course_id)
-                        );
-                        if (!empty($pc_crs_id)) {
-                            $courseDetails = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Course->find(
-                                'first',
-                                array('conditions' => array('Course.id' => $pc_crs_id), 'recursive' => -1)
-                            );
-                            if (!empty($courseDetails)) {
-                                $course_title_code = $courseDetails['Course']['course_code_title'];
-                            }
+                    if (!empty($publishedCourseId)) {
+                        $courseId = $courseRegistrationsTable->PublishedCourses->find()
+                            ->select(['course_id'])
+                            ->where(['PublishedCourses.id' => $publishedCourseId])
+                            ->first();
+                        if ($courseId) {
+                            $courseDetails = $coursesTable->find()
+                                ->where(['Courses.id' => $courseId->course_id])
+                                ->first();
+                            $courseTitleCode = $courseDetails ? $courseDetails->course_code_title : '';
                         }
                     }
 
-                    if (!empty($student) && is_array($student)) {
-                        $student_name_student_number = $student['full_name_studentnumber'];
+                    if (!empty($student)) {
+                        $studentNameStudentNumber = $student['full_name_studentnumber'];
                     }
 
-                    if (!empty($student) && ($departement == 1 && $student['department_id'] != $this->department_id) || ($departement == 0 && $student['college_id'] != $this->college_id)) {
-                        if ($departement == 1) {
-                            $this->Flash->warning('You are not authorized to do that!');
-                            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+                    if (!empty($student) && (
+                            ($department == 1 && $student['department_id'] != $departmentId) ||
+                            ($department == 0 && $student['college_id'] != $collegeId)
+                        )) {
+                        if ($department == 1) {
+                            $this->Flash->warning(__('You are not authorized to do that!'));
+                            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
                         }
                     }
 
                     if (empty($student)) {
-                        $this->Flash->error('Invalid Student.');
-                        return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+                        $this->Flash->error(__('Invalid Student.'));
+                        return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
                     }
 
-                    if (empty($published_course_id)) {
-                        $this->Flash->error('Invalid course is selected.');
-                        return $this->redirect(array('action' => 'add'));
+                    if (empty($publishedCourseId)) {
+                        $this->Flash->error(__('Invalid course is selected.'));
+                        return $this->redirect(['action' => 'add']);
                     }
 
-                    if (empty($grade_id)) {
-                        $this->Flash->error(
-                            'Exam grade is not yet submitted for ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . '. Supplemetary or Makeup Exam result can only be submitted after the instructor submitted student grade. Please communicate the assigned instructor to submit grade for the student or you can submit on behalf of him if you have the appropraite permission.'
-                        );
-                        $save_is_ok = false;
+                    if (empty($gradeId)) {
+                        $this->Flash->error(__('Exam grade is not yet submitted for {0} for {1}. Supplementary or Makeup Exam result can only be submitted after the instructor submitted student grade. Please communicate the assigned instructor to submit grade for the student or you can submit on behalf of him if you have the appropriate permission.', $studentNameStudentNumber ?: 'the selected student', $courseTitleCode ?: 'the selected course'));
+                        $saveIsOk = false;
                     } else {
-                        $status = $this->ExamGradeChange->ExamGrade->gradeCanBeChanged($grade_id);
+                        $status = $examGradesTable->gradeCanBeChanged($gradeId);
                         if ($status === true) {
-                            $exam_grade_change['ExamGradeChange']['exam_grade_id'] = $grade_id;
-                            $previous_grade = $this->ExamGradeChange->ExamGrade->field('grade', array('id' => $grade_id)
-                            );
+                            $examGradeChange = ['exam_grade_id' => $gradeId];
+                            $previousGrade = $examGradesTable->find()->select(['grade'])->where(['exam_grade_id' => $gradeId])->first()->grade;
                         } else {
                             $this->Flash->error(__($status));
-                            $save_is_ok = false;
+                            $saveIsOk = false;
                         }
                     }
                 } else {
-                    $this->Flash->error(
-                        'You are required to select the course for which ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' takes Supplemetary or Makeup Exam.'
-                    );
-                    $save_is_ok = false;
+                    $this->Flash->error(__('You are required to select the course for which {0} takes Supplementary or Makeup Exam.', $studentNameStudentNumber ?: 'the selected student'));
+                    $saveIsOk = false;
                 }
 
-                if (!isset($this->request->data['ExamGradeChange']['student_id']) || $this->request->data['ExamGradeChange']['student_id'] == "0") {
-                    $this->Flash->error(
-                        'You are required to select the student who takes the Supplementary or Makeup Exam.'
-                    );
-                    $save_is_ok = false;
+                if (empty($requestData['ExamGradeChange']['student_id']) || $requestData['ExamGradeChange']['student_id'] == "0") {
+                    $this->Flash->error(__('You are required to select the student who takes the Supplementary or Makeup Exam.'));
+                    $saveIsOk = false;
+                } elseif ($saveIsOk && (empty($requestData['ExamGradeChange']['grade']) || $requestData['ExamGradeChange']['grade'] == "0")) {
+                    $this->Flash->error(__('You are required to select exam grade for {0} for {1}.', $studentNameStudentNumber ?: 'the selected student', $courseTitleCode ?: 'the selected course'));
+                    $saveIsOk = false;
+                } elseif ($saveIsOk && !$courseRegistrationsTable->PublishedCourses->isItValidGradeForPublishedCourse($publishedCourseId, $requestData['ExamGradeChange']['grade'])) {
+                    $this->Flash->warning(__('Invalid Grade for {0}!', $courseTitleCode ?: 'the selected course'));
+                    $saveIsOk = false;
                 } else {
-                    if ($save_is_ok && (!isset($this->request->data['ExamGradeChange']['grade']) || $this->request->data['ExamGradeChange']['grade'] == "" || $this->request->data['ExamGradeChange']['grade'] == "0")) {
-                        $this->Flash->error(
-                            'You are required to select exam grade for ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . '.'
-                        );
-                        $save_is_ok = false;
+                    $examGradeChange['grade'] = $requestData['ExamGradeChange']['grade'];
+                }
+
+                if ($saveIsOk && (!isset($requestData['ExamGradeChange']['makeup_exam_result']) || !is_numeric($requestData['ExamGradeChange']['makeup_exam_result']) || $requestData['ExamGradeChange']['makeup_exam_result'] < 0 || $requestData['ExamGradeChange']['makeup_exam_result'] > 100)) {
+                    $this->Flash->error(__('Please enter a valid exam result.'));
+                    $saveIsOk = false;
+                } elseif (!isset($requestData['ExamGradeChange']['grade']) || empty($requestData['ExamGradeChange']['grade'])) {
+                    $this->Flash->error(__('Please enter a valid grade.'));
+                    $saveIsOk = false;
+                } elseif (!isset($requestData['ExamGradeChange']['makeup_exam_result']) || empty($requestData['ExamGradeChange']['makeup_exam_result'])) {
+                    $this->Flash->error(__('Please enter a valid exam result.'));
+                    $saveIsOk = false;
+                } else {
+                    $examGradeChange['makeup_exam_result'] = $requestData['ExamGradeChange']['makeup_exam_result'];
+                }
+
+                $examGradeChange['reason'] = $requestData['ExamGradeChange']['reason'] ?? '';
+
+                if ($roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE) {
+                    $examGradeChange['department_reason'] = $requestData['ExamGradeChange']['reason'] ?? '';
+                    $examGradeChange['initiated_by_department'] = 1;
+                    $examGradeChange['department_approval'] = 1;
+                    $examGradeChange['department_approved_by'] = $this->Auth->user('id');
+                    $examGradeChange['department_approval_date'] = date('Y-m-d H:i:s');
+
+                    if ($roleId == ROLE_COLLEGE) {
+                        $examGradeChange['college_approval'] = 1;
+                        $examGradeChange['college_reason'] = $requestData['ExamGradeChange']['reason'] ?? '';
+                        $examGradeChange['college_approved_by'] = $this->Auth->user('id');
+                        $examGradeChange['college_approval_date'] = date('Y-m-d H:i:s');
                     } else {
-                        if ($save_is_ok && !$this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->isItValidGradeForPublishedCourse(
-                                $published_course_id,
-                                $this->request->data['ExamGradeChange']['grade']
-                            )) {
-                            $this->Flash->warning(
-                                'Invalid Grade for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . '!'
-                            );
-                            $save_is_ok = false;
+                        $examGradeChange['college_approval'] = null;
+                        $examGradeChange['college_reason'] = '';
+                        $examGradeChange['college_approved_by'] = '';
+                        $examGradeChange['college_approval_date'] = null;
+                    }
+                } else {
+                    $examGradeChange['department_reason'] = '';
+                    $examGradeChange['initiated_by_department'] = 0;
+                    $examGradeChange['department_approval'] = null;
+                    $examGradeChange['department_approved_by'] = '';
+                    $examGradeChange['department_approval_date'] = null;
+                    $examGradeChange['college_approval'] = null;
+                    $examGradeChange['college_reason'] = '';
+                    $examGradeChange['college_approved_by'] = '';
+                    $examGradeChange['college_approval_date'] = null;
+                    $saveIsOk = false;
+                }
+
+                $examGradeChange['minute_number'] = $requestData['ExamGradeChange']['minute_number'] ?? '';
+                $examGradeChange['registrar_reason'] = '';
+                $examGradeChange['registrar_approved_by'] = '';
+                $examGradeChange['registrar_approval'] = null;
+
+                if ($saveIsOk) {
+                    $entity = $examGradeChangesTable->newEntity($examGradeChange);
+                    if ($examGradeChangesTable->save($entity)) {
+                        if ($roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE) {
+                            $this->Flash->success(__('The Makeup/Supplementary exam result for {0} for {1} has been saved and sent to the registrar for confirmation.', $studentNameStudentNumber ?: 'the selected student', $courseTitleCode ?: 'the selected course'));
                         } else {
-                            $exam_grade_change['ExamGradeChange']['grade'] = $this->request->data['ExamGradeChange']['grade'];
-                        }
-                    }
-                }
-
-                if ($save_is_ok && !(isset($this->request->data['ExamGradeChange']['makeup_exam_result']) && !empty($this->request->data['ExamGradeChange']['makeup_exam_result']) && is_numeric(
-                            $this->request->data['ExamGradeChange']['makeup_exam_result']
-                        ) && $this->request->data['ExamGradeChange']['makeup_exam_result'] >= 0 && $this->request->data['ExamGradeChange']['makeup_exam_result'] <= 100)) {
-                    $this->Flash->error('Please enter a valid exam result.');
-                    $save_is_ok = false;
-                } else {
-                    if (!isset($this->request->data['ExamGradeChange']['grade']) || (isset($this->request->data['ExamGradeChange']['grade']) && empty($this->request->data['ExamGradeChange']['grade']))) {
-                        $this->Flash->error('Please enter a valid grade.');
-                        $save_is_ok = false;
-                    } else {
-                        if (!isset($this->request->data['ExamGradeChange']['makeup_exam_result']) || (isset($this->request->data['ExamGradeChange']['makeup_exam_result']) && empty($this->request->data['ExamGradeChange']['makeup_exam_result']))) {
-                            $this->Flash->error('Please enter a valid exam result.');
-                            $save_is_ok = false;
-                        } else {
-                            $exam_grade_change['ExamGradeChange']['makeup_exam_result'] = $this->request->data['ExamGradeChange']['makeup_exam_result'];
-                        }
-                    }
-                }
-
-                $exam_grade_change['ExamGradeChange']['reason'] = $this->request->data['ExamGradeChange']['reason'];
-
-                if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_COLLEGE) {
-                    $exam_grade_change['ExamGradeChange']['department_reason'] = $this->request->data['ExamGradeChange']['reason'];
-                    $exam_grade_change['ExamGradeChange']['initiated_by_department'] = 1;
-                    $exam_grade_change['ExamGradeChange']['department_approval'] = 1;
-                    $exam_grade_change['ExamGradeChange']['department_approved_by'] = $this->Auth->user('id');
-                    $exam_grade_change['ExamGradeChange']['department_approval_date'] = date('Y-m-d H:i:s');
-
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                        $exam_grade_change['ExamGradeChange']['college_approval'] = 1;
-                        $exam_grade_change['ExamGradeChange']['college_reason'] = $this->request->data['ExamGradeChange']['reason'];
-                        $exam_grade_change['ExamGradeChange']['college_approved_by'] = $this->Auth->user('id');
-                        $exam_grade_change['ExamGradeChange']['college_approval_date'] = date('Y-m-d H:i:s');
-                        $exam_grade_change['ExamGradeChange']['college_approval_date'] = null;
-                    } else {
-                        $exam_grade_change['ExamGradeChange']['college_approval'] = null;
-                        $exam_grade_change['ExamGradeChange']['college_reason'] = '';
-                        $exam_grade_change['ExamGradeChange']['college_approved_by'] = '';
-                        $exam_grade_change['ExamGradeChange']['college_approval_date'] = null;
-                    }
-                } else {
-                    $exam_grade_change['ExamGradeChange']['department_reason'] = '';
-                    $exam_grade_change['ExamGradeChange']['initiated_by_department'] = 0;
-                    $exam_grade_change['ExamGradeChange']['department_approval'] = null;
-                    $exam_grade_change['ExamGradeChange']['department_approved_by'] = '';
-                    $exam_grade_change['ExamGradeChange']['department_approval_date'] = null;
-                    $exam_grade_change['ExamGradeChange']['college_approval'] = null;
-                    $exam_grade_change['ExamGradeChange']['college_reason'] = '';
-                    $exam_grade_change['ExamGradeChange']['college_approved_by'] = '';
-                    $exam_grade_change['ExamGradeChange']['college_approval_date'] = null;
-
-                    $save_is_ok = false;
-                }
-
-                $exam_grade_change['ExamGradeChange']['minute_number'] = $this->request->data['ExamGradeChange']['minute_number'];
-
-                $exam_grade_change['ExamGradeChange']['registrar_reason'] = '';
-                $exam_grade_change['ExamGradeChange']['registrar_approved_by'] = '';
-                $exam_grade_change['ExamGradeChange']['registrar_approval'] = null;
-
-                if ($save_is_ok) {
-                    $this->ExamGradeChange->create();
-
-                    if ($this->ExamGradeChange->save($exam_grade_change)) {
-                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                                'Auth.User'
-                            )['role_id'] == ROLE_COLLEGE) {
-                            $this->Flash->success(
-                                'The Makeup/Supplementary exam result for ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . ' has been saved and sent to the registrar for confimation.'
-                            );
-                        } else {
-                            $this->Flash->success(
-                                'The Makeup/Supplementary exam result for ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . ' has been saved and sent to deparment for approval.'
-                            );
+                            $this->Flash->success(__('The Makeup/Supplementary exam result for {0} for {1} has been saved and sent to department for approval.', $studentNameStudentNumber ?: 'the selected student', $courseTitleCode ?: 'the selected course'));
                         }
 
-                        if (!empty($departement) || $this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                            return $this->redirect(array('action' => 'department_makeup_exam_result'));
-                        } else {
-                            if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                                return $this->redirect(array('action' => 'department_makeup_exam_result'));
-                            } else {
-                                return $this->redirect(array('action' => 'index'));
-                            }
-                        }
+                        return $this->redirect(['action' => $roleId == ROLE_DEPARTMENT ? 'departmentMakeupExamResult' : ($roleId == ROLE_COLLEGE ? 'departmentMakeupExamResult' : 'index')]);
                     } else {
-                        $this->Flash->error(
-                            'The Makeup/Supplementary exam result could not be saved for ' . (!empty($student_name_student_number) ? $student_name_student_number : 'the selected student') . ' for ' . (!empty($course_title_code) ? $course_title_code : 'the selected course') . '. Please, try again.'
-                        );
+                        $this->Flash->error(__('The Makeup/Supplementary exam result could not be saved for {0} for {1}. Please, try again.', $studentNameStudentNumber ?: 'the selected student', $courseTitleCode ?: 'the selected course'));
                     }
                 }
-
-                //redisplay
-                if (!empty($departement) || $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_DEPARTMENT || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                        'list',
-                        array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-                    );
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                        $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                            'list',
-                            array('conditions' => array('Program.id' => PROGRAM_UNDEGRADUATE))
-                        );
-                    }
-                } else {
-                    $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                        'list',
-                        array('conditions' => array('Program.active' => 1))
-                    );
-                }
-
-                $program_id = $this->request->data['ExamGradeChange']['program_id'];
-
-                if (empty($program_id) && !empty($this->program_ids)) {
-                    $program_id = array_values($this->program_ids)[0];
-                    if (empty($program_id)) {
-                        $program_id = 1;
-                    }
-                }
-
-                if (empty($program_id)) {
-                    $program_id = 1;
-                }
-
-                if (!empty($departement) || $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_DEPARTMENT || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $student_sections = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
-                        ($departement == 1 ? $this->department_id : $this->college_id),
-                        $departement,
-                        $program_id,
-                        3
-                    );
-                } else {
-                    $student_sections = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->allDepartmentSectionsOrganizedByProgramType(
-                        ($departement == 1 ? $this->department_id : $this->college_id),
-                        $departement,
-                        $program_id,
-                        3
-                    );
-                }
-
-                $student_section_id = $this->request->data['ExamGradeChange']['student_section_id'];
-
-                if (!empty($student_section_id)) {
-                    if (!empty($departement) || $this->Session->read(
-                            'Auth.User'
-                        )['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                            'Auth.User'
-                        )['role_id'] == ROLE_COLLEGE) {
-                        $students = $this->ExamGradeChange->possibleStudentsForSup($student_section_id);
-                    } else {
-                        $students = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->allStudents(
-                            $student_section_id
-                        );
-                    }
-                } else {
-                    $students = array();
-                }
-
-                $student_id = $this->request->data['ExamGradeChange']['student_id'];
-
-                //debug($students);
-
-                if (!empty($student_id)) {
-                    if (!empty($departement) || $this->Session->read(
-                            'Auth.User'
-                        )['role_id'] == ROLE_DEPARTMENT || $this->Session->read(
-                            'Auth.User'
-                        )['role_id'] == ROLE_COLLEGE) {
-                        $student_registered_courses = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->getPossibleStudentRegisteredAndAddCoursesForSup(
-                            $student_id
-                        );
-                    } else {
-                        $student_registered_courses = $this->ExamGradeChange->ExamGrade->CourseRegistration->Student->getStudentRegisteredAndAddCourses(
-                            $student_id
-                        );
-                    }
-                } else {
-                    $student_registered_courses = array();
-                }
-
-                $registered_course_id = $this->request->data['ExamGradeChange']['course_registration_id'];
-
-                if (isset($published_course_id) && !empty($published_course_id)) {
-                    $exam_grades = $this->ExamGradeChange->ExamGrade->CourseRegistration->getPublishedCourseGradeScaleList(
-                        $published_course_id
-                    );
-                } else {
-                    $exam_grades = array();
-                }
-
-                if (!empty($exam_grades)) {
-                    $exam_grades = array('0' => '[ Select Grade ]') + $exam_grades;
-                } else {
-                    $exam_grades = array('0' => '[ No Grade Scale Found ]');
-                }
-
-                //$exam_grades = $exam_grades + array('NG' => 'NG');
-                //debug($exam_grades);
-
-                if (isset($this->request->data['ExamGradeChange']['grade']) && !empty($this->request->data['ExamGradeChange']['grade'])) {
-                    $grade = $this->request->data['ExamGradeChange']['grade'];
-                } else {
-                    $grade = '';
-                }
-            } else {
-                if (!empty($departement) || $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_DEPARTMENT || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                        'list',
-                        array('conditions' => array('Program.id' => $this->program_ids, 'Program.active' => 1))
-                    );
-                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                        $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                            'list',
-                            array('conditions' => array('Program.id' => PROGRAM_UNDEGRADUATE))
-                        );
-                    }
-                } else {
-                    $programsss = $programs = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->Program->find(
-                        'list',
-                        array('conditions' => array('Program.active' => 1))
-                    );
-                }
-
-                $program_id = 1;
-
-                if (isset($this->request->data['ExamGradeChange']['program_id']) && !empty($this->request->data['ExamGradeChange']['program_id'])) {
-                    $program_id = $this->request->data['ExamGradeChange']['program_id'];
-                } else {
-                    if (!empty($this->program_ids)) {
-                        $program_id = array_values($this->program_ids)[0];
-                        if (empty($program_id)) {
-                            $program_id = 1;
-                        }
-                    }
-                }
-
-                if (!empty($departement) || $this->Session->read(
-                        'Auth.User'
-                    )['role_id'] == ROLE_DEPARTMENT || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                    $student_sections = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->allDepartmentSectionsOrganizedByProgramTypeSuppExam(
-                        ($departement == 1 ? $this->department_id : $this->college_id),
-                        $departement,
-                        $program_id,
-                        3
-                    );
-                } else {
-                    $student_sections = $this->ExamGradeChange->ExamGrade->CourseRegistration->PublishedCourse->Section->allDepartmentSectionsOrganizedByProgramType(
-                        ($departement == 1 ? $this->department_id : $this->college_id),
-                        $departement,
-                        $program_id,
-                        3
-                    );
-                }
-
-                $student_section_id = 0;
-
-                $students = array();
-                $student_id = 0;
-
-                $student_registered_courses = array();
-                $registered_course_id = 0;
-
-                $exam_grades = array('0' => '[ No Grade Scale Found ]');
-                $grade = '';
-
-                $grade_history = '';
             }
 
-            if (!empty($student_sections)) {
-                $student_sections = array('0' => '[ Select Section ]') + $student_sections;
-            } else {
-                $student_sections = array('0' => '[ No Section Found ]');
+            $programId = !empty($requestData['ExamGradeChange']['program_id']) ? $requestData['ExamGradeChange']['program_id'] :
+                (!empty($programIds) ? reset($programIds) : 1);
+            if (empty($programId)) {
+                $programId = 1;
             }
 
-            if (isset($students) && !empty($students)) {
-                $students = array('0' => '[ Select Student ]') + $students;
-            } else {
-                $students = array('0' => '[ No Student Found ]');
-            }
+            $programs = $roleId == ROLE_COLLEGE
+                ? $programsTable->find('list', ['conditions' => ['Programs.id' => PROGRAM_UNDERGRADUATE]])->toArray()
+                : $programsTable->find('list', ['conditions' => ['Programs.id IN' => $programIds, 'Programs.active' => 1]])->toArray();
 
-            if (isset($student_registered_courses) && !empty($student_registered_courses)) {
-                $student_registered_courses = array('0' => '[ Select Course ]') + $student_registered_courses;
-            } else {
-                $student_registered_courses = array('0' => '[ No Course Found ]');
-            }
+            $studentSections = ($department == 1 || $roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE)
+                ? $sectionsTable->allDepartmentSectionsOrganizedByProgramTypeSuppExam($department == 1 ? $departmentId : $collegeId, $department, $programId, 3)
+                : $sectionsTable->allDepartmentSectionsOrganizedByProgramType($department == 1 ? $departmentId : $collegeId, $department, $programId, 3);
 
-            $this->set(
-                compact(
-                    'student_sections',
-                    'student_section_id',
-                    'programs',
-                    'programsss',
-                    'program_id',
-                    'students',
-                    'student_id',
-                    'student_registered_courses',
-                    'registered_course_id',
-                    'exam_grades',
-                    'grade',
-                    'grade_history',
-                    'register_or_add',
-                    'save_is_ok'
-                )
-            );
+            $studentSectionId = $requestData['ExamGradeChange']['student_section_id'] ?? 0;
+            $students = $studentSectionId && ($department == 1 || $roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE)
+                ? $examGradeChangesTable->possibleStudentsForSup($studentSectionId)
+                : $sectionsTable->allStudents($studentSectionId);
+
+            $studentId = $requestData['ExamGradeChange']['student_id'] ?? 0;
+            $studentRegisteredCourses = $studentId && ($department == 1 || $roleId == ROLE_DEPARTMENT || $roleId == ROLE_COLLEGE)
+                ? $courseRegistrationsTable->Students->getPossibleStudentRegisteredAndAddCoursesForSup($studentId)
+                : $courseRegistrationsTable->Students->getStudentRegisteredAndAddCourses($studentId);
+
+            $registeredCourseId = $requestData['ExamGradeChange']['course_registration_id'] ?? 0;
+            $examGrades = $publishedCourseId ? $courseRegistrationsTable->getPublishedCourseGradeScaleList($publishedCourseId) : [];
+            $examGrades = !empty($examGrades) ? ['0' => '[ Select Grade ]'] + $examGrades : ['0' => '[ No Grade Scale Found ]'];
+            $grade = !empty($requestData['ExamGradeChange']['grade']) ? $requestData['ExamGradeChange']['grade'] : '';
+
+            $studentSections = !empty($studentSections) ? ['0' => '[ Select Section ]'] + $studentSections : ['0' => '[ No Section Found ]'];
+            $students = !empty($students) ? ['0' => '[ Select Student ]'] + $students : ['0' => '[ No Student Found ]'];
+            $studentRegisteredCourses = !empty($studentRegisteredCourses) ? ['0' => '[ Select Course ]'] + $studentRegisteredCourses : ['0' => '[ No Course Found ]'];
+
+            $this->set(compact(
+                'studentSections',
+                'studentSectionId',
+                'programs',
+                'programId',
+                'students',
+                'studentId',
+                'studentRegisteredCourses',
+                'registeredCourseId',
+                'examGrades',
+                'grade',
+                'gradeHistory',
+                'registerOrAdd',
+                'saveIsOk'
+            ));
         } else {
-            $this->Flash->error(
-                'You need to have either college or department role to access Supplmetary/Makeup exam administration. Please contact your system administrator.'
-            );
-            return $this->redirect(array('controller' => 'dashboard', 'action' => 'index'));
+            $this->Flash->error(__('You need to have either college or department role to access Supplementary/Makeup exam administration. Please contact your system administrator.'));
+            return $this->redirect(['controller' => 'Dashboard', 'action' => 'index']);
         }
     }
 
     public function delete($id = null)
     {
-
-        if (!$id || !$this->ExamGradeChange->exists($id)) {
+        $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+        if (!$id || !$examGradeChangesTable->exists(['id' => $id])) {
             $this->Flash->error(__('Invalid id for exam grade change deletion.'));
-            return $this->redirect(array('action' => 'index'));
+            return $this->redirect(['action' => 'index']);
         }
 
-        if ($this->ExamGradeChange->canItBeDeleted($id)) {
-            if ($this->ExamGradeChange->delete($id)) {
-                $this->Flash->success('Exam grade change is deleted');
-                return $this->redirect(array('action' => 'index'));
+        if ($examGradeChangesTable->canItBeDeleted($id)) {
+            $entity = $examGradeChangesTable->get($id);
+            if ($examGradeChangesTable->delete($entity)) {
+                $this->Flash->success(__('Exam grade change is deleted'));
+                return $this->redirect(['action' => 'index']);
             }
-
-            $this->Flash->error('Exam grade change was not deleted');
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Exam grade change was not deleted'));
+            return $this->redirect(['action' => 'index']);
         } else {
-            $this->Flash->error(
-                'Exam grade change is either submitted by the instructor or already on approval process to delete.'
-            );
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Exam grade change is either submitted by the instructor or already on approval process to delete.'));
+            return $this->redirect(['action' => 'index']);
         }
     }
 }
+?>

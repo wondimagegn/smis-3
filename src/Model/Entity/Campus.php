@@ -23,12 +23,10 @@ class Campus extends Entity
         'available_for_college' => true,
         'active' => true,
         'campus_code' => true,
-        'created' => true,
-        'modified' => true,
-        'accepted_students' => true,
         'class_room_blocks' => true,
         'colleges' => true,
         'dormitory_blocks' => true,
         'meal_halls' => true,
+        'colleges' => true,
     ];
 }

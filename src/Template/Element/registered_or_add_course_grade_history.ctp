@@ -1,4 +1,6 @@
 <?php
+use Cake\I18n\Time;
+
 if (isset($freshman_program) && $freshman_program) {
 	$approver = 'freshman program';
 } else {
@@ -24,7 +26,10 @@ if ($register_or_add) {
 				if (empty($grade['ExamGrade'])) {
 					echo '<br /><i style="padding-left:15px"><b>Status:</b></i> <span class="on-process">Waiting for Grade Submission.</span>';
 				} else {
-					echo '<strong>' . $grade['ExamGrade']['grade'] . '</strong> ' . ($grade['ExamGrade']['department_reply'] == 1 ? '(Re-Submit)' : '') . ' (' . $this->Time->format("F j, Y h:i:s A", $grade['ExamGrade']['created'], NULL, NULL) . ')';
+					echo '<strong>' . $grade['ExamGrade']['grade'] . '</strong> ' . ($grade['ExamGrade']['department_reply'] == 1 ? '(Re-Submit)' : '') .
+                        ' (' .$grade['ExamGrade']['created'] instanceof \Cake\I18n\FrozenTime
+                        ? $grade['ExamGrade']['created']->format('F j, Y h:i:s A')
+                        : (new \Cake\I18n\Time($grade['ExamGrade']['created']))->format('F j, Y h:i:s A'). ')';
 					echo '<br /><i style="padding-left:15px"><b>Status:</b> </i> ';
 					if ($grade['ExamGrade']['department_approval'] == 1 && $grade['ExamGrade']['registrar_approval'] == 1) {
 						echo '<span class="accepted">Accepted</span>';
@@ -79,14 +84,17 @@ if ($register_or_add) {
 				} else {
 					echo '&nbsp;&nbsp; <b>Assesment Data not available</b>';
 				}
-				
+
 			} else {
 				//Grade change or makeup exam
 				if (empty($grade['ExamGrade'])) {
 					echo '<br /><i style="padding-left:15px"><b>Status:</b></i> <span class="on-process">Waiting for Grade Submission.</span>';
 				} else {
 					//debug($grade['ExamGrade']);
-					echo '<strong>' . $grade['ExamGrade']['grade'] . '</strong> ' . ($grade['ExamGrade']['department_reply'] == 1 ? '(Re-Submit)' : '') . ' (' . $this->Time->format("F j, Y h:i:s A", $grade['ExamGrade']['created'], NULL, NULL) . ')';
+					echo '<strong>' . $grade['ExamGrade']['grade'] . '</strong> ' . ($grade['ExamGrade']['department_reply'] == 1 ? '(Re-Submit)' : '') .
+                        ' (' .$grade['ExamGrade']['created'] instanceof \Cake\I18n\FrozenTime
+                        ? $grade['ExamGrade']['created']->format('F j, Y h:i:s A')
+                        : (new \Cake\I18n\Time($grade['ExamGrade']['created']))->format('F j, Y h:i:s A').')';
 					echo '<br /><i style="padding-left:15px"><b>Status:</b></i> ';
 					if ($grade['ExamGrade']['manual_ng_conversion'] == 1) {
 						echo '<span class="accepted"><b>NG Grade Converted</b></span>';

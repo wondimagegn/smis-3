@@ -1,211 +1,200 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
 
 class ExamTypesTable extends Table
 {
-
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
-        $this->setTable('exam_types'); // Set database table name
-        $this->setPrimaryKey('id'); // Define primary key
-        $this->addBehavior('Timestamp');
+        $this->setTable('exam_types');
+        $this->setDisplayField('exam_name');
+        $this->setPrimaryKey('id');
 
-        // Define relationships
+        // Associations
         $this->belongsTo('PublishedCourses', [
-            'foreignKey' => 'published_course_id'
+            'foreignKey' => 'published_course_id',
+            'joinType' => 'INNER',
         ]);
 
         $this->belongsTo('Sections', [
-            'foreignKey' => 'section_id'
+            'foreignKey' => 'section_id',
+            'joinType' => 'INNER',
         ]);
 
         $this->hasMany('ExamResults', [
-            'foreignKey' => 'exam_type_id'
+            'foreignKey' => 'exam_type_id',
+            'dependent' => false,
         ]);
     }
 
-
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
         $validator
+            ->requirePresence('exam_name', 'create')
             ->notEmptyString('exam_name', 'Please enter exam type.')
+            ->requirePresence('percent', 'create')
             ->notEmptyString('percent', 'Please enter the percentage.')
             ->numeric('percent', 'Please enter the percent in number.')
-            ->greaterThanOrEqual('percent', 1, 'Percent can not be less than 1.')
-            ->lessThanOrEqual('percent', 100, 'Percent can not be greater than 100.')
-            ->allowEmptyString('order')
+            ->lessThanOrEqual('percent', 100, 'Percent cannot be greater than 100.')
+            ->greaterThan('percent', 0, 'Percent cannot be less than 1.')
+            ->allowEmptyString('order', true)
             ->numeric('order', 'Please enter the order in number.')
-            ->greaterThan('order', 0, 'Order can not be less than 1.');
+            ->greaterThan('order', 0, 'Order cannot be less than 1.');
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function unsetEmptyRows($data = null)
     {
-
-        $rules->add($rules->existsIn(['published_course_id'], 'PublishedCourses'));
-        $rules->add($rules->existsIn(['section_id'], 'Sections'));
-
-        return $rules;
-    }
-
-    public function unset_empty_rows($data = null)
-    {
-
         if (!empty($data['ExamType'])) {
-            $skip_first_row = 0;
+            $skipFirstRow = 0;
             foreach ($data['ExamType'] as $k => &$v) {
-                if ($skip_first_row == 0) {
-                    //
+                if ($skipFirstRow == 0) {
+                    // Skip first row
                 } else {
                     if (empty($v['exam_name']) && empty($v['percent'])) {
                         unset($data['ExamType'][$k]);
                     }
                 }
-                $skip_first_row++;
+                $skipFirstRow++;
             }
         }
         return $data;
     }
 
-    function getExamType($publishedCourseId)
+    public function getExamType($publishedCourseId)
     {
-
-        $examTypes = $this->find('all', array(
-            'conditions' => array(
-                'ExamType.published_course_id' => $publishedCourseId
-            ),
-            'contain' => array(
-                'ExamResult',
-                'PublishedCourse' => array(
-                    'GivenByDepartment',
-                    'YearLevel',
-                    'Course' => array('Curriculum'),
-                    'CourseInstructorAssignment' => array(
-                        'Staff' => array('Department', 'Title', 'Position')
-                    )
-                )
-            )
-        ));
-
-        return $examTypes;
+        return $this->find()
+            ->where(['ExamTypes.published_course_id' => $publishedCourseId])
+            ->contain([
+                'ExamResults',
+                'PublishedCourses' => [
+                    'GivenByDepartments',
+                    'YearLevels',
+                    'Courses' => ['Curriculums'],
+                    'CourseInstructorAssignments' => [
+                        'Staff' => ['Departments', 'Titles', 'Positions'],
+                    ],
+                ],
+            ])
+            ->all()
+            ->toArray();
     }
 
-    function getExamTypeReport(
-        $acadamic_year = null,
+    public function getExamTypeReport(
+        $academicYear = null,
         $semester = null,
-        $program_id = null,
-        $program_type_id = null,
-        $department_id = null,
+        $programId = null,
+        $programTypeId = null,
+        $departmentId = null,
         $gender = null,
-        $year_level_id = null,
-        $continous_ass_number = 0
+        $yearLevelId = null,
+        $continuousAssNumber = 0
     ) {
+        $options = [];
 
-        $options = array();
-
-        if (isset($acadamic_year) && !empty($acadamic_year)) {
-            $options['conditions']['PublishedCourse.academic_year'] = $acadamic_year;
+        if (!empty($academicYear)) {
+            $options['conditions']['PublishedCourses.academic_year'] = $academicYear;
         }
 
-        if (isset($semester) && !empty($semester)) {
-            $options['conditions']['PublishedCourse.semester'] = $semester;
+        if (!empty($semester)) {
+            $options['conditions']['PublishedCourses.semester'] = $semester;
         }
 
-        if (isset($department_id) && !empty($department_id)) {
-            $college_id = explode('~', $department_id);
-            if (count($college_id) > 1) {
-                $options['conditions'][] = 'PublishedCourse.given_by_department_id  IN (SELECT id FROM departments where college_id="' . $college_id[1] . '")';
+        if (!empty($departmentId)) {
+            $collegeId = explode('~', $departmentId);
+            if (count($collegeId) > 1) {
+                $options['conditions'][] = 'PublishedCourses.given_by_department_id IN (SELECT id FROM departments WHERE college_id = :collegeId)';
+                $options['bind'][':collegeId'] = $collegeId[1];
             } else {
-                $options['conditions'][] = 'PublishedCourse.given_by_department_id =' . $department_id . '';
+                $options['conditions']['PublishedCourses.given_by_department_id'] = $departmentId;
             }
         }
 
-        if (isset($program_id) && !empty($program_id)) {
-            $program_ids = explode('~', $program_id);
-            if (count($program_ids) > 1) {
-                //$options['conditions'][] = 'PublishedCourse.program_id='.$program_ids[1];
+        if (!empty($programId)) {
+            $programIds = explode('~', $programId);
+            if (count($programIds) > 1) {
+                // No condition added as per original logic
             } else {
-                $options['conditions'][] = 'PublishedCourse.program_id=' . $program_id;
+                $options['conditions']['PublishedCourses.program_id'] = $programId;
             }
         }
 
-        if (isset($program_type_id) && !empty($program_type_id)) {
-            $program_type_ids = explode('~', $program_type_id);
-            if (count($program_type_ids) > 1) {
-                //$options['conditions'][] = 'PublishedCourse.program_type_id='.$program_type_ids[1];
+        if (!empty($programTypeId)) {
+            $programTypeIds = explode('~', $programTypeId);
+            if (count($programTypeIds) > 1) {
+                // No condition added as per original logic
             } else {
-                $options['conditions'][] = 'PublishedCourse.program_type_id=' . $program_type_id;
+                $options['conditions']['PublishedCourses.program_type_id'] = $programTypeId;
             }
         }
 
-        if (isset($year_level_id) && !empty($year_level_id)) {
-            $year_id = explode('~', $year_level_id);
-            if (count($year_id) > 1) {
-                //$options['conditions'][] = 'PublishedCourse.year_level_id  IN (SELECT id FROM year_levels where name="'..'")';
+        if (!empty($yearLevelId)) {
+            $yearId = explode('~', $yearLevelId);
+            if (count($yearId) > 1) {
+                // No condition added as per original logic
             } else {
-                $options['conditions'][] = 'PublishedCourse.year_level_id  IN (SELECT id FROM year_levels where name="' . $year_level_id . '")';
+                $options['conditions']['PublishedCourses.year_level_id IN (SELECT id FROM year_levels WHERE name = :yearLevelId)'] = [':yearLevelId' => $yearLevelId];
             }
         }
 
-        $options['contain'] = array(
-            'CourseInstructorAssignment' => array('Staff' => array('Department')),
-            'GivenByDepartment' => array('fields' => array('id', 'name')),
-            'Course',
-            'Program' => array('fields' => array('id', 'name')),
-            'ProgramType' => array('fields' => array('id', 'name')),
-            'YearLevel' => array('fields' => array('id', 'name')),
-            'Section' => array('fields' => array('id', 'name')),
-            'ExamType'
-        );
+        $publishedCourses = $this->PublishedCourses->find()
+            ->select([
+                'PublishedCourses.id',
+                'PublishedCourses.academic_year',
+                'PublishedCourses.semester',
+                'PublishedCourses.given_by_department_id',
+                'PublishedCourses.program_id',
+                'PublishedCourses.program_type_id',
+                'PublishedCourses.year_level_id',
+                'GivenByDepartments.id',
+                'GivenByDepartments.name',
+                'Courses.id',
+                'Courses.course_title',
+                'Courses.course_code',
+                'Courses.credit',
+                'Programs.id',
+                'Programs.name',
+                'ProgramTypes.id',
+                'ProgramTypes.name',
+                'YearLevels.id',
+                'YearLevels.name',
+                'Sections.id',
+                'Sections.name',
+            ])
+            ->contain([
+                'CourseInstructorAssignments' => ['Staff' => ['Departments']],
+                'GivenByDepartments',
+                'Courses',
+                'Programs',
+                'ProgramTypes',
+                'YearLevels',
+                'Sections',
+                'ExamTypes',
+            ])
+            ->where($options['conditions'] ?? [])
+            ->bind($options['bind'] ?? [])
+            ->all()
+            ->toArray();
 
-        $publishedCourses = $this->PublishedCourse->find('all', $options);
-        $instructors = array();
-
+        $instructors = [];
         if (!empty($publishedCourses)) {
-            foreach ($publishedCourses as $k => $v) {
-                foreach ($v['CourseInstructorAssignment'] as $ca => $cv) {
-                    if (!empty($continous_ass_number) && count($v['ExamType']) == $continous_ass_number) {
-                        if ($cv['type'] == 'Lecture') {
-                            $instructors[$cv['Staff']['Department']['name'] . '~' . $cv['Staff']['full_name'] . '~' . $v['Course']['course_title'] . '(' . $v['Course']['course_code'] . '-' . $v['Course']['credit'] . ')' . '~' . 'p_id' . $v['PublishedCourse']['id']] = count(
-                                $v['ExamType']
-                            );
+            foreach ($publishedCourses as $v) {
+                foreach ($v->course_instructor_assignments as $cv) {
+                    if (!empty($continuousAssNumber) && count($v->exam_types) == $continuousAssNumber) {
+                        if ($cv->type === 'Lecture') {
+                            $key = "{$cv->staff->department->name}~{$cv->staff->full_name}~{$v->course->course_title}({$v->course->course_code}-{$v->course->credit})~p_id{$v->id}";
+                            $instructors[$key] = count($v->exam_types);
                         }
-                    } elseif ($continous_ass_number == 0) {
-                        if ($cv['type'] == 'Lecture') {
-                            $instructors[$cv['Staff']['Department']['name'] . '~' . $cv['Staff']['full_name'] . '~' . $v['Course']['course_title'] . '(' . $v['Course']['course_code'] . '-' . $v['Course']['credit'] . ')' . '~' . 'p_id' . $v['PublishedCourse']['id']] = count(
-                                $v['ExamType']
-                            );
+                    } elseif ($continuousAssNumber == 0) {
+                        if ($cv->type === 'Lecture') {
+                            $key = "{$cv->staff->department->name}~{$cv->staff->full_name}~{$v->course->course_title}({$v->course->course_code}-{$v->course->credit})~p_id{$v->id}";
+                            $instructors[$key] = count($v->exam_types);
                         }
                     }
                 }
@@ -215,57 +204,60 @@ class ExamTypesTable extends Table
         return $instructors;
     }
 
-    function getAssessementDetailType($course_registration_id, $type = 1)
+    public function getAssessmentDetailType($courseRegistrationId, $type = 1)
     {
-
-        $resultDetail = array();
+        $resultDetail = [];
 
         if ($type == 1) {
-            $published_course_id = $this->PublishedCourse->CourseRegistration->field(
-                'CourseRegistration.published_course_id',
-                array('CourseRegistration.id' => $course_registration_id)
-            );
-            $examTypes = $this->find(
-                'all',
-                array('conditions' => array('ExamType.published_course_id' => $published_course_id))
-            );
-            $resultDetail = array();
+            $publishedCourseId = TableRegistry::getTableLocator()->get('CourseRegistrations')
+                ->find()
+                ->select(['published_course_id'])
+                ->where(['id' => $courseRegistrationId])
+                ->first()
+                ->published_course_id;
+
+            $examTypes = $this->find()
+                ->where(['published_course_id' => $publishedCourseId])
+                ->all();
 
             if (!empty($examTypes)) {
                 foreach ($examTypes as $vex) {
-                    $resultDetail[$vex['ExamType']['exam_name'] . '(' . $vex['ExamType']['percent'] . '%)'] = ClassRegistry::init(
-                        'ExamResult'
-                    )->field(
-                        'ExamResult.result',
-                        array(
-                            'ExamResult.course_registration_id' => $course_registration_id,
-                            'ExamResult.exam_type_id' => $vex['ExamType']['id']
-                        )
-                    );
+                    $result = TableRegistry::getTableLocator()->get('ExamResults')
+                        ->find()
+                        ->select(['result'])
+                        ->where([
+                            'course_registration_id' => $courseRegistrationId,
+                            'exam_type_id' => $vex->id,
+                        ])
+                        ->first();
+
+                    $resultDetail["{$vex->exam_name}({$vex->percent}%)"] = $result ? $result->result : null;
                 }
             }
         } else {
-            $published_course_id = $this->PublishedCourse->CourseAdd->field(
-                'CourseAdd.published_course_id',
-                array('CourseAdd.id' => $course_registration_id)
-            );
-            $examTypes = $this->find(
-                'all',
-                array('conditions' => array('ExamType.published_course_id' => $published_course_id))
-            );
-            $resultDetail = array();
+            $publishedCourseId = TableRegistry::getTableLocator()->get('CourseAdds')
+                ->find()
+                ->select(['published_course_id'])
+                ->where(['id' => $courseRegistrationId])
+                ->first()
+                ->published_course_id;
+
+            $examTypes = $this->find()
+                ->where(['published_course_id' => $publishedCourseId])
+                ->all();
 
             if (!empty($examTypes)) {
                 foreach ($examTypes as $vex) {
-                    $resultDetail[$vex['ExamType']['exam_name'] . '(' . $vex['ExamType']['percent'] . '%)'] = ClassRegistry::init(
-                        'ExamResult'
-                    )->field(
-                        'ExamResult.result',
-                        array(
-                            'ExamResult.course_add_id' => $course_registration_id,
-                            'ExamResult.exam_type_id' => $vex['ExamType']['id']
-                        )
-                    );
+                    $result = TableRegistry::getTableLocator()->get('ExamResults')
+                        ->find()
+                        ->select(['result'])
+                        ->where([
+                            'course_add_id' => $courseRegistrationId,
+                            'exam_type_id' => $vex->id,
+                        ])
+                        ->first();
+
+                    $resultDetail["{$vex->exam_name}({$vex->percent}%)"] = $result ? $result->result : null;
                 }
             }
         }
@@ -273,169 +265,136 @@ class ExamTypesTable extends Table
         return $resultDetail;
     }
 
-    // 1. exam setup is already created
-    function examSetupCreation($publishedCourseId, $givenSetup)
+    public function examSetupCreation($publishedCourseId, $givenSetup)
     {
-
-        // $examTypes = $this->find('all', array('conditions' => array('ExamType.published_course_id' => $publishedCourseId), 'recursive' => -1));
-
-        $providedExamSetups = array();
+        $providedExamSetups = [];
         $count = 0;
-        debug($givenSetup);
 
         if (!empty($givenSetup)) {
             foreach ($givenSetup as $k => $v) {
                 if ($k == 0) {
                     continue;
-                } else {
-                    $asstype = array();
-                    $asstype = explode('-', $v);
+                }
 
-                    // check if the assessement is found and have proper percent
-                    if (isset($asstype[1]) && !empty($asstype[1])) {
-                        $examTypes = $this->find('first', array(
-                            'conditions' => array(
-                                'ExamType.published_course_id' => $publishedCourseId,
-                                'ExamType.percent' => trim($asstype[1]),
-                                'ExamType.exam_name' => trim($asstype[0])
-                            ),
-                            'recursive' => -1
-                        ));
+                $assType = explode('-', $v);
 
-                        if (empty($examTypes)) {
-                            debug($asstype[0]);
-                            debug($asstype[1]);
-                            debug($publishedCourseId);
-                            debug($examTypes);
-                            debug($asstype);
+                if (isset($assType[1]) && !empty($assType[1])) {
+                    $examType = $this->find()
+                        ->where([
+                            'published_course_id' => $publishedCourseId,
+                            'percent' => trim($assType[1]),
+                            'exam_name' => trim($assType[0]),
+                        ])
+                        ->first();
+
+                    if ($examType) {
+                        $providedExamSetups['ExamType'][$count] = $examType;
+                    } else {
+                        if (!is_numeric($assType[1])) {
+                            $this->validationErrors['assessement'] = [
+                                'Please provide the percent "' . $assType[1] . '" in number. If you put "%" in the weight please remove it and put only the number',
+                            ];
+                            return false;
                         }
 
-                        // check if the provide assessement is match with the system assessement
-                        if (isset($examTypes) && !empty($examTypes)) {
-                            // assessement is fine, so do nothing
-                            $providedExamSetups['ExamType'][$count] = $examTypes;
-                        } else {
-                            // nothing is defined, define it and put it in array, check if percent is number
-                            if (!is_numeric($asstype[1])) {
-                                $this->invalidate(
-                                    'assessement',
-                                    'Please provide the percent "' . $asstype[1] . '" in number. If you put "%" in the weight please remove it and put only the number'
-                                );
-                                return false;
-                            }
-
-                            $providedExamSetups['ExamType'][$count]['ExamType']['exam_name'] = trim($asstype[0]);
-                            $providedExamSetups['ExamType'][$count]['ExamType']['percent'] = trim($asstype[1]);
-                            $providedExamSetups['ExamType'][$count]['ExamType']['order'] = $count + 1;
-                            $providedExamSetups['ExamType'][$count]['ExamType']['published_course_id'] = $publishedCourseId;
-                        }
-                    } elseif (isset($asstype[0]) && !empty($asstype[0]) && !isset($asstype[1])) {
-                        // the provided excel doesnt have percent, please put the weight of the assessement  after minus(-)
-                        $this->invalidate(
-                            'assessement',
-                            'The assessement "' . $asstype[0] . '" doesn\'t have weight, please provide the weight for assessement after its name separated by - the weight of the assessment without percent.'
-                        );
-                        return false;
+                        $providedExamSetups['ExamType'][$count] = [
+                            'exam_name' => trim($assType[0]),
+                            'percent' => trim($assType[1]),
+                            'order' => $count + 1,
+                            'published_course_id' => $publishedCourseId,
+                        ];
                     }
+                } elseif (isset($assType[0]) && !empty($assType[0]) && !isset($assType[1])) {
+                    $this->validationErrors['assessement'] = [
+                        'The assessement "' . $assType[0] . '" doesn\'t have weight, please provide the weight for assessement after its name separated by - the weight of the assessment without percent.',
+                    ];
+                    return false;
                 }
 
                 $count++;
             }
         }
 
-        if (isset($providedExamSetups['ExamType']) && !empty($providedExamSetups['ExamType'])) {
-            $totalWeight = 0;
-            foreach ($providedExamSetups['ExamType'] as $ek => $ev) {
-                $totalWeight += $ev['ExamType']['percent'];
-            }
+        if (!empty($providedExamSetups['ExamType'])) {
+            $totalWeight = array_sum(array_column($providedExamSetups['ExamType'], 'percent'));
 
-            if ($totalWeight < 100 || $totalWeight > 100) {
-                $this->invalidate(
-                    'assessement',
-                    'The current total assessement  weight is ' . $totalWeight . ' it must be 100.'
-                );
+            if ($totalWeight != 100) {
+                $this->validationErrors['assessement'] = [
+                    'The current total assessement weight is ' . $totalWeight . ' it must be 100.',
+                ];
                 return false;
             }
 
-            // if everthing is fine do the assessement creation and return the published course id
-            if ($this->saveAll($providedExamSetups['ExamType'], array('validate' => 'first'))) {
+            if ($this->saveMany($this->newEntities($providedExamSetups['ExamType'], ['validate' => 'default']))) {
                 return $publishedCourseId;
-            } else {
-                //$error = $this->invalidFields();
-                //debug($error);
-                $this->invalidate('assessement', 'Something went wrong, please try again.');
-                return false;
             }
+
+            $this->validationErrors['assessement'] = ['Something went wrong, please try again.'];
+            return false;
         }
+
         return false;
     }
 
-    function getAssessementDetailTypeRemedialMasterSheet($course_registration_id, $type = 1)
+    public function getAssessmentDetailTypeRemedialMasterSheet($courseRegistrationId, $type = 1)
     {
-
-        $resultDetail = array();
+        $resultDetail = [];
 
         if ($type == 1) {
-            $published_course_id = $this->PublishedCourse->CourseRegistration->field(
-                'CourseRegistration.published_course_id',
-                array('CourseRegistration.id' => $course_registration_id)
-            );
-            $examTypes = $this->find(
-                'all',
-                array(
-                    'conditions' => array('ExamType.published_course_id' => $published_course_id),
-                    'order' => array('ExamType.order')
-                )
-            );
-            $resultDetail = array();
+            $publishedCourseId = TableRegistry::getTableLocator()->get('CourseRegistrations')
+                ->find()
+                ->select(['published_course_id'])
+                ->where(['id' => $courseRegistrationId])
+                ->first()
+                ->published_course_id;
+
+            $examTypes = $this->find()
+                ->where(['published_course_id' => $publishedCourseId])
+                ->order(['order' => 'ASC'])
+                ->all();
 
             if (!empty($examTypes)) {
                 $cnt = 0;
                 foreach ($examTypes as $vex) {
-                    //$resultDetail[$vex['ExamType']['exam_name'] . '(' . $vex['ExamType']['percent'] . '%)'] = ClassRegistry::init('ExamResult')->field('ExamResult.result', array('ExamResult.course_registration_id' => $course_registration_id, 'ExamResult.exam_type_id' => $vex['ExamType']['id']));
-                    $examRslt = ClassRegistry::init('ExamResult')->find(
-                        'first',
-                        array(
-                            'conditions' => array(
-                                'ExamResult.course_registration_id' => $course_registration_id,
-                                'ExamResult.exam_type_id' => $vex['ExamType']['id']
-                            )
-                        )
-                    );
-                    $resultDetail[$cnt]['ExamType'] = $vex['ExamType'];
-                    $resultDetail[$cnt]['ExamResult'] = (!empty($examRslt['ExamResult']) ? $examRslt['ExamResult'] : array());
+                    $examResult = TableRegistry::getTableLocator()->get('ExamResults')
+                        ->find()
+                        ->where([
+                            'course_registration_id' => $courseRegistrationId,
+                            'exam_type_id' => $vex->id,
+                        ])
+                        ->first();
+
+                    $resultDetail[$cnt]['ExamType'] = $vex->toArray();
+                    $resultDetail[$cnt]['ExamResult'] = $examResult ? $examResult->toArray() : [];
                     $cnt++;
                 }
             }
         } else {
-            $published_course_id = $this->PublishedCourse->CourseAdd->field(
-                'CourseAdd.published_course_id',
-                array('CourseAdd.id' => $course_registration_id)
-            );
-            $examTypes = $this->find(
-                'all',
-                array(
-                    'conditions' => array('ExamType.published_course_id' => $published_course_id),
-                    'order' => array('ExamType.order')
-                )
-            );
-            $resultDetail = array();
+            $publishedCourseId = TableRegistry::getTableLocator()->get('CourseAdds')
+                ->find()
+                ->select(['published_course_id'])
+                ->where(['id' => $courseRegistrationId])
+                ->first()
+                ->published_course_id;
+
+            $examTypes = $this->find()
+                ->where(['published_course_id' => $publishedCourseId])
+                ->order(['order' => 'ASC'])
+                ->all();
 
             if (!empty($examTypes)) {
                 $cnt = 0;
                 foreach ($examTypes as $vex) {
-                    //$resultDetail[$vex['ExamType']['exam_name'] . '(' . $vex['ExamType']['percent'] . '%)'] = ClassRegistry::init('ExamResult')->field('ExamResult.result', array('ExamResult.course_add_id' => $course_registration_id, 'ExamResult.exam_type_id' => $vex['ExamType']['id']));
-                    $examRslt = ClassRegistry::init('ExamResult')->find(
-                        'first',
-                        array(
-                            'conditions' => array(
-                                'ExamResult.course_add_id' => $course_registration_id,
-                                'ExamResult.exam_type_id' => $vex['ExamType']['id']
-                            )
-                        )
-                    );
-                    $resultDetail[$cnt]['ExamType'] = $vex['ExamType'];
-                    $resultDetail[$cnt]['ExamResult'] = (!empty($examRslt['ExamResult']) ? $examRslt['ExamResult'] : array());
+                    $examResult = TableRegistry::getTableLocator()->get('ExamResults')
+                        ->find()
+                        ->where([
+                            'course_add_id' => $courseRegistrationId,
+                            'exam_type_id' => $vex->id,
+                        ])
+                        ->first();
+
+                    $resultDetail[$cnt]['ExamType'] = $vex->toArray();
+                    $resultDetail[$cnt]['ExamResult'] = $examResult ? $examResult->toArray() : [];
                     $cnt++;
                 }
             }

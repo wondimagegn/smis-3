@@ -1,9 +1,12 @@
+
 <?php
-	$currency = !empty(Configure::read('SMIScurrency')) && strcasecmp(Configure::read('SMIScurrency'), '&ETB;') == 0 ? 'ETB: ' : '$ ';
+use Cake\Core\Configure;
+
+$currency = !empty(Configure::read('SMIScurrency')) && strcasecmp(Configure::read('SMIScurrency'), '&ETB;') == 0 ? 'ETB: ' : '$ ';
 	$formatOptions = array('places' => 2,  'before' => false, 'decimals' => '.',  'thousands' => ',' );
 	$formatOptionsForCurrency = array('places' => 2, 'before' => 'ETB: ', 'escape' => false, 'decimals' => '.',  'thousands' => ',' );
 
-	if (!empty($student_academic_profile['CostShare'])) { ?>
+	if (!empty($studentAcademicProfile['CostShare'])) { ?>
 		<div class="fs16 smallheading" style="margin-bottom: 10px;"><span>Cost sharing dues </span></div>
 		<table cellpadding="0" cellspacing="0" class="table">
 			<thead>
@@ -21,7 +24,7 @@
 			<tbody>
 				<?php
 				$total_due = 0;
-				foreach ($student_academic_profile['CostShare'] as $ks=> $costShare) { ?>
+				foreach ($studentAcademicProfile['CostShare'] as $ks=> $costShare) { ?>
 					<tr>
 						<td class="center"><?= $costShare['academic_year']; ?></td>
 						<td class="center"><?= $costShare['sharing_cycle']; ?></td>
@@ -29,7 +32,7 @@
 						<td class="center"><?= $this->Number->format($costShare['accomodation_fee'] , $formatOptions); ?></td>
 						<td class="center"><?= $this->Number->format($costShare['cafeteria_fee'] , $formatOptions); ?></td>
 						<td class="center"><?= $this->Number->format($costShare['medical_fee'] , $formatOptions); ?></td>
-						<td class="center"><?php 
+						<td class="center"><?php
 							$year_total = ($costShare['education_fee']+$costShare['accomodation_fee']+$costShare['cafeteria_fee']+$costShare['medical_fee']);
 							$total_due += $year_total;
 							echo $this->Number->format($year_total , $formatOptions);
@@ -48,7 +51,7 @@
 		<hr>
 
 		<?php
-		if (!empty($student_academic_profile['CostSharingPayment'])) { ?>
+		if (!empty($studentAcademicProfile['CostSharingPayment'])) { ?>
 			<div class="fs16 smallheading" style="margin-bottom: 10px;"><span>Cost sharing payments settled: </span></div>
 			<table cellpadding="0" cellspacing="0" class="table">
 				<thead>
@@ -60,7 +63,7 @@
 				</thead>
 				<tbody>
 					<?php
-					foreach ($student_academic_profile['CostSharingPayment'] as $cshP => $costSharingPayment) { ?>
+					foreach ($studentAcademicProfile['CostSharingPayment'] as $cshP => $costSharingPayment) { ?>
 						<tr>
 							<td class="center"><?= $costSharingPayment['reference_number']; ?></td>
 							<td class="center"><?= $this->Number->currency($costSharingPayment['amount'], $currency) ; ?></td>
@@ -76,7 +79,7 @@
 			<div class="warning-box warning-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no cost sharing payment settled so far for the selected student.</div>
 			<?php
 		}
-	} else if (!empty($student_academic_profile['ApplicablePayment'])) { ?>
+	} else if (!empty($studentAcademicProfile['ApplicablePayment'])) { ?>
 		<div class="fs16 smallheading" style="margin-bottom: 10px;"><span>Applicable Payment Due</span></div>
 		<table cellpadding="0" cellspacing="0" class="table">
 			<thead>
@@ -94,7 +97,7 @@
 			<tbody>
 				<?php
 				$total_due = 0;
-				foreach ($student_academic_profile['ApplicablePayment'] as $app => $applicablePayment) { ?>
+				foreach ($studentAcademicProfile['ApplicablePayment'] as $app => $applicablePayment) { ?>
 					<tr>
 						<td class="center"><?= $applicablePayment['academic_year']; ?></td>
 						<td class="center"><?= $applicablePayment['semester']; ?></td>
@@ -111,7 +114,7 @@
 		</table>
 		<hr>
 		<?php
-		if (!empty($student_academic_profile['Payment'])) { ?>
+		if (!empty($studentAcademicProfile['Payment'])) { ?>
 			<div class="fs16 smallheading" style="margin-bottom: 10px;"><span>Settled Payment Details: </span></div>
 			<table cellpadding="0" cellspacing="0" class="table">
 				<thead>
@@ -124,7 +127,7 @@
 				</thead>
 				<tbody>
 					<?php
-					foreach ($student_academic_profile['Payment'] as $pk=>$payment) { ?>
+					foreach ($studentAcademicProfile['Payment'] as $pk=>$payment) { ?>
 						<tr>
 							<td class="center"><?= $payment['academic_year']; ?></td>
 							<td class="center"><?= $payment['semester']; ?></td>
@@ -136,11 +139,11 @@
 				</tbody>
 			</table>
 			<hr>
-			<?php 
+			<?php
 		} else {  ?>
 			<div class="warning-box warning-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no recorded payment settled so far for the selected student.</div>
 			<?php
-		} 
+		}
 	} else { ?>
 		<div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no payment dues recorded for the selected student.</div>
 		<?php

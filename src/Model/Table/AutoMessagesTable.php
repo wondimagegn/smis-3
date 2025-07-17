@@ -1,1420 +1,1143 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\TableRegistry;
+use Cake\Utility\Text;
+use Cake\Event\EventInterface;
+
+
 
 class AutoMessagesTable extends Table
 {
-
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
         $this->setTable('auto_messages');
-        $this->setDisplayField('id');
         $this->setPrimaryKey('id');
+        $this->addBehavior('Timestamp'); // Ensure created/modified fields are managed
 
-        $this->addBehavior('Timestamp');
-
+        // Associations
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
-            'joinType' => 'INNER',
-            'propertyName'=>'User'
+            'joinType' => 'INNER'
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function beforeSave(EventInterface $event, $entity, $options)
     {
+        if ($entity->isNew() && (empty($entity->id) || $entity->id === '')) {
+            $entity->set('id', Text::uuid());
+        }
+    }
 
-        $validator
-            ->scalar('id')
-            ->maxLength('id', 36)
-            ->allowEmptyString('id', null, 'create');
 
+    public function validationDefault(Validator $validator): Validator
+    {
         $validator
             ->scalar('message')
             ->requirePresence('message', 'create')
-            ->notEmptyString('message');
-
-        $validator
-            ->boolean('is_read')
-            ->notEmptyString('is_read');
+            ->notEmptyString('message', 'Message cannot be empty');
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function getMessages($user_id = null)
     {
-
-        $rules->add($rules->existsIn(['user_id'], 'Users'));
-
-        return $rules;
-    }
-
-    function getMessages($user_id = null)
-    {
-        $auto_messages = $this->find()
+        return $this->find()
             ->where([
-                'AutoMessages.is_read' => 0,
+                'AutoMessages.read' => 0,
                 'AutoMessages.user_id' => $user_id
             ])
             ->order(['AutoMessages.created' => 'DESC'])
             ->limit(AUTO_MESSAGE_LIMIT)
-            ->enableHydration(false) // Disable object hydration to return an array like CakePHP 2.x
+            ->all()
             ->toArray();
-        return $auto_messages;
     }
 
-    function sendMessage($user_id = null, $message = null, $type = null)
+    public function sendMessage($user_id = null, $message = null, $type = null)
     {
-
-        $auto_message = array();
-        $auto_message['message'] = $message;
+        $autoMessage = $this->newEntity([
+            'message' => $message,
+            'read' => 0,
+            'user_id' => $user_id
+        ]);
 
         if ($type === 1) {
-            $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message['message'] . '</p>';
+            $autoMessage->message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $autoMessage->message . '</p>';
         } elseif ($type === -1) {
-            $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message['message'] . '</p>';
+            $autoMessage->message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $autoMessage->message . '</p>';
         } elseif ($type === 0) {
-            $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="on-process">' . $auto_message['message'] . '</p>';
+            $autoMessage->message = '<p style="text-align:justify; padding:0px; margin:0px" class="on-process">' . $autoMessage->message . '</p>';
         }
 
-        $auto_message['is_read'] = 0;
-        $auto_message['user_id'] = $user_id;
-
-        $this->save($auto_message);
+        $this->save($autoMessage);
     }
 
-    function alumniRegistrationMessage($message, $type = null)
+    public function alumniRegistrationMessage($message, $type = null)
     {
-
-        $auto_message = array();
-
-        $usersLists = ClassRegistry::init('User')->find(
-            'list',
-            array('conditions' => array('User.role_id' => 13), 'fields' => array('User.id', 'User.id'))
-        );
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $usersLists = $usersTable->find('list', [
+            'conditions' => ['Users.role_id' => 13],
+            'keyField' => 'id',
+            'valueField' => 'id'
+        ])->toArray();
 
         if (!empty($usersLists)) {
+            $autoMessages = [];
             foreach ($usersLists as $usr) {
-                $auto_message['message'] = $message;
-
+                $msg = $message;
                 if ($type === 1) {
-                    $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message['message'] . '</p>';
+                    $msg = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $msg . '</p>';
                 } elseif ($type === -1) {
-                    $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message['message'] . '</p>';
+                    $msg = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $msg . '</p>';
                 } elseif ($type === 0) {
-                    $auto_message['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="on-process">' . $auto_message['message'] . '</p>';
+                    $msg = '<p style="text-align:justify; padding:0px; margin:0px" class="on-process">' . $msg . '</p>';
                 }
 
-                $auto_message['is_read'] = 0;
-                $auto_message['user_id'] = $usr;
-
-                $this->save($auto_message);
+                $autoMessages[] = $this->newEntity([
+                    'message' => $msg,
+                    'read' => 0,
+                    'user_id' => $usr
+                ]);
             }
+            $this->saveMany($autoMessages);
         }
     }
 
-    function postMessageToGroup($role_id = null, $subject = null, $message = null, $data = null)
+    public function postMessageToGroup($role_id = null, $subject = null, $message = null, $data = null)
     {
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $message = '<h7>' . $subject . '</h7><p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . nl2br(htmlentities($message)) . '</p>';
 
-        debug($message);
+        $usersMessages = $usersTable->getListOfUsersRole($role_id, $message, $data);
 
-        $auto_message['message'] = '<h7>' . $subject . '</h7><p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . nl2br(
-                htmlentities($message)
-            ) . '</p>';
-        $usersMessage['AutoMessage'] = $this->User->getListOfUsersRole($role_id, $auto_message['message'], $data);
-
-        debug($usersMessage);
-
-        if (!empty($usersMessage)) {
-            return $this->saveAll($usersMessage['AutoMessage'], array('validate' => false));
+        if (!empty($usersMessages['AutoMessages'])) {
+            $entities = $this->newEntities($usersMessages['AutoMessages']);
+            return $this->saveMany($entities);
         }
 
         return false;
     }
 
-    function sendNotificationOnRegistrarGradeConfirmation($confirmed_grades = null)
+    public function sendNotificationOnRegistrarGradeConfirmation($confirmed_grades = null)
     {
-
-        //Notification to student
-        //debug($confirmed_grades);
-        $grade_ids = array();
-        $auto_message = array();
+        $autoMessages = [];
 
         if (!empty($confirmed_grades) && $confirmed_grades[0]['registrar_approval'] == 1) {
-            foreach ($confirmed_grades as $key => $grade) {
-                $grade_ids[] = $grade['id'];
+            $grade_ids = array_column($confirmed_grades, 'id');
+
+            $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+            $grade_details = $examGradesTable->find()
+                ->where(['ExamGrades.id IN' => $grade_ids])
+                ->contain([
+                    'CourseAdds' => [
+                        'PublishedCourses' => [
+                            'fields' => ['id', 'course_id'],
+                            'Courses' => ['id', 'course_code_title']
+                        ],
+                        'Students' => ['id', 'user_id']
+                    ],
+                    'CourseRegistrations' => [
+                        'PublishedCourses' => [
+                            'fields' => ['id', 'course_id'],
+                            'Courses' => ['id', 'course_code_title']
+                        ],
+                        'Students' => ['id', 'user_id']
+                    ]
+                ])
+                ->all()
+                ->toArray();
+
+            // Student notification
+            if (!empty($grade_details) && defined('ALLOW_AUTO_MASSEGES_TO_BE_SENT_FOR_STUDENTS') && ALLOW_AUTO_MASSEGES_TO_BE_SENT_FOR_STUDENTS == 1) {
+                foreach ($grade_details as $grade_detail) {
+                    if (!empty($grade_detail->course_registration_id) && $grade_detail->course_registration_id > 0 && isset($grade_detail->course_registration->student->user_id)) {
+                        $autoMessages[] = $this->newEntity([
+                            'message' => 'You got <strong>' . $grade_detail->grade . '</strong> for the course <u>' . $grade_detail->course_registration->published_course->course->course_code_title . '</u>.',
+                            'read' => 0,
+                            'user_id' => $grade_detail->course_registration->student->user_id
+                        ]);
+                    } elseif (!empty($grade_detail->course_add_id) && $grade_detail->course_add_id > 0 && isset($grade_detail->course_add->student->user_id)) {
+                        $autoMessages[] = $this->newEntity([
+                            'message' => 'You got <strong>' . $grade_detail->grade . '</strong> for the course <u>' . $grade_detail->course_add->published_course->course->course_code_title . '</u>.',
+                            'read' => 0,
+                            'user_id' => $grade_detail->course_add->student->user_id
+                        ]);
+                    }
+                }
             }
 
-            $grade_details = ClassRegistry::init('ExamGrade')->find('all', array(
-                'conditions' => array(
-                    'ExamGrade.id' => $grade_ids
-                ),
-                'contain' => array(
-                    'CourseAdd' => array('PublishedCourse' => array('Course'), 'Student'),
-                    'CourseRegistration' => array('PublishedCourse' => array('Course'), 'Student')
-                )
-            ));
+            // Instructor notification
+            $publishedCoursesTable = TableRegistry::getTableLocator()->get('PublishedCourses');
+            $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+            $sectionsTable = TableRegistry::getTableLocator()->get('Sections');
 
-            //Student notification
-            if (!empty($grade_details)) {
-                foreach ($grade_details as $key => $grade_detail) {
-                    if (!empty($grade_detail['ExamGrade']['course_registration_id']) && $grade_detail['ExamGrade']['course_registration_id'] > 0 && isset($grade_detail['CourseRegistration']['Student']) && !empty($grade_detail['CourseRegistration']['Student']['user_id'])) {
-                        $index = count($auto_message);
-                        $auto_message[$index]['message'] = 'You got <strong>' . $grade_detail['ExamGrade']['grade'] . '</strong> for the course <u>' . $grade_detail['CourseRegistration']['PublishedCourse']['Course']['course_title'] . ' (' . $grade_detail['CourseRegistration']['PublishedCourse']['Course']['course_code'] . ')</u>.';
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $grade_detail['CourseRegistration']['Student']['user_id'];
-                    } elseif (!empty($grade_detail['ExamGrade']['course_add_id']) && $grade_detail['ExamGrade']['course_add_id'] > 0 && isset($grade_detail['CourseAdd']['Student']) && !empty($grade_detail['CourseAdd']['Student']['user_id'])) {
-                        $index = count($auto_message);
-                        $auto_message[$index]['message'] = 'You got <strong>' . $grade_detail['ExamGrade']['grade'] . '</strong> for the course <u>' . $grade_detail['CourseAdd']['PublishedCourse']['Course']['course_title'] . ' (' . $grade_detail['CourseAdd']['PublishedCourse']['Course']['course_code'] . ')</u>.';
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $grade_detail['CourseAdd']['Student']['user_id'];
+            $course_instructor = $publishedCoursesTable->getInstructorByExamGradeId($confirmed_grades[0]['id']);
+            $course = $coursesTable->getCourseByExamGradeId($confirmed_grades[0]['id']);
+            $section = $sectionsTable->getSectionByExamGradeId($confirmed_grades[0]['id']);
+            $published_course = $publishedCoursesTable->getPublishedCourseByExamGradeId($confirmed_grades[0]['id']);
+
+            if (!empty($course_instructor) && !empty($course_instructor['user_id'])) {
+                $message = 'Your <u>' . $course['course_code_title'] . '</u> grade submission is ' . ($confirmed_grades[0]['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar for <u>' . $section['name'] . '</u> section. <a href="/examResults/add/' . $published_course['id'] . '">View Grade</a>';
+
+                if ($confirmed_grades[0]['registrar_approval'] == -1) {
+                    $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
+                } elseif ($confirmed_grades[0]['registrar_approval'] == 1) {
+                    $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
+                }
+
+                $autoMessages[] = $this->newEntity([
+                    'message' => $message,
+                    'read' => 0,
+                    'user_id' => $course_instructor['user_id']
+                ]);
+            }
+
+            // Department notification
+            $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+            $department_approved_bys = $examGradesTable->find('list', [
+                'conditions' => ['ExamGrades.id IN' => $grade_ids],
+                'keyField' => 'id',
+                'valueField' => 'department_approved_by'
+            ])->toArray();
+
+            $department_approved_bys = array_unique($department_approved_bys);
+
+            if (!empty($department_approved_bys)) {
+                foreach ($department_approved_bys as $department_approved_by) {
+                    if (!empty($department_approved_by)) {
+                        $approvalpage = isset($published_course['department_id']) && !empty($published_course['department_id']) ?
+                            '/examGrades/approve_non_freshman_grade_submission' :
+                            '/examGrades/approve_freshman_grade_submission';
+
+                        $message = '<u>' . $course['course_code_title'] . '</u> course grade is ' . ($confirmed_grades[0]['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar for <u>' . $section['name'] . '</u> section. <a href="' . $approvalpage . '/' . $published_course['id'] . '">View Grade</a>';
+
+                        if ($confirmed_grades[0]['registrar_approval'] == -1) {
+                            $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
+                        } elseif ($confirmed_grades[0]['registrar_approval'] == 1) {
+                            $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
+                        }
+
+                        $autoMessages[] = $this->newEntity([
+                            'message' => $message,
+                            'read' => 0,
+                            'user_id' => $department_approved_by
+                        ]);
                     }
                 }
             }
         }
 
-        //Instructor notification
-        $index = count($auto_message);
-
-        $course_instructor = ClassRegistry::init('PublishedCourse')->getInstructorByExamGradeId(
-            $confirmed_grades[0]['id']
-        );
-        $course = ClassRegistry::init('Course')->getCourseByExamGradeId($confirmed_grades[0]['id']);
-        $section = ClassRegistry::init('Section')->getSectionByExamGradeId($confirmed_grades[0]['id']);
-        $published_course = ClassRegistry::init('PublishedCourse')->getPublishedCourseByExamGradeId(
-            $confirmed_grades[0]['id']
-        );
-
-        if (!empty($course_instructor) && $course_instructor['user_id'] != "") {
-            $auto_message[$index]['message'] = 'Your <u>' . $course['course_title'] . ' (' . $course['course_code'] . ')</u> grade submission is ' . ($confirmed_grades[0]['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar for <u>' . ($section['name']) . '</u> section. <a href="/exam_results/add/' . $published_course['id'] . '">View Grade</a>';
-
-            if ($confirmed_grades[0]['registrar_approval'] == -1) {
-                $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[$index]['message'] . '</p>';
-            } elseif ($confirmed_grades[0]['registrar_approval'] == 1) {
-                $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[$index]['message'] . '</p>';
-            }
-
-            $auto_message[$index]['is_read'] = 0;
-            $auto_message[$index]['user_id'] = $course_instructor['user_id'];
-        }
-
-        //Department notification
-        $grade_ids = array();
-
-        foreach ($confirmed_grades as $key => $grade) {
-            $grade_ids[] = $grade['id'];
-        }
-
-        $department_approved_bys = ClassRegistry::init('ExamGrade')->find('list', array(
-            'conditions' => array(
-                'ExamGrade.id' => $grade_ids
-            ),
-            'fields' => array('ExamGrade.department_approved_by'),
-            'recursive' => -1
-        ));
-
-        $department_approved_bys = array_unique($department_approved_bys);
-
-        if (!empty($department_approved_bys)) {
-            foreach ($department_approved_bys as $key => $department_approved_by) {
-                if (!empty($department_approved_by)) {
-                    $index = count($auto_message);
-
-                    if (isset($published_course['department_id']) && !empty($published_course['department_id'])) {
-                        $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                    } elseif (isset($published_course['college_id']) && !empty($published_course['college_id'])) {
-                        //$approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                        $approvalpage = '/examGrades/approve_freshman_grade_submission';
-                    } else {
-                        $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                    }
-
-                    $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-
-                    $auto_message[$index]['message'] = '<u>' . $course['course_title'] . ' (' . $course['course_code'] . ')</u> course grade is ' . ($confirmed_grades[0]['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar for <u>' . ($section['name']) . '</u> section. <a href="' . $approvalpage . '/' . $published_course['id'] . '">View Grade</a>';
-
-                    if ($confirmed_grades[0]['registrar_approval'] == -1) {
-                        $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[$index]['message'] . '</p>';
-                    } elseif ($confirmed_grades[0]['registrar_approval'] == 1) {
-                        $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[$index]['message'] . '</p>';
-                    }
-
-                    $auto_message[$index]['is_read'] = 0;
-                    $auto_message[$index]['user_id'] = $department_approved_by;
-                }
-            }
-        }
-
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
-        }
-        //debug($auto_message);
-        //debug($grade_details);
-    }
-
-    function sendNotificationOnRegistrarGradeRollback(
-        $rolledback_grades = null,
-        $rolled_back_by = '',
-        $rolled_back_by_id = '',
-        $department_approved_bys
-    ) {
-
-        //Notification to student
-        //debug($confirmed_grades);
-        $grade_ids = array();
-        $auto_message = array();
-
-        debug($rolledback_grades);
-
-        if (!empty($rolledback_grades)) {
-            $grade_details = ClassRegistry::init('ExamGrade')->find('all', array(
-                'conditions' => array(
-                    'ExamGrade.id' => $rolledback_grades
-                ),
-                'contain' => array(
-                    'CourseAdd' => array(
-                        'PublishedCourse' => array('Course'),
-                        'Student'
-                    ),
-                    'CourseRegistration' => array(
-                        'PublishedCourse' => array('Course'),
-                        'Student'
-                    )
-                )
-            ));
-
-            //Student notification
-            if (!empty($grade_details)) {
-                foreach ($grade_details as $key => $grade_detail) {
-                    if (!empty($grade_detail['ExamGrade']['course_registration_id']) && $grade_detail['ExamGrade']['course_registration_id'] > 0 && isset($grade_detail['CourseRegistration']['Student']) && !empty($grade_detail['CourseRegistration']['Student']['user_id'])) {
-                        $index = count($auto_message);
-                        $auto_message[$index]['message'] = 'Exam grade you got <strong>' . $grade_detail['ExamGrade']['grade'] . '</strong> for the course <u>' . $grade_detail['CourseRegistration']['PublishedCourse']['Course']['course_title'] . ' (' . $grade_detail['CourseRegistration']['PublishedCourse']['Course']['course_code'] . ')</u>. is rolled back for resubmission by the registrar.';
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $grade_detail['CourseRegistration']['Student']['user_id'];
-                    } elseif (!empty($grade_detail['ExamGrade']['course_add_id']) && $grade_detail['ExamGrade']['course_add_id'] > 0 && isset($grade_detail['CourseAdd']['Student']) && !empty($grade_detail['CourseAdd']['Student']['user_id'])) {
-                        $index = count($auto_message);
-                        $auto_message[$index]['message'] = 'Exam grade you got <strong>' . $grade_detail['ExamGrade']['grade'] . '</strong> for the course <u>' . $grade_detail['CourseAdd']['PublishedCourse']['Course']['course_title'] . ' (' . $grade_detail['CourseAdd']['PublishedCourse']['Course']['course_code'] . ')</u>. is rolled back for resubmission by the registrar.';
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $grade_detail['CourseAdd']['Student']['user_id'];
-                    }
-                }
-            }
-        } else {
-            return;
-        }
-
-        //Instructor notification
-        $index = count($auto_message);
-
-        $course_instructor = ClassRegistry::init('PublishedCourse')->getInstructorByExamGradeId(
-            array_values($rolledback_grades)[0]
-        );
-
-        $course = ClassRegistry::init('Course')->getCourseByExamGradeId(array_values($rolledback_grades)[0]);
-        $section = ClassRegistry::init('Section')->getSectionByExamGradeId(array_values($rolledback_grades)[0]);
-        $published_course = ClassRegistry::init('PublishedCourse')->getPublishedCourseByExamGradeId(
-            array_values($rolledback_grades)[0]
-        );
-
-        //debug($published_course);
-
-        $rolledbackGrades_count = count($grade_details);
-
-        if (!empty($course_instructor) && $course_instructor['user_id'] != "") {
-            $auto_message[$index]['message'] = 'Grade you submitted for <u>' . $course['course_title'] . ' (' . $course['course_code'] . ')</u> for <u>' . ($section['name']) . '</u> section is rolled back for ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' by ' . (!empty($rolled_back_by) ? $rolled_back_by : 'the registrar') . ' for your resubmission. Please note that you need to cancel the submitted grades in order to adjust results and submit again. <a href="/exam_results/add/' . $published_course['id'] . '">Resubmit Grade</a>';
-            $auto_message[$index]['is_read'] = 0;
-            $auto_message[$index]['user_id'] = $course_instructor['user_id'];
-        }
-
-        $index = count($auto_message);
-
-        //Department notification
-        if (!empty($department_approved_bys)) {
-            foreach ($department_approved_bys as $key => $department_approved_by) {
-                if (!empty($department_approved_by)) {
-                    $index = count($auto_message);
-
-                    /* if (isset($published_course['department_id']) && !empty($published_course['department_id'])) {
-                        $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                    } else if (isset($published_course['college_id']) && !empty($published_course['college_id'])) {
-                        //$approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                        $approvalpage = '/examGrades/approve_freshman_grade_submission';
-                    } else {
-                        $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                    } */
-
-                    $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-
-                    $auto_message[$index]['message'] = '<u>' . $course['course_title'] . ' (' . $course['course_code'] . ')</u> course grade submitted ' . (isset($course_instructor['full_name']) && !empty($course_instructor['full_name']) ? 'by ' . $course_instructor['full_name'] : '') . ' for <u>' . ($section['name']) . '</u> section is rolled back for ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' by ' . (!empty($rolled_back_by) ? $rolled_back_by : 'the registrar') . '. Please check with the instructor before approving the grade again. <a href="' . $approvalpage . '/' . $published_course['id'] . '">View Grade</a>';
-
-                    $auto_message[$index]['is_read'] = 0;
-                    $auto_message[$index]['user_id'] = $department_approved_by;
-                }
-            }
-        }
-
-        $index = count($auto_message);
-
-        // Registrar notification
-        if (!empty($rolled_back_by_id)) {
-            $approvalpage = 'confirm_grade_submission';
-            $auto_message[$index]['message'] = 'You rolled back ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' submitted grade ' . (isset($course_instructor['full_name']) && !empty($course_instructor['full_name']) ? 'by ' . $course_instructor['full_name'] : '') . ' for the course <u>' . $course['course_title'] . ' (' . $course['course_code'] . ')</u> form <u>' . ($section['name']) . '</u> section for grade resubmission. <a href="/exam_grades/' . $approvalpage . '/' . $published_course['id'] . '">View Grade</a>';
-            $auto_message[$index]['is_read'] = 0;
-            $auto_message[$index]['user_id'] = $rolled_back_by_id;
-        }
-
-        debug($auto_message);
-
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function sendNotificationOnInstructorAssignment($publishedCourseId = null)
+    public function sendNotificationOnRegistrarGradeRollback($rolledback_grades = null, $rolled_back_by = '', $rolled_back_by_id = '', $department_approved_bys = [], $pc_id = '')
     {
+        $autoMessages = [];
 
-        $auto_message = array();
+        if (!empty($rolledback_grades) && !empty($pc_id) && $pc_id > 0) {
+            $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+            $grade_details = $examGradesTable->find()
+                ->where(['ExamGrades.id IN' => $rolledback_grades])
+                ->contain([
+                    'CourseAdds' => [
+                        'conditions' => ['CourseAdds.published_course_id' => $pc_id],
+                        'PublishedCourses' => [
+                            'fields' => ['id', 'course_id'],
+                            'Courses' => ['id', 'course_code_title']
+                        ],
+                        'Students' => ['id', 'user_id']
+                    ],
+                    'CourseRegistrations' => [
+                        'conditions' => ['CourseRegistrations.published_course_id' => $pc_id],
+                        'PublishedCourses' => [
+                            'fields' => ['id', 'course_id'],
+                            'Courses' => ['id', 'course_code_title']
+                        ],
+                        'Students' => ['id', 'user_id']
+                    ]
+                ])
+                ->all()
+                ->toArray();
+
+            $publishedCoursesTable = TableRegistry::getTableLocator()->get('PublishedCourses');
+            $published_course = $publishedCoursesTable->find()
+                ->where(['PublishedCourses.id' => $pc_id])
+                ->contain([
+                    'Courses',
+                    'CourseInstructorAssignments' => [
+                        'conditions' => [
+                            'OR' => [
+                                'CourseInstructorAssignments.type LIKE' => '%Lecture%',
+                                'CourseInstructorAssignments.isprimary' => 1
+                            ]
+                        ],
+                        'Staffs' => ['Titles'],
+                        'limit' => 1
+                    ],
+                    'Sections' => ['YearLevels']
+                ])
+                ->first();
+
+            // Student notification
+            if (!empty($grade_details) && defined('ALLOW_AUTO_MASSEGES_TO_BE_SENT_FOR_STUDENTS') && ALLOW_AUTO_MASSEGES_TO_BE_SENT_FOR_STUDENTS == 1) {
+                foreach ($grade_details as $grade_detail) {
+                    if (!empty($grade_detail->course_registration_id) && $grade_detail->course_registration_id > 0 && isset($grade_detail->course_registration->student->user_id)) {
+                        $autoMessages[] = $this->newEntity([
+                            'message' => 'Exam grade you got <strong>' . $grade_detail->grade . '</strong> for the course <u>' . $grade_detail->course_registration->published_course->course->course_code_title . '</u> is rolled back for resubmission by the registrar.',
+                            'read' => 0,
+                            'user_id' => $grade_detail->course_registration->student->user_id
+                        ]);
+                    } elseif (!empty($grade_detail->course_add_id) && $grade_detail->course_add_id > 0 && isset($grade_detail->course_add->student->user_id)) {
+                        $autoMessages[] = $this->newEntity([
+                            'message' => 'Exam grade you got <strong>' . $grade_detail->grade . '</strong> for the course <u>' . $grade_detail->course_add->published_course->course->course_code_title . '</u> is rolled back for resubmission by the registrar.',
+                            'read' => 0,
+                            'user_id' => $grade_detail->course_add->student->user_id
+                        ]);
+                    }
+                }
+            }
+
+            // Instructor notification
+            $instructor_full_name = '';
+            if (!empty($published_course->course_instructor_assignments[0]->staff->user_id)) {
+                $instructor_full_name = !empty($published_course->course_instructor_assignments[0]->staff->full_name) ?
+                    ($published_course->course_instructor_assignments[0]->staff->title->title ?? '') . ' ' . $published_course->course_instructor_assignments[0]->staff->full_name :
+                    '';
+            }
+
+            $course_title_course_code = !empty($published_course->course->course_code_title) ? $published_course->course->course_code_title : '';
+            $section_detail = !empty($published_course->section->id) ?
+                trim(str_replace('  ', ' ', $published_course->section->name)) . '(' .
+                (!empty($published_course->section->year_level->name) ? $published_course->section->year_level->name :
+                    ($published_course->section->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st')) . ', ' .
+                $published_course->section->academicyear . ')' : '';
+
+            $rolledbackGrades_count = count($grade_details);
+
+            if (!empty($published_course->course_instructor_assignments[0]->staff->user_id)) {
+                $autoMessages[] = $this->newEntity([
+                    'message' => 'Grade you submitted for <u>' . $course_title_course_code . '</u> for <u>' . $section_detail . '</u> section is rolled back for ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' by ' . (!empty($rolled_back_by) ? $rolled_back_by : 'the registrar') . ' for your resubmission. Please note that you need to cancel the submitted grades in order to adjust results and submit again. <a href="/examResults/add/' . $published_course->id . '">Resubmit Grade</a>',
+                    'read' => 0,
+                    'user_id' => $published_course->course_instructor_assignments[0]->staff->user_id
+                ]);
+            }
+
+            // Department notification
+            if (!empty($department_approved_bys)) {
+                foreach ($department_approved_bys as $department_approved_by) {
+                    if (!empty($department_approved_by)) {
+                        $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
+                        $autoMessages[] = $this->newEntity([
+                            'message' => '<u>' . $course_title_course_code . '</u> course grade submitted ' . (!empty($instructor_full_name) ? 'by ' . $instructor_full_name : '') . ' for <u>' . $section_detail . '</u> section is rolled back for ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' by ' . (!empty($rolled_back_by) ? $rolled_back_by : 'the registrar') . '. Please check with the instructor before approving the grade again. <a href="' . $approvalpage . '/' . $published_course->id . '">View Grade</a>',
+                            'read' => 0,
+                            'user_id' => $department_approved_by
+                        ]);
+                    }
+                }
+            }
+
+            // Registrar notification
+            if (!empty($rolled_back_by_id)) {
+                $approvalpage = 'confirm_grade_submission';
+                $autoMessages[] = $this->newEntity([
+                    'message' => 'You rolled back ' . ($rolledbackGrades_count . ' ' . ($rolledbackGrades_count == 1 ? 'student' : 'students')) . ' submitted grade ' . (!empty($instructor_full_name) ? 'by ' . $instructor_full_name : '') . ' for the course <u>' . $course_title_course_code . '</u> from <u>' . $section_detail . '</u> section for grade resubmission. <a href="/examGrades/' . $approvalpage . '/' . $published_course->id . '">View Grade</a>',
+                    'read' => 0,
+                    'user_id' => $rolled_back_by_id
+                ]);
+            }
+        }
+
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
+        }
+    }
+
+    public function sendNotificationOnInstructorAssignment($publishedCourseId = null)
+    {
+        $autoMessages = [];
 
         if (!empty($publishedCourseId)) {
-            $assignment_details = ClassRegistry::init('CourseInstructorAssignment')->find('all', array(
-                'conditions' => array(
-                    'CourseInstructorAssignment.published_course_id' => $publishedCourseId,
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Department' => array(
-                            'fields' => array('id', 'name')
-                        ),
-                        'College' => array(
-                            'fields' => array('id', 'name')
-                        ),
-                        'GivenByDepartment' => array(
-                            'fields' => array('id', 'name')
-                        ),
-                        'Program',
-                        'ProgramType',
-                        'Course'
-                    ),
-                    'Staff' => array('User', 'Title'),
-                    'Section' => array('YearLevel')
-                )
-            ));
+            $courseInstructorAssignmentsTable = TableRegistry::getTableLocator()->get('CourseInstructorAssignments');
+            $assignment_details = $courseInstructorAssignmentsTable->find()
+                ->where(['CourseInstructorAssignments.published_course_id' => $publishedCourseId])
+                ->contain([
+                    'PublishedCourses' => [
+                        'Departments' => ['fields' => ['id', 'name', 'type']],
+                        'Colleges' => ['fields' => ['id', 'name']],
+                        'GivenByDepartments' => ['fields' => ['id', 'name', 'type']],
+                        'Programs',
+                        'ProgramTypes',
+                        'Courses'
+                    ],
+                    'Staffs' => ['Users', 'Titles'],
+                    'Sections' => ['YearLevels']
+                ])
+                ->all()
+                ->toArray();
 
-            //Instructor and Course Owner Department Notification
             if (!empty($assignment_details)) {
-                foreach ($assignment_details as $key => $assignment_detail) {
-                    if (!empty($assignment_detail['Staff']['user_id'])) {
-                        $index = count($auto_message);
+                foreach ($assignment_details as $assignment_detail) {
+                    if (!empty($assignment_detail->staff->user_id)) {
+                        $message = empty($assignment_detail->section->year_level->name) ?
+                            'You are assigned as ' . ($assignment_detail->isprimary ? 'primary' : 'secondary') . ' instructor for the course <u>' . $assignment_detail->published_course->course->course_code_title . '</u> published for ' . $assignment_detail->section->name . ' section.<br />
+                            Section: ' . $assignment_detail->section->name . ' <br/>
+                            Department: ' . $assignment_detail->published_course->college->name . ' <br/>
+                            Year Level: ' . ($assignment_detail->published_course->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st') . '<br/>
+                            Program: ' . $assignment_detail->published_course->program->name . ' <br/>
+                            Program Type: ' . $assignment_detail->published_course->program_type->name . '<br/>
+                            Academic Year: ' . $assignment_detail->published_course->academic_year . ' <br/>
+                            Semester: ' . $assignment_detail->published_course->semester :
+                            'You are assigned as ' . ($assignment_detail->isprimary ? 'primary' : 'secondary') . ' instructor for the course <u>' . $assignment_detail->published_course->course->course_code_title . '</u> published for ' . $assignment_detail->section->name . ' section.<br />
+                            Section: ' . $assignment_detail->section->name . ' <br/>
+                            Year Level: ' . $assignment_detail->section->year_level->name . '<br/>
+                            Department: ' . $assignment_detail->published_course->department->name . ' <br/>
+                            Program: ' . $assignment_detail->published_course->program->name . ' <br/>
+                            Program Type: ' . $assignment_detail->published_course->program_type->name . '<br/>
+                            Academic Year: ' . $assignment_detail->published_course->academic_year . ' <br/>
+                            Semester: ' . $assignment_detail->published_course->semester;
 
-                        if (empty($assignment_detail['Section']['YearLevel']['name'])) {
-                            $auto_message[$index]['message'] = 'You are assigned to <strong><u>' . $assignment_detail['PublishedCourse']['Course']['course_title'] . ' (' . $assignment_detail['PublishedCourse']['Course']['course_code'] . ')' . '</u>  <br />
-							Section: ' . $assignment_detail['Section']['name'] . ' <br/> Year Level: Pre <br/>
-							Department: ' . $assignment_detail['PublishedCourse']['College']['name'] . ' <br/>
-							Year Level: Pre/1st<br/>
-							Program: ' . $assignment_detail['PublishedCourse']['Program']['name'] . ' <br/>
-							Program Type: ' . $assignment_detail['PublishedCourse']['ProgramType']['name'] . '<br/>
-							Academic Year: ' . $assignment_detail['PublishedCourse']['academic_year'] . ' <br/>
-							Semester: ' . $assignment_detail['PublishedCourse']['semester'] . '';
-                        } else {
-                            $auto_message[$index]['message'] = 'You are assigned  to <strong><u>' . $assignment_detail['PublishedCourse']['Course']['course_title'] . ' (' . $assignment_detail['PublishedCourse']['Course']['course_code'] . ')' . '</u> <br />
-							Section: ' . $assignment_detail['Section']['name'] . ' <br/>
-							Year Level: ' . $assignment_detail['Section']['YearLevel']['name'] . '<br/>
-							Department: ' . $assignment_detail['PublishedCourse']['Department']['name'] . ' <br/>
-							Program: ' . $assignment_detail['PublishedCourse']['Program']['name'] . ' <br/>
-							Program Type: ' . $assignment_detail['PublishedCourse']['ProgramType']['name'] . '<br/>
-							Academic Year: ' . $assignment_detail['PublishedCourse']['academic_year'] . ' <br/>
-							Semester: ' . $assignment_detail['PublishedCourse']['semester'] . '';
-                        }
-
-                        $auto_message[$index]['read'] = 0;
-                        $auto_message[$index]['user_id'] = $assignment_detail['Staff']['user_id'];
+                        $autoMessages[] = $this->newEntity([
+                            'message' => $message,
+                            'read' => 0,
+                            'user_id' => $assignment_detail->staff->user_id
+                        ]);
                     }
 
-                    if (empty($assignment_detail['PublishedCourse']['department_id'])) {
-                        $ownerDepartmentUser = ClassRegistry::init('User')->find('first', array(
-                            'conditions' => array(
-                                'User.is_admin' => 1,
-                                'User.role_id' => ROLE_COLLEGE,
-                                'User.id IN (select user_id from staffs where college_id=' . $assignment_detail['PublishedCourse']['college_id'] . ')'
-                            ),
+                    if (empty($assignment_detail->published_course->department_id)) {
+                        $usersTable = TableRegistry::getTableLocator()->get('Users');
+                        $ownerDepartmentUser = $usersTable->find()
+                            ->where([
+                                'Users.is_admin' => 1,
+                                'Users.role_id' => ROLE_COLLEGE,
+                                'Users.id IN' => $usersTable->subQuery()
+                                    ->select(['user_id'])
+                                    ->from('staffs')
+                                    ->where(['college_id' => $assignment_detail->published_course->college_id])
+                            ])
+                            ->first();
 
-                            'recursive' => -1
-                        ));
+                        $autoMessages[] = $this->newEntity([
+                            'message' => $assignment_detail->published_course->given_by_department->type . ' of ' . $assignment_detail->published_course->given_by_department->name . ' assigned ' . $assignment_detail->staff->title->title . '. ' . $assignment_detail->staff->full_name . ' as ' . ($assignment_detail->isprimary ? 'primary' : 'secondary') . ' instructor to your dispatched course <u>' . $assignment_detail->published_course->course->course_code_title . '</u> published for ' . $assignment_detail->section->name . ' section. <br/>
+                            Section: ' . $assignment_detail->section->name . '<br/>
+                            Year Level: ' . ($assignment_detail->published_course->program_id == PROGRAM_REMEDIAL ? 'Remedial' : 'Pre/1st') . '<br/>
+                            Department: ' . $assignment_detail->published_course->college->name . ' <br/>
+                            Program: ' . $assignment_detail->published_course->program->name . ' <br/>
+                            Program Type: ' . $assignment_detail->published_course->program_type->name . '<br/>
+                            Academic Year: ' . $assignment_detail->published_course->academic_year . ' <br/>
+                            Semester: ' . $assignment_detail->published_course->semester,
+                            'read' => 0,
+                            'user_id' => $ownerDepartmentUser->id
+                        ]);
+                    } elseif ($assignment_detail->published_course->department_id != $assignment_detail->published_course->given_by_department_id) {
+                        $usersTable = TableRegistry::getTableLocator()->get('Users');
+                        $ownerDepartmentUser = $usersTable->find()
+                            ->where([
+                                'Users.is_admin' => 1,
+                                'Users.role_id' => ROLE_DEPARTMENT,
+                                'Users.id IN' => $usersTable->subQuery()
+                                    ->select(['user_id'])
+                                    ->from('staffs')
+                                    ->where(['department_id' => $assignment_detail->published_course->department_id])
+                            ])
+                            ->first();
 
-                        $index = count($auto_message);
-
-                        $auto_message[$index]['message'] = 'The course you disptached <strong><u>' . $assignment_detail['PublishedCourse']['Course']['course_title'] . ' (' . $assignment_detail['PublishedCourse']['Course']['course_code'] . ')' . '</u>
-						to department of ' . $assignment_detail['PublishedCourse']['GivenByDepartment']['name'] . ' has  assigned ' . $assignment_detail['Staff']['Title']['title'] . ' ' . $assignment_detail['Staff']['full_name'] . ' <br />
-						Section: ' . $assignment_detail['Section']['name'] . ' <br/>
-						Year Level: Pre/1st<br/>
-						Department: ' . $assignment_detail['PublishedCourse']['College']['name'] . ' <br/>
-						Program: ' . $assignment_detail['PublishedCourse']['Program']['name'] . ' <br/>
-						Program Type: ' . $assignment_detail['PublishedCourse']['ProgramType']['name'] . '<br/>
-						Academic Year: ' . $assignment_detail['PublishedCourse']['academic_year'] . ' <br/>
-						Semester: ' . $assignment_detail['PublishedCourse']['semester'] . '';
-
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $ownerDepartmentUser['User']['id'];
-                    } elseif ($assignment_detail['PublishedCourse']['department_id'] != $assignment_detail['PublishedCourse']['given_by_department_id']) {
-                        $ownerDepartmentUser = ClassRegistry::init('User')->find('first', array(
-                            'conditions' => array(
-                                'User.is_admin' => 1,
-                                'User.role_id' => ROLE_DEPARTMENT,
-                                'User.id IN (select user_id from staffs where department_id=' . $assignment_detail['PublishedCourse']['department_id'] . ')'
-                            ),
-                            'recursive' => -1
-                        ));
-
-                        $index = count($auto_message);
-
-                        $auto_message[$index]['message'] = 'The course you disptached <strong><u>' . $assignment_detail['PublishedCourse']['Course']['course_title'] . ' (' . $assignment_detail['PublishedCourse']['Course']['course_code'] . ')' . '</u>
-						to department of ' . $assignment_detail['PublishedCourse']['GivenByDepartment']['name'] . ' has assigned ' . $assignment_detail['Staff']['Title']['title'] . ' ' . $assignment_detail['Staff']['full_name'] . ' <br />
-						Section: ' . $assignment_detail['Section']['name'] . ' <br/>
-						Year Level: ' . $assignment_detail['Section']['YearLevel']['name'] . '<br/>
-						Department: ' . $assignment_detail['PublishedCourse']['Department']['name'] . ' <br/>
-						Program: ' . $assignment_detail['PublishedCourse']['Program']['name'] . ' <br/>
-						Program Type: ' . $assignment_detail['PublishedCourse']['ProgramType']['name'] . '<br/>
-						Academic Year: ' . $assignment_detail['PublishedCourse']['academic_year'] . ' <br/>
-						Semester: ' . $assignment_detail['PublishedCourse']['semester'] . '';
-
-                        $auto_message[$index]['read'] = 0;
-                        $auto_message[$index]['user_id'] = $ownerDepartmentUser['User']['id'];
+                        $autoMessages[] = $this->newEntity([
+                            'message' => $assignment_detail->published_course->given_by_department->type . ' of ' . $assignment_detail->published_course->given_by_department->name . ' assigned ' . $assignment_detail->staff->title->title . '. ' . $assignment_detail->staff->full_name . ' as ' . ($assignment_detail->isprimary ? 'primary' : 'secondary') . ' instructor to your dispatched course <u>' . $assignment_detail->published_course->course->course_code_title . '</u> published for ' . $assignment_detail->section->name . ' section. <br/>
+                            Section: ' . $assignment_detail->section->name . '<br/>
+                            Year Level: ' . $assignment_detail->section->year_level->name . '<br/>
+                            Department: ' . $assignment_detail->published_course->department->name . ' <br/>
+                            Program: ' . $assignment_detail->published_course->program->name . ' <br/>
+                            Program Type: ' . $assignment_detail->published_course->program_type->name . '<br/>
+                            Academic Year: ' . $assignment_detail->published_course->academic_year . ' <br/>
+                            Semester: ' . $assignment_detail->published_course->semester,
+                            'read' => 0,
+                            'user_id' => $ownerDepartmentUser->id
+                        ]);
                     }
                 }
             }
         }
 
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function sendNotificationOnDepartmentGradeChangeApproval($grade_change = null)
+    public function sendNotificationOnDepartmentGradeChangeApproval($grade_change = null)
     {
+        $autoMessages = [];
 
-        $auto_message = array();
-
-        /* $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-            'conditions' => array(
-                'ExamGradeChange.id' => $grade_change['id']
-            ),
-            'recursive' => -1
-        )); */
+        $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+        $exam_grade_change = null;
 
         if (isset($grade_change['id']) && !empty($grade_change['id'])) {
-            $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.id' => $grade_change['id']
-                ),
-                'recursive' => -1
-            ));
+            $exam_grade_change = $examGradeChangesTable->find()
+                ->where(['ExamGradeChanges.id' => $grade_change['id']])
+                ->first();
         } elseif (isset($grade_change['ExamGradeChange']['id']) && !empty($grade_change['ExamGradeChange']['id'])) {
-            $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.id' => $grade_change['ExamGradeChange']['id']
-                ),
-                'recursive' => -1
-            ));
+            $exam_grade_change = $examGradeChangesTable->find()
+                ->where(['ExamGradeChanges.id' => $grade_change['ExamGradeChange']['id']])
+                ->first();
         } elseif (isset($grade_change['exam_grade_id']) && !empty($grade_change['exam_grade_id'])) {
-            $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.exam_grade_id' => $grade_change['exam_grade_id']
-                ),
-                'order' => array('ExamGradeChange.id' => 'DESC'),
-                'recursive' => -1
-            ));
+            $exam_grade_change = $examGradeChangesTable->find()
+                ->where(['ExamGradeChanges.exam_grade_id' => $grade_change['exam_grade_id']])
+                ->order(['ExamGradeChanges.id' => 'DESC'])
+                ->first();
         } elseif (isset($grade_change['ExamGradeChange']['exam_grade_id']) && !empty($grade_change['ExamGradeChange']['exam_grade_id'])) {
-            $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-                'conditions' => array(
-                    'ExamGradeChange.exam_grade_id' => $grade_change['ExamGradeChange']['exam_grade_id']
-                ),
-                'order' => array('ExamGradeChange.id' => 'DESC'),
-                'recursive' => -1
-            ));
-        } else {
+            $exam_grade_change = $examGradeChangesTable->find()
+                ->where(['ExamGradeChanges.exam_grade_id' => $grade_change['ExamGradeChange']['exam_grade_id']])
+                ->order(['ExamGradeChanges.id' => 'DESC'])
+                ->first();
+        }
+
+        if (!$exam_grade_change) {
             return;
         }
 
-        $exam_garde_details = $this->gradeRelatedDetails($exam_garde_change['ExamGradeChange']['exam_grade_id']);
+        $exam_grade_details = $this->gradeRelatedDetails($exam_grade_change->exam_grade_id);
 
-        //Instructor notification
-
-        if (isset($exam_garde_details['Instructor']['user_id']) && !empty($exam_garde_details['Instructor']['user_id']) && $exam_garde_change['ExamGradeChange']['initiated_by_department'] == 0) {
-            if (!empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_id'])) {
-                $auto_message[0]['message'] = 'Your makeup exam grade submission to <u>' . $exam_garde_details['Student']['full_name'] . '</u> for the course <u>' . $exam_garde_details['Course']['course_title'] . ' (' . $exam_garde_details['Course']['course_code'] . ')</u> is ' . ($grade_change['department_approval'] == 1 ? (isset($grade_change['department_reply']) ? 're-accepted' : 'accepted') : (isset($grade_change['department_reply']) ? 'rejected (after register rejection)' : 'rejected')) . ' by <u>' . (!empty($exam_garde_details['PublishedCourse']['department_id']) ? $exam_garde_details['Department']['name'] . ' Department' : $exam_garde_details['College']['name'] . ' Freshman Program') . '</u>. <a href="/exam_results/add/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>';
-            } else {
-                $auto_message[0]['message'] = 'Your exam grade change request to <u>' . $exam_garde_details['Student']['full_name'] . '</u> for the course <u>' . $exam_garde_details['Course']['course_title'] . ' (' . $exam_garde_details['Course']['course_code'] . ')</u> is ' . ($grade_change['department_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_garde_details['PublishedCourse']['department_id']) ? $exam_garde_details['Department']['name'] . ' Department' : $exam_garde_details['College']['name'] . ' Freshman Program') . '</u>. <a href="/exam_results/add/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>';
-            }
+        if (isset($exam_grade_details['Instructor']['user_id']) && !empty($exam_grade_details['Instructor']['user_id']) && $exam_grade_change->initiated_by_department == 0) {
+            $message = !empty($exam_grade_change->makeup_exam_result) && !empty($exam_grade_change->makeup_exam_id) ?
+                'Your makeup exam grade submission to <u>' . $exam_grade_details['Student']['full_name'] . '</u> for the course <u>' . $exam_grade_details['Course']['course_title'] . ' (' . $exam_grade_details['Course']['course_code'] . ')</u> is ' . ($grade_change['department_approval'] == 1 ? (isset($grade_change['department_reply']) ? 're-accepted' : 'accepted') : (isset($grade_change['department_reply']) ? 'rejected (after register rejection)' : 'rejected')) . ' by <u>' . (!empty($exam_grade_details['PublishedCourse']['department_id']) ? $exam_grade_details['Department']['name'] . ' Department' : $exam_grade_details['College']['name'] . ' Freshman Program') . '</u>. <a href="/examResults/add/' . $exam_grade_details['PublishedCourse']['id'] . '">View Grade</a>' :
+                'Your exam grade change request to <u>' . $exam_grade_details['Student']['full_name'] . '</u> for the course <u>' . $exam_grade_details['Course']['course_title'] . ' (' . $exam_grade_details['Course']['course_code'] . ')</u> is ' . ($grade_change['department_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_grade_details['PublishedCourse']['department_id']) ? $exam_grade_details['Department']['name'] . ' Department' : $exam_grade_details['College']['name'] . ' Freshman Program') . '</u>. <a href="/examResults/add/' . $exam_grade_details['PublishedCourse']['id'] . '">View Grade</a>';
 
             if ($grade_change['department_approval'] == -1) {
-                $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[0]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
             } elseif ($grade_change['department_approval'] == 1) {
-                $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[0]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
             }
 
-            $auto_message[0]['is_read'] = 0;
-            $auto_message[0]['user_id'] = $exam_garde_details['Instructor']['user_id'];
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'read' => 0,
+                'user_id' => $exam_grade_details['Instructor']['user_id']
+            ]);
         }
 
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function sendNotificationOnCollegeGradeChangeApproval($grade_change = null)
+    public function sendNotificationOnCollegeGradeChangeApproval($grade_change = null)
     {
+        $autoMessages = [];
 
-        $auto_message = array();
+        $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+        $exam_grade_change = $examGradeChangesTable->find()
+            ->where(['ExamGradeChanges.id' => $grade_change['id']])
+            ->first();
 
-        $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-            'conditions' => array(
-                'ExamGradeChange.id' => $grade_change['id']
-            ),
-            'recursive' => -1
-        ));
+        $exam_grade_details = $this->gradeRelatedDetails($exam_grade_change->exam_grade_id);
 
-        //debug($exam_garde_change);
-        $exam_garde_details = $this->gradeRelatedDetails($exam_garde_change['ExamGradeChange']['exam_grade_id']);
-
-        //Instructor notification
-        if (isset($exam_garde_details['Instructor']['user_id']) && !empty($exam_garde_details['Instructor']['user_id']) && $exam_garde_change['ExamGradeChange']['initiated_by_department'] == 0) {
-            $auto_message[0]['message'] = 'Your exam grade change request to <u>' . $exam_garde_details['Student']['full_name'] . '</u> for the course <u>' . $exam_garde_details['Course']['course_title'] . ' (' . $exam_garde_details['Course']['course_code'] . ')</u> is ' . ($grade_change['college_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_garde_details['PublishedCourse']['department_id']) ? $exam_garde_details['Department']['College']['name'] : $exam_garde_details['College']['name']) . '</u>. <a href="/exam_results/add/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>';
+        if (isset($exam_grade_details['Instructor']['user_id']) && !empty($exam_grade_details['Instructor']['user_id']) && $exam_grade_change->initiated_by_department == 0) {
+            $message = 'Your exam grade change request to <u>' . $exam_grade_details['Student']['full_name'] . '</u> for the course <u>' . $exam_grade_details['Course']['course_title'] . ' (' . $exam_grade_details['Course']['course_code'] . ')</u> is ' . ($grade_change['college_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_grade_details['PublishedCourse']['department_id']) ? $exam_grade_details['Department']['College']['name'] : $exam_grade_details['College']['name']) . '</u>. <a href="/examResults/add/' . $exam_grade_details['PublishedCourse']['id'] . '">View Grade</a>';
 
             if ($grade_change['college_approval'] == -1) {
-                $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[0]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
             } elseif ($grade_change['college_approval'] == 1) {
-                $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[0]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
             }
 
-            $auto_message[0]['is_read'] = 0;
-            $auto_message[0]['user_id'] = $exam_garde_details['Instructor']['user_id'];
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'read' => 0,
+                'user_id' => $exam_grade_details['Instructor']['user_id']
+            ]);
         }
 
-        /* $dept_approved_by_staff_detail = ClassRegistry::init('Staff')->find('first', array(
-            'conditions' => array(
-                'Staff.id' => $exam_garde_change['ExamGradeChange']['department_approved_by']
-            ),
-            'recursive' => -1
-        )); */
+        if (!empty($exam_grade_change->department_approved_by)) {
+            $approvalpage = $exam_grade_change->initiated_by_department == 1 ? '/examResults/submit_grade_for_instructor' :
+                (!empty($exam_grade_details['Department']) ? '/examGrades/approve_non_freshman_grade_submission' : '/examGrades/approve_freshman_grade_submission');
 
-        //debug($dept_approved_by_staff_detail);exit();
-        if (!empty($exam_garde_change['ExamGradeChange']['department_approved_by'])) {
-            if ($exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1) {
-                $approvalpage = '/examResults/submit_grade_for_instructor';
-            } elseif (isset($exam_garde_details['Department']) && !empty($exam_garde_details['Department'])) {
-                $approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-            } elseif (isset($exam_garde_details['College']) && !empty($exam_garde_details['College'])) {
-                //$approvalpage = '/examGrades/approve_non_freshman_grade_submission';
-                $approvalpage = '/examGrades/approve_freshman_grade_submission';
-            }
-
-            $auto_message[1]['message'] = 'Exam grade change request to <u>' . $exam_garde_details['Student']['full_name'] . '</u> for the course <u>' . $exam_garde_details['Course']['course_title'] . ' (' . $exam_garde_details['Course']['course_code'] . ')</u> is ' . ($grade_change['college_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_garde_details['PublishedCourse']['department_id']) ? $exam_garde_details['Department']['College']['name'] : $exam_garde_details['College']['name']) . '</u>. <a href="' . $approvalpage . '/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>';
+            $message = 'Exam grade change request to <u>' . $exam_grade_details['Student']['full_name'] . '</u> for the course <u>' . $exam_grade_details['Course']['course_title'] . ' (' . $exam_grade_details['Course']['course_code'] . ')</u> is ' . ($grade_change['college_approval'] == 1 ? 'accepted' : 'rejected') . ' by <u>' . (!empty($exam_grade_details['PublishedCourse']['department_id']) ? $exam_grade_details['Department']['College']['name'] : $exam_grade_details['College']['name']) . '</u>. <a href="' . $approvalpage . '/' . $exam_grade_details['PublishedCourse']['id'] . '">View Grade</a>';
 
             if ($grade_change['college_approval'] == -1) {
-                $auto_message[1]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[1]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
             } elseif ($grade_change['college_approval'] == 1) {
-                $auto_message[1]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[1]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
             }
 
-            $auto_message[1]['is_read'] = 0;
-            $auto_message[1]['user_id'] = $exam_garde_change['ExamGradeChange']['department_approved_by'];
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'read' => 0,
+                'user_id' => $exam_grade_change->department_approved_by
+            ]);
         }
 
-
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function sendNotificationOnRegistrarGradeChangeApproval($grade_change = null)
+
+    public function sendNotificationOnRegistrarGradeChangeApproval($grade_change = null)
     {
 
-        //To college, department, instructor, student
-        $auto_message = array();
+        $autoMessages = [];
 
-        $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-            'conditions' => array(
-                'ExamGradeChange.id' => $grade_change['id']
-            ),
-            'recursive' => -1
-        ));
+        if (empty($grade_change) || empty($grade_change['id'])) {
+            return;
+        }
 
-        //debug($grade_change);
-        debug($exam_garde_change);
-        $exam_garde_details = $this->gradeRelatedDetails(
-            $exam_garde_change['ExamGradeChange']['exam_grade_id'],
-            $grade_change['id']
-        );
-        //debug($exam_garde_details);
+        $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+        $exam_grade_change = $examGradeChangesTable->find()
+            ->where(['ExamGradeChanges.id' => $grade_change['id']])
+            ->first();
+
+        if (empty($exam_grade_change)) {
+            return;
+        }
+
+        $exam_grade_details = $this->gradeRelatedDetails($exam_grade_change->exam_grade_id);
+
+        if (empty($exam_grade_details) || empty($exam_grade_details['ExamGrade'])) {
+            return;
+        }
 
         $initiated_fullname = '';
-
-        //Instructor notification
-        if (isset($exam_garde_details['Instructor']['user_id']) && !empty($exam_garde_details['Instructor']['user_id'])) {
-            if ($exam_garde_change['ExamGradeChange']['initiated_by_department'] == 0) {
-                $auto_message[0]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> grade change' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? '(through Supplementary Exam)' : ' ') . ' you initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                        $exam_garde_details['Course']['course_title']
-                    )) . ' (' . (trim(
-                        $exam_garde_details['Course']['course_code']
-                    )) . ')</u> you tought in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '. <a href="/exam_results/add/' . ($exam_garde_details['PublishedCourse']['id']) . '">View Grade</a>';
-            } elseif ($exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1) {
-                $initiated_fullname = $this->User->field(
-                    'full_name',
-                    array('User.id' => (!empty($exam_garde_change['ExamGradeChange']['department_approved_by']) ? $exam_garde_change['ExamGradeChange']['department_approved_by'] : (!empty($exam_garde_change['ExamGradeChange']['college_approved_by']) ? $exam_garde_change['ExamGradeChange']['college_approved_by'] : '0')))
-                );
-                if (!empty($exam_garde_change['ExamGradeChange']['college_approved_by']) && $exam_garde_change['ExamGradeChange']['college_approved_by'] === $exam_garde_change['ExamGradeChange']['department_approved_by']) {
-                    $auto_message[0]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> grade change' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? ' through Supplementary Exam' : ' ') . ', initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> by ' . (!empty($initiated_fullname) ? $initiated_fullname : 'your college') . ' for the course <u>' . (trim(
-                            $exam_garde_details['Course']['course_title']
-                        )) . ' (' . (trim(
-                            $exam_garde_details['Course']['course_code']
-                        )) . ')</u> you tought in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '. <a href="/exam_results/add/' . ($exam_garde_details['PublishedCourse']['id']) . '">View Grade</a>';
-                } else {
-                    $auto_message[0]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> grade change' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? ' through Supplementary Exam' : ' ') . ', initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> by ' . (!empty($initiated_fullname) ? $initiated_fullname : 'your department') . ' for the course <u>' . (trim(
-                            $exam_garde_details['Course']['course_title']
-                        )) . ' (' . (trim(
-                            $exam_garde_details['Course']['course_code']
-                        )) . ')</u> you tought in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '. <a href="/exam_results/add/' . ($exam_garde_details['PublishedCourse']['id']) . '">View Grade</a>';
-                }
-            }
-
-            if (isset($auto_message[0]['message']) && !empty($auto_message[0]['message'])) {
-                if ($grade_change['registrar_approval'] == -1) {
-                    $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[0]['message'] . '</p>';
-                } elseif ($grade_change['registrar_approval'] == 1) {
-                    $auto_message[0]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[0]['message'] . '</p>';
-                }
-
-                $auto_message[0]['is_read'] = 0;
-                $auto_message[0]['user_id'] = $exam_garde_details['Instructor']['user_id'];
-            }
+        if (!empty($exam_grade_change->department_approved_by) || !empty($exam_grade_change->college_approved_by)) {
+            $usersTable = TableRegistry::getTableLocator()->get('Users');
+            $initiated_fullname = $usersTable->find()
+                ->where(['Users.id' => ($exam_grade_change->department_approved_by ?? $exam_grade_change->college_approved_by ?? 0)])
+                ->select(['first_name','middle_name','last_name'])
+                ->first()->full_name ?? '';
         }
 
-        $view_grade_url = '';
-
-        //Department notification
-        if (!empty($exam_garde_change['ExamGradeChange']['department_approved_by'])) {
-            $view_grade_url = 'department_grade_view';
-            //$auto_message[1]['message'] = 'Exam grade change request from <strong>' . ($exam_garde_details['ExamGrade']['grade']) . ' to <strong>' . ($grade_change['grade']) . '</strong>. for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for <u>' . (trim($exam_garde_details['Course']['course_title'])) . ' (' . (trim($exam_garde_details['Course']['course_code'])) . ')</u> course is ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar.'; //<a href="' . $approvalpage . '/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>
-            if ($exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1) {
-                $auto_message[1]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> ' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? 'supplementary exam' : 'exam') . ' grade change you initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                        $exam_garde_details['Course']['course_title']
-                    )) . ' (' . (trim(
-                        $exam_garde_details['Course']['course_code']
-                    )) . ')</u> the student attended in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-            } else {
-                $auto_message[1]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> exam grade change initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                        $exam_garde_details['Course']['course_title']
-                    )) . ' (' . (trim(
-                        $exam_garde_details['Course']['course_code']
-                    )) . ')</u> the student attended in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-            }
+        // Instructor notification
+        if (!empty($exam_grade_details['Instructor']['user_id'])) {
+            $message = $exam_grade_change->initiated_by_department == 0 ?
+                'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> grade change' . (!empty($exam_grade_change->makeup_exam_result) ? ' (through Supplementary Exam)' : '') . ' you initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> you taught in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '. <a href="/examResults/add/' . ($exam_grade_details['PublishedCourse']['id'] ?? '') . '">View Grade</a>' :
+                ($exam_grade_change->college_approved_by && $exam_grade_change->college_approved_by === $exam_grade_change->department_approved_by ?
+                    'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' .
+                    ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> grade change' . (!empty($exam_grade_change->makeup_exam_result) ? ' through Supplementary Exam' : '') . ', initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> by ' . (!empty($initiated_fullname) ? $initiated_fullname : 'your college') . ' for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> you taught in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '. <a href="/examResults/add/' . ($exam_grade_details['PublishedCourse']['id'] ?? '') . '">View Grade</a>' :
+                    'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' .
+                    ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') .
+                    '</strong> grade change' . (!empty($exam_grade_change->makeup_exam_result) ? ' through Supplementary Exam' : '') . ', initiated for <u>' .
+                    ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> by ' .
+                    (!empty($initiated_fullname) ? $initiated_fullname : 'your department') . ' for the course <u>' .
+                    trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' .
+                    trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> you taught in the ' .
+                    ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) .
+                    ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '. <a href="/examResults/add/' .
+                    ($exam_grade_details['PublishedCourse']['id'] ?? '') . '">View Grade</a>');
 
             if ($grade_change['registrar_approval'] == -1) {
-                $auto_message[1]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[1]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
             } elseif ($grade_change['registrar_approval'] == 1) {
-                $auto_message[1]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[1]['message'] . '</p>';
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
             }
 
-            if (isset($auto_message[1]['message']) && !empty($auto_message[1]['message'])) {
-                $auto_message[1]['is_read'] = 0;
-                if (!empty($view_grade_url)) {
-                    $auto_message[1]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
-                }
-                $auto_message[1]['user_id'] = $exam_garde_change['ExamGradeChange']['department_approved_by'];
-            }
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'is_read' => 0,
+                'user_id' => $exam_grade_details['Instructor']['user_id']
+            ]);
         }
 
-        //Student Notification
-        if (isset($exam_garde_details['Student']['user_id']) && !empty($exam_garde_details['Student']['user_id']) && $grade_change['registrar_approval'] == 1) {
-            $auto_message[2]['message'] = 'Your Exam grade for the course <u>' . (trim(
-                    $exam_garde_details['Course']['course_title']
-                )) . ' (' . (trim(
-                    $exam_garde_details['Course']['course_code']
-                )) . ')</u> you attented in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . ' is changed from <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong>' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? ' through supplementary exam grade change.' : ' through exam grade change.') . '';
-            $auto_message[2]['is_read'] = 0;
-            $auto_message[2]['user_id'] = $exam_garde_details['Student']['user_id'];
+        // Department notification
+        if (!empty($exam_grade_change->department_approved_by)) {
+            $view_grade_url = 'department_grade_view';
+            $message = $exam_grade_change->initiated_by_department == 1 ?
+                'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> ' . (!empty($exam_grade_change->makeup_exam_result) ? 'supplementary exam' : 'exam') . ' grade change you initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> the student attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '.' :
+                'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> exam grade change initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> the student attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '.';
+
+            if ($grade_change['registrar_approval'] == -1) {
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
+            } elseif ($grade_change['registrar_approval'] == 1) {
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
+            }
+
+            if (!empty($view_grade_url) && !empty($exam_grade_details['PublishedCourse']['id'])) {
+                $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
+            }
+
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'is_read' => 0,
+                'user_id' => $exam_grade_change->department_approved_by]);
         }
 
-        //College Notification
-        if (!empty($exam_garde_change['ExamGradeChange']['college_approved_by'])) {
-            if (!empty($exam_garde_change['ExamGradeChange']['college_approved_by'])) {
-                if ((isset($exam_garde_details['PublishedCourse']['year_level_id']) && empty($exam_garde_details['PublishedCourse']['year_level_id'])) || (isset($exam_garde_details['Student']['department_id']) && empty($exam_garde_details['Student']['department_id']))) {
-                    $view_grade_url = 'freshman_grade_view';
-                } else {
-                    $view_grade_url = 'college_grade_view';
-                }
-            }
-
-            //$auto_message[3]['message'] = 'Exam grade change request from <strong>' . ($exam_garde_details['ExamGrade']['grade']) . ' to <strong>' . ($grade_change['grade']) . '</strong> for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for <u>' . (trim($exam_garde_details['Course']['course_title'])) . ' (' . (trim($exam_garde_details['Course']['course_code'])) . ')</u> course is ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' by the registrar.';
-
-            if ($exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1 && !empty($exam_garde_change['ExamGradeChange']['department_approved_by']) && $exam_garde_change['ExamGradeChange']['college_approved_by'] === $exam_garde_change['ExamGradeChange']['department_approved_by']) {
-                $auto_message[3]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> ' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? 'supplementary exam' : 'exam') . ' grade change initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                        $exam_garde_details['Course']['course_title']
-                    )) . ' (' . (trim(
-                        $exam_garde_details['Course']['course_code']
-                    )) . ')</u> the student attended in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-            } else {
-                $auto_message[3]['message'] = 'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> exam grade change initiated for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                        $exam_garde_details['Course']['course_title']
-                    )) . ' (' . (trim(
-                        $exam_garde_details['Course']['course_code']
-                    )) . ')</u> the student attended in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-            }
-
-
-            if (isset($auto_message[3]['message']) && !empty($auto_message[3]['message'])) {
-                if ($grade_change['registrar_approval'] == -1) {
-                    $auto_message[3]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[3]['message'] . '</p>';
-                } elseif ($grade_change['registrar_approval'] == 1) {
-                    $auto_message[3]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $auto_message[3]['message'] . '</p>';
-                }
-
-                if (!empty($view_grade_url)) {
-                    $auto_message[3]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
-                }
-
-                $auto_message[3]['is_read'] = 0;
-                $auto_message[3]['user_id'] = $exam_garde_change['ExamGradeChange']['college_approved_by'];
-            }
+        // Student Notification
+        if (!empty($exam_grade_details['Student']['user_id']) && $grade_change['registrar_approval'] == 1) {
+            $autoMessages[] = $this->newEntity([
+                'message' => 'Your Exam grade for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> you attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . ' is changed from <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong>' . (!empty($exam_grade_change->makeup_exam_result) ? ' through supplementary exam grade change.' : ' through exam grade change.'),
+                'is_read' => 0,
+                'user_id' => $exam_grade_details['Student']['user_id']
+            ]
+            );
         }
 
-        //Registrar Notification
-        if (!empty($exam_garde_change['ExamGradeChange']['registrar_approved_by'])) {
+        // College Notification
+        if (!empty($exam_grade_change->college_approved_by)) {
+            $view_grade_url = (empty($exam_grade_details['PublishedCourse']['year_level_id']) || empty($exam_grade_details['Student']['department_id'])) ? 'freshman_grade_view' : 'college_grade_view';
+            $message = ($exam_grade_change->initiated_by_department == 1 && $exam_grade_change->college_approved_by === $exam_grade_change->department_approved_by) ?
+                'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> ' . (!empty($exam_grade_change->makeup_exam_result) ? 'supplementary exam' : 'exam') . ' grade change initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> the student attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '.' :
+                'Registrar ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> exam grade change initiated for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> the student attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '.';
+
+            if ($grade_change['registrar_approval'] == -1) {
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $message . '</p>';
+            } elseif ($grade_change['registrar_approval'] == 1) {
+                $message = '<p style="text-align:justify; padding:0px; margin:0px" class="accepted">' . $message . '</p>';
+            }
+
+            if (!empty($view_grade_url) && !empty($exam_grade_details['PublishedCourse']['id'])) {
+                $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
+            }
+
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'is_read' => 0,
+                'user_id' => $exam_grade_change->college_approved_by
+            ]);
+        }
+
+        // Registrar Notification
+        if (!empty($exam_grade_change->registrar_approved_by)) {
             $view_grade_url = 'registrar_grade_view';
-            $auto_message[4]['message'] = 'You ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong> ' . (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) ? 'supplementary exam' : 'exam') . ' grade change ' . (isset($exam_garde_change['ExamGradeChange']['initiated_by_department']) && $exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1 ? 'initiated by ' . (!empty($initiated_fullname) ? $initiated_fullname : ' the department/college') : '') . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                    $exam_garde_details['Course']['course_title']
-                )) . ' (' . (trim(
-                    $exam_garde_details['Course']['course_code']
-                )) . ')</u> the student attended in the ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
+            $message = 'You ' . ($grade_change['registrar_approval'] == 1 ? 'accepted' : 'rejected') . ' <strong>' . ($exam_grade_details['ExamGrade']['grade'] ?? '') . '</strong> to <strong>' . ($exam_grade_change->grade ?? '') . '</strong> ' . (!empty($exam_grade_change->makeup_exam_result) ? 'supplementary exam' : 'exam') . ' grade change ' . ($exam_grade_change->initiated_by_department == 1 ? 'initiated by ' . (!empty($initiated_fullname) ? $initiated_fullname : 'the department/college') : '') . ' for <u>' . ($exam_grade_details['Student']['full_name_studentnumber'] ?? '') . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title'] ?? '') . ' (' . trim($exam_grade_details['Course']['course_code'] ?? '') . ')</u> the student attended in the ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . ($exam_grade_details['PublishedCourse']['academic_year'] ?? '') . '.';
 
-            if (isset($auto_message[4]['message']) && !empty($auto_message[4]['message'])) {
-                if ($grade_change['registrar_approval'] == -1) {
-                    $auto_message[4]['message'] = '<p style="text-align:justify; padding:0px; margin:0px">' . $auto_message[4]['message'] . '</p>';
-                } elseif ($grade_change['registrar_approval'] == 1) {
-                    $auto_message[4]['message'] = '<p style="text-align:justify; padding:0px; margin:0px">' . $auto_message[4]['message'] . '</p>';
-                }
-
-                if (!empty($view_grade_url)) {
-                    $auto_message[4]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
-                }
-
-                $auto_message[4]['is_read'] = 0;
-                $auto_message[4]['user_id'] = $exam_garde_change['ExamGradeChange']['registrar_approved_by'];
+            if ($grade_change['registrar_approval'] == -1 || $grade_change['registrar_approval'] == 1) {
+                $message = '<p style="text-align:justify; padding:0px; margin:0px">' . $message . '</p>';
             }
+
+            if (!empty($view_grade_url) && !empty($exam_grade_details['PublishedCourse']['id'])) {
+                $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
+            }
+
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'is_read' => 0,
+                'user_id' => $exam_grade_change->registrar_approved_by
+            ]);
         }
 
-        debug($auto_message);
+        if (!empty($autoMessages)) {
+            $autoMessages[] = $this->newEntity([
+                'message' => $message,
+                'is_read' => 0,
+                'user_id' => $exam_grade_change->registrar_approved_by
+            ]);
 
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+            if( $this->saveMany($autoMessages, ['validate' => false])){
+
+            } else {
+                debug($autoMessages);
+            }
+
         }
     }
 
-    function sendNotificationOnAutoAndManualGradeChange(
-        $grade_changes = null,
-        $privilaged_registrars = array(),
-        $use_the_new_format = 0,
-        $converted_by_full_name = ''
-    ) {
-
-        //To student and registrar
-        $auto_message = array();
-        /* $grade_changes[0]['grade'] = 'F';
-        $grade_changes[0]['exam_grade_id'] = 1;
-        $grade_changes[0]['manual_ng_conversion'] = 1; */
+    public function sendNotificationOnAutoAndManualGradeChange($grade_changes = null, $privilaged_registrars = [], $use_the_new_format = 0, $converted_by_full_name = '')
+    {
+        $autoMessages = [];
 
         if (!empty($grade_changes)) {
-            foreach ($grade_changes as $key => $grade_change) {
-                $index = count($auto_message);
+            foreach ($grade_changes as $grade_change) {
+                $examGradeChangesTable = TableRegistry::getTableLocator()->get('ExamGradeChanges');
+                $exam_grade_change = $examGradeChangesTable->find()
+                    ->where(['ExamGradeChanges.exam_grade_id' => $grade_change['exam_grade_id']])
+                    ->order(['ExamGradeChanges.id' => 'DESC'])
+                    ->first();
 
-                //debug($grade_change);
-
-                $exam_garde_change = ClassRegistry::init('ExamGradeChange')->find('first', array(
-                    'conditions' => array(
-                        //'ExamGradeChange.grade' => $grade_change['grade'],
-                        'ExamGradeChange.exam_grade_id' => $grade_change['exam_grade_id']
-                    ),
-                    'order' => array('ExamGradeChange.id' => 'DESC'),
-                    'recursive' => -1
-                ));
-
-                debug($exam_garde_change);
-
-                $exam_garde_details = $this->gradeRelatedDetails($grade_change['exam_grade_id']);
+                $exam_grade_details = $this->gradeRelatedDetails($grade_change['exam_grade_id']);
 
                 $change_type_and_grade = '';
-
-                if (isset($exam_garde_change['ExamGradeChange']['auto_ng_conversion']) && !empty($exam_garde_change['ExamGradeChange']['auto_ng_conversion']) && $exam_garde_change['ExamGradeChange']['auto_ng_conversion'] == 1) {
-                    $change_type_and_grade = 'through Auto NG to F Conversion to <strong>' . (isset($exam_garde_change['ExamGradeChange']['grade']) && !empty($exam_garde_change['ExamGradeChange']['grade']) ? $exam_garde_change['ExamGradeChange']['grade'] : (isset($grade_change['grade']) && !empty($grade_change['grade']) ? $grade_change['grade'] : '')) . '</strong> grade';
-                } elseif (isset($exam_garde_change['ExamGradeChange']['manual_ng_conversion']) && !empty($exam_garde_change['ExamGradeChange']['manual_ng_conversion']) && $exam_garde_change['ExamGradeChange']['manual_ng_conversion'] == 1) {
-                    $change_type_and_grade = 'throgh Manual NG Conversion to <strong>' . (isset($exam_garde_change['ExamGradeChange']['grade']) && !empty($exam_garde_change['ExamGradeChange']['grade']) ? $exam_garde_change['ExamGradeChange']['grade'] : (isset($grade_change['grade']) && !empty($grade_change['grade']) ? $grade_change['grade'] : '')) . '</strong> grade';
-                } elseif (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && isset($exam_garde_change['ExamGradeChange']['initiated_by_department']) && $exam_garde_change['ExamGradeChange']['initiated_by_department'] == 1) {
-                    $change_type_and_grade = 'throgh Supplemetary Exam' . (isset($exam_garde_details['ExamGrade']['grade']) && !empty($exam_garde_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_garde_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . (isset($exam_garde_change['ExamGradeChange']['grade']) && !empty($exam_garde_change['ExamGradeChange']['grade']) ? $exam_garde_change['ExamGradeChange']['grade'] : (isset($grade_change['grade']) && !empty($grade_change['grade']) ? $grade_change['grade'] : '')) . '</strong> grade';
-                } elseif (isset($exam_garde_change['ExamGradeChange']['makeup_exam_result']) && !empty($exam_garde_change['ExamGradeChange']['makeup_exam_result'])) {
-                    $change_type_and_grade = 'throgh Supplemetary Exam' . (isset($exam_garde_details['ExamGrade']['grade']) && !empty($exam_garde_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_garde_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . (isset($exam_garde_change['ExamGradeChange']['grade']) && !empty($exam_garde_change['ExamGradeChange']['grade']) ? $exam_garde_change['ExamGradeChange']['grade'] : (isset($grade_change['grade']) && !empty($grade_change['grade']) ? $grade_change['grade'] : '')) . '</strong> grade';
-                } elseif (isset($exam_garde_change['ExamGradeChange']['registrar_approved_by']) && !empty($exam_garde_change['ExamGradeChange']['registrar_approved_by'])) {
-                    $change_type_and_grade = 'manually' . (isset($exam_garde_details['ExamGrade']['grade']) && !empty($exam_garde_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_garde_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . (isset($exam_garde_change['ExamGradeChange']['grade']) && !empty($exam_garde_change['ExamGradeChange']['grade']) ? $exam_garde_change['ExamGradeChange']['grade'] : (isset($grade_change['grade']) && !empty($grade_change['grade']) ? $grade_change['grade'] : '')) . '</strong> grade';
+                if (!empty($exam_grade_change->auto_ng_conversion)) {
+                    $change_type_and_grade = 'through Auto NG to F Conversion to <strong>' . ($exam_grade_change->grade ?? $grade_change['grade'] ?? '') . '</strong> grade';
+                } elseif (!empty($exam_grade_change->manual_ng_conversion)) {
+                    $change_type_and_grade = 'through Manual NG Conversion to <strong>' . ($exam_grade_change->grade ?? $grade_change['grade'] ?? '') . '</strong> grade';
+                } elseif (!empty($exam_grade_change->makeup_exam_result) && $exam_grade_change->initiated_by_department == 1) {
+                    $change_type_and_grade = 'through Supplementary Exam' . (!empty($exam_grade_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_grade_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . ($exam_grade_change->grade ?? $grade_change['grade'] ?? '') . '</strong> grade';
+                } elseif (!empty($exam_grade_change->makeup_exam_result)) {
+                    $change_type_and_grade = 'through Supplementary Exam' . (!empty($exam_grade_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_grade_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . ($exam_grade_change->grade ?? $grade_change['grade'] ?? '') . '</strong> grade';
+                } elseif (!empty($exam_grade_change->registrar_approved_by)) {
+                    $change_type_and_grade = 'manually' . (!empty($exam_grade_details['ExamGrade']['grade']) ? ' from <strong>' . $exam_grade_details['ExamGrade']['grade'] . '</strong>' : '') . ' to <strong>' . ($exam_grade_change->grade ?? $grade_change['grade'] ?? '') . '</strong> grade';
                 }
 
-                debug($change_type_and_grade);
-
-                //Student Notification
-                if (isset($exam_garde_details['Student']['user_id']) && !empty($exam_garde_details['Student']['user_id'])) {
-                    $auto_message[$index]['message'] = 'Your Exam grade is changed ' . $change_type_and_grade . ' for the course <u>' . (trim(
-                            $exam_garde_details['Course']['course_title']
-                        )) . ' (' . (trim(
-                            $exam_garde_details['Course']['course_code']
-                        )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-                    $auto_message[$index]['read'] = 0;
-                    $auto_message[$index]['user_id'] = $exam_garde_details['Student']['user_id'];
+                // Student Notification
+                if (!empty($exam_grade_details['Student']['user_id'])) {
+                    $autoMessages[] = $this->newEntity([
+                        'message' => 'Your Exam grade is changed ' . $change_type_and_grade . ' for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'] . '.',
+                        'read' => 0,
+                        'user_id' => $exam_grade_details['Student']['user_id']
+                    ]);
                 }
 
-                //Instructor Notification
-                if (isset($exam_garde_details['Instructor']['user_id']) && !empty($exam_garde_details['Instructor']['user_id'])) {
-                    $index = count($auto_message);
-                    $auto_message[$index]['message'] = 'Exam grade you submitted is changed ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                            $exam_garde_details['Course']['course_title']
-                        )) . ' (' . (trim(
-                            $exam_garde_details['Course']['course_code']
-                        )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.' . (isset($exam_garde_details['PublishedCourse']['id']) && !empty($exam_garde_details['PublishedCourse']['id']) ? ' <a href="/exam_results/add/' . $exam_garde_details['PublishedCourse']['id'] . '">View Grade</a>' : '');
-                    $auto_message[$index]['read'] = 0;
-                    $auto_message[$index]['user_id'] = $exam_garde_details['Instructor']['user_id'];
+                // Instructor Notification
+                if (!empty($exam_grade_details['Instructor']['user_id'])) {
+                    $message = 'Exam grade you submitted is changed ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'] . '.' . (!empty($exam_grade_details['PublishedCourse']['id']) ? ' <a href="/examResults/add/' . $exam_grade_details['PublishedCourse']['id'] . '">View Grade</a>' : '');
+                    $autoMessages[] = $this->newEntity([
+                        'message' => $message,
+                        'read' => 0,
+                        'user_id' => $exam_grade_details['Instructor']['user_id']
+                    ]);
                 }
 
-                if (!$use_the_new_format) {
-                    //Department Notification
-                    if (isset($exam_garde_change['ExamGrade']['department_approved_by']) && !empty($exam_garde_change['ExamGrade']['department_approved_by'])) {
-                        $index = count($auto_message);
-
-                        $auto_message[$index]['message'] = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                                $exam_garde_details['Course']['course_title']
-                            )) . ' (' . (trim(
-                                $exam_garde_details['Course']['course_code']
-                            )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . '.';
-
-                        if ((isset($exam_garde_details['PublishedCourse']['year_level_id']) && empty($exam_garde_details['PublishedCourse']['year_level_id'])) || (isset($exam_garde_details['Student']['department_id']) && empty($exam_garde_details['Student']['department_id']))) {
-                            $view_grade_url = 'freshman_grade_view';
-                        } else {
-                            $view_grade_url = 'department_grade_view';
-                        }
-
-                        $view_grade_url = 'department_grade_view';
-
-                        if (!empty($view_grade_url) && !empty($exam_garde_details['PublishedCourse']['id'])) {
-                            $auto_message[$index]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade Details</a>';
-                        }
-
-                        $auto_message[$index]['is_read'] = 0;
-                        $auto_message[$index]['user_id'] = $exam_garde_change['ExamGrade']['department_approved_by'];
+                if (!$use_the_new_format && !empty($exam_grade_change->department_approved_by)) {
+                    $view_grade_url = (empty($exam_grade_details['PublishedCourse']['year_level_id']) || empty($exam_grade_details['Student']['department_id'])) ? 'freshmanGradeView' : 'departmentGradeView';
+                    $message = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'] . '.';
+                    if (!empty($view_grade_url) && !empty($exam_grade_details['PublishedCourse']['id'])) {
+                        $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade Details</a>';
                     }
+                    $autoMessages[] = $this->newEntity([
+                        'message' => $message,
+                        'read' => 0,
+                        'user_id' => $exam_grade_change->department_approved_by
+                    ]);
                 }
 
-                //debug($privilaged_registrars);
-                //debug($exam_garde_details);
                 if (!empty($privilaged_registrars)) {
-                    foreach ($privilaged_registrars as $key => $privilaged_registrar) {
-                        $index = count($auto_message);
-                        //Registrar Notification
-
-                        if (!$use_the_new_format) {
-                            if (!empty($privilaged_registrar['StaffAssigne']['id'])) {
-                                if (isset($privilaged_registrar['StaffAssigne']['department_id']) && !empty($privilaged_registrar['StaffAssigne']['department_id'])) {
-                                    $department_ids = unserialize(
-                                        $privilaged_registrar['StaffAssigne']['department_id']
-                                    );
-                                } else {
-                                    $department_ids = array();
-                                }
-
-                                if (isset($privilaged_registrar['StaffAssigne']['college_id']) && !empty($privilaged_registrar['StaffAssigne']['college_id'])) {
-                                    $college_ids = unserialize($privilaged_registrar['StaffAssigne']['college_id']);
-                                } else {
-                                    $college_ids = array();
-                                }
-                            }
-                        }
-                        //debug($department_ids);
-                        //debug($college_ids);
+                    foreach ($privilaged_registrars as $privilaged_registrar) {
                         $view_grade_url = '';
-
-                        if (isset($privilaged_registrar['User']['role_id']) && $privilaged_registrar['User']['role_id'] != ROLE_STUDENT) {
+                        if ($privilaged_registrar['User']['role_id'] != ROLE_STUDENT) {
                             if ($privilaged_registrar['User']['role_id'] == ROLE_REGISTRAR) {
                                 $view_grade_url = 'registrar_grade_view';
                             } elseif ($privilaged_registrar['User']['role_id'] == ROLE_COLLEGE) {
-                                if (isset($exam_garde_details['Student']['department_id']) && empty($exam_garde_details['Student']['department_id'])) {
-                                    $view_grade_url = 'freshman_grade_view';
-                                } else {
-                                    $view_grade_url = 'college_grade_view';
-                                }
+                                $view_grade_url = empty($exam_grade_details['Student']['department_id']) ? 'freshman_grade_view' : 'college_grade_view';
                             } elseif ($privilaged_registrar['User']['role_id'] == ROLE_DEPARTMENT) {
                                 $view_grade_url = 'department_grade_view';
                             }
                         }
 
                         if (!$use_the_new_format) {
-                            if ((!empty($exam_garde_details['Student']['department_id']) && isset($department_ids) && !empty($department_ids) && in_array(
-                                        $exam_garde_details['Student']['department_id'],
-                                        $department_ids
-                                    )) || (empty($exam_garde_details['Student']['department_id']) && !empty($exam_garde_details['Student']['college_id']) && !empty($exam_garde_details['Student']['college_id']) && isset($college_ids) && !empty($college_ids) && in_array(
-                                        $exam_garde_details['Student']['college_id'],
-                                        $college_ids
-                                    ))) {
-                                $auto_message[$index]['message'] = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                                        $exam_garde_details['Course']['course_title']
-                                    )) . ' (' . (trim(
-                                        $exam_garde_details['Course']['course_code']
-                                    )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year']; //' is changed from <strong>' . ($exam_garde_details['ExamGrade']['grade']) . '</strong> to <strong>' . ($exam_garde_change['ExamGradeChange']['grade']) . '</strong>';
+                            $department_ids = !empty($privilaged_registrar['StaffAssigne']['department_id']) ? unserialize($privilaged_registrar['StaffAssigne']['department_id']) : [];
+                            $college_ids = !empty($privilaged_registrar['StaffAssigne']['college_id']) ? unserialize($privilaged_registrar['StaffAssigne']['college_id']) : [];
 
-                                if (isset($exam_garde_details['ExamGradeChange']['auto_ng_conversion']) && $exam_garde_details['ExamGradeChange']['auto_ng_conversion'] == 1) {
-                                    $auto_message[$index]['message'] .= ' automatically.';
-                                } else {
-                                    $auto_message[$index]['message'] .= ' manually.';
-                                }
-
+                            if ((!empty($exam_grade_details['Student']['department_id']) && !empty($department_ids) && in_array($exam_grade_details['Student']['department_id'], $department_ids)) ||
+                                (empty($exam_grade_details['Student']['department_id']) && !empty($exam_grade_details['Student']['college_id']) && !empty($college_ids) && in_array($exam_grade_details['Student']['college_id'], $college_ids))) {
+                                $message = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'];
+                                $message .= !empty($exam_grade_change->auto_ng_conversion) ? ' automatically.' : ' manually.';
                                 if (!empty($view_grade_url)) {
-                                    $auto_message[$index]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
+                                    $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
                                 }
-
-                                $auto_message[$index]['read'] = 0;
-                                $auto_message[$index]['user_id'] = $privilaged_registrar['User']['id'];
+                                $autoMessages[] = $this->newEntity([
+                                    'message' => $message,
+                                    'read' => 0,
+                                    'user_id' => $privilaged_registrar['User']['id']
+                                ]);
                             }
                         } else {
                             if ($privilaged_registrar['User']['role_id'] == ROLE_REGISTRAR) {
-                                if (isset($exam_garde_details['ExamGradeChange']['auto_ng_conversion']) && $exam_garde_details['ExamGradeChange']['auto_ng_conversion'] == 1) {
-                                    $auto_message[$index]['message'] = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                                            $exam_garde_details['Course']['course_title']
-                                        )) . ' (' . (trim(
-                                            $exam_garde_details['Course']['course_code']
-                                        )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'] . ' automatically by the System.';
-                                } else {
-                                    $auto_message[$index]['message'] = 'You applied an Exam Grade change ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                                            $exam_garde_details['Course']['course_title']
-                                        )) . ' (' . (trim(
-                                            $exam_garde_details['Course']['course_code']
-                                        )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'];
-                                }
+                                $message = !empty($exam_grade_change->auto_ng_conversion) ?
+                                    'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'] . ' automatically by the System.' :
+                                    'You applied an Exam Grade change ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'];
                             } else {
-                                $auto_message[$index]['message'] = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_garde_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . (trim(
-                                        $exam_garde_details['Course']['course_title']
-                                    )) . ' (' . (trim(
-                                        $exam_garde_details['Course']['course_code']
-                                    )) . ')</u> from ' . ($exam_garde_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_garde_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_garde_details['PublishedCourse']['academic_year'];
-                                if (isset($exam_garde_details['ExamGradeChange']['auto_ng_conversion']) && $exam_garde_details['ExamGradeChange']['auto_ng_conversion'] == 1) {
-                                    $auto_message[$index]['message'] .= ', automatically by the System.';
-                                } else {
-                                    $auto_message[$index]['message'] .= ', manually by ' . $converted_by_full_name . '.';
-                                }
+                                $message = 'Exam Grade is changed ' . $change_type_and_grade . ' for <u>' . $exam_grade_details['Student']['full_name_studentnumber'] . '</u> for the course <u>' . trim($exam_grade_details['Course']['course_title']) . ' (' . trim($exam_grade_details['Course']['course_code']) . ')</u> from ' . ($exam_grade_details['PublishedCourse']['semester'] == 'I' ? '1st' : ($exam_grade_details['PublishedCourse']['semester'] == 'II' ? '2nd' : '3rd')) . ' semester of ' . $exam_grade_details['PublishedCourse']['academic_year'];
+                                $message .= !empty($exam_grade_change->auto_ng_conversion) ? ', automatically by the System.' : ', manually by ' . $converted_by_full_name . '.';
                             }
 
                             if (!empty($view_grade_url)) {
-                                /* if ($privilaged_registrar['User']['role_id'] == ROLE_DEPARTMENT && ((isset($exam_garde_change['CourseRegistration']['year_levele_id']) && !empty($exam_garde_change['CourseRegistration']['year_levele_id'])) || (isset($exam_garde_change['CourseAdd']['year_levele_id']) && !empty($exam_garde_change['CourseAdd']['year_levele_id'])))) {
-                                    $auto_message[$index]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
-                                } else if ($privilaged_registrar['User']['role_id'] != ROLE_DEPARTMENT) {
-                                    $auto_message[$index]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
-                                } */
-
-                                $auto_message[$index]['message'] .= ' <a href="/exam_grades/' . $view_grade_url . '/' . $exam_garde_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
+                                $message .= ' <a href="/examGrades/' . $view_grade_url . '/' . $exam_grade_details['PublishedCourse']['id'] . '/pc">View Grade</a>';
                             }
 
-                            $auto_message[$index]['is_read'] = 0;
-                            $auto_message[$index]['user_id'] = $privilaged_registrar['User']['id'];
+                            $autoMessages[] = $this->newEntity([
+                                'message' => $message,
+                                'read' => 0,
+                                'user_id' => $privilaged_registrar['User']['id']
+                            ]);
                         }
                     }
                 }
             }
         }
 
-        debug($auto_message);
-
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function gradeRelatedDetails($exam_grade_id = null)
+    public function gradeRelatedDetails($exam_grade_id = null)
     {
+        $exam_grade_details = [];
 
-        $exam_garde_details = array();
+        $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+        $exam_grade_details_r = $examGradesTable->find()
+            ->where(['ExamGrades.id' => $exam_grade_id])
+            ->contain([
+                'CourseRegistrations' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'Sections',
+                        'Departments',
+                        'Colleges',
+                        'CourseInstructorAssignments' => function ($query) {
+                            return $query
+                                ->where([
+                                    'OR' => [
+                                        'CourseInstructorAssignments.type LIKE' => '%Lecture%',
+                                        'CourseInstructorAssignments.isprimary' => 1
+                                    ]
+                                ])
+                                ->contain(['Staffs' => ['Titles', 'Positions']])
+                                ->limit(1);
+                        }
+                    ]
+                ],
+                'CourseAdds' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'Sections',
+                        'Departments' => ['Colleges'],
+                        'Colleges',
+                        'CourseInstructorAssignments' => function ($query) {
+                            return $query
+                                ->where([
+                                    'OR' => [
+                                        'CourseInstructorAssignments.type LIKE' => '%Lecture%',
+                                        'CourseInstructorAssignments.isprimary' => 1
+                                    ]
+                                ])
+                                ->contain(['Staffs' => ['Titles', 'Positions']])
+                                ->limit(1);
+                        }
+                    ]
+                ],
+                'MakeupExams' => [
+                    'Students',
+                    'PublishedCourses' => [
+                        'Courses',
+                        'Sections',
+                        'Departments' => ['Colleges'],
+                        'Colleges',
+                        'CourseInstructorAssignments' => function ($query) {
+                            return $query
+                                ->where([
+                                    'OR' => [
+                                        'CourseInstructorAssignments.type LIKE' => '%Lecture%',
+                                        'CourseInstructorAssignments.isprimary' => 1
+                                    ]
+                                ])
+                                ->contain(['Staffs' => ['Titles', 'Positions']])
+                                ->limit(1);
+                        }
+                    ]
+                ]
+            ])
+            ->first();
 
-        $exam_garde_details_r = ClassRegistry::init('ExamGrade')->find('first', array(
-            'conditions' => array(
-                'ExamGrade.id' => $exam_grade_id
-            ),
-            'contain' => array(
-                'CourseRegistration' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'OR' => array(
-                                    'CourseInstructorAssignment.type LIKE \'%Lecture%\'',
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                )
-                            ),
-                            'Staff' => array('Title', 'Position'),
-                            'limit' => 1
-                        ),
-                        'Course',
-                        'Section',
-                        'Department',
-                        'College'
-                    )
-                ),
-                'CourseAdd' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'OR' => array(
-                                    'CourseInstructorAssignment.type LIKE \'%Lecture%\'',
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                )
-                            ),
-                            'Staff' => array('Title', 'Position'),
-                            'limit' => 1
-                        ),
-                        'Course',
-                        'Section',
-                        'Department' => array('College'),
-                        'College'
-                    )
-                ),
-                'MakeupExam' => array(
-                    'Student',
-                    'PublishedCourse' => array(
-                        'CourseInstructorAssignment' => array(
-                            'conditions' => array(
-                                'OR' => array(
-                                    'CourseInstructorAssignment.type LIKE \'%Lecture%\'',
-                                    'CourseInstructorAssignment.isprimary' => 1
-                                )
-                            ),
-                            'Staff' => array('Title', 'Position'),
-                            'limit' => 1
-                        ),
-                        'Course',
-                        'Section',
-                        'Department' => array('College'),
-                        'College'
-                    )
-                )
-            )
-        ));
-
-        if (empty($exam_garde_details_r['ExamGrade']['id'])) {
-            return array();
+        if (empty($exam_grade_details_r) || empty($exam_grade_details_r->id)) {
+            return [
+                'ExamGrade' => [],
+                'Student' => [],
+                'Course' => [],
+                'Section' => [],
+                'Department' => [],
+                'College' => [],
+                'Instructor' => [],
+                'PublishedCourse' => []
+            ];
         }
 
-        $exam_garde_details['ExamGrade'] = $exam_garde_details_r['ExamGrade'];
+        $exam_grade_details['ExamGrade'] = $exam_grade_details_r->toArray();
 
-        //debug($exam_garde_details_r);
-        if (!empty($exam_garde_details_r['CourseRegistration']['id'])) {
-            $exam_garde_details['Student'] = $exam_garde_details_r['CourseRegistration']['Student'];
-            $exam_garde_details['Course'] = $exam_garde_details_r['CourseRegistration']['PublishedCourse']['Course'];
-            $exam_garde_details['Section'] = $exam_garde_details_r['CourseRegistration']['PublishedCourse']['Section'];
-            $exam_garde_details['Department'] = $exam_garde_details_r['CourseRegistration']['PublishedCourse']['Department'];
-            $exam_garde_details['College'] = $exam_garde_details_r['CourseRegistration']['PublishedCourse']['College'];
-
-            $exam_garde_details['Instructor'] = array();
-
-            if (isset($exam_garde_details_r['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
-                $exam_garde_details['Instructor'] = $exam_garde_details_r['CourseRegistration']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-            }
-
-            $exam_garde_details['PublishedCourse'] = (isset($exam_garde_details_r['CourseRegistration']['PublishedCourse']) && !empty($exam_garde_details_r['CourseRegistration']['PublishedCourse']) ? $exam_garde_details_r['CourseRegistration']['PublishedCourse'] : array());
-        } elseif (!empty($exam_garde_details_r['CourseAdd']['id'])) {
-            $exam_garde_details['Student'] = $exam_garde_details_r['CourseAdd']['Student'];
-            $exam_garde_details['Course'] = $exam_garde_details_r['CourseAdd']['PublishedCourse']['Course'];
-            $exam_garde_details['Section'] = $exam_garde_details_r['CourseAdd']['PublishedCourse']['Section'];
-            $exam_garde_details['Department'] = $exam_garde_details_r['CourseAdd']['PublishedCourse']['Department'];
-            $exam_garde_details['College'] = $exam_garde_details_r['CourseAdd']['PublishedCourse']['College'];
-
-            $exam_garde_details['Instructor'] = array();
-
-            if (isset($exam_garde_details_r['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
-                $exam_garde_details['Instructor'] = $exam_garde_details_r['CourseAdd']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-            }
-
-            $exam_garde_details['PublishedCourse'] = (isset($exam_garde_details_r['CourseAdd']['PublishedCourse']) && !empty($exam_garde_details_r['CourseAdd']['PublishedCourse']) ? $exam_garde_details_r['CourseAdd']['PublishedCourse'] : array());
-        } elseif (!empty($exam_garde_details_r['MakeupExam']['id'])) {
-            $exam_garde_details['Student'] = $exam_garde_details_r['MakeupExam']['Student'];
-            $exam_garde_details['Course'] = $exam_garde_details_r['MakeupExam']['PublishedCourse']['Course'];
-            $exam_garde_details['Section'] = $exam_garde_details_r['MakeupExam']['PublishedCourse']['Section'];
-            $exam_garde_details['Department'] = $exam_garde_details_r['MakeupExam']['PublishedCourse']['Department'];
-            $exam_garde_details['College'] = $exam_garde_details_r['MakeupExam']['PublishedCourse']['College'];
-
-            $exam_garde_details['Instructor'] = array();
-
-            if (isset($exam_garde_details_r['MakeupExam']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'])) {
-                $exam_garde_details['Instructor'] = $exam_garde_details_r['MakeupExam']['PublishedCourse']['CourseInstructorAssignment'][0]['Staff'];
-            }
-
-            $exam_garde_details['PublishedCourse'] = (isset($exam_garde_details_r['MakeupExam']['PublishedCourse']) && !empty($exam_garde_details_r['MakeupExam']['PublishedCourse']) ? $exam_garde_details_r['MakeupExam']['PublishedCourse'] : array());
+        if (!empty($exam_grade_details_r->course_registration) && !empty($exam_grade_details_r->course_registration->id)) {
+            $exam_grade_details['Student'] = !empty($exam_grade_details_r->course_registration->student) ? $exam_grade_details_r->course_registration->student->toArray() : [];
+            $exam_grade_details['Course'] = !empty($exam_grade_details_r->course_registration->published_course->course) ? $exam_grade_details_r->course_registration->published_course->course->toArray() : [];
+            $exam_grade_details['Section'] = !empty($exam_grade_details_r->course_registration->published_course->section) ? $exam_grade_details_r->course_registration->published_course->section->toArray() : [];
+            $exam_grade_details['Department'] = !empty($exam_grade_details_r->course_registration->published_course->department) ? $exam_grade_details_r->course_registration->published_course->department->toArray() : [];
+            $exam_grade_details['College'] = !empty($exam_grade_details_r->course_registration->published_course->college) ? $exam_grade_details_r->course_registration->published_course->college->toArray() : [];
+            $exam_grade_details['Instructor'] = !empty($exam_grade_details_r->course_registration->published_course->course_instructor_assignments) && !empty($exam_grade_details_r->course_registration->published_course->course_instructor_assignments[0]->staff) ?
+                $exam_grade_details_r->course_registration->published_course->course_instructor_assignments[0]->staff->toArray() : [];
+            $exam_grade_details['PublishedCourse'] = !empty($exam_grade_details_r->course_registration->published_course) ? $exam_grade_details_r->course_registration->published_course->toArray() : [];
+        } elseif (!empty($exam_grade_details_r->course_add) && !empty($exam_grade_details_r->course_add->id)) {
+            $exam_grade_details['Student'] = !empty($exam_grade_details_r->course_add->student) ? $exam_grade_details_r->course_add->student->toArray() : [];
+            $exam_grade_details['Course'] = !empty($exam_grade_details_r->course_add->published_course->course) ? $exam_grade_details_r->course_add->published_course->course->toArray() : [];
+            $exam_grade_details['Section'] = !empty($exam_grade_details_r->course_add->published_course->section) ? $exam_grade_details_r->course_add->published_course->section->toArray() : [];
+            $exam_grade_details['Department'] = !empty($exam_grade_details_r->course_add->published_course->department) ? $exam_grade_details_r->course_add->published_course->department->toArray() : [];
+            $exam_grade_details['College'] = !empty($exam_grade_details_r->course_add->published_course->college) ? $exam_grade_details_r->course_add->published_course->college->toArray() : [];
+            $exam_grade_details['Instructor'] = !empty($exam_grade_details_r->course_add->published_course->course_instructor_assignments) && !empty($exam_grade_details_r->course_add->published_course->course_instructor_assignments[0]->staff) ?
+                $exam_grade_details_r->course_add->published_course->course_instructor_assignments[0]->staff->toArray() : [];
+            $exam_grade_details['PublishedCourse'] = !empty($exam_grade_details_r->course_add->published_course) ? $exam_grade_details_r->course_add->published_course->toArray() : [];
+        } elseif (!empty($exam_grade_details_r->makeup_exam) && !empty($exam_grade_details_r->makeup_exam->id)) {
+            $exam_grade_details['Student'] = !empty($exam_grade_details_r->makeup_exam->student) ? $exam_grade_details_r->makeup_exam->student->toArray() : [];
+            $exam_grade_details['Course'] = !empty($exam_grade_details_r->makeup_exam->published_course->course) ? $exam_grade_details_r->makeup_exam->published_course->course->toArray() : [];
+            $exam_grade_details['Section'] = !empty($exam_grade_details_r->makeup_exam->published_course->section) ? $exam_grade_details_r->makeup_exam->published_course->section->toArray() : [];
+            $exam_grade_details['Department'] = !empty($exam_grade_details_r->makeup_exam->published_course->department) ? $exam_grade_details_r->makeup_exam->published_course->department->toArray() : [];
+            $exam_grade_details['College'] = !empty($exam_grade_details_r->makeup_exam->published_course->college) ? $exam_grade_details_r->makeup_exam->published_course->college->toArray() : [];
+            $exam_grade_details['Instructor'] = !empty($exam_grade_details_r->makeup_exam->published_course->course_instructor_assignments) && !empty($exam_grade_details_r->makeup_exam->published_course->course_instructor_assignments[0]->staff) ?
+                $exam_grade_details_r->makeup_exam->published_course->course_instructor_assignments[0]->staff->toArray() : [];
+            $exam_grade_details['PublishedCourse'] = !empty($exam_grade_details_r->makeup_exam->published_course) ? $exam_grade_details_r->makeup_exam->published_course->toArray() : [];
         } else {
-            $exam_garde_details['Student'] = array();
-            $exam_garde_details['Course'] = array();
-            $exam_garde_details['Section'] = array();
-            $exam_garde_details['Department'] = array();
-            $exam_garde_details['College'] = array();
-            $exam_garde_details['Instructor'] = array();
-            $exam_garde_details['PublishedCourse'] = array();
+            $exam_grade_details['Student'] = [];
+            $exam_grade_details['Course'] = [];
+            $exam_grade_details['Section'] = [];
+            $exam_grade_details['Department'] = [];
+            $exam_grade_details['College'] = [];
+            $exam_grade_details['Instructor'] = [];
+            $exam_grade_details['PublishedCourse'] = [];
         }
 
-        return $exam_garde_details;
+        return $exam_grade_details;
     }
 
-    function getInstructorLatestCourseAssignment($user_id = null)
+    public function getInstructorLatestCourseAssignment($user_id = null)
     {
+        if (empty($user_id)) {
+            return [];
+        }
 
-        if (isset($user_id) && !empty($user_id)) {
-            $staff = ClassRegistry::init('Staff')->find('first', array(
-                'conditions' => array('Staff.user_id' => $user_id),
-                'recursive' => -1
-            ));
+        $staffsTable = TableRegistry::getTableLocator()->get('Staffs');
+        $staff = $staffsTable->find()
+            ->where(['Staffs.user_id' => $user_id])
+            ->first();
 
-            $latest_course_assignment = ClassRegistry::init('CourseInstructorAssignment')->find('first', array(
-                'conditions' => array(
-                    'CourseInstructorAssignment.staff_id' => $staff['Staff']['id']
-                ),
-                'order' => array('CourseInstructorAssignment.created DESC'),
-                'recursive' => -1
-            ));
+        if (!$staff) {
+            return [];
+        }
 
-            $course_assignments = ClassRegistry::init('CourseInstructorAssignment')->find('all', array(
-                'conditions' => array(
-                    'CourseInstructorAssignment.staff_id' => $staff['Staff']['id'],
-                    'CourseInstructorAssignment.academic_year' => $latest_course_assignment['CourseInstructorAssignment']['academic_year'],
-                    'CourseInstructorAssignment.semester' => $latest_course_assignment['CourseInstructorAssignment']['semester'],
-                    'OR' => array(
-                        'CourseInstructorAssignment.type LIKE \'%Lecture%\'',
-                        'CourseInstructorAssignment.isprimary' => 1
-                    )
-                ),
-                'contain' => array(
-                    'PublishedCourse' => array(
-                        'Department',
-                        'College',
-                        'Section',
-                        'Course',
-                        'CourseRegistration' => array(
-                            'ExamGrade' => array(
-                                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC')
-                            )
-                        ),
-                        'CourseAdd' => array(
-                            'ExamGrade' => array(
-                                'order' => array('ExamGrade.id' => 'DESC', 'ExamGrade.created' => 'DESC')
-                            )
-                        )
-                    )
-                )
-            ));
-            //debug($course_assignments);
-            $ongoing_courses = array();
+        $courseInstructorAssignmentsTable = TableRegistry::getTableLocator()->get('CourseInstructorAssignments');
+        $latest_course_assignment = $courseInstructorAssignmentsTable->find()
+            ->where(['CourseInstructorAssignments.staff_id' => $staff->id])
+            ->order(['CourseInstructorAssignments.created' => 'DESC'])
+            ->first();
 
-            if (!empty($course_assignments)) {
-                foreach ($course_assignments as $key => $course_assignment) {
-                    $grade_submitted = true;
+        if (!$latest_course_assignment) {
+            return [];
+        }
 
-                    if ($course_assignment['PublishedCourse']['drop'] == 0) {
-                        if (!isset($course_assignment['PublishedCourse']['CourseRegistration'])) {
-                            debug($course_assignment);
-                        }
+        $course_assignments = $courseInstructorAssignmentsTable->find()
+            ->where([
+                'CourseInstructorAssignments.staff_id' => $staff->id,
+                'CourseInstructorAssignments.academic_year' => $latest_course_assignment->academic_year,
+                'CourseInstructorAssignments.semester' => $latest_course_assignment->semester,
+                'OR' => [
+                    'CourseInstructorAssignments.type LIKE' => '%Lecture%',
+                    'CourseInstructorAssignments.isprimary' => 1
+                ]
+            ])
+            ->contain([
+                'PublishedCourses' => [
+                    'Departments',
+                    'Colleges',
+                    'Sections',
+                    'Courses',
+                    'CourseRegistrations' => [
+                        'ExamGrades' => [
+                            'order' => ['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC']
+                        ]
+                    ],
+                    'CourseAdds' => [
+                        'ExamGrades' => [
+                            'order' => ['ExamGrades.id' => 'DESC', 'ExamGrades.created' => 'DESC']
+                        ]
+                    ]
+                ]
+            ])
+            ->all()
+            ->toArray();
 
-                        if (!empty($course_assignment['PublishedCourse']['CourseRegistration'])) {
-                            foreach ($course_assignment['PublishedCourse']['CourseRegistration'] as $key2 => $course_registration) {
-                                //Excluding students who dropped the course
-                                $course_droped = ClassRegistry::init('CourseRegistration')->isCourseDroped(
-                                    $course_registration['id']
-                                );
+        $ongoing_courses = [];
+        foreach ($course_assignments as $course_assignment) {
+            $grade_submitted = true;
 
-                                if (!$course_droped && (empty($course_registration['ExamGrade']) || $course_registration['ExamGrade'][0]['department_approval'] == -1)) {
-                                    $grade_submitted = false;
-                                    if ($course_assignment['PublishedCourse']['id'] == 6) {
-                                        debug($course_registration);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
+            if ($course_assignment->published_course->drop == 0) {
+                if (!empty($course_assignment->published_course->course_registrations)) {
+                    foreach ($course_assignment->published_course->course_registrations as $course_registration) {
+                        $courseRegistrationsTable = TableRegistry::getTableLocator()->get('CourseRegistrations');
+                        $course_dropped = $courseRegistrationsTable->isCourseDropped($course_registration->id);
 
-                        if ($grade_submitted == true) {
-                            if (!empty($course_assignment['PublishedCourse']['CourseAdd'])) {
-                                foreach ($course_assignment['PublishedCourse']['CourseAdd'] as $key2 => $course_add) {
-                                    //Course drop consideration left
-                                    if (empty($course_add['ExamGrade']) || $course_add['ExamGrade'][0]['department_approval'] == -1) {
-                                        $grade_submitted = false;
-                                        if ($course_assignment['PublishedCourse']['id'] == 6) {
-                                            debug($course_add);
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if ($grade_submitted == false) {
-                            $index = count($ongoing_courses);
-
-                            $ongoing_courses[$index]['Course'] = $course_assignment['PublishedCourse']['Course'];
-                            $ongoing_courses[$index]['Section'] = $course_assignment['PublishedCourse']['Section'];
-                            $ongoing_courses[$index]['Department'] = $course_assignment['PublishedCourse']['Department'];
-                            $ongoing_courses[$index]['College'] = $course_assignment['PublishedCourse']['College'];
-                            $ongoing_courses[$index]['PublishedCourse'] = $course_assignment['PublishedCourse'];
-
-                            unset($ongoing_courses[$index]['PublishedCourse']['Course']);
-                            unset($ongoing_courses[$index]['PublishedCourse']['CourseRegistration']);
-                            unset($ongoing_courses[$index]['PublishedCourse']['CourseAdd']);
+                        if (!$course_dropped && (empty($course_registration->exam_grades) || $course_registration->exam_grades[0]->department_approval == -1)) {
+                            $grade_submitted = false;
+                            break;
                         }
                     }
                 }
-            }
 
-            //debug($ongoing_courses);
-            //debug($course_assignments);
-            //debug($latest_course_assignment);
-            //debug($staff);
-            return $ongoing_courses;
-        } else {
-            return array();
+                if ($grade_submitted && !empty($course_assignment->published_course->course_adds)) {
+                    foreach ($course_assignment->published_course->course_adds as $course_add) {
+                        if (empty($course_add->exam_grades) || $course_add->exam_grades[0]->department_approval == -1) {
+                            $grade_submitted = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!$grade_submitted) {
+                    $ongoing_courses[] = [
+                        'Course' => $course_assignment->published_course->course->toArray(),
+                        'Section' => $course_assignment->published_course->section->toArray(),
+                        'Department' => $course_assignment->published_course->department->toArray(),
+                        'College' => $course_assignment->published_course->college->toArray(),
+                        'PublishedCourse' => array_diff_key($course_assignment->published_course->toArray(), ['course' => '', 'course_registrations' => '', 'course_adds' => ''])
+                    ];
+                }
+            }
         }
+
+        return $ongoing_courses;
     }
 
-    function sendPermissionManagementBreakAttempt($user_id = null, $message = null)
+    public function sendPermissionManagementBreakAttempt($user_id = null, $message = null)
     {
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $user = $usersTable->find()
+            ->where(['Users.id' => $user_id])
+            ->first();
 
-        $user = ClassRegistry::init('User')->find(
-            'first',
-            array('conditions' => array('User.id' => $user_id), 'recursive' => -1)
-        );
-        $sys_admins = ClassRegistry::init('User')->find(
-            'all',
-            array('conditions' => array('User.role_id' => 1), 'recursive' => -1)
-        );
-        $auto_message = array();
+        $sys_admins = $usersTable->find()
+            ->where(['Users.role_id' => 1])
+            ->all()
+            ->toArray();
+
+        $autoMessages = [];
 
         if (!empty($sys_admins)) {
             foreach ($sys_admins as $sys_admin) {
-                $index = count($auto_message);
-                if ($message) {
-                    $auto_message[$index]['message'] = $message;
-                } else {
-                    $auto_message[$index]['message'] = '<u>' . $user['User']['first_name'] . ' ' . $user['User']['middle_name'] . ' ' . $user['User']['last_name'] . ' (' . $user['User']['username'] . ')</u> is trying to break permission management system. Please give appropriate warning.';
-                }
+                $msg = $message ?: '<u>' . $user->first_name . ' ' . $user->middle_name . ' ' . $user->last_name . ' (' . $user->username . ')</u> is trying to break permission management system. Please give appropriate warning.';
+                $msg = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $msg . '</p>';
 
-                $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[$index]['message'] . '</p>';
-                $auto_message[$index]['is_read'] = 0;
-                $auto_message[$index]['user_id'] = $sys_admin['User']['id'];
+                $autoMessages[] = $this->newEntity([
+                    'message' => $msg,
+                    'read' => 0,
+                    'user_id' => $sys_admin->id
+                ]);
             }
         }
 
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
     }
 
-    function sendInappropriateAccessAttempt($user_id = null, $message = null)
+    public function sendInappropriateAccessAttempt($user_id = null, $message = null)
     {
+        $usersTable = TableRegistry::getTableLocator()->get('Users');
+        $user = $usersTable->find()
+            ->where(['Users.id' => $user_id])
+            ->first();
 
-        $user = ClassRegistry::init('User')->find(
-            'first',
-            array('conditions' => array('User.id' => $user_id), 'recursive' => -1)
-        );
-        $sys_admins = ClassRegistry::init('User')->find(
-            'all',
-            array('conditions' => array('User.role_id' => 1), 'recursive' => -1)
-        );
-        $auto_message = array();
+        $sys_admins = $usersTable->find()
+            ->where(['Users.role_id' => 1])
+            ->all()
+            ->toArray();
+
+        $autoMessages = [];
 
         if (!empty($sys_admins)) {
             foreach ($sys_admins as $sys_admin) {
-                $index = count($auto_message);
-                if ($message) {
-                    $auto_message[$index]['message'] = $message;
-                } else {
-                    $auto_message[$index]['message'] = '<u>' . $user['User']['first_name'] . ' ' . $user['User']['middle_name'] . ' ' . $user['User']['last_name'] . ' (' . $user['User']['username'] . ')</u> is trying to access a page or a permission not allowed to access. Please give appropriate warning.';
-                }
+                $msg = $message ?: '<u>' . $user->first_name . ' ' . $user->middle_name . ' ' . $user->last_name . ' (' . $user->username . ')</u> is trying to access a page or a permission not allowed to access. Please give appropriate warning.';
+                $msg = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $msg . '</p>';
 
-                $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">' . $auto_message[$index]['message'] . '</p>';
-                $auto_message[$index]['is_read'] = 0;
-                $auto_message[$index]['user_id'] = $sys_admin['User']['id'];
+                $autoMessages[] = $this->newEntity([
+                    'message' => $msg,
+                    'read' => 0,
+                    'user_id' => $sys_admin->id
+                ]);
             }
         }
 
-        if (!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
+        if (!empty($autoMessages)) {
+            $this->saveMany($autoMessages);
         }
-    }
-
-    public function sendRegistrarAssignedNotificationToDepartmentAndCollege(
-        $current_academic_year = null,
-        $department_id = null,
-        $college_id = null,
-        $message = null
-    ) {
-        /* $accepted_student_department_notified = ClassRegistry::init('AcceptedStudent')->find('all', array(
-            'conditions' => array(
-                'AcceptedStudent.Placement_Approved_By_Department is null',
-                'AcceptedStudent.academicyear' => $current_academic_year,
-                'AcceptedStudent.placementtype' => REGISTRAR_ASSIGNED
-            )
-        ));
-
-        $colleges_departments = ClassRegistry::init('User')->find('all', array(
-            'conditions' => array(
-                'User.role_id' => array(5, 6),
-                'User.admin' => 1,
-                'User.id IN (select user_id from staffs where department_id = ' . $department_id . ' OR college_id=' . $college_id . ' ) '
-
-            ),
-            'recursive' => -1
-        ));
-
-        $auto_message = array();
-
-        if (!empty($colleges_departments)) {
-            foreach($colleges_departments as $sys_admin) {
-                $index = count($auto_message);
-                if($message) {
-                    $auto_message[$index]['message'] = $message;
-                } else {
-                    $auto_message[$index]['message'] = ' you have '. count($accepted_student_department_notified).' assigned to your '. (isset($department_id) && !empty($department_id) ? 'department' : 'college' ).' for '. $current_academic_year .' academic year.' . (isset($department_id) && !empty($department_id) ? ' You can  now attach the students to a curriculum in Placement > Accepted Students > Attach Curriculum ' : '');
-                }
-
-                $auto_message[$index]['message'] = '<p style="text-align:justify; padding:0px; margin:0px" class="rejected">'.$auto_message[$index]['message'].'</p>';
-                $auto_message[$index]['read'] = 0;
-                $auto_message[$index]['user_id'] = $sys_admin['User']['id'];
-            }
-        }
-
-        if(!empty($auto_message)) {
-            $this->saveAll($auto_message, array('validate' => false));
-        } */
     }
 }
+?>

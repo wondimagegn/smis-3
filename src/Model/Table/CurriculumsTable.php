@@ -1,11 +1,11 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\Query;
+use Cake\ORM\RulesChecker;
+use Cake\Datasource\EntityInterface;
 
 class CurriculumsTable extends Table
 {
@@ -15,7 +15,7 @@ class CurriculumsTable extends Table
      * @param array $config The configuration for the Table.
      * @return void
      */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
@@ -23,8 +23,7 @@ class CurriculumsTable extends Table
         $this->setDisplayField('name');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
+        // Associations
         $this->belongsTo('Departments', [
             'foreignKey' => 'department_id',
             'joinType' => 'INNER',
@@ -35,37 +34,46 @@ class CurriculumsTable extends Table
         ]);
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
+            'joinType' => 'INNER',
         ]);
         $this->belongsTo('DepartmentStudyPrograms', [
             'foreignKey' => 'department_study_program_id',
-        ]);
-        $this->hasMany('AcceptedStudents', [
-            'foreignKey' => 'curriculum_id',
-        ]);
-        $this->hasMany('CourseCategories', [
-            'foreignKey' => 'curriculum_id',
+            'joinType' => 'INNER',
         ]);
         $this->hasMany('Courses', [
             'foreignKey' => 'curriculum_id',
-        ]);
-        $this->hasMany('CurriculumAttachments', [
-            'foreignKey' => 'curriculum_id',
-        ]);
-        $this->hasMany('OtherAcademicRules', [
-            'foreignKey' => 'curriculum_id',
-        ]);
-        $this->hasMany('Sections', [
-            'foreignKey' => 'curriculum_id',
+            'dependent' => false,
         ]);
         $this->hasMany('Students', [
             'foreignKey' => 'curriculum_id',
+            'dependent' => false,
         ]);
+
+        $this->hasMany('Sections', [
+            'foreignKey' => 'curriculum_id',
+            'dependent' => false,
+        ]);
+
+
         $this->hasMany('Attachments', [
             'foreignKey' => 'foreign_key',
             'conditions' => ['Attachments.model' => 'Curriculum'],
+            'sort' => ['Attachments.created' => 'DESC'],
             'dependent' => true,
-            'cascadeCallbacks' => true
         ]);
+        $this->hasMany('CourseCategories', [
+            'foreignKey' => 'curriculum_id',
+            'dependent' => true,
+        ]);
+
+        // Behaviors
+        // Placeholder for Tools.Logable (requires a CakePHP 3.x compatible version)
+        // $this->addBehavior('Tools.Logable', [
+        //     'change' => 'full',
+        //     'description_ids' => true,
+        //     'displayField' => 'username',
+        //     'foreignKey' => 'foreign_key'
+        // ]);
     }
 
     /**
@@ -74,220 +82,239 @@ class CurriculumsTable extends Table
      * @param \Cake\Validation\Validator $validator Validator instance.
      * @return \Cake\Validation\Validator
      */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
             ->scalar('name')
-            ->maxLength('name', 250)
-            ->requirePresence('name', 'create')
-            ->notEmptyString('name');
-
-        $validator
-            ->date('year_introduced')
-            ->requirePresence('year_introduced', 'create')
-            ->notEmptyDate('year_introduced');
-
-        $validator
-            ->scalar('type_credit')
-            ->maxLength('type_credit', 25)
-            ->allowEmptyString('type_credit');
+            ->notEmptyString('name', 'Please provide curriculum name, it is required.');
 
         $validator
             ->scalar('certificate_name')
-            ->maxLength('certificate_name', 30)
-            ->requirePresence('certificate_name', 'create')
-            ->notEmptyString('certificate_name');
+            ->notEmptyString('certificate_name', 'Please provide certificate name, it is required.');
+
+        $validator
+            ->scalar('year_introduced')
+            ->notEmptyString('year_introduced', 'Please provide curriculum introduced year, it is required.');
+
+        $validator
+            ->scalar('type_credit')
+            ->notEmptyString('type_credit', 'Please provide type of credit, it is required.');
 
         $validator
             ->scalar('amharic_degree_nomenclature')
-            ->maxLength('amharic_degree_nomenclature', 255)
-            ->allowEmptyString('amharic_degree_nomenclature');
-
-        $validator
-            ->scalar('specialization_amharic_degree_nomenclature')
-            ->maxLength('specialization_amharic_degree_nomenclature', 255)
-            ->allowEmptyString('specialization_amharic_degree_nomenclature');
+            ->notEmptyString('amharic_degree_nomenclature', 'Please provide amharic degree nomenclature, it is required.');
 
         $validator
             ->scalar('english_degree_nomenclature')
-            ->maxLength('english_degree_nomenclature', 100)
-            ->requirePresence('english_degree_nomenclature', 'create')
-            ->notEmptyString('english_degree_nomenclature');
+            ->notEmptyString('english_degree_nomenclature', 'Please provide english degree nomenclature, it is required.');
 
         $validator
-            ->scalar('specialization_english_degree_nomenclature')
-            ->maxLength('specialization_english_degree_nomenclature', 100)
-            ->requirePresence('specialization_english_degree_nomenclature', 'create')
-            ->notEmptyString('specialization_english_degree_nomenclature');
+            ->integer('program_id')
+            ->requirePresence('program_id', 'create')
+            ->notEmptyString('program_id', 'Please select program, it is required.');
 
         $validator
             ->integer('minimum_credit_points')
             ->requirePresence('minimum_credit_points', 'create')
-            ->notEmptyString('minimum_credit_points');
-
-        $validator
-            ->boolean('lock')
-            ->notEmptyString('lock');
-
-        $validator
-            ->boolean('registrar_approved')
-            ->notEmptyString('registrar_approved');
-
-        $validator
-            ->boolean('active')
-            ->notEmptyString('active');
-
-        $validator
-            ->integer('curriculum_type')
-            ->notEmptyString('curriculum_type');
+            ->notEmptyString('minimum_credit_points', 'Please provide minimum credit points, it is required.')
+            ->greaterThanOrEqual('minimum_credit_points', 0, 'Please provide valid minimum credit point, greater than or equal to zero.')
+            ->add('minimum_credit_points', 'sumCreditCurriculum', [
+                'rule' => [$this, 'sumCreditCurriculum'],
+                'message' => 'The minimum credit point should be less than or equal to the sum of the course category total credit, please adjust.'
+            ])
+            ->add('minimum_credit_points', 'sumMandatoryCredit', [
+                'rule' => [$this, 'sumMandatoryCredit'],
+                'message' => 'The sum of the mandatory credit should be equal to minimum credit points, please adjust.'
+            ]);
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Virtual field equivalent for curriculum_detail
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param EntityInterface $entity The entity to compute the virtual field for.
+     * @return string|null
      */
-    public function buildRules(RulesChecker $rules)
+    public function _getCurriculumDetail(EntityInterface $entity): ?string
     {
-        $rules->add($rules->existsIn(['department_id'], 'Departments'));
-        $rules->add($rules->existsIn(['program_id'], 'Programs'));
-        $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
-        $rules->add($rules->existsIn(['department_study_program_id'], 'DepartmentStudyPrograms'));
-
-        return $rules;
+        return $entity->name . ' - ' . $entity->year_introduced;
     }
 
-    function sumCreditCurriculum()
+    /**
+     * Custom validation rule for sumCreditCurriculum
+     *
+     * @param mixed $value The value to validate.
+     * @param array $context The validation context.
+     * @return bool
+     */
+    public function sumCreditCurriculum($value, array $context): bool
     {
-        $sum_course_category = 0;
+        $sumCourseCategory = 0;
+        if (!empty($context['data']['CourseCategory'])) {
+            foreach ($context['data']['CourseCategory'] as $category) {
+                $sumCourseCategory += $category['total_credit'] ?? 0;
+            }
+        }
+        return $sumCourseCategory >= $value;
+    }
 
-        if (!empty($this->data['CourseCategory'])) {
-            foreach ($this->data['CourseCategory'] as $ck => $cv) {
-                $sum_course_category += $cv['total_credit'];
+    /**
+     * Custom validation rule for sumMandatoryCredit
+     *
+     * @param mixed $value The value to validate.
+     * @param array $context The validation context.
+     * @return bool
+     */
+    public function sumMandatoryCredit($value, array $context): bool
+    {
+        $sumCourseCategory = 0;
+        if (!empty($context['data']['CourseCategory'])) {
+            foreach ($context['data']['CourseCategory'] as $category) {
+                $sumCourseCategory += $category['mandatory_credit'] ?? 0;
+            }
+        }
+        return $sumCourseCategory == $value;
+    }
+
+    /**
+     * Checks if a curriculum can be deleted
+     *
+     * @param int|null $curriculumId The curriculum ID to check.
+     * @return bool
+     */
+    public function canItBeDeleted(?int $curriculumId = null): bool
+    {
+        if ($curriculumId === null) {
+            return false;
+        }
+
+        if ($this->Courses->find()->where(['Courses.curriculum_id' => $curriculumId])->count() > 0) {
+            return false;
+        }
+        if ($this->Students->find()->where(['Students.curriculum_id' => $curriculumId])->count() > 0) {
+            return false;
+        }
+        // Commented out as in original
+        /*
+        if ($this->Attachments->find()->where(['Attachments.model' => 'Curriculum', 'Attachments.foreign_key' => $curriculumId])->count() > 0) {
+            return false;
+        }
+        if ($this->CourseCategories->find()->where(['CourseCategories.curriculum_id' => $curriculumId])->count() > 0) {
+            return false;
+        }
+        */
+        return true;
+    }
+
+    /**
+     * Organizes courses by year and semester
+     *
+     * @param array|null $data The curriculum data including courses.
+     * @return array|null
+     */
+    public function organizedCourseOfCurriculumByYearSemester(?array $data = null): ?array
+    {
+
+        if (empty($data['id'])) {
+            return $data;
+        }
+
+        $coursesOrganizedByYear = [];
+        foreach ($data['courses'] as $course) {
+
+            if (empty($course['courses'])) {
+                $yearName = $course['year_level']['name'] ?? 'Unknown';
+                $semester = $course['semester'] ?? 'Unknown';
+                $coursesOrganizedByYear[$yearName][$semester][] = $course;
             }
         }
 
-        if ($sum_course_category >= $this->data['Curriculum']['minimum_credit_points']) {
-            return true;
-        }
+        $data['courses'] = $coursesOrganizedByYear;
 
-        return false;
+
+        return $data;
     }
 
-    function sumMandatoryCredit()
+    /**
+     * Prepares attachment data for saving
+     *
+     * @param array|null $data The data containing attachments.
+     * @return array|null
+     */
+    public function preparedAttachment(?array $data = null): ?array
     {
-        $sum_course_category = 0;
-
-        if (!empty($this->data['CourseCategory'])) {
-            foreach ($this->data['CourseCategory'] as $ck => $cv) {
-                $sum_course_category += $cv['mandatory_credit'];
-            }
-        }
-
-        if ($sum_course_category == $this->data['Curriculum']['minimum_credit_points']) {
-            return true;
-        }
-
-        return false;
-    }
-
-
-    function canItBeDeleted($curriculum_id = null)
-    {
-        if ($this->Course->find('count', array('conditions' => array('Course.curriculum_id' => $curriculum_id))) > 0) {
-            return false;
-        } elseif ($this->Student->find('count', array('conditions' => array('Student.curriculum_id' => $curriculum_id))
-            ) > 0) {
-            return false;
-        }
-        /* else if ($this->Attachment->find('count', array('conditions' => array('Attachment.model' => 'Curriculum', 'Attachment.foreign_key' => $curriculum_id))) > 0) {
-            return false;
-        } else if ($this->CourseCategory->find('count', array('conditions' => array('CourseCategory.curriculum_id' => $curriculum_id))) > 0) {
-            return false;
-        } */
-        else {
-            return true;
-        }
-    }
-
-    function organized_course_of_curriculum_by_year_semester($data = null)
-    {
-        $courses_organized_by_year = array();
-
-        if (!empty($data['id'])) {
-            foreach ($data['Course'] as $index => $value) {
-                if (empty($value['Course'])) {
-                    $courses_organized_by_year[$value['YearLevel']['name']][$value['semester']][] = $value;
-                    // $value['hasEquivalentMap']=ClassRegistry::init('EquivalentCourse')->checkCourseHasEquivalentCourse($value['id'],$studentAttachedCurriculumID);
+        if (!empty($data['Attachment'])) {
+            foreach ($data['Attachment'] as $index => &$attachment) {
+                if (empty($attachment['file']['name']) && empty($attachment['file']['type']) && empty($attachment['file']['tmp_name'])) {
+                    unset($data['Attachment'][$index]);
+                } else {
+                    $attachment['model'] = 'Curriculum';
+                    $attachment['group'] = 'attachment';
                 }
             }
-            $data['Course'] = $courses_organized_by_year;
         }
         return $data;
     }
 
-    function preparedAttachment($data = null)
+    /**
+     * Gets department study program details
+     *
+     * @param int|null $departmentId The department ID.
+     * @param int|null $programModalityId The program modality ID.
+     * @param int|null $qualificationId The qualification ID.
+     * @return array
+     */
+    public function getDepartmentStudyProgramDetails(?int $departmentId = null, ?int $programModalityId = null, ?int $qualificationId = null): array
     {
-        if (!empty($data['Attachment'])) {
-            foreach ($data['Attachment'] as $in => &$dv) {
-                if (empty($dv['file']['name']) && empty($dv['file']['type']) && empty($dv['tmp_name'])) {
-                    unset($data['Attachment'][$in]);
-                } else {
-                    $dv['model'] = 'Curriculum';
-                    $dv['group'] = 'attachment';
-                }
-            }
-            return $data;
+        $conditions = [];
+        if ($departmentId) {
+            $conditions['DepartmentStudyPrograms.department_id'] = $departmentId;
         }
-    }
-
-    function getDepartmentStudyProgramDetails($department_id = null, $program_modality_id = null, $qualification_id = null)
-    {
-        $conditions = array();
-
-        if ($department_id) {
-            $conditions[] = array('DepartmentStudyProgram.department_id' => $department_id);
+        if ($programModalityId) {
+            $conditions['DepartmentStudyPrograms.program_modality_id'] = $programModalityId;
+        }
+        if ($qualificationId) {
+            $conditions['DepartmentStudyPrograms.qualification_id'] = $qualificationId;
         }
 
-        if ($program_modality_id) {
-            $conditions[] = array('DepartmentStudyProgram.program_modality_id' => $program_modality_id);
-        }
-
-        if ($qualification_id) {
-            $conditions[] = array('DepartmentStudyProgram.qualification_id' => $qualification_id);
-        }
-
-        //debug($conditions);
-
-        $departmentStudyProgramDetails = array();
-        $departmentStudyProgramListForSelect = array();
-
+        $departmentStudyProgramDetails = [];
+        $departmentStudyProgramListForSelect = [];
 
         if (!empty($conditions)) {
-            $departmentStudyProgramDetails = $this->DepartmentStudyProgram->find('all', array(
-                'conditions' => $conditions,
-                'contain' => array(
-                    'StudyProgram' => array('fields' => array('id', 'study_program_name', 'code')),
-                    'ProgramModality' => array('fields' => array('id', 'modality', 'code')),
-                    'Qualification'  => array('fields' => array('id', 'qualification', 'code')),
-                ),
-                'fields' => array('DepartmentStudyProgram.id', 'DepartmentStudyProgram.study_program_id')
-            ));
+            $departmentStudyProgramDetails = $this->DepartmentStudyPrograms->find()
+                ->select([
+                    'DepartmentStudyPrograms.id',
+                    'DepartmentStudyPrograms.study_program_id',
+                    'StudyPrograms.id',
+                    'StudyPrograms.study_program_name',
+                    'StudyPrograms.code',
+                    'ProgramModalities.id',
+                    'ProgramModalities.modality',
+                    'ProgramModalities.code',
+                    'Qualifications.id',
+                    'Qualifications.qualification',
+                    'Qualifications.code'
+                ])
+                ->contain([
+                    'StudyPrograms' => ['fields' => ['id', 'study_program_name', 'code']],
+                    'ProgramModalities' => ['fields' => ['id', 'modality', 'code']],
+                    'Qualifications' => ['fields' => ['id', 'qualification', 'code']]
+                ])
+                ->where($conditions)
+                ->toArray();
         }
 
-        if (!empty($departmentStudyProgramDetails)) {
-            foreach ($departmentStudyProgramDetails as $dspkey => $dspval) {
-                //debug($dspval);
-                $departmentStudyProgramListForSelect[$dspval['DepartmentStudyProgram']['id']] = $dspval['StudyProgram']['study_program_name'] . '(' . $dspval['StudyProgram']['code'] . ') => ' . $dspval['ProgramModality']['modality'] . '(' . $dspval['ProgramModality']['code'] . ') => ' . $dspval['Qualification']['qualification'] . '(' . $dspval['Qualification']['code'] . ')';
-            }
+        foreach ($departmentStudyProgramDetails as $dsp) {
+            $departmentStudyProgramListForSelect[$dsp->id] = sprintf(
+                '%s (%s) => %s (%s) => %s (%s)',
+                $dsp->study_program->study_program_name,
+                $dsp->study_program->code,
+                $dsp->program_modality->modality,
+                $dsp->program_modality->code,
+                $dsp->qualification->qualification,
+                $dsp->qualification->code
+            );
         }
 
         return $departmentStudyProgramListForSelect;

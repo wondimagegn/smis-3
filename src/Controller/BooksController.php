@@ -1,79 +1,112 @@
 <?php
-
 namespace App\Controller;
+
+use App\Controller\AppController;
+use Cake\ORM\TableRegistry;
+use Cake\Datasource\Exception\RecordNotFoundException;
 
 class BooksController extends AppController
 {
-
-    public $name = 'Books';
+    public function initialize(): void
+    {
+        parent::initialize();
+        $this->loadComponent('Flash');
+        $this->loadComponent('Paginator');
+    }
 
     public function index()
     {
-
-        $this->Book->recursive = 0;
-        $this->set('books', $this->paginate());
+        $booksTable = TableRegistry::getTableLocator()->get('Books');
+        $this->set('books', $this->Paginator->paginate($booksTable->find()));
     }
 
     public function view($id = null)
     {
-
         if (!$id) {
-            $this->Session->setFlash(__('Invalid book'));
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Invalid book'));
+            return $this->redirect(['action' => 'index']);
         }
-        $this->set('book', $this->Book->read(null, $id));
+
+        $booksTable = TableRegistry::getTableLocator()->get('Books');
+        try {
+            $book = $booksTable->get($id);
+            $this->set('book', $book);
+        } catch (RecordNotFoundException $e) {
+            $this->Flash->error(__('Invalid book'));
+            return $this->redirect(['action' => 'index']);
+        }
     }
 
     public function add()
     {
+        $booksTable = TableRegistry::getTableLocator()->get('Books');
+        $book = $booksTable->newEntity();
 
-        if (!empty($this->request->data)) {
-            $this->Book->create();
-            if ($this->Book->save($this->request->data)) {
-                $this->Session->setFlash(__('The book has been saved'));
-                return $this->redirect(array('action' => 'index'));
-            } else {
-                $this->Session->setFlash(__('The book could not be saved. Please, try again.'));
+        if ($this->request->is('post')) {
+            $book = $booksTable->patchEntity($book, $this->request->getData());
+            if ($booksTable->save($book)) {
+                $this->Flash->success(__('The book has been saved'));
+                return $this->redirect(['action' => 'index']);
             }
+            $this->Flash->error(__('The book could not be saved. Please, try again.'));
         }
-        $courses = $this->Book->Course->find('list');
-        $this->set(compact('courses'));
+
+        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+        $courses = $coursesTable->find('list')->all()->toArray();
+        $this->set(compact('book', 'courses'));
     }
 
     public function edit($id = null)
     {
+        if (!$id) {
+            $this->Flash->error(__('Invalid book'));
+            return $this->redirect(['action' => 'index']);
+        }
 
-        if (!$id && empty($this->request->data)) {
-            $this->Session->setFlash(__('Invalid book'));
-            return $this->redirect(array('action' => 'index'));
+        $booksTable = TableRegistry::getTableLocator()->get('Books');
+        try {
+            $book = $booksTable->get($id);
+        } catch (RecordNotFoundException $e) {
+            $this->Flash->error(__('Invalid book'));
+            return $this->redirect(['action' => 'index']);
         }
-        if (!empty($this->request->data)) {
-            if ($this->Book->save($this->request->data)) {
-                $this->Session->setFlash(__('The book has been saved'));
-                return $this->redirect(array('action' => 'index'));
-            } else {
-                $this->Session->setFlash(__('The book could not be saved. Please, try again.'));
+
+        if ($this->request->is(['post', 'put'])) {
+            $book = $booksTable->patchEntity($book, $this->request->getData());
+            if ($booksTable->save($book)) {
+                $this->Flash->success(__('The book has been saved'));
+                return $this->redirect(['action' => 'index']);
             }
+            $this->Flash->error(__('The book could not be saved. Please, try again.'));
         }
-        if (empty($this->request->data)) {
-            $this->request->data = $this->Book->read(null, $id);
-        }
-        $courses = $this->Book->Course->find('list');
-        $this->set(compact('courses'));
+
+        $coursesTable = TableRegistry::getTableLocator()->get('Courses');
+        $courses = $coursesTable->find('list')->all()->toArray();
+        $this->set(compact('book', 'courses'));
     }
 
     public function delete($id = null)
     {
+        $this->request->allowMethod(['post', 'delete']);
 
         if (!$id) {
-            $this->Session->setFlash(__('Invalid id for book'));
-            return $this->redirect(array('action' => 'index'));
+            $this->Flash->error(__('Invalid id for book'));
+            return $this->redirect(['action' => 'index']);
         }
-        if ($this->Book->delete($id)) {
-            $this->Session->setFlash(__('Book deleted'));
-            return $this->redirect(array('action' => 'index'));
+
+        $booksTable = TableRegistry::getTableLocator()->get('Books');
+        try {
+            $book = $booksTable->get($id);
+            if ($booksTable->delete($book)) {
+                $this->Flash->success(__('Book deleted'));
+            } else {
+                $this->Flash->error(__('Book was not deleted'));
+            }
+        } catch (RecordNotFoundException $e) {
+            $this->Flash->error(__('Invalid id for book'));
         }
-        $this->Session->setFlash(__('Book was not deleted'));
-        return $this->redirect(array('action' => 'index'));
+
+        return $this->redirect(['action' => 'index']);
     }
 }
+?>

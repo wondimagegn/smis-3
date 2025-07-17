@@ -1,37 +1,37 @@
 <?php
-
 namespace App\Model\Table;
-
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
-
 class EquivalentCoursesTable extends Table
 {
+
     /**
      * Initialize method
      *
      * @param array $config The configuration for the Table.
      * @return void
      */
-
     public function initialize(array $config)
     {
+
         parent::initialize($config);
 
-        $this->setTable('equivalent_courses'); // Set database table name
+        $this->setTable('equivalent_courses');
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        // Define relationships
         $this->belongsTo('CoursesForSubstituted', [
             'className' => 'Courses',
-            'foreignKey' => 'course_for_substitued_id'
+            'foreignKey' => 'course_for_substituted_id',
+            'joinType' => 'INNER',
         ]);
 
         $this->belongsTo('CoursesBeSubstituted', [
             'className' => 'Courses',
-            'foreignKey' => 'course_be_substitued_id'
+            'foreignKey' => 'course_be_substituted_id',
+            'joinType' => 'INNER',
         ]);
     }
 
@@ -43,295 +43,377 @@ class EquivalentCoursesTable extends Table
      */
     public function validationDefault(Validator $validator)
     {
+
         $validator
             ->integer('id')
             ->allowEmptyString('id', null, 'create');
+
+        $validator
+            ->integer('course_for_substituted_id')
+            ->requirePresence('course_for_substituted_id', 'create')
+            ->notEmptyString('course_for_substituted_id', 'Please specify the course to substitute.');
+
+        $validator
+            ->integer('course_be_substituted_id')
+            ->requirePresence('course_be_substituted_id', 'create')
+            ->notEmptyString('course_be_substituted_id', 'Please specify the substituted course.')
+            ->add('course_be_substituted_id', 'differentCourse', [
+                'rule' => function ($value, $context) {
+
+                    return $value !== ($context['data']['course_for_substituted_id'] ?? null);
+                },
+                'message' => 'The substituted course cannot be the same as the course to substitute.'
+            ]);
+
+        $validator
+            ->add('curriculum_id', 'similarCurriculum', [
+                'rule' => [$this, 'isSimilarCurriculum'],
+                'message' => 'You cannot map courses from the same curriculum.',
+                'provider' => 'table'
+            ]);
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Returns a rules checker object for validating application integrity.
      *
      * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
      * @return \Cake\ORM\RulesChecker
      */
     public function buildRules(RulesChecker $rules)
     {
-        $rules->add($rules->existsIn(['course_for_substitued_id'], 'CourseForSubstitueds'));
-        $rules->add($rules->existsIn(['course_be_substitued_id'], 'CourseBeSubstitueds'));
+
+        $rules->add(
+            $rules->existsIn(['course_for_substituted_id'],
+                'CoursesForSubstituted',
+                'The course to substitute does not exist.')
+        );
+        $rules->add(
+            $rules->existsIn(['course_be_substituted_id'],
+                'CoursesBeSubstituted',
+                'The substituted course does not exist.')
+        );
 
         return $rules;
     }
 
-    function isSimilarCurriculum($data = null)
+    /**
+     * Validates that courses are not from the same curriculum.
+     *
+     * @param mixed $value The curriculum ID.
+     * @param array $context The validation context.
+     * @return bool True if valid, false otherwise.
+     */
+    public function isSimilarCurriculum($value, array $context)
     {
-        if (empty($data['EquivalentCourse']['curriculum_id']) || empty($data['EquivalentCourse']['curriculum_id'])) {
+
+        if (empty($context['data']['curriculum_id']) || empty($context['data']['other_curriculum_id'])) {
             return true;
         }
-        //other_curriculum_id
-        if (!empty($data['EquivalentCourse']['curriculum_id']) && !empty($data['EquivalentCourse']['other_curriculum_id'])) {
-            if ($data['EquivalentCourse']['curriculum_id'] == $data['EquivalentCourse']['other_curriculum_id']) {
-                $this->invalidate('error', 'You are trying to map similar curriculum courses. You can not map similar curriculum courses.');
+
+        if ($context['data']['curriculum_id'] == $context['data']['other_curriculum_id']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Checks if deleting an equivalent course mapping is allowed based on student grades.
+     *
+     * @param int|null $id The equivalent course ID.
+     * @param int|null $departmentId The department ID.
+     * @return bool True if deletion is allowed, false otherwise.
+     */
+    public function checkStudentTakingEquivalentCourseAndDenyDelete($id = null, $departmentId = null)
+    {
+
+        if (!$id || !$departmentId) {
+            return false;
+        }
+
+        $equivalentCourse = $this->find()
+            ->select(['course_be_substituted_id'])
+            ->where(['EquivalentCourses.id' => $id])
+            ->first();
+
+        if (!$equivalentCourse) {
+            return false;
+        }
+
+        $course = TableRegistry::getTableLocator()->get('Courses')
+            ->find()
+            ->select(['curriculum_id'])
+            ->where(['id' => $equivalentCourse->course_be_substituted_id])
+            ->first();
+
+        if (!$course) {
+            return false;
+        }
+
+        $courseIds = TableRegistry::getTableLocator()->get('Courses')
+            ->find('list', ['valueField' => 'id'])
+            ->where(['curriculum_id' => $course->curriculum_id])
+            ->toArray();
+
+        $publishedCourseIds = TableRegistry::getTableLocator()->get('PublishedCourses')
+            ->find('list', ['valueField' => 'id'])
+            ->where([
+                'course_id IN' => $courseIds,
+                'department_id' => $departmentId
+            ])
+            ->toArray();
+
+        if (empty($publishedCourseIds)) {
+            return true;
+        }
+
+        $examGradesTable = TableRegistry::getTableLocator()->get('ExamGrades');
+        foreach ($publishedCourseIds as $publishedCourseId) {
+            if ($examGradesTable->isGradeSubmitted($publishedCourseId)) {
                 return false;
             }
         }
-        return true;
-    }
-
-    // Do not allow deletion of mapped course if the equivalent course has
-    function checkStudentTakeingEquivalentCourseAndDenyDelete($id = null, $department_id = null)
-    {
-        $equivalent_course_id = $this->field(
-            'course_be_substitued_id',
-            array('EquivalentCourse.id' => $id)
-        );
-
-        $curriculum_id = ClassRegistry::init('Course')->field('curriculum_id', array('Course.id' => $equivalent_course_id));
-
-        $course_ids = ClassRegistry::init('Course')->find('list', array(
-            'conditions' => array('Course.curriculum_id' => $curriculum_id),
-            'fields' => array('Course.id', 'Course.id')
-        ));
-
-        $published_course_ids = ClassRegistry::init('PublishedCourse')->find('list', array(
-            'conditions' => array(
-                'PublishedCourse.course_id' => $course_ids,
-                'PublishedCourse.department_id' => $department_id
-            ),
-            'fields' => array('PublishedCourse.id', 'PublishedCourse.id')
-        ));
-
-        if (!empty($published_course_ids)) {
-            foreach ($published_course_ids as $in => $pu) {
-                $grade_submitted = ClassRegistry::init('ExamGrade')->is_grade_submitted($pu);
-                if ($grade_submitted > 0) {
-                    return false;
-                }
-            }
-        }
 
         return true;
     }
 
-    function equivalentCreditOfCourse($course_id, $studentAttachedCurriculum)
+    /**
+     * Retrieves the credit value of a course or its equivalent.
+     *
+     * @param int|null $courseId The course ID.
+     * @param int|null $studentAttachedCurriculum The curriculum ID.
+     * @return float Credit value or 0 if not found.
+     */
+    public function equivalentCreditOfCourse($courseId = null, $studentAttachedCurriculum = null)
     {
-        if ($studentAttachedCurriculum) {
-            $courseCredit = ClassRegistry::init('Course')->find('first', array(
-                'conditions' => array(
-                    'Course.curriculum_id' => $studentAttachedCurriculum,
-                    'Course.id' => $course_id
-                )
-            ));
-        } else {
-            $courseCredit = array();
+
+        if (!$courseId || !$studentAttachedCurriculum) {
+            return 0;
         }
 
-        if (!empty($courseCredit)) {
-            return $courseCredit['Course']['credit'];
-        } else {
-            // does it have equivalence
-            $equivalentCourseIds = $this->find('list', array(
-                'conditions' => array(
-                    'EquivalentCourse.course_be_substitued_id' => $course_id
-                ),
-                'fields' => array('course_for_substitued_id', 'course_for_substitued_id')
-            ));
+        $course = TableRegistry::getTableLocator()->get('Courses')
+            ->find()
+            ->select(['credit'])
+            ->where([
+                'id' => $courseId,
+                'curriculum_id' => $studentAttachedCurriculum
+            ])
+            ->first();
 
-            if (!empty($equivalentCourseIds)) {
-                if ($studentAttachedCurriculum) {
-                    $courseCredit = ClassRegistry::init('Course')->find('first', array(
-                        'conditions' => array(
-                            'Course.curriculum_id' => $studentAttachedCurriculum,
-                            'Course.id' => $equivalentCourseIds
-                        )
-                    ));
-                } else {
-                    $courseCredit = array();
-                }
+        if ($course) {
+            return (float)$course->credit;
+        }
 
-                if (!empty($courseCredit)) {
-                    return $courseCredit['Course']['credit'];
-                }
+        $equivalentCourseIds = $this->find('list', [
+            'keyField' => 'course_for_substituted_id',
+            'valueField' => 'course_for_substituted_id'
+        ])
+            ->where(['course_be_substituted_id' => $courseId])
+            ->toArray();
+
+        if (!empty($equivalentCourseIds)) {
+            $equivalentCourse = TableRegistry::getTableLocator()->get('Courses')
+                ->find()
+                ->select(['credit'])
+                ->where([
+                    'id IN' => $equivalentCourseIds,
+                    'curriculum_id' => $studentAttachedCurriculum
+                ])
+                ->first();
+
+            if ($equivalentCourse) {
+                return (float)$equivalentCourse->credit;
             }
         }
+
         return 0;
     }
 
-    function checkCourseHasEquivalentCourse($course_id, $studentAttachedCurriculum)
+    /**
+     * Checks if a course or its equivalent exists in the student’s curriculum.
+     *
+     * @param int|null $courseId The course ID.
+     * @param int|null $studentAttachedCurriculum The curriculum ID.
+     * @return bool True if exists, false otherwise.
+     */
+    public function checkCourseHasEquivalentCourse($courseId = null, $studentAttachedCurriculum = null)
     {
-        if ($studentAttachedCurriculum) {
-            $doesItExistInAttachedCurriculum = ClassRegistry::init('Course')->field('id', array(
-                'Course.curriculum_id' => $studentAttachedCurriculum,
-                'Course.id' => $course_id
-            ));
-        } else {
-            $doesItExistInAttachedCurriculum = '';
+
+        if (!$courseId || !$studentAttachedCurriculum) {
+            return false;
         }
 
-        if (!empty($doesItExistInAttachedCurriculum)) {
+        $courseExists = TableRegistry::getTableLocator()->get('Courses')
+                ->find()
+                ->where([
+                    'id' => $courseId,
+                    'curriculum_id' => $studentAttachedCurriculum
+                ])
+                ->count() > 0;
+
+        if ($courseExists) {
             return true;
-        } else {
-            // does it have equivalence
-            $equivalentCourseIds = $this->find('list', array(
-                'conditions' => array(
-                    'EquivalentCourse.course_be_substitued_id' => $course_id
-                ),
-                'fields' => array('course_for_substitued_id', 'course_for_substitued_id')
-            ));
-
-            //debug($course_id);
-            //debug($equivalentCourseIds);
-
-            if (!empty($equivalentCourseIds)) {
-                if ($studentAttachedCurriculum) {
-                    $doesItExistInAttachedCurriculum = ClassRegistry::init('Course')->field('id', array(
-                        'Course.curriculum_id' => $studentAttachedCurriculum,
-                        'Course.id' => $equivalentCourseIds
-                    ));
-                } else {
-                    $doesItExistInAttachedCurriculum = '';
-                }
-
-                if (!empty($doesItExistInAttachedCurriculum)) {
-                    return true;
-                }
-                return false;
-            }
         }
+
+        $equivalentCourseIds = $this->find('list', [
+            'keyField' => 'course_for_substituted_id',
+            'valueField' => 'course_for_substituted_id'
+        ])
+            ->where(['course_be_substituted_id' => $courseId])
+            ->toArray();
+
+        if (!empty($equivalentCourseIds)) {
+            return TableRegistry::getTableLocator()->get('Courses')
+                    ->find()
+                    ->where([
+                        'id IN' => $equivalentCourseIds,
+                        'curriculum_id' => $studentAttachedCurriculum
+                    ])
+                    ->count() > 0;
+        }
+
         return false;
     }
 
-    function validEquivalentCourse($course_id, $studentAttachedCurriculum, $type = 1)
+    /**
+     * Retrieves valid equivalent course IDs for a given course and curriculum.
+     *
+     * @param int|null $courseId The course ID.
+     * @param int|null $studentAttachedCurriculum The curriculum ID.
+     * @param int $type The type of equivalence (default 1).
+     * @return array List of equivalent course IDs.
+     */
+    public function validEquivalentCourse($courseId = null, $studentAttachedCurriculum = null, $type = 1)
     {
-        if ($studentAttachedCurriculum) {
-            $doesItExistInAttachedCurriculum = ClassRegistry::init('Course')->field('id', array(
-                'Course.curriculum_id' => $studentAttachedCurriculum,
-                'Course.id' => $course_id
-            ));
-        } else {
-            $doesItExistInAttachedCurriculum = 0;
+
+        if (!$courseId) {
+            return [];
         }
-        //debug($doesItExistInAttachedCurriculum);
 
-        // does it have equivalence
-        if ($doesItExistInAttachedCurriculum) {
-            $equivalentCourseIds1 = $this->find('list', array(
-                'conditions' => array(
-                    'EquivalentCourse.course_for_substitued_id' => $course_id
-                ),
-                'fields' => array('course_be_substitued_id', 'course_be_substitued_id')
-            ));
+        $courseExists = $studentAttachedCurriculum ? TableRegistry::getTableLocator()->get('Courses')
+                ->find()
+                ->where([
+                    'id' => $courseId,
+                    'curriculum_id' => $studentAttachedCurriculum
+                ])
+                ->count() > 0 : false;
 
-            $equivalentCourseIds = $equivalentCourseIds1;
+        $equivalentCourseIds = [];
 
-            if (!empty($equivalentCourseIds)) {
-                $courseLists = ClassRegistry::init('Course')->find('list', array(
-                    'conditions' => array(
-                        'Course.id' => $equivalentCourseIds
-                    ),
-                    'fields' => array('id', 'id')
-                ));
-                //debug($courseLists);
-                return $courseLists;
-            }
+        if ($courseExists) {
+            $equivalentCourseIds = $this->find('list', [
+                'keyField' => 'course_be_substituted_id',
+                'valueField' => 'course_be_substituted_id'
+            ])
+                ->where(['course_for_substituted_id' => $courseId])
+                ->toArray();
         } else {
-            $equivalentCourseIds1 = $this->find('list', array(
-                'conditions' => array(
-                    'EquivalentCourse.course_be_substitued_id' => $course_id
-                ),
-                'fields' => array('course_for_substitued_id', 'course_for_substitued_id')
-            ));
+            $equivalentCourseIds = $this->find('list', [
+                'keyField' => 'course_for_substituted_id',
+                'valueField' => 'course_for_substituted_id'
+            ])
+                ->where(['course_be_substituted_id' => $courseId])
+                ->toArray();
 
-            $equivalentCourseIds = $equivalentCourseIds1;
+            if (!empty($equivalentCourseIds) && $studentAttachedCurriculum) {
+                $courseLists = TableRegistry::getTableLocator()->get('Courses')
+                    ->find('list', ['valueField' => 'id'])
+                    ->where([
+                        'id IN' => $equivalentCourseIds,
+                        'curriculum_id' => $studentAttachedCurriculum
+                    ])
+                    ->toArray();
 
-            if (!empty($equivalentCourseIds)) {
-                if ($studentAttachedCurriculum) {
-                    $courseLists = ClassRegistry::init('Course')->find('list', array(
-                        'conditions' => array(
-                            'Course.curriculum_id' => $studentAttachedCurriculum,
-                            'Course.id' => $equivalentCourseIds
-                        ),
-                        'fields' => array('id', 'id')
-                    ));
-                } else {
-                    $courseLists = array();
+                if (!empty($courseLists)) {
+                    $additionalEquivalents = $this->find('list', [
+                        'keyField' => 'course_be_substituted_id',
+                        'valueField' => 'course_be_substituted_id'
+                    ])
+                        ->where(['course_for_substituted_id IN' => $courseLists])
+                        ->toArray();
+
+                    $equivalentCourseIds = array_merge($courseLists, $additionalEquivalents);
                 }
-
-                if (isset($courseLists) && !empty($courseLists)) {
-                    $equivalentCourseIds1 = $this->find('list', array(
-                        'conditions' => array(
-                            'EquivalentCourse.course_for_substitued_id' => $courseLists
-                        ),
-                        'fields' => array('course_be_substitued_id', 'course_be_substitued_id')
-                    ));
-                }
-
-                $merged = $courseLists + $equivalentCourseIds1;
-                //debug($merged);
-                return $merged;
-                // return $equivalentCourseIds;
             }
         }
-        return array();
+
+        return array_unique($equivalentCourseIds);
     }
 
-    function courseEquivalentCategory($course_id, $studentAttachedCurriculum)
+    /**
+     * Retrieves the course category of an equivalent course.
+     *
+     * @param int|null $courseId The course ID.
+     * @param int|null $studentAttachedCurriculum The curriculum ID.
+     * @return string|null The category name or null if not found.
+     */
+    public function courseEquivalentCategory($courseId = null, $studentAttachedCurriculum = null)
     {
-        $equivalentCourseIds = $this->find('list', array(
-            'conditions' => array(
-                'EquivalentCourse.course_be_substitued_id' => $course_id
-            ),
-            'fields' => array('course_for_substitued_id', 'course_for_substitued_id')
-        ));
 
-        //debug($equivalentCourseIds);
-        //debug($course_id);
-
-        if ($studentAttachedCurriculum) {
-            $course = ClassRegistry::init('Course')->find('first', array(
-                'conditions' => array(
-                    'Course.curriculum_id' => $studentAttachedCurriculum,
-                    'Course.id' => $equivalentCourseIds
-                ),
-                'contain' => array('CourseCategory')
-            ));
-
-            //debug($course['CourseCategory']['name']);
-            if (!empty($course)) {
-                return $course['CourseCategory']['name'];
-            } else {
-                return array();
-            }
-        } else {
-            return array();
+        if (!$courseId || !$studentAttachedCurriculum) {
+            return null;
         }
+
+        $equivalentCourseIds = $this->find('list', [
+            'keyField' => 'course_for_substituted_id',
+            'valueField' => 'course_for_substituted_id'
+        ])
+            ->where(['course_be_substituted_id' => $courseId])
+            ->toArray();
+
+        if (empty($equivalentCourseIds)) {
+            return null;
+        }
+
+        $course = TableRegistry::getTableLocator()->get('Courses')
+            ->find()
+            ->where([
+                'id IN' => $equivalentCourseIds,
+                'curriculum_id' => $studentAttachedCurriculum
+            ])
+            ->contain(['CourseCategories' => ['fields' => ['name']]])
+            ->first();
+
+        return $course && $course->course_category ? $course->course_category->name : null;
     }
 
-    function isEquivalentCourseMajor($course_id, $studentAttachedCurriculum)
+    /**
+     * Checks if an equivalent course is marked as major.
+     *
+     * @param int|null $courseId The course ID.
+     * @param int|null $studentAttachedCurriculum The curriculum ID.
+     * @return int 1 if major, 0 otherwise.
+     */
+    public function isEquivalentCourseMajor($courseId = null, $studentAttachedCurriculum = null)
     {
-        $equivalentCourseIds = $this->find('list', array(
-            'conditions' => array(
-                'EquivalentCourse.course_be_substitued_id' => $course_id
-            ),
-            'fields' => array('course_for_substitued_id', 'course_for_substitued_id')
-        ));
 
-        if ($studentAttachedCurriculum) {
-            $course = ClassRegistry::init('Course')->find('first', array(
-                'conditions' => array(
-                    'Course.curriculum_id' => $studentAttachedCurriculum,
-                    'Course.id' => $equivalentCourseIds
-                ),
-                'contain' => array('CourseCategory')
-            ));
-
-            if (isset($course['Course']) && !empty($course['Course']) && $course['Course']['major']) {
-                return 1;
-            }
+        if (!$courseId || !$studentAttachedCurriculum) {
+            return 0;
         }
 
-        return 0;
+        $equivalentCourseIds = $this->find('list', [
+            'keyField' => 'course_for_substituted_id',
+            'valueField' => 'course_for_substituted_id'
+        ])
+            ->where(['course_be_substituted_id' => $courseId])
+            ->toArray();
+
+        if (empty($equivalentCourseIds)) {
+            return 0;
+        }
+
+        $course = TableRegistry::getTableLocator()->get('Courses')
+            ->find()
+            ->select(['major'])
+            ->where([
+                'id IN' => $equivalentCourseIds,
+                'curriculum_id' => $studentAttachedCurriculum
+            ])
+            ->first();
+
+        return $course && $course->major ? 1 : 0;
     }
 }
+

@@ -4,7 +4,7 @@
  *
  * @copyright     Copyright 2010, Joseph B Crawford II
  * @link          http://www.jbcrawford.net
- * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
+ * @license       MIT License[](http://www.opensource.org/licenses/mit-license.php)
  */
 ?>
 <div class="box">
@@ -19,12 +19,12 @@
     <div class="box-body">
         <div class="row">
             <div class="large-12 columns" style="margin-top: -20px;">
-                <?= $this->Form->create($permission, ['url' => ['action' => 'add'], 'onsubmit' => 'return checkForm(this);']) ?>
-                <?= $this->Form->control('aco_id', ['type' => 'hidden']) ?>
+                <?= $this->Form->create($permission, ['url' => ['action' => 'add', $aco->id, $roleId], 'onsubmit' => 'return checkForm(this);']) ?>
+                <?= $this->Form->control('Permission.aco_id', ['type' => 'hidden', 'value' => $aco->id]) ?>
                 <hr>
                 <div class="row">
                     <div class="large-4 columns">
-                        <?= $this->Form->control('role_id', [
+                        <?= $this->Form->control('Permission.role_id', [
                             'label' => 'Role: ',
                             'style' => 'width:90%',
                             'onchange' => 'getUsersBasedOnRole(this)',
@@ -37,7 +37,7 @@
                 </div>
                 <div class="row">
                     <div class="large-4 columns">
-                        <?= $this->Form->control('aro_id', [
+                        <?= $this->Form->control('Permission.aro_id', [
                             'label' => 'Users: ',
                             'style' => 'width:90%',
                             'id' => 'AroID',
@@ -48,11 +48,12 @@
                 </div>
                 <div class="row">
                     <div class="large-4 columns">
-                        <?= $this->Form->control('privilege', [
+                        <?= $this->Form->control('Permission.privilege', [
                             'label' => 'Privilege: ',
                             'id' => 'PrivilegeID',
                             'style' => 'width:50%',
                             'options' => $perms,
+                            'empty' => '[ Select Privilege ]'
                         ]) ?>
                     </div>
                 </div>
@@ -77,7 +78,10 @@
         $("#AroID").attr('disabled', true);
         $("#PrivilegeID").attr('disabled', true);
         $("#SubmitID").attr('disabled', true);
-        window.location.replace(<?= json_encode($this->Url->build(['action' => 'add', $aco->id, '_ext' => ''])) ?> + obj.value);
+        const acoId = <?= json_encode($aco->id) ?>;
+        const roleId = obj.value;
+        const url = <?= json_encode($this->Url->build(['action' => 'add', '_ext' => ''])) ?> + '/' + acoId + '/' + roleId;
+        window.location.replace(url);
     }
 
     function toggleSubmitButtonActive() {
@@ -87,15 +91,15 @@
         }
     }
 
-    let formBeingSubmitted = false; /* global variable */
+    let formBeingSubmitted = false;
 
     function checkForm(form) {
-        if (form.AroID.value == 0) {
-            form.AroID.focus();
+        if (form['Permission.aro_id'].value == 0) {
+            form['Permission.aro_id'].focus();
             return false;
         }
-        if (form.RoleID.value == 0) {
-            form.RoleID.focus();
+        if (form['Permission.role_id'].value == 0) {
+            form['Permission.role_id'].focus();
             return false;
         }
 
@@ -107,10 +111,9 @@
 
         form.SubmitID.value = 'Adding Permission...';
         formBeingSubmitted = true;
-        return true; /* submit form */
+        return true;
     }
 
-    // Prevent form resubmission and disable default JS warning dialog
     if (window.history.replaceState) {
         window.history.replaceState(null, null, window.location.href);
     }

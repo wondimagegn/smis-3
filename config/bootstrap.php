@@ -43,7 +43,6 @@ use Cake\Mailer\TransportFactory;
 use Cake\Utility\Inflector;
 use Cake\Utility\Security;
 
-use Cake\Core\Plugin;
 
 /*
  * Uncomment block of code below if you want to use `.env` file during development.
@@ -70,6 +69,9 @@ use Cake\Core\Plugin;
  * idea to create multiple configuration files, and separate the configuration
  * that changes from configuration that does not. This makes deployment simpler.
  */
+
+
+
 try {
     Configure::config('default', new PhpConfig());
     Configure::load('app', 'default', false);
@@ -98,8 +100,6 @@ if (Configure::read('debug')) {
     // disable router cache during development
     Configure::write('Cache._cake_routes_.duration', '+2 seconds');
 }
-
-
 
 
 /*
@@ -229,4 +229,3 @@ Log::debug('Security.Datasources = ' . Configure::read('Security.Datasources.def
 
 require_once CONFIG . 'constant.php';
 require_once CONFIG . 'smis.php';
-

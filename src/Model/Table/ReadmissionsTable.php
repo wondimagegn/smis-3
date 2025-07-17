@@ -1,281 +1,347 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
+use Cake\I18n\Time;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
 
 class ReadmissionsTable extends Table
 {
-    public function initialize(array $config)
+    /**
+     * Initialize method
+     *
+     * @param array $config The configuration for the Table.
+     * @return void
+     */
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
         $this->setTable('readmissions');
         $this->setPrimaryKey('id');
 
-        // Define associations
+        $this->addBehavior('Timestamp');
+
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT',
         ]);
-
-        $this->addBehavior('Timestamp');
     }
 
-    public function validationDefault(Validator $validator)
+    /**
+     * Default validation rules.
+     *
+     * @param Validator $validator Validator instance.
+     * @return Validator
+     */
+    public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->requirePresence('minute_number', 'create')
-            ->notEmptyString('minute_number', 'Please provide minute number.');
-
-        $validator
-            ->requirePresence('academic_commision_approval', 'create')
-            ->notEmptyString('academic_commision_approval', 'Please select accepted or rejected option.');
+            ->numeric('student_id', __('Student ID must be a valid number.'))
+            ->requirePresence('student_id', 'create', __('Student ID is required.'))
+            ->notEmptyString('student_id', __('Please provide a valid student ID.'))
+            ->scalar('minute_number', __('Minute number must be a string.'))
+            ->requirePresence('minute_number', 'create', __('Minute number is required.'))
+            ->notEmptyString('minute_number', __('Please provide a minute number.'))
+            ->boolean('academic_commission_approval', __('Academic commission approval must be a boolean value.'))
+            ->requirePresence('academic_commission_approval', 'create', __('Academic commission approval is required.'))
+            ->notEmptyString('academic_commission_approval', __('Please select accepted or rejected for academic commission approval.'))
+            ->boolean('registrar_approval', __('Registrar approval must be a boolean value.'))
+            ->requirePresence('registrar_approval', 'create', __('Registrar approval is required.'))
+            ->notEmptyString('registrar_approval', __('Please select accepted or rejected for registrar approval.'))
+            ->scalar('academic_year', __('Academic year must be a string.'))
+            ->requirePresence('academic_year', 'create', __('Academic year is required.'))
+            ->notEmptyString('academic_year', __('Please provide an academic year.'))
+            ->scalar('semester', __('Semester must be a string.'))
+            ->requirePresence('semester', 'create', __('Semester is required.'))
+            ->notEmptyString('semester', __('Please provide a semester.'));
 
         return $validator;
     }
 
-    public function buildRules(RulesChecker $rules)
+    /**
+     * Returns a rules checker object that will be used for validating application integrity.
+     *
+     * @param RulesChecker $rules The rules object to be modified.
+     * @return RulesChecker
+     */
+    public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add($rules->existsIn(['student_id'], 'Students'));
+        $rules->add($rules->existsIn(['student_id'], 'Students', [
+            'allowNullable' => false,
+            'message' => __('Student ID must reference an existing student.')
+        ]));
+
+        $rules->add($rules->isUnique(
+            ['student_id', 'academic_year', 'semester'],
+            __('A readmission application already exists for this student in the specified academic year and semester.')
+        ));
 
         return $rules;
     }
 
-    function is_readmitted($student_id = null, $academic_year = null)
+    /**
+     * Checks if a student was readmitted in a specific academic year.
+     *
+     * @param int|null $studentId The student ID.
+     * @param string|null $academicYear The academic year (e.g., '2024/25').
+     * @return bool
+     */
+    public function isReadmittedForYear(?int $studentId, ?string $academicYear): bool
     {
-        $check = $this->find('count', array(
-            'conditions' => array(
-                'Readmission.student_id' => $student_id,
-                'Readmission.academic_year like ' => $academic_year . '%',
-                'Readmission.registrar_approval = 1',
-                'Readmission.academic_commision_approval = 1'
-            )
-        ));
-
-        if ($check > 0) {
-            return true;
-        } else {
+        if (!$studentId || !$academicYear) {
             return false;
         }
+
+        return $this->find()
+                ->where([
+                    'student_id' => $studentId,
+                    'academic_year LIKE' => $academicYear . '%',
+                    'registrar_approval' => true,
+                    'academic_commission_approval' => true
+                ])
+                ->count() > 0;
     }
 
-    function isEverReadmitted($student_id)
+    /**
+     * Checks if a student was ever readmitted.
+     *
+     * @param int|null $studentId The student ID.
+     * @return bool
+     */
+    public function hasEverBeenReadmitted(?int $studentId): bool
     {
-
-        $check = $this->find(
-            'count',
-            array('conditions' => array(
-                'Readmission.student_id' => $student_id,
-                'Readmission.registrar_approval = 1',
-                'Readmission.academic_commision_approval = 1'
-            )
-            )
-        );
-
-        if ($check > 0) {
-            return true;
-        } else {
+        if (!$studentId) {
             return false;
         }
+
+        return $this->find()
+                ->where([
+                    'student_id' => $studentId,
+                    'registrar_approval' => true,
+                    'academic_commission_approval' => true
+                ])
+                ->count() > 0;
     }
 
-    function isReadmitted($student_id, $academic_year, $semester)
+    /**
+     * Checks if a student was readmitted for a specific academic year and semester.
+     *
+     * @param int|null $studentId The student ID.
+     * @param string|null $academicYear The academic year (e.g., '2024/25').
+     * @param string|null $semester The semester (e.g., '1').
+     * @return bool
+     */
+    public function isReadmitted(?int $studentId, ?string $academicYear, ?string $semester): bool
     {
-        $check = $this->find('count', array(
-            'conditions' => array(
-                'Readmission.student_id' => $student_id,
-                'Readmission.academic_year' => $academic_year,
-                'Readmission.semester' => $semester,
-                'Readmission.registrar_approval = 1',
-                'Readmission.academic_commision_approval = 1'
-            )
-        ));
-
-        if ($check > 0) {
-            return true;
-        } else {
+        if (!$studentId || !$academicYear || !$semester) {
             return false;
         }
+
+        return $this->find()
+                ->where([
+                    'student_id' => $studentId,
+                    'academic_year' => $academicYear,
+                    'semester' => $semester,
+                    'registrar_approval' => true,
+                    'academic_commission_approval' => true
+                ])
+                ->count() > 0;
     }
 
-    function elegible_for_readmission($student_id = null, $current_academic_year = null)
+    /**
+     * Checks if a student is eligible for readmission.
+     *
+     * @param int|null $studentId The student ID.
+     * @param string|null $currentAcademicYear The current academic year (e.g., '2024/25').
+     * @return bool
+     */
+    public function eligibleForReadmission(?int $studentId, ?string $currentAcademicYear): bool
     {
-        //Searching for the rule by the acadamic stand
-        /* $acadamic_rules = ClassRegistry::init('AcademicRule')->find('all', array(
-            'conditions' => array(
-                'AcademicRule.academic_stand_id' => $as['id']
-            ),
-            'recursive' => -1
-        ));
+        // Placeholder: Original method incomplete, commented code references AcademicRule
+        // Implement custom logic if provided, otherwise return false
+        return false;
+    }
 
-        //debug($acadamic_rules);
-        //If acadamic rule is found
-        if (!empty($acadamic_rules)) {
-            foreach ($acadamic_rules as $key => $acadamic_rule) {
-                if ($acadamic_rule['AcademicRule']['tcw'] == 1) {
-                    //return true;
-                    return 1;
-                }
+    /**
+     * Organizes readmission applicants by department or freshman status, program, and program type.
+     *
+     * @param array|null $data Array of readmission applicant data.
+     * @return array
+     */
+    public function organizeReadmissionApplicants(?array $data): array
+    {
+        $organized = [];
+
+        if (empty($data)) {
+            return $organized;
+        }
+
+        foreach ($data as $value) {
+            $departmentName = $value['Student']['Department']['name'] ?? '';
+            $programName = $value['Program']['name'] ?? '';
+            $programTypeName = $value['ProgramType']['name'] ?? '';
+
+            $groupKey = empty($departmentName) ? 'Pre/Freshman' : $departmentName;
+
+            $organized[$groupKey][$programName][$programTypeName][] = $value;
+        }
+
+        return $organized;
+    }
+
+    /**
+     * Retrieves students eligible for readmission, excluding those already readmitted, graduated, or on senate lists.
+     *
+     * @param bool $nonFreshman Whether to filter for non-freshman students (default: true).
+     * @param int|null $programId The program ID.
+     * @param int|null $programTypeId The program type ID.
+     * @param int|null $departmentId The department or college ID.
+     * @param string|null $academicYear The academic year (e.g., '2024/25').
+     * @param string|null $semester The semester (e.g., '1').
+     * @param string|null $name Partial student first name for filtering.
+     * @param string|null $admissionYears Admission years for filtering.
+     * @return array
+     */
+    public function getListOfStudentsForReadmission(
+        bool $nonFreshman = true,
+        ?int $programId = null,
+        ?int $programTypeId = null,
+        ?int $departmentId = null,
+        ?string $academicYear = null,
+        ?string $semester = null,
+        ?string $name = null,
+        ?string $admissionYears = null
+    ): array {
+        $studentsTable = TableRegistry::getTableLocator()->get('Students');
+        $studentExamStatusesTable = TableRegistry::getTableLocator()->get('StudentExamStatuses');
+        $clearancesTable = TableRegistry::getTableLocator()->get('Clearances');
+
+        $conditions = ['Students.graduated' => false];
+
+        if ($admissionYears) {
+            $conditions['Students.academicyear'] = $admissionYears;
+        }
+
+        if ($programId) {
+            $conditions['Students.program_id'] = $programId;
+        }
+
+        if ($programTypeId) {
+            $conditions['Students.program_type_id'] = $programTypeId;
+        }
+
+        if ($nonFreshman) {
+            if ($departmentId) {
+                $conditions['Students.department_id'] = $departmentId;
             }
-        } */
-    }
-
-    function organizeListOfReadmissionApplicant($data = null)
-    {
-        $readmission_applicant_organized_by_program = array();
-
-        if (!empty($data)) {
-            foreach ($data as $index => $value) {
-                if (empty($value['Student']['Department']['name'])) {
-                    $readmission_applicant_organized_by_program['Pre/Freshman'][$value['Student']['Program']['name']][$value['Student']['ProgramType']['name']][] = $value;
-                } else {
-                    $readmission_applicant_organized_by_program[$value['Student']['Department']['name']][$value['Student']['Program']['name']][$value['Student']['ProgramType']['name']][] = $value;
-                }
-            }
-        }
-
-        return $readmission_applicant_organized_by_program;
-    }
-
-
-    function getListOfStudentsForReadmission($nonfreshman = 1, $program_id = null, $program_type_id = null, $department_id = null, $academic_year = null, $semester = null, $name = null, $admission_years = null)
-    {
-        /***
-        1. Get all students in the department/college who are neither in graduation nor senate list
-        2. Get all students who doesnt apply for readmission of selected academic year and semester
-        3. Return the list
-         ***/
-        //$options['conditions']['Student.program_id'] = $program_id;
-
-        if ($admission_years != 0 && !empty($admission_years)) {
-            $options['conditions']['Student.academicyear'] = $admission_years;
-        }
-
-        if ($program_id != 0 && !empty($program_id)) {
-            $options['conditions']['Student.program_id'] = $program_id;
-        }
-
-        if ($program_type_id != 0 && !empty($program_type_id)) {
-            $options['conditions']['Student.program_type_id'] = $program_type_id;
-        }
-
-        if ($nonfreshman == 1) {
-            $options['conditions']['Student.department_id'] = $department_id;
         } else {
-            $options['conditions']['Student.college_id'] = $department_id;
-            $options['conditions'][] = 'Student.department_id IS NULL';
+            if ($departmentId) {
+                $conditions['Students.college_id'] = $departmentId;
+                $conditions['Students.department_id IS'] = null;
+            }
         }
 
-        if (isset($name) && !empty($name)) {
-            $options['conditions'][] = 'Student.first_name like "%' . $name . '%"';
+        if ($name) {
+            $conditions['Students.first_name LIKE'] = '%' . $name . '%';
         }
 
-        // $options['conditions'][] = 'Student.curriculum_id IS NOT NULL';
-        // $options['conditions'][] = 'Student.curriculum_id <> 0';
-
-        //$options['conditions'][] = 'Student.id NOT IN (SELECT student_id FROM graduate_lists)';
-        //$options['conditions'][] = 'Student.id NOT IN (SELECT student_id FROM senate_lists)';
-
-        $options['conditions'][] = 'Student.graduated = 0';
-
-        $request_dateFilter = date('Y-m-d H:i:s', strtotime("-" . DAYS_BACK_READMISSION . " day "));
-
-        debug($request_dateFilter);
-        debug($admission_years);
-
-        if (isset($academic_year) && isset($semester)) {
-            $options['conditions'][] = 'Student.id NOT IN (SELECT student_id FROM readmissions where  academic_year="' . $academic_year . '" AND semester = "' . $semester . '" AND created >= "' . $request_dateFilter . '")';
+        if ($academicYear && $semester) {
+            $requestDateFilter = (new Time())->modify('-' . DAYS_BACK_READMISSION . ' days')->format('Y-m-d H:i:s');
+            $conditions[] = function ($exp) use ($studentId, $academicYear, $semester, $requestDateFilter) {
+                return $exp->notExists(
+                    $this->find()
+                        ->select([1])
+                        ->where([
+                            'Readmissions.student_id = Students.id',
+                            'Readmissions.academic_year' => $academicYear,
+                            'Readmissions.semester' => $semester,
+                            'Readmissions.created >=' => $requestDateFilter
+                        ])
+                );
+            };
         }
 
-        $options['contain'] = array(
-            'Curriculum' => array(
-                'fields' => array(
-                    'id',
-                    'minimum_credit_points',
-                    'certificate_name',
-                    'amharic_degree_nomenclature',
-                    'specialization_amharic_degree_nomenclature',
-                    'english_degree_nomenclature',
-                    'specialization_english_degree_nomenclature',
-                    'minimum_credit_points', 'name'
-                ),
-                'Department',
-                'CourseCategory' => array('id', 'curriculum_id')
-            ),
-            'Department.name',
-            'Program.name',
-            'ProgramType.name',
-        );
+        $notDismissalStatusIds = [1, 2, 3];
 
-        $students = $this->Student->find('all', $options);
-        // debug($students);
-        $filtered_students = array();
+        $students = $studentsTable->find()
+            ->select([
+                'Students.id',
+                'Students.first_name',
+                'Students.department_id',
+                'Students.college_id',
+                'Students.program_id',
+                'Students.program_type_id',
+                'Students.curriculum_id',
+                'Students.academicyear',
+                'Students.graduated'
+            ])
+            ->where($conditions)
+            ->contain([
+                'Curriculums' => [
+                    'fields' => [
+                        'id',
+                        'minimum_credit_points',
+                        'certificate_name',
+                        'amharic_degree_nomenclature',
+                        'specialization_amharic_degree_nomenclature',
+                        'english_degree_nomenclature',
+                        'specialization_english_degree_nomenclature',
+                        'name'
+                    ],
+                    'Departments' => ['fields' => ['id', 'name']],
+                    'CourseCategories' => ['fields' => ['id', 'curriculum_id']]
+                ],
+                'Departments' => ['fields' => ['id', 'name']],
+                'Programs' => ['fields' => ['id', 'name']],
+                'ProgramTypes' => ['fields' => ['id', 'name']]
+            ])
+            ->toArray();
 
-        $not_dismissal_status_ids = ['0' => '1', '1' => '2', '2' => '3'];
+        $filteredStudents = [];
 
-        if (!empty($students)) {
-            foreach ($students as $key => $student) {
-                $last_status = $this->Student->StudentExamStatus->find('first', array(
-                    'conditions' => array(
-                        'StudentExamStatus.student_id' => $student['Student']['id']
-                    ),
-                    'order' => array(
-                        'StudentExamStatus.created DESC'
-                    ),
-                    'recursive' => -1
-                ));
+        foreach ($students as $student) {
+            $lastStatus = $studentExamStatusesTable->find()
+                ->select(['academic_status_id', 'cgpa', 'mcgpa'])
+                ->where(['student_id' => $student->id])
+                ->order(['created' => 'DESC'])
+                ->first();
 
-                if (!empty($last_status) && !in_array($last_status['StudentExamStatus']['academic_status_id'], $not_dismissal_status_ids) && !is_null($last_status['StudentExamStatus']['academic_status_id'])) {
-                    $cid = $student['Curriculum']['id'];
+            if ($lastStatus && !in_array($lastStatus->academic_status_id, $notDismissalStatusIds) && !is_null($lastStatus->academic_status_id)) {
+                $curriculumId = $student->curriculum_id;
 
-                    if (!isset($filtered_students[$cid])) {
-                        $filtered_students[$cid][0]['Curriculum'] = $student['Curriculum'];
-                        $filtered_students[$cid][0]['Program'] = $student['Program'];
-                        $filtered_students[$cid][0]['ProgramType'] = $student['ProgramType'];
-                        $filtered_students[$cid][0]['Department'] = $student['Department'];
-                    }
+                if (!isset($filteredStudents[$curriculumId])) {
+                    $filteredStudents[$curriculumId][0] = [
+                        'Curriculum' => $student->curriculum->toArray(),
+                        'Program' => $student->program->toArray(),
+                        'ProgramType' => $student->program_type->toArray(),
+                        'Department' => $student->department ? $student->department->toArray() : []
+                    ];
+                }
 
-                    $index = count($filtered_students[$cid]);
+                $index = count($filteredStudents[$curriculumId]);
+                $filteredStudents[$curriculumId][$index] = $student->toArray();
 
-                    $filtered_students[$cid][$index] = $student;
+                if ($lastStatus) {
+                    $filteredStudents[$curriculumId][$index]['cgpa'] = $lastStatus->cgpa;
+                    $filteredStudents[$curriculumId][$index]['mcgpa'] = $lastStatus->mcgpa;
+                }
 
-                    if (!empty($last_status)) {
-                        $filtered_students[$cid][$index]['cgpa'] = $last_status['StudentExamStatus']['cgpa'];
-                        $filtered_students[$cid][$index]['mcgpa'] = $last_status['StudentExamStatus']['mcgpa'];
-                    } /* else {
-                        $filtered_students[$cid][$index]['cgpa'] = null;
-                        $filtered_students[$cid][$index]['mcgpa'] = null;
-                    } */
+                $error = '';
+                $eligible = $clearancesTable->eligibleForReadmission($student->id);
 
-                    $error = "";
+                if (in_array($eligible, [0, 5])) {
+                    $error = __('This student does not have clearance or has withdrawn.') . '<br/>';
+                }
 
-                    $elegible = $this->Student->Clearance->elegibleForReadmission($student['Student']['id']);
-
-                    if ($elegible == 0 || $elegible == 5) {
-                        $error = "This student doesn't have clearance/withdraw. <br/>";
-                    }
-
-                    // readmission status is not properly set up for AMU and Not being used.. Neway.
-
-                    /* $minimumPointAchieved = $this->Student->Clearance->isAchievedMinimumReadmissionPoint($student['Student']['id']);
-
-                    if ($minimumPointAchieved == 3) {
-                        $error .= "This student have not achieved minimum readmission point for application. <br/>";
-                    } */
-
-                    if (isset($error) && !empty($error)) {
-                        $filtered_students[$cid][$index]['criteria']['error'] = $error;
-                    }
+                if ($error) {
+                    $filteredStudents[$curriculumId][$index]['criteria']['error'] = $error;
                 }
             }
-
-            return $filtered_students;
         }
 
-        return array();
+        return $filteredStudents;
     }
 }

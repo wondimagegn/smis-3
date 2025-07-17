@@ -27,7 +27,7 @@ class OtpsTable extends Table
 
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT',
         ]);
     }
 }

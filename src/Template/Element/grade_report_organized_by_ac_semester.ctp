@@ -1,10 +1,11 @@
 <?php
-if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_profile['Exam Result'])) {
-	$student_copys = $student_academic_profile['Exam Result'];
+use Cake\Core\Configure;
+if (isset($studentAcademicProfile['Exam Result']) && !empty($studentAcademicProfile['Exam Result'])) {
+	$student_copys = $studentAcademicProfile['Exam Result'];
 	$credit_type = '';
 
-	if (isset($student_academic_profile['Curriculum']['type_credit']) && !empty($student_academic_profile['Curriculum']['type_credit'])) {
-		$crtype = explode('ECTS', $student_academic_profile['Curriculum']['type_credit']);
+	if (isset($studentAcademicProfile['Curriculum']['type_credit']) && !empty($studentAcademicProfile['Curriculum']['type_credit'])) {
+		$crtype = explode('ECTS', $studentAcademicProfile['Curriculum']['type_credit']);
 		//debug($crtype);
 		if (count($crtype) >= 2) {
 			$credit_type = 'ECTS';
@@ -13,44 +14,18 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 		}
 	}
 
-	/* if (isset($student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']) && !empty($student_academic_profile['Curriculum']['specialization_english_degree_nomenclature'])) {
-		$stream = explode(' in ', $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']);
-		if (count($stream) == 1) {
-			$stream2 = explode(' of ', $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']);
-			if (count($stream2) == 2 && count($stream) == 1) {
-				$stream[1] =  $stream2[1];
-			} else if (count($stream2) > 2 && count($stream) == 1) {
-				$stream[1] =  $stream2[2];
-			} else {
-				$stream[1] = $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature'];
-			}
-		}
-	} else {
-		$stream = explode(' in ', $student_academic_profile['Curriculum']['english_degree_nomenclature']);
-		if (count($stream) == 1) {
-			$stream = explode(' of ', $student_academic_profile['Curriculum']['english_degree_nomenclature']);
-		}
-	}
-
-	if (isset($stream) && !empty($stream[1])) {
-		$searchBracket = explode('(', $stream[1]);
-		if (count($searchBracket) != 1) {
-			$searchBracket = explode(')', $searchBracket[1]);
-			$stream[1] = trim($searchBracket[0]);
-		}
-	} */
 
 	if (isset($student_copys) && !empty($student_copys)) {
 		$count = 1;
 		foreach ($student_copys as $index => $student_copy) {
-			if (isset($student_copy['courses']) && !empty($student_copy['courses'])) { 
+			if (isset($student_copy['courses']) && !empty($student_copy['courses'])) {
 
 				/// Stream Display
-				
+
 				if (!empty($student_copy['Section']) && !is_numeric($student_copy['Section']['year_level_id']) || $student_copy['Section']['year_level_id'] == 0) {
-			
+
 					$preEngineeringColleges = Configure::read('preengineering_college_ids');
-		
+
 					if (isset($student_copy['Section']['College']['stream']) && $student_copy['Section']['College']['stream'] == STREAM_NATURAL && in_array($student_copy['Section']['College']['id'], $preEngineeringColleges)) {
 						$stream[1] = 'Pre Engineering';
 					} else if (isset($student_copy['Section']['College']['stream']) && $student_copy['Section']['College']['stream'] == STREAM_NATURAL) {
@@ -58,9 +33,9 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 					} else if (isset($student_copy['Section']['College']['stream']) && $student_copy['Section']['College']['stream'] == STREAM_SOCIAL) {
 						$stream[1] = 'Social Stream';
 					}
-		
+
 					$type_credit = (count(explode('ECTS', $student_copy['Section']['Curriculum']['type_credit'])) >= 2 ? 'ECTS' : 'Credit');
-		
+
 				} else if (isset($student_copy['Section']['Curriculum']) && !empty($student_copy['Section']['Curriculum']['name']) && !is_null($student_copy['Section']['department_id'])) {
 					if (isset($student_copy['Section']['Curriculum']['specialization_english_degree_nomenclature']) && !empty($student_copy['Section']['Curriculum']['specialization_english_degree_nomenclature'])) {
 						$stream = explode(' in ', $student_copy['Section']['Curriculum']['specialization_english_degree_nomenclature']);
@@ -81,23 +56,23 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 						}
 					}
 
-				} else if (isset($student_academic_profile['Curriculum']) && !empty($student_academic_profile['Curriculum']['name'])) {
-					if (isset($student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']) && !empty($student_academic_profile['Curriculum']['specialization_english_degree_nomenclature'])) {
-						$stream = explode(' in ', $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']);
+				} else if (isset($studentAcademicProfile['Curriculum']) && !empty($studentAcademicProfile['Curriculum']['name'])) {
+					if (isset($studentAcademicProfile['Curriculum']['specialization_english_degree_nomenclature']) && !empty($studentAcademicProfile['Curriculum']['specialization_english_degree_nomenclature'])) {
+						$stream = explode(' in ', $studentAcademicProfile['Curriculum']['specialization_english_degree_nomenclature']);
 						if (count($stream) == 1) {
-							$stream2 = explode(' of ', $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature']);
+							$stream2 = explode(' of ', $studentAcademicProfile['Curriculum']['specialization_english_degree_nomenclature']);
 							if (count($stream2) == 2 && count($stream) == 1) {
 								$stream[1] = $stream2[1];
 							} else if (count($stream2) > 2 && count($stream) == 1) {
 								$stream[1] = $stream2[2];
 							} else {
-								$stream[1] = $student_academic_profile['Curriculum']['specialization_english_degree_nomenclature'];
+								$stream[1] = $studentAcademicProfile['Curriculum']['specialization_english_degree_nomenclature'];
 							}
 						}
 					} else {
-						$stream = explode(' in ', $student_academic_profile['Curriculum']['english_degree_nomenclature']);
+						$stream = explode(' in ', $studentAcademicProfile['Curriculum']['english_degree_nomenclature']);
 						if (count($stream) == 1) {
-							$stream = explode(' of ', $student_academic_profile['Curriculum']['english_degree_nomenclature']);
+							$stream = explode(' of ', $studentAcademicProfile['Curriculum']['english_degree_nomenclature']);
 						}
 					}
 				}
@@ -111,7 +86,7 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 				}
 
 				/// End Stream Display
-				
+
 				?>
 				<div style="overflow-x:auto;">
 					<fieldset style="padding-top: 10px; padding-bottom: 10px;">
@@ -149,24 +124,16 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 											<b class="text-gray">&nbsp;&nbsp;Section:</b> <?= $student_copy['Section']['name']; ?>
 										</div>
 									</div>
-									<!-- <div class="row">
-										<div class="large-6 columns" style="padding: 0.2rem;">
-											<b class="text-gray">&nbsp;&nbsp;ACY:</b> <?php //echo $student_copy['academic_year']; ?>
-											<b class="text-gray">&nbsp;&nbsp;Semester:</b> <?php //echo $student_copy['semester']; ?>
-										</div>
-										<div class="large-6 columns" style="padding: 0.2rem;">
-											<b class="text-gray">&nbsp;&nbsp;Year Level:</b> <?php //echo (is_null($student_copy['Section']['department_id']) ? 'Pre/1st' : $student_copy['YearLevel']['name']); ?>
-										</div>
-									</div> -->
+
 								</td>
 							</tr>
 						</table>
 						<br>
 
-						<?php 
+						<?php
 
-						//debug($student_copy['courses'][0]); 
-						//debug($student_copy); 
+						//debug($student_copy['courses'][0]);
+						//debug($student_copy);
 
 						if (isset($student_copy['Section']['Curriculum']) && !empty($student_copy['Section']['Curriculum']['type_credit'])) {
 							//debug($student_copy['Section']['Curriculum']['type_credit']);
@@ -175,7 +142,7 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 							} else {
 								$credit_type = 'Credit';
 							}
-						} 
+						}
 						//debug($credit_type);
 						?>
 
@@ -234,13 +201,13 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 													<tbody>
 														<tr><td style="background-color: white;" class="vcenter">From: <?= $course_reg_add['PublishedCourse']['add'] ? 'Mass Add (Date Mass Added: ' .  (isset( $course_reg_add['CourseAdd']) ? $this->Time->format("M j, Y h:i A", $course_reg_add['CourseAdd']['created'], NULL, NULL) : $this->Time->format("M j, Y h:i A", $course_reg_add['CourseRegistration']['created'], NULL, NULL)) . ')' : ($course_reg_add['regAdd'] == 10 ? 'Course Registration (Date Registered: ' .  ($this->Time->format("M j, Y h:i A", $course_reg_add['CourseRegistration']['created'], NULL, NULL)) . ')' : 'Course Add (Date Added: ' .  ($this->Time->format("M j, Y h:i A", $course_reg_add['CourseAdd']['created'], NULL, NULL)) . ')') . (!$course_reg_add['firstTime'] ? '<span class="accepted" style="padding-left:20px;"> (Repeated Course) </span>' : ''); ?> </td></tr>
 														<?= (isset($course_reg_add['PublishedCourse']['CourseInstructorAssignment']) && !empty($course_reg_add['PublishedCourse']['CourseInstructorAssignment']) ? '<tr><td style="background-color: white;" class="vcenter">Instructor: &nbsp;' . (isset($course_reg_add['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Title']['title']) ? $course_reg_add['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Title']['title']. '. ' : '') . (trim(ucwords(strtolower($course_reg_add['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['full_name']))))  . (isset($course_reg_add['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Position']['position']) ? ' (' . $course_reg_add['PublishedCourse']['CourseInstructorAssignment'][0]['Staff']['Position']['position']. ')' : '') . '</td></tr>': ''); ?>
-														<?php 
-														if (isset($course_reg_add['Grade']) && !empty($course_reg_add['Grade'])) { 
+														<?php
+														if (isset($course_reg_add['Grade']) && !empty($course_reg_add['Grade'])) {
 															$grade_scale_name_from_published_course = '';
 															if (!isset($course_reg_add['Grade']['grade_scale']) && isset($course_reg_add['PublishedCourse']['grade_scale_id']) && !empty($course_reg_add['PublishedCourse']['grade_scale_id'])) {
 																$grade_scale_name_from_published_course = ClassRegistry::init('GradeScale')->field('GradeScale.name', array('GradeScale.id' => $course_reg_add['PublishedCourse']['grade_scale_id']));
-															} 
-															//debug($course_reg_add['Grade']); 
+															}
+															//debug($course_reg_add['Grade']);
 															?>
 															<tr><td style="background-color: white;" class="vcenter">Grade: &nbsp; <?= (isset($course_reg_add['Grade']['grade']) ? $course_reg_add['Grade']['grade'] : '') . (isset($course_reg_add['Grade']['gradeChangeRequested']) && !empty($course_reg_add['Grade']['gradeChangeRequested']) ? '<span class="rejected" style="padding-left: 20px;"> (Grade Change)</span>' : ''); ?></td></tr>
 															<tr><td style="background-color: white;" class="vcenter">Pass Grade: &nbsp; <?= (isset($course_reg_add['Grade']['pass_grade']) && $course_reg_add['Grade']['pass_grade'] ? '<Span class="accepted">Yes</Span>' : '<Span class="rejected">No</Span>'); ?> <?= (isset($course_reg_add['Grade']['repeatable']) && $course_reg_add['Grade']['repeatable'] == 1 && $course_reg_add['firstTime'] == 1 && $course_reg_add['Grade']['pass_grade'] == 1  ? '<span class="accepted" style="padding-left:20px;">(This course can be repeated in case of result deficiency for graduation.)</span>' : ''); ?> </td></tr>
@@ -251,16 +218,16 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 															<?php
 														} ?>
 
-														<?php 
+														<?php
 														if (isset($course_reg_add['ExamType']) && !empty($course_reg_add['ExamType']) /* && isset($course_reg_add['Grade']) && !empty($course_reg_add['Grade']['grade']) */) { ?>
 															<tr>
-																<td style="background-color: white;" class="vcenter"><b>Assessment Detail: </b>&nbsp; 
+																<td style="background-color: white;" class="vcenter"><b>Assessment Detail: </b>&nbsp;
 																	<?php
 																	if (!empty($course_reg_add['ExamType'])) {
 																		$assessment_sum = 0;
 																		$percent = 0;
 																		$errorOverPercent = '';
-																		
+
 																		foreach ($course_reg_add['ExamType'] as $k => $result) {
 																			$percent += $result['ExamType']['percent'];
 																			if ($percent <= 100) {
@@ -290,7 +257,7 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 																<tr><td style="background-color: white;" class="vcenter on-process">Course grade is modified via Backdated Grade Entry Interface.</td></tr>
 																<?php
 															}
-														} else if (!isset($course_reg_add['ExamType']) && isset($course_reg_add['Grade']['grade']) || (isset($course_reg_add['Grade']['backdatedGradeEntry']) && $course_reg_add['Grade']['backdatedGradeEntry']) || (isset($course_reg_add['Grade']['registrarGradeEntry']) && $course_reg_add['Grade']['registrarGradeEntry'])) { 
+														} else if (!isset($course_reg_add['ExamType']) && isset($course_reg_add['Grade']['grade']) || (isset($course_reg_add['Grade']['backdatedGradeEntry']) && $course_reg_add['Grade']['backdatedGradeEntry']) || (isset($course_reg_add['Grade']['registrarGradeEntry']) && $course_reg_add['Grade']['registrarGradeEntry'])) {
 															if (isset($course_reg_add['Grade']['backdatedGradeEntry']) && $course_reg_add['Grade']['backdatedGradeEntry']) { ?>
 																<tr><td style="background-color: white;" class="vcenter rejected">Grade submitted via Backdated Grade Entry Interface.</td></tr>
 																<?php
@@ -312,13 +279,13 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 															<tr><td style="background-color: white;" class="vcenter">Grade Change Requested: &nbsp; <?= (isset($course_reg_add['Grade']['gradeChangeRequested']) ? $this->Time->format("M j, Y h:i A", $course_reg_add['Grade']['gradeChangeRequested'], NULL, NULL) : ''); ?></td></tr>
 															<tr><td style="background-color: white;" class="vcenter">Grade Change Approved: &nbsp; <?= (isset($course_reg_add['Grade']['gradeChangeApproved']) ? $this->Time->format("M j, Y h:i A", $course_reg_add['Grade']['gradeChangeApproved'], NULL, NULL) : ''); ?></td></tr>
 															<?php
-														} 
+														}
 
-														if (!$course_reg_add['hasEquivalentMap'] && isset($student_academic_profile['Curriculum']['name'])) { ?>
-															<tr><td style="background-color: white;" class="vcenter rejected">Course Equivalency is not set!! Currently, the Student is attached to "<?= $student_academic_profile['Curriculum']['name'] ?>" but, this course is taken from "<?= $course_reg_add['Course']['Curriculum']['name']; ?>" curriculum. Thus, this course should be mapped to the equivalent course from student attached curriculum.</td></tr>
+														if (!$course_reg_add['hasEquivalentMap'] && isset($studentAcademicProfile['Curriculum']['name'])) { ?>
+															<tr><td style="background-color: white;" class="vcenter rejected">Course Equivalency is not set!! Currently, the Student is attached to "<?= $studentAcademicProfile['Curriculum']['name'] ?>" but, this course is taken from "<?= $course_reg_add['Course']['Curriculum']['name']; ?>" curriculum. Thus, this course should be mapped to the equivalent course from student attached curriculum.</td></tr>
 															<?php
 														} ?>
-														
+
 													</tbody>
 												</table>
 											</td>
@@ -432,7 +399,7 @@ if (isset($student_academic_profile['Exam Result']) && !empty($student_academic_
 				<?php
 			}
 		}
-	} 
+	}
 } else { ?>
 	<div class="info-box info-message"><span style="margin-right: 15px;"></span>There is no record of course registration to show Exam Results.</div>
 	<?php

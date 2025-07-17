@@ -18,8 +18,11 @@ class Attachment extends Entity
     protected $_accessible = [
         'model' => true,
         'foreign_key' => true,
-        'dirname' => true,
-        'basename' => true,
+        'file' => true,
+        'file_dir' => true,
+        'file_size' => true,
+        'file_type' => true,
+        'size' => true,
         'checksum' => true,
         'group' => true,
         'alternative' => true,

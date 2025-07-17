@@ -1,13 +1,13 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-use Cake\I18n\FrozenDate;
+use Cake\I18n\Time;
 
+/**
+ * CourseExemptions Table
+ */
 class CourseExemptionsTable extends Table
 {
     /**
@@ -24,200 +24,193 @@ class CourseExemptionsTable extends Table
         $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
         $this->belongsTo('Courses', [
             'foreignKey' => 'course_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT'
         ]);
+
         $this->belongsTo('Students', [
             'foreignKey' => 'student_id',
-            'joinType' => 'INNER',
+            'joinType' => 'LEFT'
         ]);
-        $this->hasMany('ExcludedCourseFromTranscripts', [
+
+        $this->hasMany('Attachments', [
+            'foreignKey' => 'foreign_key',
+            'conditions' => ['Attachments.model' => 'CourseExemption'],
+            'dependent' => true
+        ]);
+
+        $this->hasMany('ExcludedCoursesFromTranscripts', [
             'foreignKey' => 'course_exemption_id',
+            'dependent' => false
         ]);
     }
 
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator)
     {
         $validator
-            ->integer('id')
-            ->allowEmptyString('id', null, 'create');
-
-        $validator
-            ->dateTime('request_date')
-            ->requirePresence('request_date', 'create')
-            ->notEmptyDateTime('request_date');
-
-        $validator
+            ->allowEmptyString('id', null, 'create')
             ->scalar('reason')
             ->requirePresence('reason', 'create')
-            ->notEmptyString('reason');
-
-        $validator
+            ->notEmptyString('reason', 'Please provide reason for request.')
             ->scalar('taken_course_title')
-            ->maxLength('taken_course_title', 50)
             ->requirePresence('taken_course_title', 'create')
-            ->notEmptyString('taken_course_title');
-
-        $validator
+            ->notEmptyString('taken_course_title', 'Please provide course title')
             ->scalar('taken_course_code')
-            ->maxLength('taken_course_code', 15)
             ->requirePresence('taken_course_code', 'create')
-            ->notEmptyString('taken_course_code');
-
-        $validator
-            ->integer('course_taken_credit')
+            ->notEmptyString('taken_course_code', 'Please provide course code.')
+            ->numeric('course_taken_credit')
             ->requirePresence('course_taken_credit', 'create')
-            ->notEmptyString('course_taken_credit');
-
-        $validator
-            ->boolean('department_accept_reject')
-            ->allowEmptyString('department_accept_reject');
-
-        $validator
+            ->notEmptyString('course_taken_credit', 'Please provide credit in number')
+            ->greaterThanOrEqual('course_taken_credit', 0, 'Credit should be greater than or equal to zero')
             ->scalar('department_reason')
             ->requirePresence('department_reason', 'create')
-            ->notEmptyString('department_reason');
-
-        $validator
-            ->boolean('registrar_confirm_deny')
-            ->allowEmptyString('registrar_confirm_deny');
-
-        $validator
-            ->scalar('registrar_reason')
-            ->requirePresence('registrar_reason', 'create')
-            ->notEmptyString('registrar_reason');
-
-        $validator
-            ->uuid('department_approve_by')
-            ->requirePresence('department_approve_by', 'create')
-            ->notEmptyString('department_approve_by');
-
-        $validator
-            ->uuid('registrar_approve_by')
-            ->requirePresence('registrar_approve_by', 'create')
-            ->notEmptyString('registrar_approve_by');
-
-        $validator
-            ->scalar('transfer_from')
-            ->maxLength('transfer_from', 100)
-            ->allowEmptyString('transfer_from');
-
-        $validator
-            ->scalar('grade')
-            ->maxLength('grade', 5)
-            ->allowEmptyString('grade');
+            ->notEmptyString('department_reason', 'Please provide reason');
 
         return $validator;
     }
 
     /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
+     * Checks if a course is exempted for a student
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param int|null $studentId Student ID
+     * @param int|null $courseId Course ID
+     * @return int Number of exemptions
      */
-    public function buildRules(RulesChecker $rules)
+    public function isCourseExempted(?int $studentId = null, ?int $courseId = null)
     {
-        $rules->add($rules->existsIn(['course_id'], 'Courses'));
-        $rules->add($rules->existsIn(['student_id'], 'Students'));
-
-        return $rules;
-    }
-
-    function isCourseExempted($student_id = null, $course_id = null)
-    {
-        $count = $this->find('count', array(
-                'conditions' => array(
-                    'CourseExemption.student_id' => $student_id,
-                    'CourseExemption.course_id' => $course_id,
-                    'registrar_confirm_deny' => 1,
-                    'department_accept_reject' => 1
-                )
-        ));
-        return $count;
-    }
-
-    function getStudentCourseExemptionCredit($student_id)
-    {
-        $course = $this->find('all', array(
-            'conditions' => array(
-                'CourseExemption.student_id' => $student_id,
-                'registrar_confirm_deny' => 1,
-                'department_accept_reject' => 1
-            ),
-            'recursive' => -1
-        ));
-
-        $exemptionSums = 0;
-
-        if (isset($course) && !empty($course)) {
-            foreach ($course as $k => $v) {
-                $exemptionSums += $v['CourseExemption']['course_taken_credit'];
-            }
-        }
-        return $exemptionSums;
-    }
-
-    //count course substitution request not approved
-    public function countExemptionRequest($roleId = null, $departmentIds = null, $collegeIds = null): int
-    {
-        $courseExemptions = TableRegistry::getTableLocator()->get('CourseExemptions');
-        $daysBack = FrozenDate::now()->subDays(DAYS_BACK_COURSE_SUBSTITUTION);
-
-        $query = $courseExemptions->find()
-            ->contain(['Students'])
-            ->where(['CourseExemptions.request_date >=' => $daysBack]);
-
-        if ($roleId == ROLE_DEPARTMENT) {
-            $query->where([
-                'Students.department_id IN' => (array)$departmentIds,
-                'Students.graduated' => 0,
-                'CourseExemptions.department_accept_reject IS' => null
-            ]);
-        } elseif ($roleId == ROLE_REGISTRAR) {
-            $query->where([
-                'Students.graduated' => 0,
-                'CourseExemptions.department_accept_reject IS NOT' => null,
-                'CourseExemptions.registrar_confirm_deny IS' => null
-            ]);
-
-            if (!empty($departmentIds)) {
-                $query->where([
-                    'Students.department_id IN' => (array)$departmentIds
-                ]);
-            } elseif (!empty($collegeIds)) {
-                $query->where([
-                    'Students.department_id IS' => null,
-                    'Students.college_id IN' => (array)$collegeIds
-                ]);
-            }
-        } else {
+        if (!$studentId || !$courseId) {
             return 0;
         }
 
-        return $query->count();
+        return $this->find()
+            ->where([
+                'CourseExemptions.student_id' => $studentId,
+                'CourseExemptions.course_id' => $courseId,
+                'CourseExemptions.registrar_confirm_deny' => 1,
+                'CourseExemptions.department_accept_reject' => 1
+            ])
+            ->count();
     }
-    function studentExemptedCourseList($student_id)
-    {
-        $exemptedCourseLists = $this->find('all', array(
-            'conditions' => array(
-                'CourseExemption.student_id' => $student_id,
-                'registrar_confirm_deny' => 1,
-                'department_accept_reject' => 1
-            ),
-            'contain' => array('Course')
-        ));
 
-        return $exemptedCourseLists;
+    /**
+     * Calculates total exemption credits for a student
+     *
+     * @param int|null $studentId Student ID
+     * @return float Total exemption credits
+     */
+    public function getStudentCourseExemptionCredit(?int $studentId = null): float
+    {
+        if (!$studentId) {
+            return 0.0;
+        }
+
+        $courses = $this->find()
+            ->where([
+                'CourseExemptions.student_id' => $studentId,
+                'CourseExemptions.registrar_confirm_deny' => 1,
+                'CourseExemptions.department_accept_reject' => 1
+            ])
+            ->contain([
+                'Courses' => ['fields' => ['id', 'credit']]
+            ])
+            ->disableHydration()
+            ->all()
+            ->toArray();
+
+        $exemptionSums = 0.0;
+
+        foreach ($courses as $course) {
+            if (
+                isset($course['Course']['credit']) &&
+                is_numeric($course['Course']['credit']) &&
+                !empty($course['Course']['credit'])
+            ) {
+                $exemptionSums += (float) $course['Course']['credit'];
+            }
+        }
+
+        return $exemptionSums;
+    }
+
+    /**
+     * Counts unapproved course exemption requests
+     *
+     * @param int|null $roleId User role ID
+     * @param array|int|null $departmentIds Department IDs
+     * @param array|int|null $collegeIds College IDs
+     * @return int Number of unapproved requests
+     */
+    public function countExemptionRequest(?int $roleId = null, $departmentIds = null, $collegeIds = null): int
+    {
+        $options = [];
+
+        if ($roleId === ROLE_DEPARTMENT && !empty($departmentIds)) {
+            $options['conditions'] = [
+                'Students.department_id IN' => (array) $departmentIds,
+                'Students.graduated' => 0,
+                'CourseExemptions.department_accept_reject IS NULL',
+                'CourseExemptions.request_date >=' => (new Time())->modify('-' . DAYS_BACK_COURSE_SUBSTITUTION . ' days')->format('Y-m-d')
+            ];
+        } elseif ($roleId === ROLE_REGISTRAR) {
+            if (!empty($departmentIds)) {
+                $options['conditions'] = [
+                    'Students.department_id IS NOT NULL',
+                    'Students.department_id IN' => (array) $departmentIds,
+                    'Students.graduated' => 0,
+                    'CourseExemptions.department_accept_reject IS NOT NULL',
+                    'CourseExemptions.registrar_confirm_deny IS NULL',
+                    'CourseExemptions.request_date >=' => (new Time())->modify('-' . DAYS_BACK_COURSE_SUBSTITUTION . ' days')->format('Y-m-d')
+                ];
+            } elseif (!empty($collegeIds)) {
+                $options['conditions'] = [
+                    'Students.department_id IS NULL',
+                    'Students.college_id IN' => (array) $collegeIds,
+                    'Students.graduated' => 0,
+                    'CourseExemptions.department_accept_reject IS NOT NULL',
+                    'CourseExemptions.registrar_confirm_deny IS NULL',
+                    'CourseExemptions.request_date >=' => (new Time())->modify('-' . DAYS_BACK_COURSE_SUBSTITUTION . ' days')->format('Y-m-d')
+                ];
+            }
+        }
+
+        if (empty($options)) {
+            return 0;
+        }
+
+        return $this->find()
+            ->where($options['conditions'])
+            ->contain(['Students'])
+            ->count();
+    }
+
+    /**
+     * Retrieves list of exempted courses for a student
+     *
+     * @param int|null $studentId Student ID
+     * @return array List of exempted courses
+     */
+    public function studentExemptedCourseList(?int $studentId = null): array
+    {
+        if (!$studentId) {
+            return [];
+        }
+
+        return $this->find()
+            ->where([
+                'CourseExemptions.student_id' => $studentId,
+                'CourseExemptions.registrar_confirm_deny' => 1,
+                'CourseExemptions.department_accept_reject' => 1
+            ])
+            ->contain(['Courses'])
+            ->disableHydration()
+            ->all()
+            ->toArray();
     }
 }

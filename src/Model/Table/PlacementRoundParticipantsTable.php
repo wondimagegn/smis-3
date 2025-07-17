@@ -1,170 +1,51 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
+use Cake\ORM\TableRegistry;
 use Cake\Validation\Validator;
 
 class PlacementRoundParticipantsTable extends Table
 {
-
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
-
         parent::initialize($config);
 
         $this->setTable('placement_round_participants');
-        $this->setDisplayField('name');
+        $this->setDisplayField('id');
         $this->setPrimaryKey('id');
 
-        $this->addBehavior('Timestamp');
-
-        $this->belongsTo('Programs', [
-            'foreignKey' => 'program_id',
-            'joinType' => 'INNER',
-        ]);
-        $this->belongsTo('ProgramTypes', [
-            'foreignKey' => 'program_type_id',
-            'joinType' => 'INNER',
-        ]);
-        $this->hasMany('PlacementEntranceExamResultEntries', [
-            'foreignKey' => 'placement_round_participant_id',
-        ]);
         $this->hasMany('PlacementParticipatingStudents', [
             'foreignKey' => 'placement_round_participant_id',
-        ]);
-        $this->hasMany('PlacementPreferences', [
-            'foreignKey' => 'placement_round_participant_id',
+            'dependent' => false,
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
         $validator
-            ->scalar('type')
-            ->requirePresence('type', 'create')
+            ->numeric('foreign_key')
+            ->notEmptyString('foreign_key', 'Please select participating unit')
+            ->notEmptyString('academic_year', 'Please select academic year')
+            ->numeric('placement_round')
+            ->notEmptyString('placement_round', 'Please select placement round')
+            ->notEmptyString('applied_for', 'Please select placement round')
+            ->notEmptyString('name', 'Please select placement round')
             ->notEmptyString('type');
-
-        $validator
-            ->scalar('name')
-            ->maxLength('name', 200)
-            ->allowEmptyString('name');
-
-        $validator
-            ->scalar('applied_for')
-            ->maxLength('applied_for', 200)
-            ->requirePresence('applied_for', 'create')
-            ->notEmptyString('applied_for');
-
-        $validator
-            ->integer('group_identifier')
-            ->requirePresence('group_identifier', 'create')
-            ->notEmptyString('group_identifier');
-
-        $validator
-            ->integer('foreign_key')
-            ->requirePresence('foreign_key', 'create')
-            ->notEmptyString('foreign_key');
-
-        $validator
-            ->scalar('academic_year')
-            ->maxLength('academic_year', 30)
-            ->requirePresence('academic_year', 'create')
-            ->notEmptyString('academic_year');
-
-        $validator
-            ->integer('placement_round')
-            ->requirePresence('placement_round', 'create')
-            ->notEmptyString('placement_round');
-
-        $validator
-            ->allowEmptyString('intake_capacity');
-
-        $validator
-            ->allowEmptyString('female_quota');
-
-        $validator
-            ->allowEmptyString('disability_quota');
-
-        $validator
-            ->allowEmptyString('region_quota');
-
-        $validator
-            ->scalar('developing_region')
-            ->maxLength('developing_region', 200)
-            ->allowEmptyString('developing_region');
-
-        $validator
-            ->integer('exam_giver')
-            ->notEmptyString('exam_giver');
-
-        $validator
-            ->scalar('semester')
-            ->maxLength('semester', 10)
-            ->allowEmptyString('semester');
-
-        $validator
-            ->boolean('require_all_selected')
-            ->notEmptyString('require_all_selected');
-
-        $validator
-            ->notEmptyString('require_cgpa');
-
-        $validator
-            ->numeric('minimum_cgpa')
-            ->allowEmptyString('minimum_cgpa');
-
-        $validator
-            ->numeric('maximum_cgpa')
-            ->allowEmptyString('maximum_cgpa');
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function reformat(array $data = [])
     {
+        $reformatedData = [];
+        $group_identifier = strtotime(date('Y-m-d H:i:s'));
 
-        $rules->add($rules->existsIn(['program_id'], 'Programs'));
-        $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
-
-        return $rules;
-    }
-
-
-    public function reformat($data = array())
-    {
-
-        $reformatedData = array();
-
-        $group_identifier = strtotime(date('Y-m-d h:i:sa'));
-
-        if (isset($data) && !empty($data)) {
+        if (!empty($data)) {
             $firstData = $data['PlacementRoundParticipant'][1];
             foreach ($data['PlacementRoundParticipant'] as $dk => $dv) {
                 $reformatedData['PlacementRoundParticipant'][$dk] = $dv;
-                $reformatedData['PlacementRoundParticipant'][$dk]['group_identifier'] = (isset($firstData['group_identifier']) && !empty($firstData['group_identifier']) ? $firstData['group_identifier'] : $group_identifier);
+                $reformatedData['PlacementRoundParticipant'][$dk]['group_identifier'] = !empty($firstData['group_identifier']) ? $firstData['group_identifier'] : $group_identifier;
                 $reformatedData['PlacementRoundParticipant'][$dk]['applied_for'] = $firstData['applied_for'];
                 $reformatedData['PlacementRoundParticipant'][$dk]['program_id'] = $firstData['program_id'];
                 $reformatedData['PlacementRoundParticipant'][$dk]['program_type_id'] = $firstData['program_type_id'];
@@ -175,88 +56,62 @@ class PlacementRoundParticipantsTable extends Table
             }
         }
 
-        // Array after removing duplicates
-        //$xunique=array_unique($reformatedData);
+        $reformatedDataDuplicateRemoved['PlacementRoundParticipant'] = array_unique($reformatedData['PlacementRoundParticipant'], SORT_REGULAR);
 
-        $reformatedDataDuplicateRemoved['PlacementRoundParticipant'] = array_unique(
-            $reformatedData['PlacementRoundParticipant'],
-            SORT_REGULAR
-        );
-
-        if (count($reformatedData['PlacementRoundParticipant']) > count(
-                $reformatedDataDuplicateRemoved['PlacementRoundParticipant']
-            )) {
-            $this->invalidate('foreign_key', 'Please remove the duplicated rows, and try again.');
+        if (count($reformatedData['PlacementRoundParticipant']) > count($reformatedDataDuplicateRemoved['PlacementRoundParticipant'])) {
+            $this->validationErrors['foreign_key'] = 'Please remove the duplicated rows, and try again.';
             return false;
         }
-
-        //debug($reformatedData);
 
         return $reformatedData;
     }
 
-    public function isDuplicated($data = array(), $edit = 0)
+    public function isDuplicated(array $data = [], int $edit = 0)
     {
-
-        if (isset($data) && !empty($data)) {
+        if (!empty($data)) {
             $firstData = $data['PlacementRoundParticipant'][1];
+            $conditions = [
+                'PlacementRoundParticipants.type' => $firstData['type'],
+                'PlacementRoundParticipants.applied_for' => $firstData['applied_for'],
+                'PlacementRoundParticipants.program_id' => $firstData['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $firstData['program_type_id'],
+                'PlacementRoundParticipants.foreign_key' => $firstData['foreign_key'],
+                'PlacementRoundParticipants.academic_year' => $firstData['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $firstData['placement_round']
+            ];
+
             if ($edit) {
-                $count = $this->find("first", array(
-                    'conditions' => array(
-                        'PlacementRoundParticipant.group_identifier <> ' => $firstData['group_identifier'],
-                        'PlacementRoundParticipant.type' => $firstData['type'],
-                        'PlacementRoundParticipant.applied_for' => $firstData['applied_for'],
-                        'PlacementRoundParticipant.program_id' => $firstData['program_id'],
-                        'PlacementRoundParticipant.program_type_id' => $firstData['program_type_id'],
-                        'PlacementRoundParticipant.foreign_key' => $firstData['foreign_key'],
-                        'PlacementRoundParticipant.academic_year' => $firstData['academic_year'],
-                        'PlacementRoundParticipant.placement_round' => $firstData['placement_round']
-                    ),
-                    'recursive' => -1
-                ));
+                $conditions['PlacementRoundParticipants.group_identifier <>'] = $firstData['group_identifier'];
+            }
 
-                if (!empty($count) && count($count) > 0) {
-                    return $count['PlacementRoundParticipant']['group_identifier'];
-                }
-            } else {
-                $count = $this->find("first", array(
-                    'conditions' => array(
-                        'PlacementRoundParticipant.type' => $firstData['type'],
-                        'PlacementRoundParticipant.applied_for' => $firstData['applied_for'],
-                        'PlacementRoundParticipant.program_id' => $firstData['program_id'],
-                        'PlacementRoundParticipant.program_type_id' => $firstData['program_type_id'],
-                        'PlacementRoundParticipant.foreign_key' => $firstData['foreign_key'],
-                        'PlacementRoundParticipant.academic_year' => $firstData['academic_year'],
-                        'PlacementRoundParticipant.placement_round' => $firstData['placement_round']
-                    ),
-                    'recursive' => -1
-                ));
+            $count = $this->find('first')
+                ->where($conditions)
+                ->disableHydration()
+                ->first();
 
-                if (!empty($count) && count($count) > 0) {
-                    return $count['PlacementRoundParticipant']['group_identifier'];
-                }
+            if (!empty($count)) {
+                return $count['PlacementRoundParticipant']['group_identifier'];
             }
         }
 
         return false;
     }
 
-    public function isPossibleToDefineDeadline($data = array())
+    public function isPossibleToDefineDeadline(array $data = [])
     {
+        if (!empty($data)) {
+            $row = $this->find('first')
+                ->where([
+                    'PlacementRoundParticipants.applied_for' => $data['PlacementDeadline']['applied_for'],
+                    'PlacementRoundParticipants.program_id' => $data['PlacementDeadline']['program_id'],
+                    'PlacementRoundParticipants.program_type_id' => $data['PlacementDeadline']['program_type_id'],
+                    'PlacementRoundParticipants.academic_year' => $data['PlacementDeadline']['academic_year'],
+                    'PlacementRoundParticipants.placement_round' => $data['PlacementDeadline']['placement_round']
+                ])
+                ->disableHydration()
+                ->first();
 
-        if (isset($data) && !empty($data)) {
-            $row = $this->find("first", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.applied_for' => $data['PlacementDeadline']['applied_for'],
-                    'PlacementRoundParticipant.program_id' => $data['PlacementDeadline']['program_id'],
-                    'PlacementRoundParticipant.program_type_id' => $data['PlacementDeadline']['program_type_id'],
-                    'PlacementRoundParticipant.academic_year' => $data['PlacementDeadline']['academic_year'],
-                    'PlacementRoundParticipant.placement_round' => $data['PlacementDeadline']['placement_round']
-                ),
-                'recursive' => -1
-            ));
-
-            if (isset($row) && !empty($row)) {
+            if (!empty($row)) {
                 return $row['PlacementRoundParticipant']['group_identifier'];
             }
         }
@@ -264,351 +119,286 @@ class PlacementRoundParticipantsTable extends Table
         return false;
     }
 
-    public function participating_unit_name(
-        $acceptedStudentdetail = array(),
-        $selectedAcademicYear,
-        $apply_for_college = null,
-        $type = 'd'
-    ) {
-
-        debug(Configure::read('program_types_available_for_placement_preference'));
+    public function participating_unit_name(array $acceptedStudentdetail = [], string $selectedAcademicYear, ?string $apply_for_college = null, string $type = 'd'): array
+    {
+        $participatingdepartmentname = [];
+        $placementParticipatingStudentsTable = TableRegistry::getTableLocator()->get('PlacementParticipatingStudents');
 
         if (!empty($acceptedStudentdetail)) {
-            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound(
-                $selectedAcademicYear,
-                $acceptedStudentdetail['AcceptedStudent']['id']
-            );
+            $placementRound = $placementParticipatingStudentsTable->getNextRound($selectedAcademicYear, $acceptedStudentdetail['AcceptedStudent']['id']);
+            $applied_for = empty($acceptedStudentdetail['AcceptedStudent']['department_id']) ?
+                'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'] :
+                (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id']) ?
+                    'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'] : '');
 
-            if (empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
-                // the student is still in college
-                $applied_for = 'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'];
-            } elseif (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
-                // the assignment is specialization
-                $applied_for = 'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'];
-            }
-
-            $rows = $this->find("all", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.applied_for' => $applied_for,
-                    'PlacementRoundParticipant.placement_round' => $placementRound,
-                    //'PlacementRoundParticipant.program_id' => $acceptedStudentdetail['AcceptedStudent']['program_id'],
-                    //'PlacementRoundParticipant.program_type_id' => array($acceptedStudentdetail['AcceptedStudent']['program_type_id'], 1),
-                    'PlacementRoundParticipant.program_id' => Configure::read(
-                        'programs_available_for_placement_preference'
-                    ),
-                    'PlacementRoundParticipant.program_type_id' => Configure::read(
-                        'program_types_available_for_placement_preference'
-                    ),
-                    'PlacementRoundParticipant.academic_year' => $selectedAcademicYear
-                ),
-                'recursive' => -1
-            ));
-        } elseif (isset($apply_for_college) && !empty($apply_for_college)) {
-            if ($type == 'c') {
-                $applied_for = 'c~' . $apply_for_college;
-            } elseif ($type == 'd') {
-                $applied_for = 'd~' . $apply_for_college;
-            }
-
-            //$apply_for_college=null,$type='d'
-            $rows = $this->find("all", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.applied_for' => $applied_for,
-                    'PlacementRoundParticipant.program_id' => Configure::read(
-                        'programs_available_for_placement_preference'
-                    ),
-                    'PlacementRoundParticipant.program_type_id' => Configure::read(
-                        'program_types_available_for_placement_preference'
-                    ),
-                    'PlacementRoundParticipant.academic_year' => $selectedAcademicYear,
-                    //'PlacementRoundParticipant.placement_round' => $placementRound,
-                    // $placementRound is not defined here
-                ),
-                'recursive' => -1
-            ));
+            $rows = $this->find()
+                ->where([
+                    'PlacementRoundParticipants.applied_for' => $applied_for,
+                    'PlacementRoundParticipants.placement_round' => $placementRound,
+                    'PlacementRoundParticipants.program_id IN' => \Cake\Core\Configure::read('programs_available_for_placement_preference'),
+                    'PlacementRoundParticipants.program_type_id IN' => \Cake\Core\Configure::read('program_types_available_for_placement_preference'),
+                    'PlacementRoundParticipants.academic_year' => $selectedAcademicYear
+                ])
+                ->disableHydration()
+                ->all()
+                ->toArray();
+        } elseif (!empty($apply_for_college)) {
+            $applied_for = $type == 'c' ? 'c~' . $apply_for_college : ($type == 'd' ? 'd~' . $apply_for_college : '');
+            $rows = $this->find()
+                ->where([
+                    'PlacementRoundParticipants.applied_for' => $applied_for,
+                    'PlacementRoundParticipants.program_id IN' => \Cake\Core\Configure::read('programs_available_for_placement_preference'),
+                    'PlacementRoundParticipants.program_type_id IN' => \Cake\Core\Configure::read('program_types_available_for_placement_preference'),
+                    'PlacementRoundParticipants.academic_year' => $selectedAcademicYear
+                ])
+                ->disableHydration()
+                ->all()
+                ->toArray();
+        } else {
+            $rows = [];
         }
 
-        $participatingdepartmentname = array();
-
-        if (!empty($rows)) {
-            foreach ($rows as $k => $v) {
-                if (!empty($v['PlacementRoundParticipant']['name'])) {
-                    $participatingdepartmentname[$v['PlacementRoundParticipant']['id']] = $v['PlacementRoundParticipant']['name'];
-                }
+        foreach ($rows as $v) {
+            if (!empty($v['name'])) {
+                $participatingdepartmentname[$v['id']] = $v['name'];
             }
         }
 
         return $participatingdepartmentname;
     }
 
-    public function reformatDevRegion($data = array())
+    public function reformatDevRegion(array $data = []): array
     {
-
-        //debug($data);
-        if (isset($data['PlacementSetting']) && !empty($data['PlacementSetting'])) {
-            if (isset($data['PlacementSetting'][0]) && !empty($data['PlacementSetting'][0]['developing_region'])) {
-                $developingRegions = implode(',', $data['PlacementSetting'][0]['developing_region']);
-                if (!empty($developingRegions)) {
-                    foreach ($data['PlacementSetting'] as $k => &$v) {
-                        $v['developing_region'] = $developingRegions;
-                        $reformatedData['PlacementSetting'][$k] = $v;
-                    }
-                    return $reformatedData;
+        if (!empty($data['PlacementSetting']) && !empty($data['PlacementSetting'][0]['developing_region'])) {
+            $developingRegions = implode(',', $data['PlacementSetting'][0]['developing_region']);
+            if (!empty($developingRegions)) {
+                $reformatedData = [];
+                foreach ($data['PlacementSetting'] as $k => $v) {
+                    $v['developing_region'] = $developingRegions;
+                    $reformatedData['PlacementSetting'][$k] = $v;
                 }
-            } else {
-                return $data;
+                return $reformatedData;
             }
         }
 
         return $data;
     }
 
-    public function get_selected_participating_unit_name($data)
+    public function get_selected_participating_unit_name(array $data): array
     {
+        $rows = $this->find()
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['PlacementPreference']['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['PlacementPreference']['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $data['PlacementPreference']['round'],
+                'PlacementRoundParticipants.program_id' => $data['PlacementPreference']['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['PlacementPreference']['program_type_id']
+            ])
+            ->disableHydration()
+            ->all()
+            ->toArray();
 
-        $rows = $this->find("all", array(
-            'conditions' => array(
-                'PlacementRoundParticipant.applied_for' => $data['PlacementPreference']['applied_for'],
-                'PlacementRoundParticipant.academic_year' => $data['PlacementPreference']['academic_year'],
-                'PlacementRoundParticipant.placement_round' => $data['PlacementPreference']['round'],
-                'PlacementRoundParticipant.program_id' => $data['PlacementPreference']['program_id'],
-                'PlacementRoundParticipant.program_type_id' => $data['PlacementPreference']['program_type_id']
-            ),
-            'recursive' => -1
-        ));
-
-        $participatingdepartmentname = array();
-
-        if (!empty($rows)) {
-            foreach ($rows as $k => $v) {
-                if (!empty($v['PlacementRoundParticipant']['name'])) {
-                    $participatingdepartmentname[$v['PlacementRoundParticipant']['id']] = $v['PlacementRoundParticipant']['name'];
-                }
+        $participatingdepartmentname = [];
+        foreach ($rows as $v) {
+            if (!empty($v['name'])) {
+                $participatingdepartmentname[$v['id']] = $v['name'];
             }
         }
 
         return $participatingdepartmentname;
     }
 
-    public function get_participating_unit_name($data)
+    public function get_participating_unit_name(array $data): array
     {
+        $rows = $this->find()
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $data['round'],
+                'PlacementRoundParticipants.program_id' => $data['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['program_type_id']
+            ])
+            ->limit($data['limit'] ?? 100)
+            ->disableHydration()
+            ->all()
+            ->toArray();
 
-        $rows = $this->find("all", array(
-            'conditions' => array(
-                'PlacementRoundParticipant.applied_for' => $data['applied_for'],
-                'PlacementRoundParticipant.academic_year' => $data['academic_year'],
-                'PlacementRoundParticipant.placement_round' => $data['round'],
-                'PlacementRoundParticipant.program_id' => $data['program_id'],
-                'PlacementRoundParticipant.program_type_id' => $data['program_type_id']
-            ),
-            'limit' => isset($data['limit']) ? $data['limit'] : 100,
-            'recursive' => -1
-        ));
-
-        $participatingdepartmentname = array();
-
-        if (!empty($rows)) {
-            foreach ($rows as $k => $v) {
-                if (!empty($v['PlacementRoundParticipant']['name'])) {
-                    $participatingdepartmentname[$v['PlacementRoundParticipant']['id']] = $v['PlacementRoundParticipant']['name'];
-                }
-            }
-        }
-        return $participatingdepartmentname;
-    }
-
-    public function allParticipatingUnitsDefined($data)
-    {
-
-        if (!empty($data['PlacementRoundParticipant']['applied_for'])) {
-            $colleges = classRegistry::init('College')->find('list');
-            $departments = classRegistry::init('Department')->find('list');
-
-            $rows = $this->find("all", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.applied_for' => $data['PlacementRoundParticipant']['applied_for'],
-                    'PlacementRoundParticipant.academic_year' => $data['PlacementRoundParticipant']['academic_year'],
-                    'PlacementRoundParticipant.placement_round' => $data['PlacementRoundParticipant']['placement_round'],
-                    'PlacementRoundParticipant.program_id' => $data['PlacementRoundParticipant']['program_id'],
-                    'PlacementRoundParticipant.program_type_id' => $data['PlacementRoundParticipant']['program_type_id']
-                ),
-                'recursive' => -1
-            ));
-
-            //debug($rows);
-
-            $participatingUnitName = array();
-            $collegeID = null;
-            $departmentID = null;
-            $collegeName = null;
-            $departmentName = null;
-
-            $appliedUnitClg = explode('c~', $data['PlacementRoundParticipant']['applied_for']);
-
-            if (isset($appliedUnitClg[1])) {
-                $collegeID = $appliedUnitClg[1];
-            } else {
-                $appliedUnitDept = explode('d~', $data['PlacementRoundParticipant']['applied_for']);
-                if (isset($appliedUnitDept[1])) {
-                    $departmentID = $appliedUnitDept[1];
-                }
-            }
-
-
-            if (isset($collegeID)) {
-                $collegeName = $colleges[$collegeID];
-            } elseif (isset($departmentID)) {
-                $departmentName = $departments[$departmentID];
-                $deptCollID = classRegistry::init('Department')->field(
-                    'Department.college_id',
-                    array('Department.id ' => $departmentID)
-                );
-                $collegeName = $colleges[$deptCollID];
-            }
-
-            debug($collegeName);
-            debug($departmentName);
-
-            if (!empty($rows)) {
-                foreach ($rows as $k => $v) {
-                    if (empty($departmentName)) {
-                        if ($v['PlacementRoundParticipant']['type'] == 'College') {
-                            $participatingUnitName[$collegeName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman (' . $v['PlacementRoundParticipant']['name'] . ')';
-                        } elseif ($v['PlacementRoundParticipant']['type'] == 'Department') {
-                            $participatingUnitName[$collegeName]['d~' . $v['PlacementRoundParticipant']['foreign_key']] = $departments[$v['PlacementRoundParticipant']['foreign_key']];
-                        }
-                    } else {
-                        if ($v['PlacementRoundParticipant']['type'] == 'College') {
-                            $participatingUnitName[$departmentName]['c~' . $v['PlacementRoundParticipant']['foreign_key']] = $colleges[$v['PlacementRoundParticipant']['foreign_key']] . ' Freshman (' . $v['PlacementRoundParticipant']['name'] . ')';
-                        } elseif ($v['PlacementRoundParticipant']['type'] == 'Department') {
-                            $participatingUnitName[$departmentName]['d~' . $v['PlacementRoundParticipant']['foreign_key']] = $departments[$v['PlacementRoundParticipant']['foreign_key']];
-                        }
-                    }
-                }
-            }
-
-            return $participatingUnitName;
-        }
-    }
-
-    public function getParticipatingUnitForDirectPlacement($data)
-    {
-
-        $rows = $this->find("all", array(
-            'conditions' => array(
-                'PlacementRoundParticipant.applied_for' => $data['applied_for'],
-                'PlacementRoundParticipant.academic_year' => $data['academic_year'],
-                // 'PlacementRoundParticipant.placement_round' => $data['round'],
-                'PlacementRoundParticipant.program_id' => $data['program_id'],
-                'PlacementRoundParticipant.program_type_id' => $data['program_type_id']
-            ),
-            'limit' => isset($data['limit']) ? $data['limit'] : 100,
-            'recursive' => -1
-        ));
-
-        $participatingdepartmentname = array();
-
-        if (!empty($rows)) {
-            foreach ($rows as $k => $v) {
-                if (!empty($v['PlacementRoundParticipant']['name'])) {
-                    $participatingdepartmentname[$v['PlacementRoundParticipant']['id']] = $v['PlacementRoundParticipant']['name'];
-                }
+        $participatingdepartmentname = [];
+        foreach ($rows as $v) {
+            if (!empty($v['name'])) {
+                $participatingdepartmentname[$v['id']] = $v['name'];
             }
         }
 
         return $participatingdepartmentname;
     }
 
-    public function get_participating_unit_for_edit($placement_round_participant_id)
+    public function allParticipatingUnitsDefined(array $data): array
     {
+        if (empty($data['PlacementRoundParticipant']['applied_for'])) {
+            return [];
+        }
 
-        if (isset($placement_round_participant_id) && !empty($placement_round_participant_id)) {
-            $groupId = $this->find("first", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.id' => $placement_round_participant_id
-                ),
-                'recursive' => -1
-            ));
+        $collegesTable = TableRegistry::getTableLocator()->get('Colleges');
+        $departmentsTable = TableRegistry::getTableLocator()->get('Departments');
+        $colleges = $collegesTable->find('list')->disableHydration()->toArray();
+        $departments = $departmentsTable->find('list')->disableHydration()->toArray();
 
-            $rows = $this->find("all", array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.group_identifier' => $groupId['PlacementRoundParticipant']['group_identifier']
-                ),
-                'recursive' => -1
-            ));
+        $rows = $this->find()
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['PlacementRoundParticipant']['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['PlacementRoundParticipant']['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $data['PlacementRoundParticipant']['placement_round'],
+                'PlacementRoundParticipants.program_id' => $data['PlacementRoundParticipant']['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['PlacementRoundParticipant']['program_type_id']
+            ])
+            ->disableHydration()
+            ->all()
+            ->toArray();
 
-            $participatingdepartmentname = array();
+        $participatingUnitName = [];
+        $collegeID = null;
+        $departmentID = null;
+        $collegeName = null;
+        $departmentName = null;
 
-            if (!empty($rows)) {
-                foreach ($rows as $k => $v) {
-                    if (!empty($v['PlacementRoundParticipant']['name'])) {
-                        $participatingdepartmentname[$v['PlacementRoundParticipant']['id']] = $v['PlacementRoundParticipant']['name'];
-                    }
+        $appliedUnitClg = explode('c~', $data['PlacementRoundParticipant']['applied_for']);
+        if (!empty($appliedUnitClg[1])) {
+            $collegeID = $appliedUnitClg[1];
+        } else {
+            $appliedUnitDept = explode('d~', $data['PlacementRoundParticipant']['applied_for']);
+            if (!empty($appliedUnitDept[1])) {
+                $departmentID = $appliedUnitDept[1];
+            }
+        }
+
+        if (!empty($collegeID)) {
+            $collegeName = $colleges[$collegeID] ?? '';
+        } elseif (!empty($departmentID)) {
+            $departmentName = $departments[$departmentID] ?? '';
+            $deptCollID = $departmentsTable->find()
+                ->select(['college_id'])
+                ->where(['Departments.id' => $departmentID])
+                ->disableHydration()
+                ->first()['college_id'] ?? null;
+            $collegeName = $colleges[$deptCollID] ?? '';
+        }
+
+        foreach ($rows as $v) {
+            $targetName = empty($departmentName) ? $collegeName : $departmentName;
+            if ($v['type'] === 'College') {
+                $participatingUnitName[$targetName]['c~' . $v['foreign_key']] = ($colleges[$v['foreign_key']] ?? '') . ' Freshman (' . $v['name'] . ')';
+            } elseif ($v['type'] === 'Department') {
+                $participatingUnitName[$targetName]['d~' . $v['foreign_key']] = $departments[$v['foreign_key']] ?? '';
+            }
+        }
+
+        return $participatingUnitName;
+    }
+
+    public function getParticipatingUnitForDirectPlacement(array $data): array
+    {
+        $rows = $this->find()
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['academic_year'],
+                'PlacementRoundParticipants.program_id' => $data['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['program_type_id']
+            ])
+            ->limit($data['limit'] ?? 100)
+            ->disableHydration()
+            ->all()
+            ->toArray();
+
+        $participatingdepartmentname = [];
+        foreach ($rows as $v) {
+            if (!empty($v['name'])) {
+                $participatingdepartmentname[$v['id']] = $v['name'];
+            }
+        }
+
+        return $participatingdepartmentname;
+    }
+
+    public function get_participating_unit_for_edit(int $placement_round_participant_id): array
+    {
+        if (!empty($placement_round_participant_id)) {
+            $groupId = $this->find('first')
+                ->where(['PlacementRoundParticipants.id' => $placement_round_participant_id])
+                ->disableHydration()
+                ->first();
+
+            $rows = $this->find()
+                ->where(['PlacementRoundParticipants.group_identifier' => $groupId['PlacementRoundParticipant']['group_identifier']])
+                ->disableHydration()
+                ->all()
+                ->toArray();
+
+            $participatingdepartmentname = [];
+            foreach ($rows as $v) {
+                if (!empty($v['name'])) {
+                    $participatingdepartmentname[$v['id']] = $v['name'];
                 }
             }
+
             return $participatingdepartmentname;
         }
 
-        return array();
+        return [];
     }
 
-    public function placementSettingDefined($data = array())
+    public function placementSettingDefined(array $data = []): bool
     {
+        $participatinListCapacity = $this->find()
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $data['round'],
+                'PlacementRoundParticipants.program_id' => $data['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['program_type_id']
+            ])
+            ->disableHydration()
+            ->all()
+            ->toArray();
 
-        $participatinListCapacity = $this->find("all", array(
-            'conditions' => array(
-                'PlacementRoundParticipant.applied_for' => $data['applied_for'],
-                'PlacementRoundParticipant.academic_year' => $data['academic_year'],
-                'PlacementRoundParticipant.placement_round' => $data['round'],
-                'PlacementRoundParticipant.program_id' => $data['program_id'],
-                'PlacementRoundParticipant.program_type_id' => $data['program_type_id'],
-            ),
-            'recursive' => -1
-        ));
+        $participatingSettings = $this->find('count')
+            ->where([
+                'PlacementRoundParticipants.applied_for' => $data['applied_for'],
+                'PlacementRoundParticipants.academic_year' => $data['academic_year'],
+                'PlacementRoundParticipants.placement_round' => $data['round'],
+                'PlacementRoundParticipants.program_id' => $data['program_id'],
+                'PlacementRoundParticipants.program_type_id' => $data['program_type_id']
+            ])
+            ->disableHydration()
+            ->count();
 
-        $participatingSettings = $this->find("count", array(
-            'conditions' => array(
-                'PlacementRoundParticipant.applied_for' => $data['applied_for'],
-                'PlacementRoundParticipant.academic_year' => $data['academic_year'],
-                'PlacementRoundParticipant.placement_round' => $data['round'],
-                'PlacementRoundParticipant.program_id' => $data['program_id'],
-                'PlacementRoundParticipant.program_type_id' => $data['program_type_id'],
-            ),
-            'recursive' => -1
-        ));
+        $placementResultSetting = TableRegistry::getTableLocator()->get('PlacementResultSettings')->find('count')
+            ->where([
+                'PlacementResultSettings.applied_for' => $data['applied_for'],
+                'PlacementResultSettings.academic_year' => $data['academic_year'],
+                'PlacementResultSettings.round' => $data['round'],
+                'PlacementResultSettings.program_id' => $data['program_id'],
+                'PlacementResultSettings.program_type_id' => $data['program_type_id']
+            ])
+            ->disableHydration()
+            ->count();
 
-        $placementResultSetting = ClassRegistry::init('PlacementResultSetting')->find("count", array(
-            'conditions' => array(
-                'PlacementResultSetting.applied_for' => $data['applied_for'],
-                'PlacementResultSetting.academic_year' => $data['academic_year'],
-                'PlacementResultSetting.round' => $data['round'],
-                'PlacementResultSetting.program_id' => $data['program_id'],
-                'PlacementResultSetting.program_type_id' => $data['program_type_id'],
-            ),
-            'recursive' => -1
-        ));
-
-        $placementReadyStudent = ClassRegistry::init('PlacementParticipatingStudent')->find("count", array(
-            'conditions' => array(
-                'PlacementParticipatingStudent.academic_year' => $data['academic_year'],
-                'PlacementParticipatingStudent.round' => $data['round'],
-                'PlacementParticipatingStudent.program_id' => $data['program_id'],
-                'PlacementParticipatingStudent.program_type_id' => $data['program_type_id']
-            ),
-            'recursive' => -1
-        ));
+        $placementReadyStudent = TableRegistry::getTableLocator()->get('PlacementParticipatingStudents')->find('count')
+            ->where([
+                'PlacementParticipatingStudents.academic_year' => $data['academic_year'],
+                'PlacementParticipatingStudents.round' => $data['round'],
+                'PlacementParticipatingStudents.program_id' => $data['program_id'],
+                'PlacementParticipatingStudents.program_type_id' => $data['program_type_id']
+            ])
+            ->disableHydration()
+            ->count();
 
         $intake_capacity_defined_for_all_participants = true;
-        $defined_intake_capacies = array();
+        $defined_intake_capacies = [];
 
-        if (!empty($participatinListCapacity)) {
-            foreach ($participatinListCapacity as $key => $participants) {
-                debug($participants['PlacementRoundParticipant']['intake_capacity']);
-                if (!is_null($participants['PlacementRoundParticipant']['intake_capacity']) && is_numeric(
-                        $participants['PlacementRoundParticipant']['intake_capacity']
-                    )) {
-                    $defined_intake_capacies[$participants['PlacementRoundParticipant']['name']] = $participants['PlacementRoundParticipant']['intake_capacity'];
-                }
+        foreach ($participatinListCapacity as $participants) {
+            if (!is_null($participants['intake_capacity']) && is_numeric($participants['intake_capacity'])) {
+                $defined_intake_capacies[$participants['name']] = $participants['intake_capacity'];
             }
         }
 
@@ -617,80 +407,59 @@ class PlacementRoundParticipantsTable extends Table
         }
 
         if ($participatingSettings == 0) {
-            $this->invalidate(
-                'placement_round_participant',
-                'Please record placement round participant before running auto placement.'
-            );
+            $this->validationErrors['placement_round_participant'] = 'Please record placement round participant before running auto placement.';
             return false;
         } elseif ($placementResultSetting == 0) {
-            $this->invalidate(
-                'placement_result_setting',
-                'Please record result settings in auto placement before running the auto placement.'
-            );
+            $this->validationErrors['placement_result_setting'] = 'Please record result settings in auto placement before running the auto placement.';
             return false;
         } elseif ($placementReadyStudent == 0) {
-            $this->invalidate(
-                'placement_participating_student',
-                'Please prepare the students for auto placement before running the auto placement.'
-            );
+            $this->validationErrors['placement_participating_student'] = 'Please prepare the students for auto placement before running the auto placement.';
             return false;
         } elseif (!$intake_capacity_defined_for_all_participants) {
-            $this->invalidate(
-                'placement_round_participant',
-                'Please define all intake capacities for all participating units for auto placement before running the auto placement.'
-            );
+            $this->validationErrors['placement_round_participant'] = 'Please define all intake capacities for all participating units for auto placement before running the auto placement.';
             return false;
         }
+
         return true;
     }
 
-    public function roundLabel($round)
+    public function roundLabel(int $round): string
     {
-
-        $r = '';
         if ($round == 1) {
-            $r = $round . 'st';
+            return $round . 'st';
         } elseif ($round == 2) {
-            $r = $round . 'nd';
+            return $round . 'nd';
         } elseif ($round == 3) {
-            $r = $round . 'rd';
-        } else {
-            $r = $round . 'th';
+            return $round . 'rd';
         }
-        return $r;
+        return $round . 'th';
     }
 
-    public function appliedFor($acceptedStudentdetail, $selectedAcademicYear)
+    public function appliedFor(array $acceptedStudentdetail, string $selectedAcademicYear): string
     {
-
         $applied_for = '';
-
         if (!empty($acceptedStudentdetail)) {
-            $placementRound = classRegistry::init('PlacementParticipatingStudent')->getNextRound(
-                $selectedAcademicYear,
-                $acceptedStudentdetail['AcceptedStudent']['id']
-            );
+            $placementParticipatingStudentsTable = TableRegistry::getTableLocator()->get('PlacementParticipatingStudents');
+            $placementRound = $placementParticipatingStudentsTable->getNextRound($selectedAcademicYear, $acceptedStudentdetail['AcceptedStudent']['id']);
 
-            if (isset($placementRound) && !empty($placementRound)) {
-                $roundAppliedFor = ClassRegistry::init('PlacementParticipatingStudent')->find('first', array(
-                    'conditions' => array(
-                        'PlacementParticipatingStudent.academic_year LIKE ' => $selectedAcademicYear . '%',
-                        'PlacementParticipatingStudent.round' => $placementRound,
-                        'PlacementParticipatingStudent.accepted_student_id' => $acceptedStudentdetail['AcceptedStudent']['id']
-                    ),
-                    'order' => array('PlacementParticipatingStudent.round DESC')
-                ));
+            if (!empty($placementRound)) {
+                $roundAppliedFor = $placementParticipatingStudentsTable->find('first')
+                    ->where([
+                        'PlacementParticipatingStudents.academic_year LIKE' => $selectedAcademicYear . '%',
+                        'PlacementParticipatingStudents.round' => $placementRound,
+                        'PlacementParticipatingStudents.accepted_student_id' => $acceptedStudentdetail['AcceptedStudent']['id']
+                    ])
+                    ->order(['PlacementParticipatingStudents.round' => 'DESC'])
+                    ->disableHydration()
+                    ->first();
 
-                if (isset($roundAppliedFor) && !empty($roundAppliedFor)) {
+                if (!empty($roundAppliedFor)) {
                     $applied_for = $roundAppliedFor['PlacementParticipatingStudent']['applied_for'];
                 } else {
-                    if (empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['department_id'])) {
-                        // the student is still in college
-                        $applied_for = 'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'];
-                    } elseif (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id'])) {
-                        // the assignment is specialization
-                        $applied_for = 'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'];
-                    }
+                    $applied_for = empty($acceptedStudentdetail['AcceptedStudent']['department_id']) ?
+                        'c~' . $acceptedStudentdetail['AcceptedStudent']['college_id'] :
+                        (!empty($acceptedStudentdetail['AcceptedStudent']['college_id']) && !empty($acceptedStudentdetail['AcceptedStudent']['department_id']) && empty($acceptedStudentdetail['AcceptedStudent']['specialization_id']) ?
+                            'd~' . $acceptedStudentdetail['AcceptedStudent']['department_id'] : '');
                 }
             }
         }
@@ -698,87 +467,68 @@ class PlacementRoundParticipantsTable extends Table
         return $applied_for;
     }
 
-    function canItBeDeleted($round_participant_id = null)
+    public function canItBeDeleted(?int $round_participant_id = null): bool
     {
+        $placementParticipatingStudentsTable = TableRegistry::getTableLocator()->get('PlacementParticipatingStudents');
+        $placementPreferencesTable = TableRegistry::getTableLocator()->get('PlacementPreferences');
 
-        if ($this->PlacementParticipatingStudent->find(
-                'count',
-                array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))
-            ) > 0) {
+        if ($placementParticipatingStudentsTable->find('count')
+                ->where(['PlacementParticipatingStudents.placement_round_participant_id' => $round_participant_id])
+                ->disableHydration()
+                ->count() > 0) {
             return false;
-        } elseif (ClassRegistry::init('PlacementParticipatingStudent')->find(
-                'count',
-                array('conditions' => array('PlacementParticipatingStudent.placement_round_participant_id' => $round_participant_id))
-            ) > 0) {
+        } elseif ($placementPreferencesTable->find('count')
+                ->where(['PlacementPreferences.placement_round_participant_id' => $round_participant_id])
+                ->disableHydration()
+                ->count() > 0) {
             return false;
-        } elseif (ClassRegistry::init('PlacementPreference')->find(
-                'count',
-                array('conditions' => array('PlacementPreference.placement_round_participant_id' => $round_participant_id))
-            ) > 0) {
-            return false;
-        } else {
-            return true;
         }
+
+        return true;
     }
 
-    public function latest_defined_academic_year_and_round($applied_for = null)
+    public function latest_defined_academic_year_and_round(?string $applied_for = null): array
     {
+        $latestAcyRnd = [];
 
-        $latestAcyRnd = array();
+        $query = $this->find('first')
+            ->order([
+                'PlacementRoundParticipants.academic_year' => 'DESC',
+                'PlacementRoundParticipants.placement_round' => 'DESC'
+            ])
+            ->group([
+                'PlacementRoundParticipants.academic_year',
+                'PlacementRoundParticipants.placement_round',
+                'PlacementRoundParticipants.applied_for'
+            ])
+            ->disableHydration();
 
         if (!empty($applied_for)) {
-            $latestACYDefined = $this->find('first', array(
-                'conditions' => array(
-                    'PlacementRoundParticipant.applied_for' => $applied_for,
-                ),
-                'order' => array(
-                    'PlacementRoundParticipant.academic_year' => 'DESC',
-                    'PlacementRoundParticipant.placement_round' => 'DESC'
-                ),
-                'group' => array(
-                    'PlacementRoundParticipant.academic_year',
-                    'PlacementRoundParticipant.placement_round',
-                    'PlacementRoundParticipant.applied_for'
-                ),
-            ));
-        } else {
-            $latestACYDefined = $this->find('first', array(
-                'order' => array(
-                    'PlacementRoundParticipant.academic_year' => 'DESC',
-                    'PlacementRoundParticipant.placement_round' => 'DESC'
-                ),
-                'group' => array(
-                    'PlacementRoundParticipant.academic_year',
-                    'PlacementRoundParticipant.placement_round',
-                    'PlacementRoundParticipant.applied_for'
-                ),
-            ));
+            $query->where(['PlacementRoundParticipants.applied_for' => $applied_for]);
         }
 
+        $latestACYDefined = $query->first();
+
         if (!empty($latestACYDefined)) {
-            $latestAcyRnd['applied_for'] = $latestACYDefined['PlacementRoundParticipant']['applied_for'];
-            $latestAcyRnd['academic_year'] = $latestACYDefined['PlacementRoundParticipant']['academic_year'];
-            $latestAcyRnd['round'] = $latestACYDefined['PlacementRoundParticipant']['placement_round'];
+            $latestAcyRnd['applied_for'] = $latestACYDefined['applied_for'];
+            $latestAcyRnd['academic_year'] = $latestACYDefined['academic_year'];
+            $latestAcyRnd['round'] = $latestACYDefined['placement_round'];
         }
 
         return $latestAcyRnd;
     }
 
-    function get_placement_participant_ids_by_group_identifier($group_identifier = null)
+    public function get_placement_participant_ids_by_group_identifier(?string $group_identifier = null): array
     {
-
         if (!empty($group_identifier)) {
-            $participantIDs = $this->find(
-                "list",
-                array(
-                    'conditions' => array('PlacementRoundParticipant.group_identifier' => $group_identifier),
-                    'fields' => array('PlacementRoundParticipant.id', 'PlacementRoundParticipant.id')
-                )
-            );
-            if (!empty($participantIDs)) {
-                return $participantIDs;
-            }
+            $participantIDs = $this->find('list')
+                ->where(['PlacementRoundParticipants.group_identifier' => $group_identifier])
+                ->select(['id'])
+                ->disableHydration()
+                ->toArray();
+            return $participantIDs;
         }
-        return array();
+
+        return [];
     }
 }
