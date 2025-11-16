@@ -1,67 +1,52 @@
 <?php
+use Cake\I18n\I18n;
 
-// Export all member records in .xls format with the help of the xlsHelper
-
-$this->Xls->setHeader('Student IDs for ' . $selected_college_name .' '. (isset($selected_department_name) && !is_null($selected_department_name) ? $selected_department_name : 'Pre/Freshman'));
-$this->Xls->addXmlHeader();
-$this->Xls->setWorkSheetName('Student IDs for ' . $selected_college_name .' '. (isset($selected_department_name) && !is_null($selected_department_name) ? $selected_department_name : 'Pre/Freshman'));
+$this->set('title', __('Export Student IDs'));
 
 if (!empty($acceptedStudents)) {
-    $this->Xls->openRow();
-    $this->Xls->writeString('College: ' . $selected_college_name);
-    $this->Xls->closeRow();
+    $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('Student IDs for ' . $selectedCollegeName . ' ' . ($selectedDepartmentName ?? 'Pre/Freshman'));
 
-    $this->Xls->openRow();
-    $this->Xls->writeString('Campus: ' . $selected_campus_name);
-    $this->Xls->closeRow();
+    $row = 1;
+    $sheet->setCellValue("A{$row}", __('College: {0}', $selectedCollegeName));
+    $row++;
+    $sheet->setCellValue("A{$row}", __('Campus: {0}', $selectedCampusName));
+    $row++;
+    $sheet->setCellValue("A{$row}", __('Program: {0}', $selectedProgramName));
+    $row++;
+    $sheet->setCellValue("A{$row}", __('Program Type: {0}', $selectedProgramTypeName));
+    $row++;
+    $sheet->setCellValue("A{$row}", __('Academic Year: {0}', $selectedAcademicYear));
+    $row += 2;
 
-   /*  $this->Xls->openRow();
-    $this->Xls->writeString('Department: ' . (isset($selected_department_name) && !is_null($selected_department_name) ? $selected_department_name : 'Pre/Freshman'));
-    $this->Xls->closeRow(); */
-    $this->Xls->openRow();
-    $this->Xls->writeString('Program: ' . $selected_program_name);
-    $this->Xls->closeRow();
-    $this->Xls->openRow();
-    $this->Xls->writeString('Program Type: ' . $selected_program_type_name);
-    $this->Xls->closeRow();
-    $this->Xls->openRow();
-    $this->Xls->writeString('Academic Year: ' . $selected_acdemicyear);
-    $this->Xls->closeRow();
-    $this->Xls->openRow();
-    $this->Xls->closeRow();
-
-    // headers
-
-    $this->Xls->openRow();
-    $this->Xls->writeString('#');
-    $this->Xls->writeString('Full Name');
-    $this->Xls->writeString('Sex');
-    $this->Xls->writeString('Student Id');
-    $this->Xls->writeString('Department');
-    $this->Xls->writeString('Region');
-    $this->Xls->writeString('National ID');
-    $this->Xls->closeRow();
-
-    // End headers
-
-    // start data rendering
+    $sheet->setCellValue("A{$row}", __('#'));
+    $sheet->setCellValue("B{$row}", __('Full Name'));
+    $sheet->setCellValue("C{$row}", __('Sex'));
+    $sheet->setCellValue("D{$row}", __('Student ID'));
+    $sheet->setCellValue("E{$row}", __('Department'));
+    $sheet->setCellValue("F{$row}", __('Region'));
+    $sheet->setCellValue("G{$row}", __('National ID'));
+    $row++;
 
     $count = 1;
     foreach ($acceptedStudents as $acceptedStudent) {
-        $this->Xls->openRow();
-        $this->Xls->writeString($count++);
-        $this->Xls->writeString($acceptedStudent['AcceptedStudent']['full_name']);
-        $this->Xls->writeString((strcasecmp(trim($acceptedStudent['AcceptedStudent']['sex']), 'male') == 0 ? 'M' : (strcasecmp(trim($acceptedStudent['AcceptedStudent']['sex']), 'female') == 0 ? 'F' : '')));
-        $this->Xls->writeString($acceptedStudent['AcceptedStudent']['studentnumber']);
-        $this->Xls->writeString((isset($acceptedStudent['Department']) && !is_null($acceptedStudent['Department']['name']) ? $acceptedStudent['Department']['name'] : 'Pre/Freshman'));
-        $this->Xls->writeString($acceptedStudent['Region']['name']);
-        $this->Xls->writeString((isset($acceptedStudent['Student']) && !empty($acceptedStudent['Student']['student_national_id']) ? $acceptedStudent['Student']['student_national_id'] : ''));
-        $this->Xls->closeRow();
+        $sheet->setCellValue("A{$row}", $count++);
+        $sheet->setCellValue("B{$row}", $acceptedStudent->full_name);
+        $sheet->setCellValue("C{$row}", strcasecmp(trim($acceptedStudent->sex), 'male') == 0 ? 'M' : (strcasecmp(trim($acceptedStudent->sex), 'female') == 0 ? 'F' : ''));
+        $sheet->setCellValue("D{$row}", $acceptedStudent->studentnumber);
+        $sheet->setCellValue("E{$row}", $acceptedStudent->Department->name ?? 'Pre/Freshman');
+        $sheet->setCellValue("F{$row}", $acceptedStudent->Region->name);
+        $sheet->setCellValue("G{$row}", $acceptedStudent->Student->student_national_id ?? '');
+        $row++;
     }
-    $this->Xls->openRow();
-    $this->Xls->closeRow();
-    // start data rendering
 
+    $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xls');
+    $this->response = $this->response->withType('application/vnd.ms-excel');
+    $this->response = $this->response->withHeader('Content-Disposition', 'attachment;filename="Student_IDs_for_' . $selectedCollegeName . '_' . ($selectedDepartmentName ?? 'Pre-Freshman') . '.xls"');
+    ob_start();
+    $writer->save('php://output');
+    $output = ob_get_clean();
+    echo $output;
 }
-$this->Xls->addXmlFooter();
-exit();
+?>

@@ -2,6 +2,7 @@
     <hr>
     <div onclick="toggleViewFullId('ListPublishedCourse')">
         <?php
+
         // Check the current action
         if (in_array($this->request->getParam('action'), ['manage_ng', 'cancel_ng_grade', 'manage_fx'])) {
             if (isset($previous_academicyear) && !empty($previous_academicyear)) {
@@ -27,6 +28,8 @@
         <fieldset style="padding-bottom: 0px; padding-top: 15px;">
             <div class="row">
                 <div class="large-3 columns">
+                    <!-- Explicit CSRF token if element is standalone -->
+
                     <?= $this->Form->control('acadamic_year', [
                         'id' => 'AcadamicYear',
                         'label' => 'Acadamic Year: ',
@@ -68,7 +71,7 @@
                         'label' => 'Program Type: ',
                         'style' => 'width:90%',
                         'type' => 'select',
-                        'options' => $program_types,
+                        'options' => $programTypes,
                         'required' => true,
                         'default' => isset($program_type_id) ? $program_type_id : ''
                     ]); ?>
@@ -94,10 +97,16 @@
                 </div>
             </div>
             <hr>
-            <?= $this->Form->button(
-                isset($search_button_label) && !empty($search_button_label) ? $search_button_label : 'List Published Courses',
-                ['name' => 'listPublishedCourses', 'id' => 'listPublishedCourses', 'class' => 'tiny radius button bg-blue']
-            ); ?>
+
+
+            <?= $this->Form->submit(
+                isset($search_button_label) && !empty($search_button_label) ? $search_button_label :
+                    'List Published Courses', [
+               'name' => 'listPublishedCourses',
+                    'id' => 'listPublishedCourses',
+                    'class' => 'tiny radius button bg-blue',
+                'div' => false
+            ]) ?>
         </fieldset>
     </div>
     <hr>
@@ -156,34 +165,45 @@ if (!empty($this->request->getParam('pass'))) {
         }
         $('#' + id).toggle("slow");
     }
+</script>
 
-    $('#listPublishedCourses').click(function() {
-        $('#listPublishedCourses').val('Looking for Published Courses...');
-        $('#PublishedCourse').val(0);
-        $("#show_published_courses_drop_down").hide();
+<script>
+    $(document).ready(function() {
+        $("#PublishedCourse").change(function() {
+            // Serialize form data and submit to controller
+            window.location.replace("/student-status-patterns/regenerate-status/" + $("#PublishedCourse").val());
+        });
 
-        if ($('#show_search_results').length) {
-            $("#show_search_results").hide();
-        }
+        $('#listPublishedCourses').click(function(e) {
+            e.preventDefault(); // Prevent default button behavior
+            $('#listPublishedCourses').val('<?= __('Looking for Published Courses...') ?>');
+            $('#PublishedCourse').val(0);
+            $("#show_published_courses_drop_down").hide();
 
-        if ($('#manage_ng_form').length) {
-            $("#manage_ng_form").hide();
-        }
+            if ($('#show_search_results').length) {
+                $("#show_search_results").hide();
+            }
 
-        if ($('#minuteNumber').length) {
-            $('#minuteNumber').val('');
-        }
+            if ($('#manage_ng_form').length) {
+                $("#manage_ng_form").hide();
+            }
 
-        if ($('#select-all').length) {
-            $("#select-all").prop('checked', false);
-        }
-        var additionalParams = <?= json_encode($additionalParams); ?>;
-        if (additionalParams) {
-            var redirectUrl = '<?= $this->Url->build($redirectUrl); ?>';
+            if ($('#minuteNumber').length) {
+                $('#minuteNumber').val('');
+            }
 
-            alert(redirectUrl);
+            if ($('#select-all').length) {
+                $("#select-all").prop('checked', false);
+            }
 
-            window.location.href = redirectUrl;
-        }
+            var additionalParams = <?= json_encode($additionalParams); ?>;
+            if (additionalParams) {
+                var redirectUrl = '<?= $this->Url->build($redirectUrl); ?>';
+                window.location.href = redirectUrl;
+            } else {
+                // Submit the form
+                $('form').submit(); // Or $('#yourFormId').submit();
+            }
+        });
     });
 </script>

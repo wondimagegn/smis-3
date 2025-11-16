@@ -1,69 +1,152 @@
-<div class="box">
-	<div class="box-header bg-transparent">
-		<div class="box-title" style="margin-top: 10px;"><i class="fontello-plus"></i>
-			<span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('Add College'); ?></span>
-		</div>
-	</div>
-	<div class="box-body">
-		<div class="row">
-			<?= $this->Html->script('amharictyping'); ?>
-			<?= $this->Form->create('College', array('data-abide', 'onSubmit' => 'return checkForm(this);')); ?>
-			<div class="large-12 columns" style="margin-top: -30px;">
-				<hr>
-			</div>
-			<div class="large-12 columns">
-				<div class="large-6 columns">
-					<?php
-					echo $this->Form->input('campus_id', array('style' => 'width:90%'));
-					echo $this->Form->input('name', array('style' => 'width:90%', 'placeholder' => 'Like: College of Natural Sciences', 'required', 'pattern' => '[a-zA-Z]+', 'label' => 'Name <small></small></label><small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">College Name is required and must be a string.</small>'));
-					echo $this->Form->input('shortname', array('style' => 'width:90%', 'placeholder' => 'Like: NS or CNS', 'pattern' => 'alpha', 'required', 'label' => 'Short Name <small></small></label><small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">College short name is required and must be a single word.</small>'));
-					echo $this->Form->input('type', array('style' => 'width:90%', 'placeholder' => 'College, School or Institute', 'pattern' => 'alpha', 'label' => 'Type <small></small></label><small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">Type name must be a single word.</small>'));
-					echo $this->Form->input('phone', array('style' => 'width:90%', 'type'=> 'tel', 'id'=>'etPhone'));
-					echo '<br>'.$this->Form->input('active', array('type'=>'checkbox', 'checked' =>'checked'));
-					?>
-				</div>
-				<div class="large-6 columns">
-					<?php
-					echo $this->Form->input('amharic_name', array('style' => 'width:90%', 'id' => 'AmharicText', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);"));
-					echo $this->Form->input('amharic_short_name', array('style' => 'width:90%', 'id' => 'AmharicText', 'onkeypress' => "return AmharicPhoneticKeyPress(event,this);"));
-					echo $this->Form->input('description', array('style' => 'width:90%'));
-					echo $this->Form->input('institution_code', array('style' => 'width:90%', 'placeholder' => 'Like: AMU-CNS', 'pattern' => 'institution_code', 'label' => 'Institution Code <small></small></label><small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">Institution Code must be a single word, with Hyphen separated; Like AMU-CNS</small>'));
-					echo $this->Form->input('moodle_category_id', array('id' => 'moodleCategoryId ', 'type' => 'number', 'min'=>'1', 'max'=>'1000', 'step'=>'1', 'class' => 'fs13', 'label' =>'Moodle Category ID: ', 'style' => 'width:25%'));
-					?>
-				</div>
-			</div>
-		</div>
+<?php
+$this->assign('title', __('Add College'));
 
-		<div class="row">
-			<div class="large-12 columns">
-			<hr>
-				<?= $this->Form->end(array('label' => 'Add College', 'id' => 'SubmitID', 'class' => 'tiny radius button bg-blue')); ?>
-			</div>
-		</div>
-	</div>
-</div>
+echo $this->Html->script('amharictyping');
+?>
 
-<script>
+    <div class="box">
+        <div class="box-header bg-transparent">
+            <div class="box-title" style="margin-top: 10px;">
+                <i class="fontello-plus"></i>
+                <span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('Add College') ?></span>
+            </div>
+        </div>
+        <div class="box-body">
+            <div class="row">
+                <?= $this->Form->create($college, ['data-abide' => true, 'onsubmit' => 'return checkForm(this);']) ?>
+                <div class="large-12 columns" style="margin-top: -30px;">
+                    <hr>
+                </div>
+                <div class="large-12 columns">
+                    <div class="large-6 columns">
+                        <?= $this->Form->control('campus_id', ['style' => 'width:90%']) ?>
+                        <?= $this->Form->control('name', [
+                            'style' => 'width:90%',
+                            'placeholder' => 'Like: College of Natural Sciences',
+                            'required' => true,
+                            'pattern' => '[a-zA-Z]+',
+                            'label' => 'Name',
+                            'error' => [
+                                'required' => 'College Name is required and must be a string.',
+                                'pattern' => 'College Name must be a string.'
+                            ],
+                            'templates' => [
+                                'error' => '<small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">{{content}}</small>'
+                            ]
+                        ]) ?>
+                        <?= $this->Form->control('shortname', [
+                            'style' => 'width:90%',
+                            'placeholder' => 'Like: NS or CNS',
+                            'pattern' => 'alpha',
+                            'required' => true,
+                            'label' => 'Short Name',
+                            'error' => [
+                                'required' => 'College short name is required.',
+                                'pattern' => 'College short name must be a single word.'
+                            ],
+                            'templates' => [
+                                'error' => '<small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">{{content}}</small>'
+                            ]
+                        ]) ?>
+                        <?= $this->Form->control('type', [
+                            'style' => 'width:90%',
+                            'placeholder' => 'College, School or Institute',
+                            'pattern' => 'alpha',
+                            'label' => 'Type',
+                            'error' => [
+                                'pattern' => 'Type name must be a single word.'
+                            ],
+                            'templates' => [
+                                'error' => '<small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">{{content}}</small>'
+                            ]
+                        ]) ?>
+                        <?= $this->Form->control('phone', [
+                            'style' => 'width:90%',
+                            'type' => 'tel',
+                            'label' => 'Phone Office',
+                            'id' => 'etPhone'
+                        ]) ?>
+                        <br>
+                        <?= $this->Form->control('active', [
+                            'type' => 'checkbox',
+                            'checked' => true
+                        ]) ?>
+                    </div>
+                    <div class="large-6 columns">
+                        <?= $this->Form->control('amharic_name', [
+                            'style' => 'width:90%',
+                            'id' => 'AmharicText',
+                            'onkeypress' => 'return AmharicPhoneticKeyPress(event, this);'
+                        ]) ?>
+                        <?= $this->Form->control('amharic_short_name', [
+                            'style' => 'width:90%',
+                            'id' => 'AmharicTextShort',
+                            'onkeypress' => 'return AmharicPhoneticKeyPress(event, this);'
+                        ]) ?>
+                        <?= $this->Form->control('description', [
+                            'style' => 'width:90%'
+                        ]) ?>
+                        <?= $this->Form->control('institution_code', [
+                            'style' => 'width:90%',
+                            'placeholder' => 'Like: AMU-CNS',
+                            'pattern' => 'institution_code',
+                            'label' => 'Institution Code',
+                            'error' => [
+                                'pattern' => 'Institution Code must be a single word, with Hyphen separated; Like AMU-CNS'
+                            ],
+                            'templates' => [
+                                'error' => '<small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">{{content}}</small>'
+                            ]
+                        ]) ?>
+                        <?= $this->Form->control('moodle_category_id', [
+                            'id' => 'moodleCategoryId',
+                            'type' => 'number',
+                            'min' => 1,
+                            'max' => 1000,
+                            'step' => 1,
+                            'class' => 'fs13',
+                            'label' => 'Moodle Category ID: ',
+                            'style' => 'width:25%',
+                            'required' => true,
+                            'error' => [
+                                'required' => 'Moodle Category ID is required and cannot be empty.',
+                                'integer' => 'Moodle Category ID must be a valid number.',
+                                'min' => 'Moodle Category ID must be at least 1.',
+                                'max' => 'Moodle Category ID must not exceed 1000.'
+                            ],
+                            'templates' => [
+                                'error' => '<small class="error" style="width:90%; background: #fff; color:red; border-style: solid; border-width: thin; border-color: red; border-radius: 5px;">{{content}}</small>'
+                            ]
+                        ]) ?>
+                    </div>
+                </div>
+                <div class="large-12 columns">
+                    <hr>
+                    <?= $this->Form->button('Add College', [
+                        'id' => 'SubmitID',
+                        'class' => 'tiny radius button bg-blue'
+                    ]) ?>
+                    <?= $this->Form->end() ?>
+                </div>
+            </div>
+        </div>
+    </div>
 
-	var form_being_submitted = false; /* global variable */
+    <script>
+        var form_being_submitted = false;
 
-	var checkForm = function(form) {
-	
-		if (form_being_submitted) {
-			alert("Adding College, please wait a moment...");
-			form.SubmitID.disabled = true;
-			return false;
-		}
+        function checkForm(form) {
+            if (form_being_submitted) {
+                alert("Adding College, please wait a moment...");
+                form.SubmitID.disabled = true;
+                return false;
+            }
+            form.SubmitID.value = 'Adding College...';
+            form_being_submitted = true;
+            return true;
+        }
 
-		form.SubmitID.value = 'Adding College...';
-		form_being_submitted = true;
-		return true; /* submit form */
-	};
-
-	// prevent possible form resubmission of a form 
-	// and disable default JS form resubmit warning  dialog  caused by pressing browser back button or reload or refresh button
-
-	if (window.history.replaceState) {
-		window.history.replaceState(null, null, window.location.href);
-	}
-</script>
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+    </script>

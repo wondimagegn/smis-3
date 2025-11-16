@@ -1,83 +1,114 @@
-<?php ?>
-<script type="text/javascript">
-   function validatePasswordJs(form) {
-       
-       if (window.document.getElementById('password').value=='') {
-             alert('Please provide a password');
-            return false;
-       } else if (window.document.getElementById('password').value.length<6) {
-                 alert('The minimum password length is 6');
-            return false;
-       }    
-       return true;
-       
-   }
-</script>
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-             
-<h3><?php echo __('Password issue/reset  to a student'); ?></h3>
- <?php echo $this->Html->script('generatepassword'); ?>      
-   <?php /*echo $this->Form->create('AcceptedStudent',array('action'=>'issue_password',
-   'onSubmit'=>'return validatePasswordJs(this)'));*/
-   echo $this->Form->create('AcceptedStudent',array('action'=>'issue_password'));
-   ?> 
-<div class="students index">
-<?php if (!isset($hide_search)) { ?>
-<table cellpadding="0" cellspacing="0"><tbody>
-	
-	<tr><td>
-	
-	
-	<?php 
-			echo $this->Form->input('AcceptedStudent.studentnumber',array('label'=>'Student Number')); 
-			
-			?>
-	</td></tr>
-	<tr><td><?php echo $this->Form->Submit('Continue',array('div'=>false,'name'=>'issuestudentidsearch')); ?> </td>	
-</tr>
-</tbody>
-</table>
-<?php } ?>
-<?php 
-if(isset($hide_search)) {
-?>
-   <table>
-    <tr><td style="font-weight:bold">Student Name: <?php echo $students['AcceptedStudent']['full_name']?></td></tr>
-    <tr><td style="font-weight:bold">College: <?php echo $students['College']['name']?></td></tr>
-    <tr>
-    <td><?php 
-    echo $this->Form->hidden('AcceptedStudent.id',array('value'=>$students['AcceptedStudent']['id']));
-    echo $this->Form->hidden('User.id',array('value'=>$students['AcceptedStudent']['user_id']));
-
-    echo $this->Form->hidden('User.role_id',array('value'=>$students['User']['role_id']));
-    echo $this->Form->input('User.username',array('value'=>$students['AcceptedStudent']['studentnumber'],'readonly'=>'readonly'));  ?></td></tr>
-   <tr> <td><?php echo $this->Form->input('User.passwd',array('label' => 'Password', 'type'=>'password','id'=>'password'));  ?></td></tr>
-    <tr> <td><?php echo $this->Form->input('Generate Password',
-     array('id'=>'text','name'=>'text'));  ?> 
-     </td></tr>
-     <tr><td style="padding-left:350px;">  <input type="button" id="button_generate_password" value="Generate" onclick="suggestPassword(this.form)"> </td></tr>
-    <!-- <tr> <td> <table><tr><td><input type="button" id="button_generate_password" value="Generate" onclick="suggestPassword(this.form)"></td><td><?php echo $this->Form->input('Generate Password',
-     array('id'=>'text','name'=>'text'));  ?></td></tr></table></tr> -->
-  
-   <tr><td><?php echo $this->Form->Submit('Set Password',array('div'=>false,
- 'name'=>'issuepasswordtostudent','class'=>'tiny radius button bg-blue')); 
-          
- ?> </td>	
-    <tr><td></td></tr>
-</table>
-<?php 
-    
-    }
-    
-?>
-</div>
 <?php
-echo $this->Form->end();
+use Cake\I18n\I18n;
+
+$this->set('title', __('Password Issue/Reset to a Student'));
+$this->Html->script(['jquery-1.6.2.min', 'generatepassword'], ['block' => 'script']);
 ?>
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
+
+<script type="text/javascript">
+    function validatePasswordJs() {
+        var password = $("#password").val();
+        if (!password) {
+            alert('<?= __('Please provide a password') ?>');
+            return false;
+        } else if (password.length < 6) {
+            alert('<?= __('The minimum password length is 6') ?>');
+            return false;
+        }
+        return true;
+    }
+</script>
+
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <h2><?= __('Password Issue/Reset to a Student') ?></h2>
+                    <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'issuePassword'], 'class' => 'form-horizontal', 'onsubmit' => 'return validatePasswordJs()']) ?>
+                    <div class="students-index">
+                        <?php if (empty($hideSearch)): ?>
+                            <table class="table">
+                                <tbody>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.studentnumber', [
+                                            'label' => ['text' => __('Student Number'), 'class' => 'control-label'],
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Continue'), ['name' => 'issuestudentidsearch', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        <?php else: ?>
+                            <table class="table">
+                                <tr>
+                                    <td style="font-weight: bold;">
+                                        <?= __('Student Name: {0}', h($students->full_name)) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold;">
+                                        <?= __('College: {0}', h($students->College->name)) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->hidden('AcceptedStudent.id', ['value' => $students->id]) ?>
+                                        <?= $this->Form->hidden('User.id', ['value' => $students->user_id]) ?>
+                                        <?= $this->Form->hidden('User.role_id', ['value' => $students->User->role_id]) ?>
+                                        <?= $this->Form->control('User.username', [
+                                            'value' => $students->studentnumber,
+                                            'readonly' => true,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('User.passwd', [
+                                            'label' => ['text' => __('Password'), 'class' => 'control-label'],
+                                            'type' => 'password',
+                                            'id' => 'password',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('text', [
+                                            'label' => ['text' => __('Generate Password'), 'class' => 'control-label'],
+                                            'id' => 'text',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-left: 350px;">
+                                        <input type="button" id="button-generate-password" value="<?= __('Generate') ?>" onclick="suggestPassword(this.form)" class="btn btn-secondary">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Set Password'), ['name' => 'issuepasswordtostudent', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr><td></td></tr>
+                            </table>
+                        <?php endif; ?>
+                    </div>
+                    <?= $this->Form->end() ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,81 +1,114 @@
-<div class="box">
-	<div class="box-header bg-transparent">
-		<div class="box-title" style="margin-top: 10px;"><i class="fontello-th-list" style="font-size: larger; font-weight: bold;"></i>
-			<span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('Departments'); ?></span>
-		</div>
-	</div>
-	<div class="box-body">
-		<div class="row">
-			<div class="large-12 columns">
-				<div style="margin-top: -30px;">
-					<hr>
-					<?php
-					if (isset($departments) && !empty($departments)) { ?>
-						<div style="overflow-x:auto;">
-							<table cellpadding="0" cellspacing="0" class="table">
-								<thead>
-									<tr>
-										<th class="center">#</th>
-										<th class="vcenter"><?= $this->Paginator->sort('name'); ?></th>
-										<th class="center"><?= $this->Paginator->sort('shortname', 'Short'); ?></th>
-										<th class="center"><?= $this->Paginator->sort('institution_code'); ?></th>
-										<th class="center"><?= $this->Paginator->sort('college_id'); ?></th>
-										<th class="center"><?= $this->Paginator->sort('active'); ?></th>
-										<th class="center"><?= __('Actions'); ?></th>
-									</tr>
-								</thead>
-								<tbody>
-									<?php
-									$count = $this->Paginator->counter('%start%');
-									foreach ($departments as $department) { ?>
-										<tr>
-											<td class="center"><?= $count++; ?></td>
-											<td class="vcenter"><?= $department['Department']['name']; ?></td>
-											<td class="center"><?= $department['Department']['shortname']; ?></td>
-											<td class="center"><?= (isset($department['Department']['institution_code']) ? $department['Department']['institution_code'] : ''); ?></td>
-											<td class="center"><?= $this->Html->link($department['College']['shortname'], array('controller' => 'colleges', 'action' => 'view', $department['College']['id'])); ?></td>
-											<td style="text-align: center;"><?= (isset($department['Department']['active']) && $department['Department']['active'] == 1 ? '<span style="color:green">Yes</span>' : '<span style="color:red">No</span>'); ?></td>
-											<td class="center">
-												<?= $this->Html->link(__(''), array('action' => 'view', $department['Department']['id']), array('class' => 'fontello-eye', 'title' => 'View')); ?> &nbsp;
-												<?php
-												if ($this->Session->read('Auth.User')['role_id'] == ROLE_SYSADMIN || (($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE || $this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR || $this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) && $this->Session->read('Auth.User')['is_admin'] == 1)) { ?>
-													<?= $this->Html->link(__(''), array('action' => 'edit', $department['Department']['id']), array('class' => 'fontello-pencil', 'title' => 'Edit')); ?> &nbsp;
-													<?php
-												}
-												if ($this->Session->read('Auth.User')['role_id'] == ROLE_SYSADMIN) { ?>
-													<?= $this->Html->link(__(''), array('action' => 'delete', $department['Department']['id']), array('class' => 'fontello-trash', 'title' => 'Delete'), sprintf(__('Are you sure you want to delete %s department?'), $department['Department']['name'])); ?>
-													<?php
-												} ?>
-											</td>
-										</tr>
-										<?php 
-									} ?>
-								</tbody>
-							</table>
-						</div>
-						<br>
+<?php
+$this->assign('title', __('Departments'));
+?>
 
-						<hr>
-						<div class="row">
-							<div class="large-5 columns">
-								<?= $this->Paginator->counter(array('format' => __('Page %page% of %pages%, showing %current% records out of %count% total'))); ?>
-							</div>
-							<div class="large-7 columns">
-								<div class="pagination-centered">
-									<ul class="pagination">
-										<?= $this->Paginator->prev('<< ' . __(''), array('tag' => 'li'), null, array('class' => 'arrow unavailable')); ?> <?= $this->Paginator->numbers(array('separator' => '', 'tag' => 'li')); ?> <?= $this->Paginator->next(__('') . ' >>', array('tag' => 'li'), null, array('class' => 'arrow unavailable')); ?>
-									</ul>
-								</div>
-							</div>
-						</div>
-						<?php
-					} else { ?>
-						<div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style='margin-right: 15px;'></span>Unable to load departments data. Please Make sure that you have the privilage to view/list departments.</div>
-						<hr>
-						<?php
-					} ?>
-				</div>
-			</div>
-		</div>
-	</div>
+<div class="box">
+    <div class="box-header bg-transparent">
+        <div class="box-title" style="margin-top: 10px;">
+            <i class="fontello-th-list" style="font-size: larger; font-weight: bold;"></i>
+            <span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('Departments') ?></span>
+        </div>
+    </div>
+    <div class="box-body">
+        <div class="row">
+            <div class="large-12 columns">
+                <div style="margin-top: -30px;">
+                    <hr>
+                    <?php if (!empty($departments)) { ?>
+                        <div style="overflow-x:auto;">
+                            <table cellpadding="0" cellspacing="0" class="table">
+                                <thead>
+                                <tr>
+                                    <th class="center">#</th>
+                                    <th class="vcenter"><?= $this->Paginator->sort('name') ?></th>
+                                    <th class="center"><?= $this->Paginator->sort('shortname', 'Short') ?></th>
+                                    <th class="center"><?= $this->Paginator->sort('institution_code') ?></th>
+                                    <th class="center"><?= $this->Paginator->sort('college_id') ?></th>
+                                    <th class="center"><?= $this->Paginator->sort('active') ?></th>
+                                    <th class="center"><?= __('Actions') ?></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php $count = $this->Paginator->counter(['format' => '{{start}}']); ?>
+
+                                <?php
+
+                                foreach ($departments as $department) { ?>
+                                    <tr>
+                                        <td class="center"><?= $count++ ?></td>
+                                        <td class="vcenter"><?= h($department->name) ?></td>
+                                        <td class="center"><?= h($department->shortname) ?></td>
+                                        <td class="center"><?= h($department->institution_code ?? '') ?></td>
+                                        <td class="center">
+                                            <?= $this->Html->link(
+                                                h($department->college->shortname),
+                                                ['controller' => 'Colleges', 'action' => 'view', $department->college->id]
+                                            ) ?>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <?= $department->active ?
+                                                '<span style="color:green">Yes</span>' :
+                                                '<span style="color:red">No</span>' ?>
+                                        </td>
+                                        <td class="center">
+                                            <?= $this->Html->link(
+                                                __(''),
+                                                ['action' => 'view', $department->id],
+                                                ['class' => 'fontello-eye', 'title' => 'View']
+                                            ) ?>
+                                            &nbsp;
+                                            <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_SYSADMIN ||
+                                                (in_array($this->request->getSession()->read('Auth.User.role_id'), [ROLE_COLLEGE, ROLE_REGISTRAR, ROLE_DEPARTMENT]) &&
+                                                    $this->request->getSession()->read('Auth.User.is_admin') == 1)) { ?>
+                                                <?= $this->Html->link(
+                                                    __(''),
+                                                    ['action' => 'edit', $department->id],
+                                                    ['class' => 'fontello-pencil', 'title' => 'Edit']
+                                                ) ?>
+                                                &nbsp;
+                                            <?php } ?>
+                                            <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_SYSADMIN) { ?>
+                                                <?= $this->Html->link(
+                                                    __(''),
+                                                    ['action' => 'delete', $department->id],
+                                                    [
+                                                        'class' => 'fontello-trash',
+                                                        'title' => 'Delete',
+                                                        'confirm' => __('Are you sure you want to delete {0} department?', $department->name)
+                                                    ]
+                                                ) ?>
+                                            <?php } ?>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <br>
+                        <hr>
+                        <div class="row">
+                            <div class="large-5 columns">
+                                <?= $this->Paginator->counter(['format' => __('Page {{page}} of {{pages}}, showing {{current}} records out of {{count}} total')]) ?>
+                            </div>
+                            <div class="large-7 columns">
+                                <div class="pagination-centered">
+                                    <ul class="pagination">
+                                        <?= $this->Paginator->prev('<< ' . __(''), ['tag' => 'li', 'disabledTag' => 'li', 'class' => 'arrow unavailable']) ?>
+                                        <?= $this->Paginator->numbers(['separator' => '', 'tag' => 'li']) ?>
+                                        <?= $this->Paginator->next(__('') . ' >>', ['tag' => 'li', 'disabledTag' => 'li', 'class' => 'arrow unavailable']) ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    <?php } else { ?>
+                        <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                            <span style="margin-right: 15px;"></span>
+                            Unable to load departments data. Please make sure that you have the privilege to view/list departments.
+                        </div>
+                        <hr>
+                    <?php } ?>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

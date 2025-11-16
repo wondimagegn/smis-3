@@ -1,71 +1,79 @@
 <?php
-if (count($programss) > 0) { ?>
-    <table id="sectionNotAssignClass" cellpadding="0" cellspacing="0" class="table">
-        <thead>
+$this->assign('title', __('Unassigned Students Summary'));
+?>
+
+<?php if (!empty($programss)): ?>
+    <div style="overflow-x:auto;">
+        <table id="sectionNotAssignClass" class="table table-bordered">
+            <thead>
             <tr>
-                <td style="border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85);" colspan="<?= (count($programss)+1); ?>" class="vcenter">
-                    <span class="text-gray">
-                    <br style="line-height: 0.5;"> 
-                    Table: Summary of students who are not assigned to a section for <?= $sselectedAcademicYear; ?> <?php //echo $selectedYearLevelName . ' year, ' . $selectedProgramName .' - '. $selectedProgramTypeName . '.'; ?>
-                    <?php // (isset($selectedCurriculumName) ? '<br>Selected Curriculum:  '. $selectedCurriculumName : ''); ?>
-                    </span>
+                <td style="border-bottom: 2px solid #555;" colspan="<?= count($programss) + 1 ?>" class="text-center">
+                        <span class="text-muted">
+                            <br style="line-height: 0.5;">
+                            <?= __(
+                                'Table: Summary of students%s by Program and Program Type',
+                                isset($sselectedAcademicYear) && !empty($sselectedAcademicYear) && $sselectedAcademicYear != '/undefined'
+                                    ? sprintf(__(' admitted for %s'), h($sselectedAcademicYear))
+                                    : ''
+                            ) ?>
+                        </span>
                 </td>
             </tr>
             <tr>
-                <th class="center"><!-- ProgramType/Program --></th>
-                <?php
-                $count_program = count($programss);
-                $count_program_type = count($programTypess);
-
-                foreach ($programss as $kp => $vp) { ?>
-                    <th class="center"><?= (isset($vp) ? $vp: ''); ?></th>
-                    <?php
-                } ?>
+                <th class="text-center"><?= __('ProgramType/Program') ?></th>
+                <?php foreach ($programss as $kp => $vp): ?>
+                    <th class="text-center"><?= h($vp ?? '') ?></th>
+                <?php endforeach; ?>
             </tr>
-        </thead>
-        <tbody>
-            <?php
-            for ($i = 1; $i <= $count_program_type; $i++) {
-                if (isset($programTypess[$i])) { ?>
+            </thead>
+            <tbody>
+            <?php $count_program = count($programss); ?>
+            <?php $count_program_type = count($programTypess); ?>
+            <?php for ($i = 1; $i <= $count_program_type; $i++): ?>
+                <?php if (isset($programTypess[$i])): ?>
                     <tr>
-                        <td class="vcenter"><?= (isset($programTypess[$i]) ? $programTypess[$i] : ''); ?></td>
-                        <?php
-                        for ($j = 1; $j <= $count_program; $j++) { 
-                            if (isset($programss[$j])) {?>
-                                <td class="center"><?= (isset($summary_data[$programss[$j]][$programTypess[$i]]) && $summary_data[$programss[$j]][$programTypess[$i]] > 0 ? $summary_data[$programss[$j]][$programTypess[$i]] : '--'); ?></td>
-                                <?php
-                            } else { ?>
-                                <td class="center">--</td>
-                                <?php
-                            }
-                        } ?>
+                        <td class="text-center"><?= h($programTypess[$i] ?? '') ?></td>
+                        <?php for ($j = 1; $j <= $count_program; $j++): ?>
+                            <td class="text-center">
+                                <?= isset($programss[$j]) && isset($summary_data[$programss[$j]][$programTypess[$i]]) && $summary_data[$programss[$j]][$programTypess[$i]] > 0
+                                    ? h($summary_data[$programss[$j]][$programTypess[$i]])
+                                    : '--' ?>
+                            </td>
+                        <?php endfor; ?>
                     </tr>
-                    <?php
-                } 
-            } ?>
-
-            <?php
-            if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT && isset($curriculum_unattached_student_count) && $curriculum_unattached_student_count > 0) { ?>
+                <?php endif; ?>
+            <?php endfor; ?>
+            <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT && isset($curriculum_unattached_student_count) && $curriculum_unattached_student_count > 0): ?>
                 <tr>
-                    <td colspan="<?= (count($programs) + 1); ?>" class="vcenter"><?= ($curriculum_unattached_student_count > 1 ? $curriculum_unattached_student_count . ' students are' : $curriculum_unattached_student_count . ' student is'); ?>  not attached to any curriculum in your department from all programs. Thus, <?= ($curriculum_unattached_student_count > 1 ? ' these students' : ' this student'); ?> will not participate in any section assignment.</td>
+                    <td colspan="<?= count($programss) + 1 ?>" class="text-center">
+                        <?= __(
+                            '%s not attached to any curriculum in your department from all programs. Thus, %s will not participate in any section assignment.',
+                            $curriculum_unattached_student_count > 1
+                                ? sprintf(__('%s students are'), $curriculum_unattached_student_count)
+                                : sprintf(__('%s student is'), $curriculum_unattached_student_count),
+                            $curriculum_unattached_student_count > 1 ? __('these students') : __('this student')
+                        ) ?>
+                    </td>
                 </tr>
-                <?php
-            } ?>
-        </tbody>
-    </table>
-    <?php
-} else { ?>
-    <table id="sectionNotAssignClass" cellpadding="0" cellspacing="0" class="table">
-        <thead>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <br>
+<?php else: ?>
+    <div style="overflow-x:auto;">
+        <table id="sectionNotAssignClass" class="table table-bordered">
+            <thead>
             <tr>
-                <td style="border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85);" colspan="<?= (count($programss)+1); ?>">
-                    <span class="text-gray">
-                    <br style="line-height: 0.5;"> 
-                    You don't have any curriculums defined in your ROLE_DEPARTMENT
-                    </span>
+                <td style="border-bottom: 2px solid #555;" colspan="<?= count($programss) + 1 ?>">
+                        <span class="text-muted">
+                            <br style="line-height: 0.5;">
+                            <?= __('You don\'t have any curriculums defined in your department.') ?>
+                        </span>
                 </td>
             </tr>
-        </thead>
-    </table>
-    <?php
-} ?>
+            </thead>
+        </table>
+    </div>
+    <br>
+<?php endif; ?>

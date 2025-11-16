@@ -1,67 +1,73 @@
-<?php ?>
+<?php
+/**
+ * @var \App\View\AppView $this
+ * @var \App\Model\Entity\StudentStatusPattern[]|\Cake\Datasource\ResultSetInterface $studentStatusPatterns
+ * @var array $programs
+ * @var array $programTypes
+ * @var array $acyearArrayData
+ * @var string $defaultAcademicYear
+ * @var array $yearLevels
+ */
+?>
 <div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-             
-<div class="studentStatusPatterns index">
-	<h2><?php echo __('Student Status Patterns');?></h2>
-	<table cellpadding="0" cellspacing="0">
-	<tr>
-			<th><?php echo $this->Paginator->sort('id');?></th>
-			<th><?php echo $this->Paginator->sort('program_id');?></th>
-			<th><?php echo $this->Paginator->sort('program_type_id');?></th>
-			<th><?php echo $this->Paginator->sort('acadamic_year');?></th>
-			<th><?php echo $this->Paginator->sort('application_date');?></th>
-			<th><?php echo $this->Paginator->sort('pattern');?></th>
-			<th><?php echo $this->Paginator->sort('created');?></th>
-			<th><?php echo $this->Paginator->sort('modified');?></th>
-			<th class="actions"><?php echo __('Actions');?></th>
-	</tr>
-	<?php
-	$i = 0;
-	foreach ($studentStatusPatterns as $studentStatusPattern):
-		$class = null;
-		if ($i++ % 2 == 0) {
-			$class = ' class="altrow"';
-		}
-	?>
-	<tr<?php echo $class;?>>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['id']; ?>&nbsp;</td>
-		<td>
-			<?php echo $this->Html->link($studentStatusPattern['Program']['name'], array('controller' => 'programs', 'action' => 'view', $studentStatusPattern['Program']['id'])); ?>
-		</td>
-		<td>
-			<?php echo $this->Html->link($studentStatusPattern['ProgramType']['name'], array('controller' => 'program_types', 'action' => 'view', $studentStatusPattern['ProgramType']['id'])); ?>
-		</td>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['acadamic_year']; ?>&nbsp;</td>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['application_date']; ?>&nbsp;</td>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['pattern']; ?>&nbsp;</td>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['created']; ?>&nbsp;</td>
-		<td><?php echo $studentStatusPattern['StudentStatusPattern']['modified']; ?>&nbsp;</td>
-		<td class="actions">
-			<?php echo $this->Html->link(__('View'), array('action' => 'view', $studentStatusPattern['StudentStatusPattern']['id'])); ?>
-			<?php echo $this->Html->link(__('Edit'), array('action' => 'edit', $studentStatusPattern['StudentStatusPattern']['id'])); ?>
-			<?php echo $this->Html->link(__('Delete'), array('action' => 'delete', $studentStatusPattern['StudentStatusPattern']['id']), null, sprintf(__('Are you sure you want to delete # %s?'), $studentStatusPattern['StudentStatusPattern']['id'])); ?>
-		</td>
-	</tr>
-<?php endforeach; ?>
-	</table>
-	<p>
-	<?php
-	echo $this->Paginator->counter(array(
-	'format' => __('Page %page% of %pages%, showing %current% records out of %count% total, starting on record %start%, ending on %end%')
-	));
-	?>	</p>
+    <div class="box-header bg-transparent">
+        <div class="box-title" style="margin-top: 10px;">
+            <i class="fontello-list" style="font-size: larger; font-weight: bold;"></i>
+            <span style="font-size: medium; font-weight: bold; margin-top: 20px;"><?= __('Student Status Patterns') ?></span>
+        </div>
+    </div>
+    <div class="box-body">
+        <div class="row">
+            <div class="large-12 columns">
+                <div style="margin-top: -30px;"><hr></div>
+                <div class="studentStatusPatterns index">
+                    <h3><?= __('Student Status Patterns') ?></h3>
+                    <table cellpadding="0" cellspacing="0" class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th scope="col"><?= $this->Paginator->sort('id', __('ID')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('program_id', __('Program')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('program_type_id', __('Program Type')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('academic_year', __('Academic Year')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('application_date', __('Application Date')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('pattern', __('Pattern')) ?></th>
+                            <th scope="col"><?= $this->Paginator->sort('description', __('Description')) ?></th>
+                            <th scope="col" class="actions"><?= __('Actions') ?></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($studentStatusPatterns as $studentStatusPattern):
+                            ?>
+                            <tr>
+                                <td><?= h($studentStatusPattern->id) ?></td>
+                                <td><?= isset($studentStatusPattern->program->name) ? h($studentStatusPattern->program->name) : '' ?></td>
+                                <td><?= isset($studentStatusPattern->program_type->name) ? h($studentStatusPattern->program_type->name) : '' ?></td>
+                                <td><?= h($studentStatusPattern->acadamic_year) ?></td>
+                                <td class="center"><?= $studentStatusPattern->application_date->nice('M j, Y') ?></td>
+                                <td><?= h($studentStatusPattern->pattern) ?></td>
+                                <td><?= h($studentStatusPattern->description) ?></td>
+                                <td class="actions">
+                                    <?= $this->Html->link(__('View'), ['action' => 'view', $studentStatusPattern->id], ['class' => 'tiny radius button bg-blue']) ?>
+                                    <?= $this->Html->link(__('Edit'), ['action' => 'edit', $studentStatusPattern->id], ['class' => 'tiny radius button bg-green']) ?>
+                                    <?= $this->Form->postLink(__('Delete'), ['action' => 'delete', $studentStatusPattern->id], ['confirm' => __('Are you sure you want to delete # {0}?', $studentStatusPattern->id), 'class' => 'tiny radius button bg-red']) ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <div class="paginator">
+                        <ul class="pagination">
+                            <?= $this->Paginator->first('<< ' . __('first')) ?>
+                            <?= $this->Paginator->prev('< ' . __('previous')) ?>
+                            <?= $this->Paginator->numbers() ?>
+                            <?= $this->Paginator->next(__('next') . ' >') ?>
+                            <?= $this->Paginator->last(__('last') . ' >>') ?>
+                        </ul>
+                        <p><?= $this->Paginator->counter(__('Page {{page}} of {{pages}}, showing {{current}} record(s) out of {{count}} total')) ?></p>
+                    </div>
 
-	<div class="paging">
-		<?php echo $this->Paginator->prev('<< ' . __('previous'), array(), null, array('class'=>'disabled'));?>
-	 | 	<?php echo $this->Paginator->numbers();?>
- |
-		<?php echo $this->Paginator->next(__('next') . ' >>', array(), null, array('class' => 'disabled'));?>
-	</div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->

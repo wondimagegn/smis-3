@@ -1,245 +1,291 @@
+<?php
+$role_id=$this->getRequest()->getSession()->read('Auth')['User']['role_id'];
+
+$this->assign('title',$role_id == ROLE_REGISTRAR ? __('Confirm Course Adds') :
+    __('Approve Course Adds'));
+?>
 <div class="box">
     <div class="box-header bg-transparent">
-		<div class="box-title" style="margin-top: 10px;"><i class="fontello-check" style="font-size: larger; font-weight: bold;"></i>
-			<span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR ? __('Confirm Course Adds') : __('Approve Course Adds')); ?></span>
-		</div>
-	</div>
+        <div class="box-title" style="margin-top: 10px;"><i class="fontello-check" style="font-size: larger; font-weight: bold;"></i>
+            <?= $role_id == ROLE_REGISTRAR ? __('Confirm Course Adds') : __('Approve Course Adds'); ?>
+        </div>
+    </div>
     <div class="box-body">
         <div class="row">
-            <div class="large-12 columns">
-                <div style="margin-top: -20px;">
-                    <?= $this->Form->create('CourseAdd', array('onSubmit' => 'return checkForm(this);')); ?>
-                    <?php
-                    if (!empty($coursesss)) { ?>
-                        <hr>
-                        <h6 class="fs14 text-gray">List of students who submitted Course Add request for approval:</h6>
-                        <hr>
+            <div class="col-12">
+                <?php
+                echo $this->Form->create(null, ['id' => 'courseAddForm', 'onsubmit' => 'return checkForm(this);']);
+                if (!empty($courses)) {
+                    echo '<hr>';
+                    echo '<h6 class="fs-6 text-gray">List of students who submitted Course Add request for approval:</h6>';
+                    echo '<hr>';
+                    echo '<h6 id="validation-message_non_selected" class="text-red fs-6"></h6>';
 
-                        <h6 id="validation-message_non_selected" class="text-red fs14"></h6>
+                    $count = 0;
+                    $autoRejections = 0;
+                    foreach ($courses as $departmentName => $program) {
+                        foreach ($program as $programName => $programType) {
+                            foreach ($programType as $programTypeName => $sections) {
+                                $displayButton = 0;
+                                $sectionCount = 0;
+                                foreach ($sections as $sectionId => $courseData) {
+                                    $sectionCount++;
+                                    if (!empty($courseData)) {
+                                        ?>
+                                        <div class="table-responsive">
+                                            <table class="table table-striped table-bordered">
+                                                <thead>
+                                                <tr>
+                                                    <td colspan="11" style="border-bottom: 2px solid #555; line-height: 1.5;">
+                                                            <span class="fw-bold fs-5">
+                                                                From: <?= h($sectionId) . ' ' .
+                                                                (!empty($courseData[0]['published_course']['section']['year_level']['name']) ? ' (' . h($courseData[0]['published_course']['section']['year_level']['name']) . ', ' . h($courseData[0]['published_course']['academic_year']) . ')' : ' (Pre/1st)'); ?>
+                                                            </span>
+                                                        <br>
+                                                        <span class="text-gray fw-bold fs-6">
+                                                                <?= !empty($courseData[0]['published_course']['section']['department']['name'])
+                                                                    ? h($courseData[0]['published_course']['section']['department']['name'])
+                                                                    : h($courseData[0]['published_course']['section']['college']['name']) . ' - Pre/Freshman'; ?>
+                                                                &nbsp; | &nbsp; <?= h($programName); ?>
+                                                                &nbsp; | &nbsp; <?= h($programTypeName); ?>
+                                                            </span>
+                                                        <br>
+                                                        <span class="text-black fw-bold fs-6">
+                                                                <?= !empty($courseData[0]['student']['department']['id'])
+                                                                    ? h($courseData[0]['student']['department']['name'])
+                                                                    : h($courseData[0]['student']['college']['name']) . ' - Pre/Freshman'; ?>
+                                                            </span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="center">#</th>
+                                                    <th class="vcenter">Full Name</th>
+                                                    <th class="center">Sex</th>
+                                                    <th class="center">Student ID</th>
+                                                    <th class="center">Sem</th>
+                                                    <th class="center">Load</th>
+                                                    <th class="center">Course</th>
+                                                    <th class="center">
+                                                        <?= empty($courseData[0]['published_course']['section']['curriculum']['id'])
+                                                            ? 'Cr.'
+                                                            : (stripos($courseData[0]['published_course']['section']['curriculum']['type_credit'],
+                                                                'ECTS') !== false ? 'ECTS' : 'Credit'); ?>
+                                                    </th>
+                                                    <th class="center">LTL</th>
+                                                    <th class="center">Decision</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <?php foreach ($courseData as $vc) { ?>
+                                                    <tr <?= ($vc['student']['max_load'] > $vc['student']['maximumCreditPerSemester'] || $vc['student']['max_load'] == 0 || $vc['student']['overCredit']) ? 'class="rejected"' : ''; ?>>
+                                                        <td class="center">
+                                                            <?= ++$count; ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.id", ['value' => $vc['id']]); ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.student_id",
+                                                                ['value' => $vc['student_id']]); ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.published_course_id",
+                                                                ['value' => $vc['published_course_id']]); ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.academic_year", ['value' =>
+                                                                $vc['academic_year']]); ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.semester", ['value' =>
+                                                                $vc['semester']]); ?>
+                                                            <?= $this->Form->hidden("CourseAdd.$count.credit", ['value' =>
+                                                                $vc['published_course']['course']['credit']]); ?>
+                                                        </td>
+                                                        <td class="vcenter">
 
-                        <?php
-                        $count = 0;
-                        $auto_rejections = 0;
-                        foreach ($coursesss as $department_name => $program) {
-                            //echo "<span class='fs14'><strong class='text-gray'>Department: </strong><b>" . $department_name . '</b></span><br>';
-                            foreach ($program as $program_name => $programType) {
-                                //echo "<span class='fs14'><strong class='text-gray'>Program: </strong><b>" . $program_name . '</b></span><br>';
-                                foreach ($programType as $program_type_name => $sections) {
-                                    //echo  "<span class='fs14'><strong class='text-gray'>Program Type: </strong><b>" . $program_type_name . '</b></span><br>';
-
-                                    $display_button = 0;
-                                    $section_count = 0;
-
-                                    foreach ($sections as $section_id => $coursss) {
-                                        $section_count++;
-                                        //debug($coursss[0]);
-                                        if (!empty($coursss)) { ?>
-                                            <br>
-                                            <div style="overflow-x:auto;">
-                                                <table cellpadding="0" cellspacing="0" class="table">
-                                                    <thead>
-                                                        <tr>
-                                                            <td colspan=11 style="vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85); line-height: 1.5;">
-                                                                <!-- <br style="line-height: 0.35;"> -->
-                                                                <span style="font-size:16px;font-weight:bold; margin-top: 25px;"> 
-                                                                    From: <?= $section_id . ' ' . (isset($coursss[0]['PublishedCourse']['Section']['YearLevel']['name'])  ?  ' (' . $coursss[0]['PublishedCourse']['Section']['YearLevel']['name'] .', '. $coursss[0]['PublishedCourse']['academic_year']. ')' : ' (Pre/1st)'); ?>
-                                                                </span>
-                                                                <br style="line-height: 0.35;">
-                                                                <span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold">
-                                                                    <?php //echo (isset($coursss[0]['PublishedCourse']['Section']['Curriculum']['name']) ? ucwords(strtolower($coursss[0]['PublishedCourse']['Section']['Curriculum']['name'])) . ' - ' . $coursss[0]['PublishedCourse']['Section']['Curriculum']['year_introduced'] . ' (' .  (count(explode('ECTS', $coursss[0]['PublishedCourse']['Section']['Curriculum']['type_credit'])) >= 2 ? 'ECTS' : 'Credit') . ') <br style="line-height: 0.35;">' : ''); ?>
-                                                                    <?= (isset($coursss[0]['PublishedCourse']['Section']['Department']) && !empty($coursss[0]['PublishedCourse']['Section']['Department']['name']) ? $coursss[0]['PublishedCourse']['Section']['Department']['name'] : $coursss[0]['PublishedCourse']['Section']['College']['name'] . ' - Pre/Freshman'); ?> &nbsp; | &nbsp; 
-                                                                    <?= (isset($program_name) ? $program_name :  ''); ?>  &nbsp; | &nbsp; <?= (isset($program_type_name) ? $program_type_name :  ''); ?> <br>
-                                                                </span>
-                                                                <span class="text-black" style="padding-top: 14px; font-size: 13px; font-weight: bold">
-                                                                    <?= (isset($coursss[0]['Student']['Department']['id']) ?  $coursss[0]['Student']['Department']['name'] : $coursss[0]['Student']['College']['name'] . ' - Pre/Freshman'); ?> <br>
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <th class="center">#</th>
-                                                            <th class="vcenter">Full Name</th>
-                                                            <th class="center">Sex</th>
-                                                            <th class="center">Student ID</th>
-                                                            <th class="center">Sem</th>
-                                                            <th class="center">Load</th>
-                                                            <th class="center">Course</th>
-                                                            <th class="center"><?= (!isset($coursss[0]['PublishedCourse']['Section']['Curriculum']['id']) ? 'Cr.' : (count(explode('ECTS', $coursss[0]['PublishedCourse']['Section']['Curriculum']['type_credit'])) >= 2 ? 'ECTS' : 'Credit')); ?></th>
-                                                            <th class="center">LTL</th>
+                                                            <?= $this->Html->link($vc['student']['full_name'], '#', array('class' => 'jsview',
+                                                                'data-animation' => "fade",'data-reveal-id' => 'myModal', 'data-reveal-ajax' => "/Students/getModalBox/" .
+                                                                    $vc['student']['id'])); ?>
+                                                        </td>
+                                                        <td class="center">
+                                                            <?= strcasecmp(trim($vc['student']['gender']), 'male') === 0 ? 'M' : (strcasecmp(trim($vc['student']['gender']), 'female') === 0 ? 'F' : ''); ?>
+                                                        </td>
+                                                        <td class="center"><?= h($vc['student']['studentnumber']); ?></td>
+                                                        <td class="center"><?= h($vc['published_course']['semester']); ?></td>
+                                                        <td class="center"><?= h($vc['student']['max_load']); ?></td>
+                                                        <td class="center">
+                                                            <?= h($vc['published_course']['course']['course_title'] . ' (' . $vc['published_course']['course']['course_code'] . ')'); ?>
+                                                        </td>
+                                                        <td class="center"><?= h($vc['published_course']['course']['credit']); ?></td>
+                                                        <td class="center"><?= h($vc['published_course']['course']['course_detail_hours']); ?></td>
+                                                        <td class="center">
                                                             <?php
-                                                            if ($role_id == ROLE_DEPARTMENT || $role_id == ROLE_COLLEGE) { ?>
-                                                                <th class="center">Decision</th>
-                                                                <?php
-                                                                $options = array('1' => ' Accept', '0' => ' Reject');
-                                                                $attributes = array('legend' => false, 'separator' => " "); ?>
-                                                                <?php
+                                                            $options = ['1' => 'Accept', '0' => 'Reject'];
+                                                            $attributes = ['legend' => false, 'separator' => $role_id == ROLE_REGISTRAR ? '<br>' : ' '];
+
+                                                            if ($role_id == ROLE_DEPARTMENT || $role_id == ROLE_COLLEGE) {
+                                                                if ($vc['student']['max_load'] == 0) {
+                                                                    $autoRejections++;
+                                                                    echo $this->Form->hidden("CourseAdd.$count.department_approval", ['value' => '0']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", ['value' => 'Auto Rejected. Reason: At least one Registration Required.']);
+                                                                    echo 'Will Be Auto Rejected <br>(At least one Registration Required)';
+                                                                } elseif ($vc['student']['willBeOverMaxLoadWithThisAdd'] || $vc['student']['overCredit'] != 0) {
+                                                                    $autoRejections++;
+                                                                    $creditType = !empty($vc['student']['curriculum']['type_credit'])
+                                                                    && stripos($vc['student']['curriculum']['type_credit'], 'ECTS') !== false
+                                                                        ? 'ECTS' : 'Credit';
+                                                                    echo $this->Form->hidden("CourseAdd.$count.department_approval", ['value' => '0']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", [
+                                                                        'value' => "Auto Rejected. Reason: Will be over Max allowed {$creditType} for {$vc['student']['program']['name']} -
+                                                                        {$vc['student']['program_type']['name']} Program per semester({$vc['student']['maximumCreditPerSemester']}) by
+                                                                        {$vc['student']['overCredit']} {$creditType}"
+                                                                    ]);
+                                                                    echo "Will Be Auto Rejected <br>(Will be over Max allowed {$creditType} for {$vc['student']['program']['name']} - {$vc['student']['program_type']['name']} Program per semester({$vc['student']['maximumCreditPerSemester']}) by {$vc['student']['overCredit']} {$creditType})";
+                                                                } elseif ($vc['student']['max_load'] <= $vc['student']['maximumCreditPerSemester']) {
+                                                                    echo $this->Form->radio("CourseAdd.$count.department_approval", $options, $attributes);
+                                                                    echo $this->Form->textarea("CourseAdd.$count.reason", [
+                                                                        'placeholder' => 'Your reason here if any...',
+                                                                        'rows' => 2,
+                                                                        'value' => $this->request->getData("CourseAdd.$count.reason", ''),
+                                                                        'class' => 'form-control'
+                                                                    ]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => '0']);
+                                                                } else {
+                                                                    $autoRejections++;
+                                                                    $creditType = !empty($vc['student']['curriculum']['type_credit']) && stripos($vc['student']['curriculum']['type_credit'], 'ECTS') !== false ? 'ECTS' : 'Credit';
+                                                                    echo $this->Form->hidden("CourseAdd.$count.department_approval", ['value' => '']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", [
+                                                                        'value' => "Auto Rejected. Reason: Will be over from currently allowed maximum {$creditType} for {$vc['student']['program']['name']}/{$vc['student']['program_type']['name']} per semester({$vc['student']['maximumCreditPerSemester']}) by {$vc['student']['overCredit']} {$creditType}"
+                                                                    ]);
+                                                                    echo "Will Be Auto Rejected <br>(Will be over Max allowed {$creditType} for {$vc['student']['program']['name']} - {$vc['student']['program_type']['name']} Program per semester ({$vc['student']['maximumCreditPerSemester']} {$creditType}))";
+                                                                }
+                                                            } elseif ($role_id == ROLE_REGISTRAR) {
+
+                                                                if ($vc['student']['max_load'] == 0) {
+                                                                    $autoRejections++;
+                                                                    echo $this->Form->hidden("CourseAdd.$count.registrar_confirmation", ['value' => '0']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", ['value' => 'Auto Rejected. Reason: At least one Registration Required.']);
+                                                                    echo 'Will Be Auto Rejected <br>(At least one Registration Required).';
+                                                                } elseif ($vc['student']['max_load'] >= $vc['student']['maximumCreditPerSemester']
+                                                                    && $vc['department_approval'] == 1) {
+                                                                    echo 'Department Approved/Cancelled Auto Rejection.<br>';
+                                                                    echo $this->Form->radio("CourseAdd.$count.registrar_confirmation", $options, $attributes);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason",
+                                                                        ['value' => 'Registrar Confirmed Departments Auto Course Rejection Cancellation. ' . $vc['reason']]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 0]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.registrar_confirmed_by",
+                                                                        ['value' =>$this->getRequest()->getSession()->read('Auth')['User']['id']]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.modified", ['value' => date('Y-m-d H:i:s')]);
+                                                                } elseif ($vc['student']['willBeOverMaxLoadWithThisAdd'] || $vc['student']['overCredit'] != 0) {
+                                                                    $autoRejections++;
+                                                                    $creditType = !empty($vc['student']['curriculum']['type_credit'])
+                                                                    && stripos($vc['student']['curriculum']['type_credit'], 'ECTS') !== false ?
+                                                                        'ECTS' : 'Credit';
+                                                                    echo $this->Form->hidden("CourseAdd.$count.registrar_confirmation", ['value' => '0']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", [
+                                                                        'value' => "Auto Rejected. Reason: Will be over from currently allowed maximum {$creditType}
+                                                                         for {$vc['student']['program']['name']}/{$vc['student']['program_type']['name']}
+                                                                         per semester({$vc['student']['maximumCreditPerSemester']}) by {$vc['student']['overCredit']} {$creditType}"
+                                                                    ]);
+                                                                    echo "Will Be Auto Rejected <br>(Will be over Max allowed {$creditType} for {$vc['student']['program']['name']} - {$vc['student']['program_type']['name']} Program per semester({$vc['student']['maximumCreditPerSemester']}) by {$vc['student']['overCredit']} {$creditType})";
+                                                                } elseif ($vc['student']['max_load'] <= $vc['student']['maximumCreditPerSemester']) {
+                                                                    echo $this->Form->radio("CourseAdd.$count.registrar_confirmation", $options, $attributes);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => '0']);
+                                                                } else {
+                                                                    $autoRejections++;
+                                                                    $creditType = !empty($vc['student']['curriculum']['type_credit']) && stripos($vc['student']['curriculum']['type_credit'], 'ECTS') !== false ? 'ECTS' : 'Credit';
+                                                                    echo $this->Form->hidden("CourseAdd.$count.registrar_confirmation", ['value' => '0']);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.auto_rejected", ['value' => 1]);
+                                                                    echo $this->Form->hidden("CourseAdd.$count.reason", [
+                                                                        'value' => "Auto Rejected. Reason: Will be over from currently allowed maximum {$creditType} for {$vc['student']['program']['name']}/{$vc['student']['program_type']['name']} per semester({$vc['student']['maximumCreditPerSemester']}) by {$vc['student']['overCredit']} {$creditType}"
+                                                                    ]);
+                                                                    echo "Will Be Auto Rejected <br>(Will be over Max allowed {$creditType} for {$vc['student']['program']['name']} - {$vc['student']['program_type']['name']} Program per semester ({$vc['student']['maximumCreditPerSemester']} {$creditType}))";
+                                                                }
                                                             }
-
-                                                            if ($role_id == ROLE_REGISTRAR || ROLE_REGISTRAR == $this->Session->read('Auth.User')['Role']['parent_id']) {
-                                                                $options = array('1' => ' Accept', '0' => ' Reject');
-                                                                $attributes = array('legend' => false, 'separator' => "<br>"); ?>
-                                                                <th class="center">Decision</th>
-                                                                <?php
-                                                            } ?>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <?php
-                                                        foreach ($coursss as $kc => $vc) { ?>
-                                                            <tr <?= (($vc['Student']['max_load'] > $vc['Student']['maximumCreditPerSemester']  || $vc['Student']['max_load'] == 0 || $vc['Student']['overCredit'] ) ? 'class="rejected"': ''); ?> >
-                                                                <td class="center">
-                                                                    <?= ++$count; ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.id', array('value' => $vc['CourseAdd']['id'])); ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.student_id', array('value' => $vc['CourseAdd']['student_id'])); ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.published_course_id', array('value' => $vc['CourseAdd']['published_course_id'])); ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.academic_year', array('value' => $vc['CourseAdd']['academic_year'])); ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.semester', array('value' => $vc['CourseAdd']['semester'])); ?>
-                                                                    <?= $this->Form->hidden('CourseAdd.' . $count . '.credit', array('value' => $vc['PublishedCourse']['Course']['credit'])); ?>
-                                                                </td>
-                                                                <td class="vcenter"><?= $this->Html->link($vc['Student']['full_name'], '#', array('class' => 'jsview', 'data-animation' => "fade",'data-reveal-id' => 'myModal', 'data-reveal-ajax' => "/students/get_modal_box/" . $vc['Student']['id'])); ?></td>
-                                                                <td class="center"><?= (strcasecmp(trim($vc['Student']['gender']), 'male') == 0 ? 'M' : (strcasecmp(trim($vc['Student']['gender']), 'female') == 0 ? 'F' : '')); ?></td>
-                                                                <td class="center"><?= $vc['Student']['studentnumber']; ?></td>
-                                                                <td class="center"><?= $vc['PublishedCourse']['semester']; ?></td>
-                                                                <td class="center"><?= $vc['Student']['max_load']; ?></td>
-                                                                <td class="center"><?= $vc['PublishedCourse']['Course']['course_title'] . ' (' . $vc['PublishedCourse']['Course']['course_code'] . ')'; ?></td>
-                                                                <td class="center"><?= $vc['PublishedCourse']['Course']['credit']; ?></td>
-                                                                <td class="center"><?= $vc['PublishedCourse']['Course']['course_detail_hours']; ?></td>
-                                                                <?php
-                                                                if ($role_id == ROLE_DEPARTMENT || $role_id == ROLE_COLLEGE) { 
-                                                                    if ($vc['Student']['max_load'] == 0) { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.department_approval', array('value' => '0')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: At least one Registration Required.')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Aleast one Registration Required)</td>
-                                                                        <?php
-                                                                    } else if ($vc['Student']['willBeOverMaxLoadWithThisAdd'] || $vc['Student']['overCredit'] != 0) { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.department_approval', array('value' => '0')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: Will be over Max allowed '. ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'). ' for ' . $vc['Student']['Program']['name'] . ' - ' . $vc['Student']['ProgramType']['name'] . ' Program per semester('.$vc['Student']['maximumCreditPerSemester']. ') by ' . $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit').'')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Will be over Max allowed <?= ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?> for <?= $vc['Student']['Program']['name'] . ' - ' . $vc['Student']['ProgramType']['name']; ?> Program per semester( <?= $vc['Student']['maximumCreditPerSemester']; ?>) by <?= $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit') ?>)</td>
-                                                                        <?php
-                                                                    } else if ($vc['Student']['max_load'] <= $vc['Student']['maximumCreditPerSemester']) { ?>
-                                                                        <td class="center">
-                                                                            <?= $this->Form->radio('CourseAdd.' . $count . '.department_approval', $options, $attributes); ?>
-                                                                            <?= $this->Form->input('CourseAdd.' . $count . '.reason', array('placeholder'=> 'Your reason here if any...', 'size' => '2', 'rows' => '2', 'value' => isset($this->request->data['CourseAdd'][$count]['reason']) ? $this->request->data['CourseAdd'][$count]['reason'] : '', 'label' => false, 'div' => false)); ?>
-                                                                            <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => '0')); ?>
-                                                                        </td>
-                                                                        <?php 
-                                                                    } else { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.department_approval', array('value' => '')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: Will be over from currently allowed maximum '. ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'). ' for ' . $vc['Student']['Program']['name'] . '/' . $vc['Student']['ProgramType']['name'] . ' per semester('.$vc['Student']['maximumCreditPerSemester']. ') by ' . $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit').'')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Will be over Max allowed <?= ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?> for <?= $vc['Student']['Program']['name'] . ' - ' . $vc['Student']['ProgramType']['name']; ?> Program per semester (<?= $vc['Student']['maximumCreditPerSemester'] .' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?>))</td>
-                                                                        <?php
-                                                                    }
-                                                                } else if ($role_id == ROLE_REGISTRAR) { 
-                                                                    if ($vc['Student']['max_load'] == 0) { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.registrar_confirmation', array('value' => '0')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: At least one Registration Required.')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Aleast one Registration Required).</td>
-                                                                        <?php
-                                                                    } else if ($vc['Student']['max_load'] >= $vc['Student']['maximumCreditPerSemester'] && $vc['CourseAdd']['department_approval'] == 1) { ?>
-                                                                        <td class="center">Department Approved/Cancelled Auto Rejection.<br>
-                                                                        <?= $this->Form->radio('CourseAdd.' . $count . '.registrar_confirmation', $options, $attributes); ?></td>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Registrar Confirmed Departments Auto Course Rejection Cancellation. ' . $vc['CourseAdd']['reason'])); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 0)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.registrar_confirmed_by', array('value' => $this->Session->read('Auth.User')['id'])); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.modified', array('value' =>  date('Y-m-d H:i:s'))); ?>
-                                                                        <?php 
-                                                                    } else if ($vc['Student']['willBeOverMaxLoadWithThisAdd'] || $vc['Student']['overCredit'] != 0) { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.registrar_confirmation', array('value' => '0')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: Will be over from currently allowed maximum '. ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'). ' for ' . $vc['Student']['Program']['name'] . '/' . $vc['Student']['ProgramType']['name'] . ' per semester('.$vc['Student']['maximumCreditPerSemester']. ') by ' . $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit').'')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Will be over Max allowed <?= ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?> for <?= $vc['Student']['Program']['name'] . ' - ' . $vc['Student']['ProgramType']['name']; ?> Program per semester( <?= $vc['Student']['maximumCreditPerSemester']; ?>) by <?= $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit') ?>)</td>
-                                                                        <?php
-                                                                    } else if ($vc['Student']['max_load'] <= $vc['Student']['maximumCreditPerSemester']) { ?>
-                                                                        <td class="center"><?= $this->Form->radio('CourseAdd.' . $count . '.registrar_confirmation', $options, $attributes); ?></td>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => '0')); ?>
-                                                                        <?php 
-                                                                    } else { 
-                                                                        $auto_rejections ++; ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.registrar_confirmation', array('value' => '0')); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.auto_rejected', array('value' => 1)); ?>
-                                                                        <?= $this->Form->hidden('CourseAdd.' . $count . '.reason', array('value' => 'Auto Rejected. Reason: Will be over from currently allowed maximum '. ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'). ' for ' . $vc['Student']['Program']['name'] . '/' . $vc['Student']['ProgramType']['name'] . ' per semester('.$vc['Student']['maximumCreditPerSemester']. ') by ' . $vc['Student']['overCredit']. ' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit').'')); ?>
-                                                                        <td class="center">Will Be Auto Rejected <br>(Will be over Max allowed <?= ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?> for <?= $vc['Student']['Program']['name'] . ' - ' . $vc['Student']['ProgramType']['name']; ?> Program per semester (<?= $vc['Student']['maximumCreditPerSemester'] .' '.  ((isset($vc['Student']['Curriculum']) && !empty($vc['Student']['Curriculum']['type_credit'])) ? (count(explode('ECTS', $vc['Student']['Curriculum']['type_credit'])) >= 2  ? 'ECTS' : 'Credit') : 'Credit'); ?>))</td>
-                                                                        <?php
-                                                                    }
-                                                                } ?>
-                                                            </tr>
-                                                            <?php
-                                                        } ?>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <br>
-                                            <?php
-                                        } else {
-                                            $display_button++;
-                                        }
-                                        //$count++;
+                                                            ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php } ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <br>
+                                        <?php
+                                    } else {
+                                        $displayButton++;
                                     }
-
                                 }
                             }
-                        } 
-
-                        if ($display_button != $section_count) {
-                            if ($role_id == ROLE_DEPARTMENT || $role_id == ROLE_COLLEGE) { ?>
-                                <hr>
-                                <?= $this->Form->submit('Approve/Reject Course Add', array('name' => 'approverejectadd', 'id' => 'approveRejectAdd', 'class' => 'tiny radius button bg-blue', 'div' => false)); ?>
-                                <?php
-                            } else if ($role_id ==  ROLE_REGISTRAR) { ?>
-                                <hr>
-                                <?= $this->Form->submit('Confirm/Deny Course Add', array('name' => 'approverejectadd', 'id' => 'approveRejectAdd', 'class' => 'tiny radius button bg-blue', 'div' => false)); ?>
-                                <?php
-                            }
                         }
+                    }
 
-                    } ?>
-                    <?= $this->Form->end(); ?>
-                </div>
+                    if ($displayButton != $sectionCount) {
+                        if ($role_id == ROLE_DEPARTMENT || $role_id == ROLE_COLLEGE) {
+                            echo '<hr>';
+                            echo $this->Form->submit('Approve/Reject Course Add', [
+                                'name' => 'approverejectadd',
+                                'id' => 'approveRejectAdd',
+                                'class' => 'tiny radius button bg-blue'
+                            ]);
+                        } elseif ($role_id == ROLE_REGISTRAR) {
+                            echo '<hr>';
+                            echo $this->Form->submit('Confirm/Deny Course Add', [
+                                'name' => 'approverejectadd',
+                                'id' => 'approveRejectAdd',
+                                'class' => 'tiny radius button bg-blue'
+                            ]);
+                        }
+                    }
+                }
+                echo $this->Form->end();
+                ?>
             </div>
         </div>
     </div>
 </div>
 
-<script type="text/javascript">
 
-	var form_being_submitted = false;
+<script>
+    let formBeingSubmitted = false;
 
-    const validationMessageNonSelected = document.getElementById('validation-message_non_selected');
+    function checkForm(form) {
+        const autoRejections = <?= json_encode($autoRejections); ?>;
+        const radios = document.querySelectorAll('input[type="radio"]');
+        const checkedOne = Array.from(radios).some(x => x.checked);
+        const validationMessageNonSelected = document.getElementById('validation-message_non_selected');
 
-	var checkForm = function(form) {
+        if (!checkedOne && autoRejections === 0) {
+            validationMessageNonSelected.textContent = 'At least one Course Add must be Accepted or Rejected!';
+            alert('At least one Course Add must be Accepted or Rejected!');
+            return false;
+        }
 
-        var autoRejections = <?= $auto_rejections; ?>; 
-        var radios = document.querySelectorAll('input[type="radio"]');
-		var checkedOne = Array.prototype.slice.call(radios).some(x => x.checked);
+        if (formBeingSubmitted) {
+            alert('Approving/Rejecting Course Add, please wait a moment...');
+            form.approveRejectAdd.disabled = true;
+            return false;
+        }
 
-        //alert(autoRejections);
-        //alert(checkedOne);
-		if (!checkedOne && autoRejections == 0) {
-            alert('At least one Course Add Must be Accepted or Rejected!');
-			validationMessageNonSelected.innerHTML = 'At least one Course Add Must be Accepted or Rejected!';
-			return false;
-		}
+        form.approveRejectAdd.value = 'Approving/Rejecting Course Add...';
+        formBeingSubmitted = true;
+        return true;
+    }
 
-		if (form_being_submitted) {
-			alert("Approving/Rejecting Course Add, please wait a moment...");
-			form.approveRejectAdd.disabled = true;
-			return false;
-		}
+    // Prevent form resubmission on page reload
+    if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
+    }
 
-		form.approveRejectAdd.value = 'Approving/Rejecting Course Add...';
-		form_being_submitted = true;
-		return true;
-	};
-
-	if (window.history.replaceState) {
-		window.history.replaceState(null, null, window.location.href);
-	}
+    // AJAX for modal content
+    document.querySelectorAll('.jsview').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.getAttribute('href');
+            fetch(url)
+                .then(response => response.text())
+                .then(data => {
+                    document.querySelector('#studentModal .modal-body').innerHTML = data;
+                })
+                .catch(error => {
+                    console.error('Error loading modal content:', error);
+                    document.querySelector('#studentModal .modal-body').innerHTML = 'Error loading student details.';
+                });
+        });
+    });
 </script>

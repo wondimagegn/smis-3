@@ -1,173 +1,221 @@
+<?php
+$role_id=$this->request->getSession()->read('Auth.User.role_id') ;
+$this->assign('title', __('Display Sections: (%s)',
+    ($this->request->getSession()->read('Auth.User.role_id') != ROLE_COLLEGE ? h($departmentname) : h($collegename))));
+?>
+
 <div class="box">
     <div class="box-header bg-transparent">
-        <div class="box-title" style="margin-top: 10px;"><i class="fontello-th-list" style="font-size: larger; font-weight: bold;"></i>
-            <span style="font-size: medium; font-weight: bold; margin-top: 20px;">Display Sections: (<?= (($role_id != ROLE_COLLEGE) ? $departmentname : $collegename); ?>)</span>
-        </div>
+        <h3 class="box-title" style="margin-top: 10px;">
+            <i class="fa fa-th-list" style="font-size: larger; font-weight: bold;"></i>
+            <span style="font-size: medium; font-weight: bold; margin-top: 20px;">
+                <?= __('Display Sections: (%s)', ($this->request->getSession()->read('Auth.User.role_id') != ROLE_COLLEGE ? h($departmentname) : h($collegename))) ?>
+            </span>
+        </h3>
     </div>
     <div class="box-body">
         <div class="row">
-            <div class="large-12 columns">
-                <?= $this->Form->create('Section'); ?>
-                <div style="margin-top: -30px;">
-                    <hr>
-                    <fieldset style="padding-bottom: 0px;padding-top: 15px;">
-                        <!-- <legend>&nbsp;&nbsp; Search / Filter &nbsp;&nbsp;</legend> -->
-                        <div class="row">
-                            <div class="large-3 columns">
-                                <?= $this->Form->input('Section.academicyear', array('options' => $acyear_array_data, 'required', 'style' => 'width:90%;')); ?>
-                            </div>
-                            <?php
-                            if ($role_id != ROLE_COLLEGE) { ?>
-                                <div class="large-3 columns">
-                                    <?= $this->Form->input('Section.year_level_id', array('empty' => '[ Select Year Level ]', 'required', 'style' => 'width:90%;')); ?>
-                                </div>
-                                <?php
-                            } ?>
-                            <div class="large-3 columns">
-                                <?= $this->Form->input('Section.program_id', array(/* 'empty' => "[ Select Program ]", */'required', 'style' => 'width:90%;')); ?>
-                            </div>
-                            <div class="large-3 columns">
-                                <?= $this->Form->input('Section.program_type_id', array(/* 'empty' => "[ Select Program Type ]", */'required', 'style' => 'width:90%;')); ?>
-                            </div>
-                            <?php
-                            if ($role_id == ROLE_COLLEGE) { ?>
-                                <div class="large-3 columns">
-                                    &nbsp;
-                                </div>
-                                <?php
-                            } ?>
+            <div class="col-md-12">
+                <div style="margin-top: -30px;"><hr></div>
+                <?= $this->Form->create('Section', ['url' => ['controller' => 'Sections', 'action' => 'displaySections']]) ?>
+                <fieldset style="padding-bottom: 0px; padding-top: 15px;">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <?= $this->Form->control('academicyear', [
+                                'label' => __('Academic Year: '),
+                                'options' => $acyear_array_data,
+                                'required' => true,
+                                'class' => 'form-control',
+                                'style' => 'width: 90%;'
+                            ]) ?>
                         </div>
-                        <hr>
-                        <?= $this->Form->Submit('Search', array('name' => 'search', 'class' => 'tiny radius button bg-blue', 'div' => false)); ?>
-                    </fieldset>
+                        <div class="col-md-3">
+                            <?= $this->Form->control('program_id', [
+                                'label' => __('Program: '),
+                                'required' => true,
+                                'class' => 'form-control',
+                                'style' => 'width: 90%;'
+                            ]) ?>
+                        </div>
+                        <div class="col-md-3">
+                            <?= $this->Form->control('program_type_id', [
+                                'label' => __('Program Type: '),
+                                'required' => true,
+                                'class' => 'form-control',
+                                'style' => 'width: 90%;'
+                            ]) ?>
+                        </div>
+                        <div class="col-md-3">
+                            <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT): ?>
+                                <?= $this->Form->control('year_level_id', [
+                                    'label' => __('Year Level: '),
+                                    'empty' => '[ Select Year Level ]',
+                                    'required' => true,
+                                    'class' => 'form-control',
+                                    'style' => 'width: 90%;'
+                                ]) ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <hr>
-                </div>
-            </div>
-
-            <?php
-            if (!empty($sections)) { ?>
-                <div class="large-12 columns">
-                    <!-- <table cellpadding="0" cellspacing="0" class="table-borderless">
-                        <tr>
-                            <td>Do you want to swap students?</td>
-                        </tr>
-                        <tr>
-                            <td style="background-color: white;"><?php //echo $this->Form->input('Section.swap', array('div' => false, 'options' => $swapOptions, 'label' => ' Swap By:', 'style' => 'width:150px')); ?></td>
-                        </tr>
-                        <tr>
-                            <td><?php //echo $this->Form->Submit('Swap', array('name' => 'swapStudentSection', 'class' => 'tiny radius button bg-blue', 'div' => false)); ?></td>
-                        </tr>
-                    </table> -->
+                    <?= $this->Form->button(__('Search'), [
+                        'type' => 'submit',
+                        'name' => 'search',
+                        'value' => 'search',
+                        'class' => 'btn btn-primary btn-sm'
+                    ]) ?>
+                </fieldset>
+                <hr>
+                <?php if (!empty($sections)): ?>
+                    <div class="col-md-12">
                     <br>
-
-                    <?php
-                    
-                    if (!empty($studentsections)) {
-                        //debug($studentsections[0]);
-                        foreach ($studentsections as $k => $studentsection) {
-                            $students_per_section = count($studentsection['Student']); ?>
+                    <?php if (!empty($studentsections)): ?>
+                        <?php foreach ($studentsections as $k => $studentsection): ?>
+                            <?php $students_per_section = count($studentsection['Student']); ?>
                             <div style="overflow-x:auto;">
-                                <table cellpadding="0" cellspacing="0" class="table">
+                                <table class="table table-bordered">
                                     <thead>
-                                        <tr>
-                                            <td colspan="4" style="vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85); line-height: 1.5;">
-                                                <span style="font-size:16px;font-weight:bold; margin-top: 25px;"> Section: <?= $studentsection['Section']['name'] . ' ' . (isset($studentsection['YearLevel']['name'])  ?  ' (' . $studentsection['YearLevel']['name']  : ($studentsection['Program']['id'] == PROGRAM_REMEDIAL ? ' (Remedial' : ' (Pre/1st')) . ', ' . $studentsection['Section']['academicyear'] . ')'; ?></span>
-                                                    <br>
-                                                    <span class="text-gray" style="padding-top: 13px; font-size: 13px; font-weight: bold"> 
-                                                        <?= (isset($studentsection['Department']) && !empty($studentsection['Department']['name']) ? $studentsection['Department']['name'] :  $studentsection['College']['name'] . ($studentsection['Program']['id'] == PROGRAM_REMEDIAL ? ' - Remedial Program' : ' - Pre/Freshman')); ?> <?= (isset($studentsection['Program']['name']) && !empty($studentsection['Program']['name']) ? ' &nbsp; | &nbsp; ' . $studentsection['Program']['name'] : ''); ?> <?= (isset($studentsection['ProgramType']['name']) && !empty($studentsection['ProgramType']['name']) ? ' &nbsp; | &nbsp; ' . $studentsection['ProgramType']['name'] : ''); ?> 
+                                    <tr>
+                                        <td colspan="4" style="vertical-align: middle; border-bottom: 2px solid #555; line-height: 1.5;">
+                                                    <span style="font-size: 16px; font-weight: bold; margin-top: 25px;">
+                                                        <?= __(
+                                                            'Section: %s',
+                                                            h($studentsection['Section']['name'] . ' ' . (isset($studentsection['YearLevel']['name']) ? '(' . $studentsection['YearLevel']['name'] : ($studentsection['Program']['id'] == PROGRAM_REMEDIAL ? '(Remedial' : '(Pre/1st')) . ', ' . $studentsection['Section']['academicyear'] . ')')
+                                                        ) ?>
+                                                    </span>
+                                            <br>
+                                            <span class="text-muted" style="padding-top: 13px; font-size: 13px; font-weight: bold;">
+                                                        <?= (isset($studentsection['Department']) && !empty($studentsection['Department']['name'])
+                                                            ? h($studentsection['Department']['name'])
+                                                            : h($studentsection['College']['name']) . ($studentsection['Program']['id'] == PROGRAM_REMEDIAL ? ' - Remedial Program' : ' - Pre/Freshman')) ?>
+                                                <?= isset($studentsection['Program']['name']) && !empty($studentsection['Program']['name']) ? __(' &nbsp; | &nbsp; %s', h($studentsection['Program']['name'])) : '' ?>
+                                                <?= isset($studentsection['ProgramType']['name']) && !empty($studentsection['ProgramType']['name']) ? __(' &nbsp; | &nbsp; %s', h($studentsection['ProgramType']['name'])) : '' ?>
                                                         <br>
                                                     </span>
-                                                </span>
-                                                <span class="text-gray" style="padding-top: 15px; font-size: 13px; font-weight: normal"> 
-                                                    Curriculum: <?= (!empty($sections_curriculum_name[$k]) ? $sections_curriculum_name[$k] : 'Pre/Freshman Section without Curriculum Attachment'); ?> <br>
-                                                    Hosted: <?= ($current_sections_occupation[$k] .' '.  ($current_sections_occupation[$k] > 1 ? ' Students' : ' Student')); ?>
-                                                </span>
-                                            </td>
-                                            <td style="text-align: right; vertical-align:middle; border-bottom-width: 2px; border-bottom-style: solid; border-bottom-color: rgb(85, 85, 85);">
-                                                <?= ($students_per_section ? $this->Html->link($this->Html->image("/img/xls-icon.gif", array("alt" => "Export TO Excel")) . ' Export to Excel', array('action' => 'export', $studentsection['Section']['id']), array('escape' => false)) : '') ?>  &nbsp;&nbsp;&nbsp;&nbsp;
-                                                <?php //echo $this->Html->link($this->Html->image("/img/pdf_icon.gif", array("alt" => "Print To Pdf")) . ' PDF', array('action' => 'view_pdf', $studentsection['Section']['id']), array('escape' => false)); ?> &nbsp;&nbsp;&nbsp;&nbsp;
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th class="center">#</th>
-                                            <th class="vcenter">Student Name</th>
-                                            <th class="center">Sex</th>
-                                            <th class="center">Student ID</th>
-                                            <th class="center">Actions</th>
-                                        </tr>
+                                            <span class="text-muted" style="padding-top: 15px; font-size: 13px; font-weight: normal;">
+                                                        <?= __('Curriculum: %s', !empty($sections_curriculum_name[$k]) ? h($sections_curriculum_name[$k]) : __('Pre/Freshman Section without Curriculum Attachment')) ?>
+                                                        <br>
+                                                        <?= __('Hosted: %s', $current_sections_occupation[$k] . ' ' . ($current_sections_occupation[$k] > 1 ? __('Students') : __('Student'))) ?>
+                                                    </span>
+                                        </td>
+                                        <td style="text-align: right; vertical-align: middle; border-bottom: 2px solid #555;">
+                                            <?= $students_per_section ? $this->Html->link(
+                                                $this->Html->image('/img/xls-icon.gif', ['alt' => __('Export to Excel')]) . ' ' . __('Export to Excel'),
+                                                ['action' => 'export', $studentsection['Section']['id']],
+                                                ['escape' => false]
+                                            ) : '' ?>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-center"><?= __('#') ?></th>
+                                        <th class="text-center"><?= __('Student Name') ?></th>
+                                        <th class="text-center"><?= __('Sex') ?></th>
+                                        <th class="text-center"><?= __('Student ID') ?></th>
+                                        <th class="text-center"><?= __('Actions') ?></th>
+                                    </tr>
                                     </thead>
                                     <tbody>
-                                        <?php
-                                        $counter = 1;
-                                        for ($i = 0; $i < $students_per_section; $i++) {
-                                            if ($studentsection['Student'][$i]['StudentsSection']['archive'] == 0) { 
-                                                $isStudentRegisteredInThisSection = ClassRegistry::init('CourseRegistration')->find('count', array('conditions' => array('CourseRegistration.section_id' => $studentsection['Section']['id'], 'CourseRegistration.student_id' => $studentsection['Student'][$i]['id'])));
-                                                //$isStudentRegisteredInThisSection = (isset($studentsection['Student'][$i]['CourseRegistration']) && !empty($studentsection['Student'][$i]['CourseRegistration']));
-                                                //debug($isStudentRegisteredInThisSection); ?>
-                                                <tr>
-                                                    <td class="center"><?= $counter++; ?></td>
-                                                    <td class="vcenter"><?= $this->Html->link($studentsection['Student'][$i]['full_name'], array('controller' => 'students', 'action' => 'student_academic_profile',  $studentsection['Student'][$i]['id'])); ?></td>
-                                                    <td class="center"><?= (strcasecmp(trim($studentsection['Student'][$i]['gender']), 'male') == 0 ? 'M' :(strcasecmp(trim($studentsection['Student'][$i]['gender']), 'female') == 0 ? 'F' : $studentsection['Student'][$i]['gender'])); ?></td>
-                                                    <td class="center"><?= $studentsection['Student'][$i]['studentnumber']; ?></td>
-                                                    <td class="center" id="ajax_student_'<?= $i; ?>'_'<?= $k; ?>">
-                                                        <?php
-                                                        if ($studentsection['Student'][$i]['graduated'] == 0 && !$isStudentRegisteredInThisSection) { ?>
-                                                            <?php //echo $this->Html->link('Move', '#', array('data-animation' => "fade", 'data-reveal-id' => 'myModalMove', 'data-reveal-ajax' => '/sections/move/' . str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) . '/' . $studentsection['Section']['id'])); ?>&nbsp;&nbsp;
-                                                            <?= $this->Html->link(__('Delete'), array('controller' => 'Sections', 'action' => 'deleteStudentforThisSection', $studentsection['Section']['id'], str_replace('/', '-', $studentsection['Student'][$i]['studentnumber'])), null, sprintf(__('Are you sure you want to delete %s from "%s" section?'), $studentsection['Student'][$i]['full_name'] . '('. str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) .')', $studentsection['Section']['name'] )); ?>
-                                                            <?php
-                                                        } else {?>
-
-                                                            <!-- <span class="text-gray">Move</span>&nbsp;&nbsp; -->
-                                                            <span class="text-gray">Delete</span>&nbsp;&nbsp;
-
-                                                            <?= $this->Html->link(__('Archieve'), array('controller' => 'Sections', 'action' => 'archieveUnarchieveStudentSection', $studentsection['Section']['id'], $studentsection['Student'][$i]['id'], 1), null, sprintf(__('Are you sure you want to Archeive %s form %s section?'), $studentsection['Student'][$i]['full_name'] . '('. str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) .')', $studentsection['Section']['name'] )); ?>
-                                                            <?php //echo $this->Html->link(__('Unarchieve'), array('controller' => 'Sections', 'action' => 'archieveUnarchieveStudentSection', $studentsection['Section']['id'], $studentsection['Student'][$i]['id'], 0), null, sprintf(__('Are you sure you want to Unarcheive %s for %s section?'), $studentsection['Student'][$i]['full_name'] . '('. str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) .')', $studentsection['Section']['name'] )); ?>
-                                                            <?php
-                                                        } ?>
-                                                    </td>
-                                                </tr>
+                                    <?php $counter = 1; ?>
+                                    <?php for ($i = 0; $i < $students_per_section; $i++): ?>
+                                        <?php if ($studentsection['Student'][$i]['StudentsSection']['archive'] == 0): ?>
                                             <?php
-                                            }
-                                        } ?>
+                                            $isStudentRegisteredInThisSection = $this->Sections->CourseRegistrations->find()
+                                                ->where([
+                                                    'CourseRegistration.section_id' => $studentsection['Section']['id'],
+                                                    'CourseRegistration.student_id' => $studentsection['Student'][$i]['id']
+                                                ])
+                                                ->count();
+                                            ?>
+                                            <tr>
+                                                <td class="text-center"><?= h($counter++) ?></td>
+                                                <td class="text-center">
+                                                    <?= $this->Html->link(
+                                                        h($studentsection['Student'][$i]['full_name']),
+                                                        ['controller' => 'Students', 'action' => 'studentAcademicProfile', $studentsection['Student'][$i]['id']]
+                                                    ) ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?= strcasecmp(trim($studentsection['Student'][$i]['gender']), 'male') == 0 ? 'M' :
+                                                        (strcasecmp(trim($studentsection['Student'][$i]['gender']), 'female') == 0 ? 'F' :
+                                                            h($studentsection['Student'][$i]['gender'])) ?>
+                                                </td>
+                                                <td class="text-center"><?= h($studentsection['Student'][$i]['studentnumber']) ?></td>
+                                                <td class="text-center" id="ajax_student_<?= h($i) ?>_<?= h($k) ?>">
+                                                    <?php if ($studentsection['Student'][$i]['graduated'] == 0 && !$isStudentRegisteredInThisSection): ?>
+                                                        <?= $this->Html->link(
+                                                            __('Delete'),
+                                                            ['controller' => 'Sections', 'action' => 'deleteStudentforThisSection', $studentsection['Section']['id'], str_replace('/', '-', $studentsection['Student'][$i]['studentnumber'])],
+                                                            ['confirm' => __(
+                                                                'Are you sure you want to delete %s from "%s" section?',
+                                                                h($studentsection['Student'][$i]['full_name'] . ' (' . str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) . ')'),
+                                                                h($studentsection['Section']['name'])
+                                                            )]
+                                                        ) ?>
+                                                    <?php else: ?>
+                                                        <span class="text-muted"><?= __('Delete') ?></span>&nbsp;&nbsp;
+                                                        <?= $this->Html->link(
+                                                            __('Archive'),
+                                                            ['controller' => 'Sections', 'action' => 'archiveUnarchiveStudentSection', $studentsection['Section']['id'], $studentsection['Student'][$i]['id'], 1],
+                                                            ['confirm' => __(
+                                                                'Are you sure you want to Archive %s from %s section?',
+                                                                h($studentsection['Student'][$i]['full_name'] . ' (' . str_replace('/', '-', $studentsection['Student'][$i]['studentnumber']) . ')'),
+                                                                h($studentsection['Section']['name'])
+                                                            )]
+                                                        ) ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
                                     </tbody>
                                     <tfoot>
-                                        <tr>
-                                            <td>&nbsp;</td>
-                                            <td class="vcenter"><?= $this->Html->link('Move', '#',  array('data-animation' => "fade", 'data-reveal-id' => 'myModalAdd', 'data-reveal-ajax' => '/sections/move_selected_student_section/' . $studentsection['Section']['id'])); ?></td>
-                                            <td class="center" id="ajax_student_'<?= $k; ?>"><?= $this->Html->link('Add', '#', array('data-animation' => "fade", 'data-reveal-id' => 'myModalAdd', 'data-reveal-ajax' => '/sections/add_student_section/' . $studentsection['Section']['id'])); ?></td>
-                                            <td colspan="2">&nbsp;</td>
-                                        </tr>
+                                    <tr>
+                                        <td>&nbsp;</td>
+                                        <td class="text-center">
+                                            <?= $this->Html->link(
+                                                __('Move'),
+                                                '#',
+                                                [
+                                                    'data-animation' => 'fade',
+                                                    'data-reveal-id' => 'myModalMove',
+                                                    'data-reveal-ajax' => $this->Url->build(['controller' => 'Sections', 'action' => 'moveSelectedStudentSection', $studentsection['Section']['id']])
+                                                ]
+                                            ) ?>
+                                        </td>
+                                        <td class="text-center" id="ajax_student_<?= h($k) ?>">
+                                            <?= $this->Html->link(
+                                                __('Add'),
+                                                '#',
+                                                [
+                                                    'data-animation' => 'fade',
+                                                    'data-reveal-id' => 'myModalAdd',
+                                                    'data-reveal-ajax' => $this->Url->build(['controller' => 'Sections', 'action' => 'addStudentSection', $studentsection['Section']['id']])
+                                                ]
+                                            ) ?>
+                                        </td>
+                                        <td colspan="2">&nbsp;</td>
+                                    </tr>
                                     </tfoot>
                                 </table>
                             </div>
                             <br>
-                            <?php
-                        }
-                    } ?>
-                    <?= $this->Form->end(); ?>
-                </div>
-                <?php
-            } else if (empty($sections) && !($isbeforesearch)) { ?>
-                <div class="large-12 columns">
-                    <div class='info-box info-message' style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style='margin-right: 15px;'></span>No Active section is found with the search criteria. You can Use "List Sections" to view Archieved sections instead.</div>
-                </div>
-                <?php
-            } ?>
+                        <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                <?php elseif (empty($sections) && !$isbeforesearch): ?>
+                    <div class="col-md-12">
+                        <div class="alert alert-info" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                            <span style="margin-right: 15px;"></span>
+                            <?= __('No Active section is found with the search criteria. You can use "List Sections" to view Archived sections instead.') ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?= $this->Form->end() ?>
+            </div>
         </div>
     </div>
 </div>
-<!-- <div class="box">
-    <div class="box-body">
-        <div class="row">
-            <div class="large-12 columns"> -->
-                <div id="myModalMove" class="reveal-modal" data-reveal>
 
-                </div>
-
-                <div id="myModalAdd" class="reveal-modal" data-reveal>
-
-                </div>
-            <!-- </div>
-        </div>
-    </div>
-</div> -->
+<div id="myModalMove" class="reveal-modal" data-reveal></div>
+<div id="myModalAdd" class="reveal-modal" data-reveal></div>

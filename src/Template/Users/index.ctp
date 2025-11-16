@@ -1,200 +1,333 @@
+<?php
+use Cake\I18n\Time;
+use Cake\I18n\I18n;
+use Cake\Core\Configure;
+?>
+
+<script type="text/javascript">
+    const inst_role = '<?= ROLE_INSTRUCTOR; ?>';
+    $(document).ready(function() {
+        $('#SearchRoleId').change(function() {
+            if ($(this).val() == inst_role) {
+                $('#showDepartmentDropDown').show();
+            } else {
+                $('#showDepartmentDropDown').hide();
+                $('#SearchStaffDepartmentId').val('');
+            }
+        });
+        $('#getUsers').click(function() {
+            $('#getUsers').val('Searching...');
+            $("#show_list_of_users").hide();
+        });
+        $('#select-all').click(function(event) {
+            $('.checkbox1').prop('checked', $(this).prop('checked'));
+        });
+        $('.checkbox1').click(function(event) {
+            if (!this.checked) {
+                $('#select-all').prop('checked', false);
+            }
+        });
+        $('#delete-form').on('submit', function() {
+            var checkboxes = $('input.checkbox1:checked').length;
+            if (checkboxes === 0) {
+                alert('<?= __('At least one user must be selected to delete!') ?>');
+                return false;
+            }
+            return true;
+        });
+    });
+</script>
+
 <div class="box" style="display: block;">
     <div class="box-header bg-transparent">
-        <div class="box-title" style="margin-top: 10px;"><i class="fontello-th-list" style="font-size: larger; font-weight: bold;"></i>
-            <span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('List of Users'); ?></span>
+        <div class="box-title" style="margin-top: 10px;">
+            <i class="fontello-th-list" style="font-size: larger; font-weight: bold;"></i>
+            <span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= __('List of Users') ?></span>
         </div>
     </div>
     <div class="box-body">
         <div style="margin-top: -30px;">
-            
             <hr>
             <blockquote>
                 <h6><i class="fa fa-info"></i> &nbsp; Important Note:</h6>
-                <p style="text-align:justify;" class="fs16 text-black">Clicking on the <strong>Construct Menu</strong> link will run expensive process that will consume extensive system resourse, please click on the <strong>Construct Menu</strong> if and only if there is a change on the user privilage, assignment of new privilage(s) to the user or provoked privilage(s) from the user.</p> 
+                <p style="text-align:justify;" class="fs16 text-black">
+                    Clicking on the <strong>Construct Menu</strong> link will run an expensive process that will consume extensive system resources. Please click on <strong>Construct Menu</strong> only if there is a change in user privileges, assignment of new privilege(s) to the user, or revoked privilege(s) from the user.
+                </p>
             </blockquote>
             <hr>
 
-            <?= $this->Form->create('User', array('action' => 'search')); ?>
-
+            <!-- Search Form -->
+            <?= $this->Form->create(null, ['type' => 'get', 'url' => ['action' => 'index'], 'class' => 'form-horizontal']) ?>
             <fieldset style="padding-bottom: 0px;">
-                <!-- <legend>&nbsp;&nbsp; Search Filters &nbsp;&nbsp;</legend> -->
                 <div class="row align-items-center">
                     <div class="large-4 columns">
-                        <?= $this->Form->input('Search.name', array('label' => 'Search Key:', 'placeholder' => 'name, username or email', 'default' => $selected_search, 'style' =>'width:90%;')); ?>
+                        <?= $this->Form->control('Search.name', [
+                            'label' => ['text' => __('Search Key'), 'class' => 'control-label'],
+                            'placeholder' => __('name, username or email'),
+                            'value' => $selected_search,
+                            'style' => 'width:90%',
+                            'class' => 'form-control'
+                        ]) ?>
                     </div>
                     <div class="large-4 columns">
-                        <?= $this->Form->input('Search.role_id', array('label' => 'Role: ', 'type' => 'select', 'options' => $roles, 'default' => $selected_role, 'style' =>'width:90%;')); ?>
+                        <?= $this->Form->control('Search.role_id', [
+                            'label' => ['text' => __('Role'), 'class' => 'control-label'],
+                            'type' => 'select',
+                            'options' => $roles,
+                            'value' => $selected_role,
+                            'style' => 'width:90%',
+                            'class' => 'form-control'
+                        ]) ?>
                     </div>
                     <div class="large-4 columns align-self-center">
-                        <?= $this->Form->input('Search.limit', array('id' => 'limit ', 'type' => 'number', 'min'=>'100',  'max'=>'1000', 'value' => $selected_limit, 'step'=>'100', 'class' => 'fs14', 'label' =>' Limit: ', 'style' => 'width:30%;')); ?>
+                        <?= $this->Form->control('Search.limit', [
+                            'id' => 'limit',
+                            'type' => 'number',
+                            'min' => 100,
+                            'max' => 1000,
+                            'value' => $selected_limit,
+                            'step' => 100,
+                            'label' => ['text' => __('Limit'), 'class' => 'control-label'],
+                            'style' => 'width:30%',
+                            'class' => 'fs14'
+                        ]) ?>
                     </div>
                 </div>
                 <div class="row align-items-center justify-content-center">
                     <div class="large-4 columns">
-                        <?= $this->Form->input('Search.orderby', array('label' => 'Order By: ', 'id' => 'orderby', 'class' => 'fs14', 'type' => 'select', 'style' =>'width:90%;', 'options' => array('full_name' => 'Full name', 'username' => 'Username', 'email' => 'Email', 'last_login' => 'Last Login', 'active' => 'Active', 'created' => 'Created Date', 'modified' => 'Modified Date'), 'default' => $order_by)); ?>
+                        <?= $this->Form->control('Search.orderby', [
+                            'label' => ['text' => __('Order By'), 'class' => 'control-label'],
+                            'id' => 'orderby',
+                            'type' => 'select',
+                            'options' => [
+                                'full_name' => __('Full name'),
+                                'username' => __('Username'),
+                                'email' => __('Email'),
+                                'last_login' => __('Last Login'),
+                                'active' => __('Active'),
+                                'created' => __('Created Date'),
+                                'modified' => __('Modified Date')
+                            ],
+                            'value' => $order_by,
+                            'style' => 'width:90%',
+                            'class' => 'fs14'
+                        ]) ?>
                     </div>
                     <div class="large-4 columns">
-                        <?= $this->Form->input('Search.sortorder', array('label' => 'Sort: ', 'id' => 'sortorder', 'class' => 'fs14', 'type' => 'select', 'style' =>'width:90%;', 'options' => array('asc' => 'Ascending', 'desc' => 'Descending'), 'default' => $sort_order)); ?>
+                        <?= $this->Form->control('Search.sortorder', [
+                            'label' => ['text' => __('Sort'), 'class' => 'control-label'],
+                            'id' => 'sortorder',
+                            'type' => 'select',
+                            'options' => ['asc' => __('Ascending'), 'desc' => __('Descending')],
+                            'value' => $sort_order,
+                            'style' => 'width:90%',
+                            'class' => 'fs14'
+                        ]) ?>
                     </div>
                     <div class="large-4 columns">
                         <br>
-                        <?= $this->Form->input('Search.Staff.active', array('label' => 'Active Staff', 'type' => 'checkbox', 'checked' => ((isset($this->data['Search']['Staff']['active']) && $this->data['Search']['Staff']['active']) || $selected_staff_active == 1 ? 'checked' : false))); ?>
-                        <?= $this->Form->input('Search.active', array('label' => 'Active User', 'type' => 'checkbox', 'checked' => ((isset($this->data['Search']['active']) && $this->data['Search']['active']) || $selected_user_active == 1 ? 'checked' : false))); ?>
-
-                        <?= (isset($this->data['Search']['page']) ? $this->Form->hidden('page', array('value' => $this->data['Search']['page'])) : ''); ?>
-						<?= (isset($this->data['Search']['sort']) ? $this->Form->hidden('sort', array('value' => $this->data['Search']['sort'])) : ''); ?>
-						<?= (isset($this->data['Search']['direction']) ? $this->Form->hidden('direction', array('value' => $this->data['Search']['direction'])) : ''); ?>
-
+                        <?= $this->Form->control('Search.Staff.active', [
+                            'label' => ['text' => __('Active Staff'), 'class' => 'control-label'],
+                            'type' => 'checkbox',
+                            'value' => 1,
+                            'checked' => $selected_staff_active == 1
+                        ]) ?>
+                        <?= $this->Form->control('Search.active', [
+                            'label' => ['text' => __('Active User'), 'class' => 'control-label'],
+                            'type' => 'checkbox',
+                            'value' => 1,
+                            'checked' => $selected_user_active == 1
+                        ]) ?>
+                        <?= $this->Form->hidden('page', ['value' => $this->request->getQuery('page')]) ?>
+                        <?= $this->Form->hidden('sort', ['value' => $this->request->getQuery('sort')]) ?>
+                        <?= $this->Form->hidden('direction', ['value' => $this->request->getQuery('direction')]) ?>
                         <br>
                     </div>
                 </div>
+                <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_SYSADMIN): ?>
+                    <div id="showDepartmentDropDown" style="display: <?= $selected_role == ROLE_INSTRUCTOR ? 'block' : 'none'; ?>">
+                        <div class="row align-items-center justify-content-center">
+                            <div class="large-4 columns">
+                                <?= $this->Form->control('Search.Staff.department_id', [
+                                    'label' => ['text' => __('College/Department'), 'class' => 'control-label'],
+                                    'type' => 'select',
+                                    'options' => $departments,
+                                    'empty' => __('[ Any Department ]'),
+                                    'value' => $selected_staff_department_id,
+                                    'style' => 'width:90%',
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
                 <hr>
-                <?= $this->Form->Submit('Search', array('div' => false, 'class' => 'tiny radius button bg-blue', 'name' => 'getUsers')); ?>
+                <?= $this->Form->button(__('Search'), [
+                    'name' => 'getUsers',
+                    'id' => 'getUsers',
+                    'class' => 'tiny radius button bg-blue'
+                ]) ?>
             </fieldset>
-            <?= $this->Form->end(); ?>
-
+            <?= $this->Form->end() ?>
         </div>
         <hr>
-
-        <?php
-        if (!empty($users)) { ?>
-            <br>
-            <div style="overflow-x:auto;">
-                <table cellpadding="0" cellspacing="0" class="table">
-                    <thead>
+        <div id="show_list_of_users">
+            <?php if (!empty($users)): ?>
+                <br>
+                <div style="overflow-x:auto;">
+                    <?= $this->Form->create(null, ['id' => 'delete-form', 'url' => ['action' => 'delete'], 'type' => 'post', 'onsubmit' => 'return checkForm(this);']) ?>
+                    <table cellpadding="0" cellspacing="0" class="table">
+                        <thead>
                         <tr>
-                            <td scope="col" class="center"> # </td>
-                            <td scope="col" style="padding-left: 2%;"> Full Name (Username | Email) </td>
-                            <td scope="col" class="center"> Role </td>
-                            <td scope="col" class="center"> Last Login </td>
-                            <td scope="col" class="center"> Active </td>
-                            <td scope="col" class="actions" class="center"><?= __('Actions'); ?></td>
+                            <th scope="col" class="center"><?= $this->Form->checkbox('select-all', ['id' => 'select-all']) ?></th>
+                            <th scope="col" class="center"><?= $this->Paginator->sort('id', __('#')) ?></th>
+                            <th scope="col" style="padding-left: 2%;"><?= $this->Paginator->sort('full_name', __('Full Name (Username | Email)')) ?></th>
+                            <th scope="col" class="center"><?= $this->Paginator->sort('role_id', __('Role')) ?></th>
+                            <th scope="col" class="center"><?= $this->Paginator->sort('last_login', __('Last Login')) ?></th>
+                            <th scope="col" class="center"><?= $this->Paginator->sort('active', __('Active')) ?></th>
+                            <th scope="col" class="actions center"><?= __('Actions') ?></th>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $start = $this->Paginator->counter('%start%');
-                        foreach ($users as $user) { ?>
+                        </thead>
+                        <tbody>
+                        <?php $count = $this->Paginator->counter(['format' => '{{start}}']); ?>
+                        <?php foreach ($users as $user):
+
+                            ?>
                             <tr>
-                                <td scope="row" class="center"> <?= $start++; ?> </td>
+                                <td class="center">
+                                    <?= $this->Form->checkbox("User.delete.{$user->id}", ['class' => 'checkbox1']) ?>
+                                </td>
+                                <td class="center"><?= $count++ ?></td>
                                 <td style="padding-left: 1%; padding-right:1%">
-                                    <strong><?= $user['User']['full_name']; ?></strong>&nbsp;
-                                    <br /> 
-                                    <i>
-                                        <?php //echo $this->Text->truncate($user['User']['username'] .' | '.(($user['User']['email'] =="" || is_null($user['User']['email'])) ? '---' : $user['User']['email']),50,array('ellipsis' => '...', 'exact' => true,'html' => true));  ?>
-                                        <?= $user['User']['username'] . ' | ' . (($user['User']['email'] == "" || is_null($user['User']['email'])) ? '---' : $user['User']['email']); ?>
-                                        &nbsp;
-                                    </i>
+                                    <strong><?= h($user->full_name) ?></strong>&nbsp;<br>
+                                    <i><?= h($user->username) . ' | ' . (empty($user->email) ? '---' : h($user->email)) ?></i>
+                                </td>
+                                <td class="center">
+                                    <?= h($user->role->name ?? '') ?>
+                                    <?php if ($user->is_admin == 1): ?>
+                                        <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_COLLEGE): ?>
+                                            <br><span class="alert-box success radius">Dean</span>
+                                        <?php elseif ($this->request->getSession()->read('Auth.User.role_id') == ROLE_DEPARTMENT): ?>
+                                            <br><span class="alert-box success radius">Head</span>
+                                        <?php else: ?>
+                                            <br><span class="alert-box success radius">Admin</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="center">
                                     <?php
-                                    echo $user['Role']['name'];
-                                    if ($user['User']['is_admin'] == 1) {
-                                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE) {
-                                            // echo '<br><span class="accepted">Dean</span>'; 
-                                            echo '<br><span class="status-metro status-active">Dean</span>';
-                                        } else if ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT) {
-                                            // echo '<br><span class="accepted">Head</span>'; 
-                                            echo '<br><span class="status-metro status-active">Head</span>';
-                                        } else {
-                                            // echo '<br><span class="accepted">Admin</span>';
-                                            echo '<br><span class="status-metro status-active">Admin</span>';
-                                        }
-                                    } ?>
-                                </td>
-                                <td class="center"><?= (($user['User']['last_login'] == '0000-00-00 00:00:00' || $user['User']['last_login'] == '' || is_null($user['User']['last_login'])) ? '<span class="rejected">Never Logged In</span><br>Created on: ' . $this->Time->format("M j, Y", $user['User']['created'], NULL, NULL) : ($this->Time->timeAgoInWords($user['User']['last_login'], array('format' => 'M j, Y', 'end' => '1 year', 'accuracy' => array('month' => 'month'))))); ?>&nbsp;</td>
-                                <td class="center">
-                                    <?php
-                                    echo ($user['User']['active'] == 1 ? 'Yes' : '<span class="rejected">No</span>');
-                                    //echo ($user['User']['active'] == 1 ? '<span class="status-metro status-active" title="Yes">Yes</span>' : '<span class="status-metro status-suspended" title="No">No</span>');
-
-                                    $canbe_deactivated = date("Y-m-d H:i:s", mktime(date("H"), date("i"), date("s"), date("n"), date("j"), date("Y") - Configure::read('Users.AccountDeactivation.yearstoLookGivenLastLogin')));
-
-                                    if ($user['User']['active'] == 1 && ($canbe_deactivated > $user['User']['last_login'] && $canbe_deactivated > $user['User']['created']) && $this->Session->read('Auth.User')['id'] != $user['User']['id']) {
-                                        echo '<br>' . $this->Html->link(__('Deactivate'), array('action' => 'deactivate_account', $user['User']['id']), array('confirm' => __('Are you sure you want to send account deactivation request to system administrators for {0}?', $user['User']['full_name'] . ' (' . $user['User']['username'] . ')')));
-                                    } else if ($user['User']['active'] == 0) {
-                                        echo '<br>' . $this->Html->link(__('Activate'), array('action' => 'activate_account', $user['User']['id']), array('confirm' => __('Are you sure you want to send account activation request to system administrators for {0}?', $user['User']['full_name'] . ' (' . $user['User']['username'] . ')')));
+                                    if (empty($user->last_login) || $user->last_login == '0000-00-00 00:00:00') {
+                                        echo '<span class="alert-box alert radius">' . __('Never Logged In') . '</span><br>';
+                                        echo __('Created on: ') . (new Time($user->created))->format('M j, Y');
+                                    } else {
+                                        echo (new Time($user->last_login))->timeAgoInWords(['format' => 'M j, Y', 'end' => '1 year', 'accuracy' => ['month' => 'month']]);
                                     }
-
-                                    if ($this->Session->read('Auth.User')['id'] == $user['User']['id']) {
-                                        //echo '<br><span class="accepted">own account</span>';
-                                        echo '<br><span class="status-metro status-active">own account</span>';
-                                    } ?>
+                                    ?>
+                                </td>
+                                <td class="center">
+                                    <?php
+                                    $canBeDeactivated = (new Time())->modify('-' .
+                                        Configure::read('Users.AccountDeactivation.yearstoLookGivenLastLogin') . ' years');
+                                    if ($user->active == 1) {
+                                        echo __('Yes');
+                                        $lastLogin = $user->last_login instanceof \Cake\I18n\Time ? $user->last_login : null;
+                                        $created = $user->created instanceof \Cake\I18n\Time ? $user->created : null;
+                                        if ($lastLogin && $created && $canBeDeactivated->gt($lastLogin) && $canBeDeactivated->gt($created) && $this->request->getSession()->read('Auth.User.id') != $user->id) {
+                                            echo '<br>' . $this->Html->link(
+                                                    __('Deactivate'),
+                                                    ['action' => 'deactivate_account', $user->id],
+                                                    ['confirm' => __('Are you sure you want to send account deactivation request to system administrators for {0}?', $user->full_name . ' (' . $user->username . ')')]
+                                                );
+                                        }
+                                    } else {
+                                        echo '<span class="alert-box alert radius">' . __('No') . '</span>';
+                                        echo '<br>' . $this->Html->link(
+                                                __('Activate'),
+                                                ['action' => 'activate_account', $user->id],
+                                                ['confirm' => __('Are you sure you want to send account activation request to system administrators for {0}?', $user->full_name . ' (' . $user->username . ')')]
+                                            );
+                                    }
+                                    if ($this->request->getSession()->read('Auth.User.id') == $user->id) {
+                                        echo '<br><span class="alert-box success radius">' . __('own account') . '</span>';
+                                    }
+                                    ?>
                                 </td>
                                 <td class="actions center">
-                                    <?php
-                                    
-                                    echo $this->Html->link(__(''), array('action' => 'view', $user['User']['id']), array('class' => 'fontello-eye', 'title' => 'View'));
-                                    
-                                    if (($user['User']['id'] == $this->Session->read('Auth.User')['id']) || ($this->Session->read('Auth.User')['role_id'] == ROLE_SYSADMIN) || (ENABLE_INSTRUCTOR_USER_EDIT_COLLEGE_DEPARTMENT && $this->Session->read('Auth.User')['is_admin'] && ($this->Session->read('Auth.User')['role_id'] == ROLE_DEPARTMENT || $this->Session->read('Auth.User')['role_id'] == ROLE_COLLEGE))) {
-                                        echo $this->Html->link(__(''), array('action' => 'edit', $user['User']['id']), array('class' => 'fontello-pencil', 'title' => 'Edit'));
-                                    }
-
-                                    if ($user['User']['role_id'] != ROLE_INSTRUCTOR) {
-                                        echo $this->Html->link(__(''), array('action' => 'build_user_menu', $user['User']['id']), array('class' => 'icon icon-clockwise', 'title' => 'Construct Menu'));
-                                    }
-
-                                    if ($user['User']['active'] == 0 && $this->Session->read('Auth.User')['role_id'] == $user['User']['role_id']) {
-                                        //echo $this->Html->link(__(''), array('action' => 'resetpassword'), array('onclick'=>'return false', 'style'=>'color:gray'), array('class'=>'fontello-key-outline','title'=>'Reset Password'));
-                                    } else {
-                                        if ($this->Session->read('Auth.User')['role_id'] == ROLE_INSTRUCTOR) {
-                                            //echo $this->Html->link(__(''), array('action' => 'resetpassword'), array('onclick'=>'return false', 'style'=>'color:gray'), array('class'=>'fontello-key-outline','title'=>'Reset Password'));
-                                        }
-                                        if (($this->Session->read('Auth.User')['role_id'] == $user['User']['role_id']) && ($this->Session->read('Auth.User')['role_id'] != ROLE_SYSADMIN) && ($this->Session->read('Auth.User')['is_admin'] == 1) && ($this->Session->read('Auth.User')['id'] != $user['User']['id']) && ($user['User']['role_id'] != ROLE_INSTRUCTOR)) {
-                                            echo $this->Html->link(__(''), array('action' => 'resetpassword', $user['User']['id']), array('class' => 'fontello-key', 'title' => 'Reset Password'));
-                                        }
-                                    }
-
-                                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_REGISTRAR || $this->Session->read('Auth.User')['role_id'] == $this->Session->read('Auth.User')['Role']['parent_id']) {
-                                        if ($user['User']['active'] == 0) {
-                                            //echo $this->Html->link(__(''), array('action' => 'assign'),array('onclick'=>'return false', 'style'=>'color:gray'),array('class'=>'fontello-users','title'=>'Assign')); 
-                                        } else {
-                                            echo $this->Html->link(__(''), array('action' => 'assign', $user['User']['id']), array('class' => 'fontello-users', 'title' => 'Assign'));
-                                        }
-                                    }
-
-                                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_ACCOMODATION) {
-                                        if ($user['User']['active'] == 0) {
-                                            //echo $this->Html->link(__(''), array('action' => 'assign_user_dorm_block'),array('onclick'=>'return false', 'style'=>'color:gray'), array('class'=>'fontello-users','title'=>'Assign Dorm Block'));
-                                        } else {
-                                            echo $this->Html->link(__(''), array('action' => 'assign_user_dorm_block', $user['User']['id']), array('class' => 'fontello-users', 'title' => 'Assign Dorm Block'));
-                                        }
-                                    }
-
-                                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_MEAL) {
-                                        if ($user['User']['active'] == 0) {
-                                            //echo $this->Html->link(__(''), array('action' => 'assign_user_meal_hall'),array('onclick'=>'return false', 'style'=>'color:gray'),array('class'=>'fontello-users','title'=>'Assign Meal Hall')); 
-                                        } else {
-                                            echo $this->Html->link(__(''), array('action' => 'assign_user_meal_hall', $user['User']['id']), array('class' => 'fontello-users', 'title' => 'Assign Meal Hall'));
-                                        }
-                                    }
-
-                                    if ($this->Session->read('Auth.User')['role_id'] == ROLE_SYSADMIN) {
-                                        //echo $this->Html->link(__(''), array('action' => 'delete', $user['User']['id']),array('class'=>'fontello-trash','title'=>'Delete'));  
-                                    } ?>
+                                    <?= $this->Html->link('', ['action' => 'view', $user->id], ['class' => 'fontello-eye', 'title' => __('View')]) ?>
+                                    <?php if ($user->id == $this->request->getSession()->read('Auth.User.id') || $this->request->getSession()->read('Auth.User.role_id') == ROLE_SYSADMIN || (Configure::read('ENABLE_INSTRUCTOR_USER_EDIT_COLLEGE_DEPARTMENT') && $this->request->getSession()->read('Auth.User.is_admin') && in_array($this->request->getSession()->read('Auth.User.role_id'), [ROLE_DEPARTMENT, ROLE_COLLEGE]))): ?>
+                                        <?= $this->Html->link('', ['action' => 'edit', $user->id], ['class' => 'fontello-pencil', 'title' => __('Edit')]) ?>
+                                    <?php endif; ?>
+                                    <?php if ($user->role_id != ROLE_INSTRUCTOR): ?>
+                                        <?= $this->Html->link('', ['action' => 'build_user_menu', $user->id], ['class' => 'fontello-clockwise', 'title' => __('Construct Menu')]) ?>
+                                    <?php endif; ?>
+                                    <?php if ($user->active == 0 && $this->request->getSession()->read('Auth.User.role_id') == $user->role_id): ?>
+                                        <!-- Disabled reset password link -->
+                                    <?php elseif ($this->request->getSession()->read('Auth.User.role_id') == ROLE_INSTRUCTOR): ?>
+                                        <!-- Disabled reset password link -->
+                                    <?php elseif ($this->request->getSession()->read('Auth.User.role_id')
+                                        == $user->role_id &&
+                                        $this->request->getSession()->read('Auth.User.role_id')
+                                        != ROLE_SYSADMIN &&
+                                        $this->request->getSession()->read('Auth.User.is_admin')
+                                        == 1 && $this->request->getSession()->read('Auth.User.id')
+                                        != $user->id && $user->role_id != ROLE_INSTRUCTOR): ?>
+                                        <?= $this->Html->link('', ['action' => 'resetpassword',
+                                            $user->id], ['class' => 'fontello-key',
+                                            'title' => __('Reset Password')]) ?>
+                                    <?php endif; ?>
+                                    <?php if (in_array($this->request->getSession()->read('Auth.User.role_id'), [ROLE_REGISTRAR, $user->Role->parent_id])): ?>
+                                        <?php if ($user->active == 0): ?>
+                                            <!-- Disabled assign link -->
+                                        <?php else: ?>
+                                            <?= $this->Html->link('', ['action' => 'assign', $user->id], ['class' => 'fontello-users', 'title' => __('Assign')]) ?>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_ACCOMODATION): ?>
+                                        <?php if ($user->active == 0): ?>
+                                            <!-- Disabled assign dorm block link -->
+                                        <?php else: ?>
+                                            <?= $this->Html->link('', ['action' => 'assign_user_dorm_block', $user->id], ['class' => 'fontello-users', 'title' => __('Assign Dorm Block')]) ?>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_MEAL): ?>
+                                        <?php if ($user->active == 0): ?>
+                                            <!-- Disabled assign meal hall link -->
+                                        <?php else: ?>
+                                            <?= $this->Html->link('', ['action' => 'assign_user_meal_hall', $user->id], ['class' => 'fontello-users', 'title' => __('Assign Meal Hall')]) ?>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    <?php if ($this->request->getSession()->read('Auth.User.role_id') == ROLE_SYSADMIN): ?>
+                                        <!-- Delete link disabled as per original -->
+                                    <?php endif; ?>
                                 </td>
                             </tr>
-                            <?php
-                        } ?>
-                    <tbody>
-                </table>
-            </div>
-            <br>
-
-			<hr>
-			<div class="row">
-				<div class="large-5 columns">
-					<?= $this->Paginator->counter(array('format' => __('Page %page% of %pages%, showing %current% records out of %count% total'))); ?>
-				</div>
-				<div class="large-7 columns">
-					<div class="pagination-centered">
-						<ul class="pagination">
-							<?= $this->Paginator->prev('<< ' . __(''), array('tag' => 'li'), null, array('class' => 'arrow unavailable')); ?> <?= $this->Paginator->numbers(array('separator' => '', 'tag' => 'li')); ?> <?= $this->Paginator->next(__('') . ' >>', array('tag' => 'li'), null, array('class' => 'arrow unavailable')); ?>
-						</ul>
-					</div>
-				</div>
-			</div>
-            <?php
-        } ?>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <div class="form-group">
+                        <?= $this->Form->button(__('Delete Selected'), ['id' => 'delete-selected', 'class' => 'tiny radius button bg-blue']) ?>
+                    </div>
+                    <div class="row">
+                        <div class="large-5 columns">
+                            <?= $this->Paginator->counter(['format' => __('Page {{page}} of {{pages}}, showing {{current}} records out of {{count}} total')]) ?>
+                        </div>
+                        <div class="large-7 columns">
+                            <div class="pagination-centered">
+                                <ul class="pagination">
+                                    <?= $this->Paginator->prev('<< ' . __('Previous'), ['tag' => 'li'], null, ['class' => 'arrow unavailable']) ?>
+                                    <?= $this->Paginator->numbers(['tag' => 'li', 'currentClass' => 'current', 'separator' => '']) ?>
+                                    <?= $this->Paginator->next(__('Next') . ' >>', ['tag' => 'li'], null, ['class' => 'arrow unavailable']) ?>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <?= $this->Form->end() ?>
+                </div>
+            <?php else: ?>
+                <div class="alert-box info">
+                    <span></span> <?= __('No users found with the given search criteria') ?>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 </div>

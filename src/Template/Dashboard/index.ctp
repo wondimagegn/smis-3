@@ -1,6 +1,7 @@
 <?php
 use Cake\Core\Configure;
 use Cake\Utility\Inflector;
+$role_id=$this->getRequest()->getSession()->read('Auth')['User']['role_id'];
 ?>
 <div class="row">
     <div class="large-12 columns">
@@ -29,8 +30,7 @@ use Cake\Utility\Inflector;
                     <span class="box-btn" data-widget="collapse">
                         <i class="icon-minus"></i>
                     </span>
-                    <!-- <span class="box-btn" data-widget="remove"><i class="icon-cross"></i></span> -->
-                </div>
+                    </div>
                 <h3 class="box-title">
                     <i class="fontello-chat-alt"></i><span>Messages</span>
                 </h3>
@@ -74,8 +74,7 @@ use Cake\Utility\Inflector;
                         <span class="box-btn" data-widget="collapse">
                             <i class="icon-minus"></i>
                         </span>
-                        <!-- <span class="box-btn" data-widget="remove"><i class="icon-cross"></i></span> -->
-                    </div>
+                        </div>
                     <h3 class="box-title">
                         <i class="fontello-graduation-cap"></i><span>Rank</span>
                     </h3>
@@ -174,7 +173,8 @@ use Cake\Utility\Inflector;
         </div>
     <?php endif; ?>
 
-    <?php if ($role_id == ROLE_COLLEGE || $role_id == ROLE_DEPARTMENT || $role_id == ROLE_REGISTRAR) : ?>
+    <?php if ($role_id == ROLE_COLLEGE || $role_id == ROLE_DEPARTMENT
+        || $role_id == ROLE_REGISTRAR) : ?>
         <div class="large-4 columns">
             <div class="box" ng-controller="gradeChangeController">
                 <div class="box-header bg-transparent">
@@ -188,10 +188,11 @@ use Cake\Utility\Inflector;
                         <i class="fontello-check"></i><span>Grade Change Approval</span>
                     </h3>
                 </div>
-                <div class="box-body" id="GradeChangeApproval" style="display: block; margin-top: -15px;">
+                <div ng-init="getAll()" class="box-body" id="GradeChangeApproval"
+                     style="display: block; margin-top: -15px;">
                     <loading-ajax></loading-ajax>
                     <table cellpadding="0" cellspacing="0" class="table">
-                        <tbody ng-init="getAll()">
+                        <tbody >
                         <tr ng-if="isNotZeroOrUndefined(exam_grade_change_requests)">
                             <td>
                                 <a ng-href="/examGradeChanges/manageDepartmentGradeChange">
@@ -290,13 +291,13 @@ use Cake\Utility\Inflector;
                 <div class="box-header bg-transparent">
                     <div class="pull-right box-tools">
                         <span class="box-btn" data-widget="collapse"><i class="icon-minus"></i></span>
-                        <!-- <span class="box-btn" data-widget="remove"><i class="icon-cross"></i></span> -->
-                    </div>
+                      </div>
                     <h3 class="box-title"><i class="fontello-check"></i><span>Grade Approval/Confirmation</span></h3>
                 </div>
                 <loading-ajax> </loading-ajax>
 
-                <div class="box-body" style="display: block; margin-top: -15px;" id="GradeConfiramationApproval" ng-controller="gradeApprovalConfirmation">
+                <div class="box-body" style="display: block; margin-top: -15px;" id="GradeConfiramationApproval"
+                     ng-controller="gradeApprovalConfirmation">
                     <table cellpadding="0" cellspacing="0" class="table">
                         <tr ng-repeat="grade in courses_for_dpt_approvals | startFrom:currentPage*pageSize | limitTo:pageSize">
                             <td>
@@ -357,7 +358,7 @@ use Cake\Utility\Inflector;
                     <table ng-show="courses_for_registrar_approval.length > 0" cellpadding="0" cellspacing="0" class="table">
                         <tr ng-repeat="grade in courses_for_registrar_approval | startFrom:currentPage*pageSize | limitTo:pageSize">
                             <td>
-                                <a ng-href="/examGrades/confirmGradeSubmission/{{grade.PublishedCourse.id}}">
+                                <a ng-href="/examGrades/confirmGradeSubmission/{{grade.id}}">
                                     Instructor: {{grade.course_instructor_assignments[0].staff.Title.title}}. {{grade.course_instructor_assignments[0].staff.full_name}} <br />
                                     Course: {{grade.course.course_title}} ({{ grade.course.course_code }}) <br />
                                     Department: {{grade.department.name}} {{grade.college.name}} <br />

@@ -1,45 +1,75 @@
-<?php echo $this->Form->create('AcceptedStudent', array('action' => 'place_to_campus'));?> 
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-            	
-<div>
-<?php if(!isset($show_list_generated) || empty($acceptedStudents)) { ?>
-<div class="smallheading"><?php echo __('Place Student To Campuses')?></div>
-<?php if(!isset($show_list_generated) || empty($acceptedStudents)) { ?>
-<table cellpadding="0" cellspacing="0"><tr> 
-	<?php 
-			echo '<td>'.$this->Form->input('AcceptedStudent.academicyear',array('id'=>'academicyear',
-                'label' => 'Academic Year','type'=>'select','options'=>$acyear_array_data,
-                'empty'=>"--Select Academic Year--",'selected'=>isset($selectedsacdemicyear)?$selectedsacdemicyear:'')).'</td>';
-            echo '<td>'. $this->Form->input('AcceptedStudent.college_id',array('empty'=>"--Select College--")).'</td></tr>';
-            echo '<tr><td>'. $this->Form->input('AcceptedStudent.program_id',array('empty'=>"--Select Program--")).'</td>'; 
-            echo '<td>'. $this->Form->input('AcceptedStudent.program_type_id',array('empty'=>"--Select Program Type--")).'</td></tr>'; 
-            ?>
-	<tr><td><?php echo $this->Form->submit('Randmly Place To Campus',array('name'=>'search','div'=>'false','class'=>'tiny radius button bg-blue')); ?> </td>	
-	<td><?php echo $this->Form->submit('Cancel The Assignment',array('name'=>'cancel','div'=>'false','class'=>'tiny radius button bg-blue')); ?> </td>	
-		
-</tr>
+<?php
+use Cake\I18n\I18n;
 
-</table>
-<?php } ?>
-<?php 
-}
-
-if(!empty($acceptedStudents)){
+$this->set('title', __('Place Student To Campuses'));
 ?>
 
-<?php 
-} else if(empty($acceptedStudents) && !($isbeforesearch)){
-    echo "<div class='info-box info-message'> <span></span> No Accepted students without campus assignment in these selected criteria</div>";
-}
-?>
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="accepted-students-index">
+                        <h2><?= __('Place Student To Campuses') ?></h2>
+                        <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'placeToCampus'], 'class' => 'form-horizontal']) ?>
+                        <?php if (empty($showListGenerated) || empty($acceptedStudents)): ?>
+                            <table class="table">
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.academic_year', [
+                                            'id' => 'academic-year',
+                                            'label' => ['text' => __('Academic Year'), 'class' => 'control-label'],
+                                            'type' => 'select',
+                                            'options' => $academicYearList,
+                                            'empty' => __('--Select Academic Year--'),
+                                            'value' => $selectedAcademicYear ?? '',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.college_id', [
+                                            'empty' => __('--Select College--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.program_id', [
+                                            'empty' => __('--Select Program--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.program_type_id', [
+                                            'empty' => __('--Select Program Type--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Randomly Place To Campus'), ['name' => 'search', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Cancel The Assignment'), ['name' => 'cancel', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        <?php endif; ?>
+                        <?php if (empty($acceptedStudents) && !$isBeforeSearch): ?>
+                            <div class="alert alert-info">
+                                <span></span><?= __('No Accepted students without campus assignment in these selected criteria') ?>
+                            </div>
+                        <?php endif; ?>
+                        <?= $this->Form->end() ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
-<?php  
-echo $this->Form->end();
-?>

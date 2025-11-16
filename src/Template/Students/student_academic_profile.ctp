@@ -6,18 +6,23 @@
  * @var int $role_id
  */
 
-$this->assign('title', __('Student Academic Profile') . (isset($studentAcademicProfile['BasicInfo']['Student'])
+$this->assign('title', __('Student Academic Profile') .
+    (empty($studentAcademicProfile['BasicInfo']['Student'])
         ? ' - ' . h($studentAcademicProfile['BasicInfo']['Student']['full_name']) . ' (' .
         h($studentAcademicProfile['BasicInfo']['Student']['studentnumber']) . ')'
         : ''));
+
+$role_id = $this->request->getSession()->read('Auth.User.role_id');
+
+
 ?>
 <div class="box">
     <div class="box-header bg-transparent">
         <div class="box-title" style="margin-top: 10px;"><i class="fontello-vcard" style="font-size: larger; font-weight: bold;"></i>
             <span style="font-size: medium; font-weight: bold; margin-top: 20px;"><?= __('Student Academic Profile'); ?>
-                <?= (isset($student_academic_profile['BasicInfo']['Student']) ? ' - '.
-                    $student_academic_profile['BasicInfo']['Student']['full_name'] . ' ('.
-                    $student_academic_profile['BasicInfo']['Student']['studentnumber'] .')' : ''); ?> </span>
+                <?= (empty($studentAcademicProfile['BasicInfo']['Student']) ? ' - '.
+                    $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('.
+                    $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')' : ''); ?> </span>
         </div>
     </div>
     <div class="box-body">
@@ -26,7 +31,7 @@ $this->assign('title', __('Student Academic Profile') . (isset($studentAcademicP
                 <hr>
                 <?= $this->Form->create($student, ['url' => ['action' => 'studentAcademicProfile']]) ?>
                 <?php
-                if ($role_id != ROLE_STUDENT && !isset($studentAcademicProfile)) { ?>
+                if ($role_id != ROLE_STUDENT && empty($studentAcademicProfile)) { ?>
                     <fieldset style="padding-bottom: 5px;">
                         <legend>&nbsp;&nbsp; Student Number / ID &nbsp;&nbsp;</legend>
                         <div class="row">

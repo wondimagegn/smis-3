@@ -1,22 +1,26 @@
 <?php
-if (isset($gradeStatistics['statistics']) && !empty($gradeStatistics['statistics'])) { ?>
-    <?php //echo $this->element('reports/graph-grade-statistics'); ?>
+$this->assign('title', __('Course Grade Statistics'));
+?>
+
+<?php if (isset($gradeStatistics['statistics']) && !empty($gradeStatistics['statistics'])): ?>
     <br><br><br>
-    <h6 class="fs13"><span class="text-black">Grade Distribution: </h6>
-    <table cellpadding="0" cellspacing="0" class="table" style="width:30%;">
+    <h6 style="font-size: 13px;">
+        <span class="text-dark"><?= __('Grade Distribution:') ?></span>
+    </h6>
+    <table class="table table-bordered" style="width: 30%;">
+        <thead>
         <tr>
-            <th style="text-align: center;"> Grade </th>
-            <th style="text-align: center;"> Frequency </th>
+            <th style="text-align: center;"><?= __('Grade') ?></th>
+            <th style="text-align: center;"><?= __('Frequency') ?></th>
         </tr>
-        <?php
-        $count = 0;
-        foreach ($gradeStatistics['statistics'] as $grade => $freq) { ?>
+        </thead>
+        <tbody>
+        <?php foreach ($gradeStatistics['statistics'] as $grade => $freq): ?>
             <tr>
-                <td style="text-align: center;"> <?= $grade; ?> </td>
-                <td style="text-align: center;"><?= $freq; ?> </td>
+                <td style="text-align: center;"><?= h($grade) ?></td>
+                <td style="text-align: center;"><?= h($freq) ?></td>
             </tr>
-            <?php 
-        } ?>
+        <?php endforeach; ?>
+        </tbody>
     </table>
-    <?php
-} ?>
+<?php endif; ?>

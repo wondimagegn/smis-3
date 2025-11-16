@@ -1,5 +1,6 @@
 <?php
 use Cake\Core\Configure;
+debug($studentAcademicProfile);
 if (isset($studentAcademicProfile['Exam Result']) && !empty($studentAcademicProfile['Exam Result'])) {
 	$student_copys = $studentAcademicProfile['Exam Result'];
 	$credit_type = '';

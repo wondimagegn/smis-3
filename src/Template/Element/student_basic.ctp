@@ -1,5 +1,6 @@
 <?php
-if (isset($student_section_exam_status) && !empty($student_section_exam_status)) {  ?>
+if (isset($studentSectionExamStatus) && !empty($studentSectionExamStatus)) {
+    ?>
     <table cellpadding="0" cellspacing="0" class="table">
         <tr>
             <td>
@@ -9,43 +10,63 @@ if (isset($student_section_exam_status) && !empty($student_section_exam_status))
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">Full Name: </span>
-                                    <?= (isset($student_section_exam_status['StudentBasicInfo']['full_name']) ? $student_section_exam_status['StudentBasicInfo']['full_name'] . ' &nbsp; &nbsp; &nbsp; &nbsp; ' .  $this->Html->link('Open Profile', array('controller' => 'students', 'action' => 'student_academic_profile', $student_section_exam_status['StudentBasicInfo']['id'])) : (isset($student_section_exam_status['Student']['full_name']) ? $student_section_exam_status['Student']['full_name']  . ' &nbsp; &nbsp; &nbsp; &nbsp; '.  $this->Html->link('Open Profile', array('controller' => 'students', 'action' => 'student_academic_profile', $student_section_exam_status['Student']['id'])) : '')); ?>
+                                    <?= (isset($studentSectionExamStatus['StudentBasicInfo']['full_name']) ?
+                                        $studentSectionExamStatus['StudentBasicInfo']['full_name'] .
+                                        ' &nbsp; &nbsp; &nbsp; &nbsp; ' .  $this->Html->link('Open Profile',
+                                            array('controller' => 'students', 'action' => 'studentAcademicProfile',
+                                                $studentSectionExamStatus['StudentBasicInfo']['id'])) :
+                                        (isset($studentSectionExamStatus['Student']['full_name']) ?
+                                            $studentSectionExamStatus['Student']['full_name']  .
+                                            ' &nbsp; &nbsp; &nbsp; &nbsp; '.  $this->Html->link('Open Profile',
+                                                array('controller' => 'students', 'action' => 'studentAcademicProfile',
+                                                    $studentSectionExamStatus['Student']['id'])) : '')); ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">Student ID: </span>
-                                    <?= (isset($student_section_exam_status['StudentBasicInfo']['studentnumber']) ? $student_section_exam_status['StudentBasicInfo']['studentnumber'] : (isset($student_section_exam_status['Student']['studentnumber']) ? $student_section_exam_status['Student']['studentnumber'] : '')); ?>
+                                    <?= (isset($studentSectionExamStatus['StudentBasicInfo']['studentnumber']) ?
+                                        $studentSectionExamStatus['StudentBasicInfo']['studentnumber'] :
+                                        (isset($studentSectionExamStatus['Student']['studentnumber']) ?
+                                            $studentSectionExamStatus['Student']['studentnumber'] : '')); ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">Sex: </span>
-                                    <?= (isset($student_section_exam_status['StudentBasicInfo']['gender']) ? (ucfirst(strtolower(trim($student_section_exam_status['StudentBasicInfo']['gender'])))) :  (isset($student_section_exam_status['Student']['gender']) ? (ucfirst(strtolower(trim($student_section_exam_status['Student']['gender'])))) : '')); ?>
+                                    <?= (isset($studentSectionExamStatus['StudentBasicInfo']['gender']) ?
+                                        (ucfirst(strtolower(trim($studentSectionExamStatus['StudentBasicInfo']['gender']))))
+                                        :  (isset($studentSectionExamStatus['Student']['gender'])
+                                            ? (ucfirst(strtolower(trim($studentSectionExamStatus['Student']['gender'])))) :
+                                            '')); ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">
-                                        <?= (isset($student_section_exam_status['College']['type']) ? $student_section_exam_status['College']['type'].': ' : 'College: '); ?>
+                                        <?= (isset($studentSectionExamStatus['College']['type']) ?
+                                            $studentSectionExamStatus['College']['type'].': ' : 'College: '); ?>
                                     </span>
-                                    <?= $student_section_exam_status['College']['name']; ?>
+                                    <?= $studentSectionExamStatus['College']['name']; ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">
-                                        <?= (isset($student_section_exam_status['Department']['type']) ? $student_section_exam_status['Department']['type'].': ' : 'Department: '); ?>
+                                        <?= (isset($studentSectionExamStatus['Department']['type']) ?
+                                            $studentSectionExamStatus['Department']['type'].': ' : 'Department: '); ?>
                                     </span>
-                                    <?= (isset($student_section_exam_status['Department']['name']) ? $student_section_exam_status['Department']['name'] : 'Pre/Freshman'); ?>
+                                    <?= (isset($studentSectionExamStatus['Department']['name']) ?
+                                        $studentSectionExamStatus['Department']['name'] : 'Pre/Freshman'); ?>
                                 </td>
                             </tr>
                             <?php
-                            if (isset($student_section_exam_status['Curriculum']['name'])) { ?>
+                            if (isset($studentSectionExamStatus['Curriculum']['name'])) { ?>
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">Attached Curriculum: </span>
-                                        <?= $student_section_exam_status['Curriculum']['name'] . ' - '. $student_section_exam_status['Curriculum']['year_introduced']; ?>
+                                        <?= $studentSectionExamStatus['Curriculum']['name'] . ' - '.
+                                        $studentSectionExamStatus['Curriculum']['year_introduced']; ?>
                                     </td>
                                 </tr>
                                 <?php
@@ -53,27 +74,39 @@ if (isset($student_section_exam_status) && !empty($student_section_exam_status))
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">Program: </span>
-                                    <?= (isset($student_section_exam_status['Program']['name']) ? $student_section_exam_status['Program']['name'] : 'N/A'); ?>
+                                    <?= (isset($studentSectionExamStatus['Program']['name']) ?
+                                        $studentSectionExamStatus['Program']['name'] : 'N/A'); ?>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font">
                                     <span class="text-gray">Program Type: </span>
-                                    <?= (isset($student_section_exam_status['ProgramType']['name']) ? $student_section_exam_status['ProgramType']['name'] : 'N/A'); ?>
+                                    <?= (isset($studentSectionExamStatus['ProgramType']['name']) ?
+                                        $studentSectionExamStatus['ProgramType']['name'] : 'N/A'); ?>
                                 </td>
                             </tr>
                             <?php
-                            if ($student_section_exam_status['StudentBasicInfo']['graduated'] == 0) { ?>
+                            if ($studentSectionExamStatus['StudentBasicInfo']['graduated'] == 0) { ?>
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">Year Level: </span>
-                                        <?= (isset($student_section_exam_status['Section']['YearLevel']['name']) ? $student_section_exam_status['Section']['YearLevel']['name'] . ' (' . $student_section_exam_status['Section']['academicyear'] . ')' : (isset($student_section_exam_status['Section']) && empty($student_section_exam_status['Section']['YearLevel']) ? 'Pre/1st' . ' (' . $student_section_exam_status['Section']['academicyear'] . ')' : '---')); ?>
+                                        <?= (isset($studentSectionExamStatus['Section']['year_level']['name']) ?
+                                            $studentSectionExamStatus['Section']['year_level']['name'] . ' (' .
+                                            $studentSectionExamStatus['Section']['academic_year'] . ')' :
+                                            (isset($studentSectionExamStatus['Section']) &&
+                                            empty($studentSectionExamStatus['Section']['year_level']) ? 'Pre/1st' .
+                                                ' (' . $studentSectionExamStatus['Section']['academic_year'] . ')' :
+                                                '---')); ?>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">Section: </span>
-                                        <?= (isset($student_section_exam_status['Section']['name']) ? $student_section_exam_status['Section']['name'] . (!$student_section_exam_status['Section']['archive'] && !$student_section_exam_status['Section']['StudentsSection']['archive'] ? ' &nbsp;(<b class="accepted"> Current </b>)' : ' &nbsp;(<span class="rejected"> Previous </span>)') : '---'); ?>
+                                        <?= (isset($studentSectionExamStatus['Section']['name']) ?
+                                            $studentSectionExamStatus['Section']['name'] .
+                                            (!$studentSectionExamStatus['Section']['archive'] &&
+                                            !$studentSectionExamStatus['Section']['archive'] ? ' &nbsp;
+ (<b class="accepted"> Current </b>)' : ' &nbsp;(<span class="rejected"> Previous </span>)') : '---'); ?>
                                     </td>
                                 </tr>
                                 <?php
@@ -91,7 +124,7 @@ if (isset($student_section_exam_status) && !empty($student_section_exam_status))
 
                     <div class="large-5 columns">
                         <?php
-                        if (!empty($student_section_exam_status['StudentExamStatus'])) { ?>
+                        if (!empty($studentSectionExamStatus['StudentExamStatus'])) {    ?>
                             <table cellpadding="0" cellspacing="0" class="table">
                                 <thead>
                                     <tr>
@@ -101,38 +134,46 @@ if (isset($student_section_exam_status) && !empty($student_section_exam_status))
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">Academic Year: </span>
-                                        <?= (isset($student_section_exam_status['StudentExamStatus']['academic_year']) ? $student_section_exam_status['StudentExamStatus']['academic_year'] : '---'); ?>
+                                        <?= (isset($studentSectionExamStatus['StudentExamStatus']['academic_year']) ?
+                                            $studentSectionExamStatus['StudentExamStatus']['academic_year'] : '---'); ?>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">Semester: </span>
-                                        <?= (isset($student_section_exam_status['StudentExamStatus']['semester']) ? $student_section_exam_status['StudentExamStatus']['semester'] : '---'); ?>
+                                        <?= (isset($studentSectionExamStatus['StudentExamStatus']['semester']) ?
+                                            $studentSectionExamStatus['StudentExamStatus']['semester'] : '---'); ?>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="font">
                                         <span class="text-gray">SGPA: </span>
-                                        <?= (isset($student_section_exam_status['StudentExamStatus']['sgpa']) ? $student_section_exam_status['StudentExamStatus']['sgpa'] : '---'); ?>
+                                        <?= (isset($studentSectionExamStatus['StudentExamStatus']['sgpa']) ?
+                                            $studentSectionExamStatus['StudentExamStatus']['sgpa'] : '---'); ?>
                                     </td>
                                 </tr>
 
                                 <?php
-                                if (!empty($student_section_exam_status['StudentExamStatus']['sgpa'])) { ?>
+                                if (!empty($studentSectionExamStatus['StudentExamStatus']['sgpa'])) { ?>
                                     <tr>
                                         <td class="font">
                                             <span class="text-gray">CGPA: </span>
-                                            <?= (isset($student_section_exam_status['StudentExamStatus']['cgpa']) ? $student_section_exam_status['StudentExamStatus']['cgpa'] : '---'); ?>
+                                            <?= (isset($studentSectionExamStatus['StudentExamStatus']['cgpa']) ?
+                                                $studentSectionExamStatus['StudentExamStatus']['cgpa'] : '---'); ?>
                                         </td>
                                     </tr>
                                     <?php
                                 }
 
-                                if (!empty($student_section_exam_status['StudentExamStatus']['AcademicStatus'])) { ?>
+                                if (!empty($studentSectionExamStatus['StudentExamStatus']['AcademicStatus'])) { ?>
                                     <tr>
                                         <td class="font">
                                             <span class="text-gray">Academic Status: </span>
-                                            <?= ( $student_section_exam_status['StudentBasicInfo']['graduated'] == 1 ? '<span>Graduated</span>' : (isset($student_section_exam_status['StudentExamStatus']['AcademicStatus']) ? $student_section_exam_status['StudentExamStatus']['AcademicStatus']['name'] : '---')); ?>
+                                            <?= ( $studentSectionExamStatus['StudentBasicInfo']['graduated'] == 1 ?
+                                                '<span>Graduated</span>' :
+                                                (isset($studentSectionExamStatus['StudentExamStatus']['AcademicStatus']) ?
+                                                    $studentSectionExamStatus['StudentExamStatus']['AcademicStatus']['name']
+                                                    : '---')); ?>
                                         </td>
                                     </tr>
                                     <?php

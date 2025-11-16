@@ -1,69 +1,64 @@
-<?php 
-echo $this->Form->create('Section',
-array('controller'=>'sections','action'=>'section_move_update',
-"method"=>"POST"));
+<?php
+$this->assign('title', __('Upgrade Student Section'));
 ?>
+
 <div class="row">
-<div class="large-12 columns">
-	
-  <div class="row">
-		<div class="large-6 columns">
-			 <?php 
-debug($student_detail);
-debug($nextSection);
-	echo $this->Form->input('Selected_section_id',array('label'=>false,'id'=>'Selected_section_id','type'=>'select',
-        'options'=>$sections,'empty'=>"--Select Section--"));
-
-	echo $this->Form->hidden('previous_section_id', 
-array('value'=>$previous_section_id));
-
-
-?>
-		</div>
-		<div class="large-6 columns">
-			 		 
-
-<?php 
-echo $this->Form->Submit(__('Move'),array('div'=>false,'class'=>'tiny radius button bg-blue','name'=>'attach'));
-?>
-		</div>
-	
+    <div class="col-md-12">
+        <div class="row">
+            <div class="col-md-6">
+                <?= $this->Form->create('Section', ['url' => ['controller' => 'Sections',
+                    'action' => 'sectionMoveUpdate']]) ?>
+                <?= $this->Form->control('Selected_section_id', [
+                    'label' => false,
+                    'id' => 'Selected_section_id',
+                    'type' => 'select',
+                    'options' => $sections,
+                    'empty' => '--Select Section--',
+                    'class' => 'form-control'
+                ]) ?>
+                <?= $this->Form->hidden('previous_section_id', ['value' => $previous_section_id]) ?>
+            </div>
+            <div class="col-md-6">
+                <?= $this->Form->button(__('Move'), [
+                    'type' => 'submit',
+                    'name' => 'attach',
+                    'class' => 'btn btn-primary btn-sm'
+                ]) ?>
+            </div>
+        </div>
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th colspan="5" class="font-weight-bold">
+                    <?= __(
+                        '%s-%s (%s-%s-%s)',
+                        h($previousSectionName['Section']['name']),
+                        h($previousSectionName['YearLevel']['name']),
+                        h($previousSectionName['Program']['name']),
+                        h($previousSectionName['ProgramType']['name']),
+                        h($previousSectionName['Department']['name'])
+                    ) ?>
+                </th>
+            </tr>
+            <tr>
+                <th class="text-center"><?= __('No.') ?></th>
+                <th class="text-center"><?= __('Student Number') ?></th>
+                <th class="text-center"><?= __('Name') ?></th>
+                <th class="text-center"><?= __('Sex') ?></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="text-center">1</td>
+                <?= $this->Form->hidden('Section.1.selected_id', ['value' => 1]) ?>
+                <?= $this->Form->hidden('Section.1.student_id', ['value' => $students['Student']['id']]) ?>
+                <td class="text-center"><?= h($students['Student']['studentnumber']) ?></td>
+                <td class="text-center"><?= h($students['Student']['full_name']) ?></td>
+                <td class="text-center"><?= h(ucfirst(strtolower(trim($students['Student']['gender'])))) ?></td>
+            </tr>
+            </tbody>
+        </table>
+        <?= $this->Form->end() ?>
+    </div>
 </div>
-
-<table>
-   <tr><th colspan=5 class="smallheading"><?php echo  __(''.$previousSectionName['Section']['name'].'-'.$previousSectionName['YearLevel']['name'].'('.$previousSectionName['Program']['name'].'-'.$previousSectionName['ProgramType']['name'].'-'.$previousSectionName['Department']['name'].')');?></th></tr>
-	<tr>
-	        
-            <th><?php echo ('No.'); ?> </th>
-            
-		    <th><?php echo ('Student Number');?></th>
-            <th><?php echo ('Name');?></th>
-			<th><?php echo ('Sex');?></th>	
-	</tr>
-	
-	  <tr>         
-		<td>1</td>
-       
-       <?php 
-
-echo $this->Form->hidden('Section.1.selected_id',
-array('value'=>1)); 
-
-echo $this->Form->hidden('Section.1.student_id',array('value'=>$students['Student']['id'])); ?>
-        <td><?php echo $students['Student']['studentnumber']; ?>&nbsp;</td>
-        <td><?php echo $students['Student']['full_name']; ?>&nbsp;</td>
-		<td><?php echo $students['Student']['gender']; ?>
-&nbsp;</td>
-       </tr>
-         
-	<?php 
-    ?>
-
-</table>
-
-</div>
-</div>
-
-<?php echo $this->Form->end();?>
 <a class="close-reveal-modal">&#215;</a>
-

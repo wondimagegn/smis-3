@@ -1,45 +1,62 @@
+<div class="box">
+    <div class="box-header bg-transparent">
+        <div class="box-title" style="margin-top: 10px;">
+            <i class="fontello-list" style="font-size: larger; font-weight: bold;"></i>
+            <span style="font-size: medium; font-weight: bold; margin-top: 20px;">
+                <?= __('Status Patterns Detail') ?></span>
+        </div>
+    </div>
+    <div class="box-body">
+        <div class="row">
+            <div class="large-12 columns">
 <div class="studentStatusPatterns view">
-<h2><?php echo __('Student Status Pattern');?></h2>
-	<dl><?php $i = 0; $class = ' class="altrow"';?>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Id'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['id']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Program'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Html->link($studentStatusPattern['Program']['name'], array('controller' => 'programs', 'action' => 'view', $studentStatusPattern['Program']['id'])); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Program Type'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $this->Html->link($studentStatusPattern['ProgramType']['name'], array('controller' => 'program_types', 'action' => 'view', $studentStatusPattern['ProgramType']['id'])); ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Acadamic Year'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['acadamic_year']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Application Date'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['application_date']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Pattern'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['pattern']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Created'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['created']; ?>
-			&nbsp;
-		</dd>
-		<dt<?php if ($i % 2 == 0) echo $class;?>><?php echo __('Modified'); ?></dt>
-		<dd<?php if ($i++ % 2 == 0) echo $class;?>>
-			<?php echo $studentStatusPattern['StudentStatusPattern']['modified']; ?>
-			&nbsp;
-		</dd>
-	</dl>
+
+    <dl>
+        <?php $i = 0; $class = ' class="altrow"'; ?>
+
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Program') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+            <?= $this->Html->link(h($studentStatusPattern->program->name ?? ''), ['controller' => 'Programs', 'action' => 'view', $studentStatusPattern->program->id ?? '']) ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Program Type') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+            <?= $this->Html->link(h($studentStatusPattern->program_type->name ?? ''), ['controller' => 'ProgramTypes', 'action' => 'view', $studentStatusPattern->program_type->id ?? '']) ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Academic Year') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+            <?= h($studentStatusPattern->acadamic_year) ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Application Date') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+           <?= $studentStatusPattern->application_date ?
+                    h($studentStatusPattern->application_date->format('M j, Y')) : '' ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Pattern') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+            <?= h($studentStatusPattern->pattern) ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Created') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+
+            <?= $studentStatusPattern->created ?
+                h($studentStatusPattern->created->format('M j, Y')) : '' ?>
+            &nbsp;
+        </dd>
+        <dt<?= ($i % 2 == 0 ? $class : '') ?>><?= __('Modified') ?></dt>
+        <dd<?= ($i++ % 2 == 0 ? $class : '') ?>>
+
+
+            <?= $studentStatusPattern->modified ?
+                h($studentStatusPattern->modified->format('M j, Y')) : '' ?>
+            &nbsp;
+        </dd>
+    </dl>
 </div>
+            </div>
+        </div>
+    </div>

@@ -1,169 +1,192 @@
-<?php echo $this->Form->create('AcceptedStudent', array('action' => 'transfer_campus'));?> 
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-             
-<div class="reservedPlaces form">
-
-		<p class="fs16">
-				     <strong> Important Note: </strong> 
-				       This tool will help you to change freshman student campus. By providing some criteria you can find the target student for change. After change you need to do the following:
-				       <ul>
-				       		<li>Using the dean account, place the student to the new section of the campus</li>
-				       		<li>Register the students to the courses</li>
-				       </ul>
-		</p>
-		<div onclick="toggleViewFullId('ListPublishedCourse')"><?php 
-			if (!empty($auto_approve) ) {
-				echo $this->Html->image('plus2.gif', array('id' => 'ListPublishedCourseImg')); 
-				?><span style="font-size:10px; vertical-align:top; font-weight:bold" id="ListPublishedCourseTxt">Display Filter</span><?php
-			}
-			else {
-				echo $this->Html->image('minus2.gif', array('id' => 'ListPublishedCourseImg')); 
-				?><span style="font-size:10px; vertical-align:top; font-weight:bold" id="ListPublishedCourseTxt">Hide Filter</span><?php
-			}
-		?>
-		</div>
-		<div id="ListPublishedCourse" style="display:<?php echo (!empty($auto_approve)   ? 'none' : 'display'); ?>">
-	 <?php 
-	      
-	        echo '<table class="fs16 small_padding" >';
-			echo '<tr><td>Academic Year</td><td>'.$this->Form->input('AcceptedStudent.academicyear',array('id'=>'academicyear',
-            'label' => false,'type'=>'select','options'=>$academicYearLists,
-            'empty'=>"--Select Academic Year--",'selected'=>isset($selected_academicyear)?$selected_academicyear:'')).'</td><td>Current College</td><td>'.
-$this->Form->input('AcceptedStudent.college_id',array('label'=>false)).'</td></tr>';
-            echo '<tr><td>Program</td><td>'.$this->Form->input('AcceptedStudent.program_id',array('label'=>false)).'</td><td>Program Type</td><td>'.$this->Form->input('AcceptedStudent.program_type_id',array('label'=>false)).'</td></tr>';
-
- echo '<tr><td>Name</td><td>'.
-$this->Form->input('AcceptedStudent.name',array('label'=>false)).'</td><td>Current Campus</td><td>'.$this->Form->input('AcceptedStudent.campus_id',array('label'=>false)).'</td></tr>';
-
-            echo '<tr>';
-            echo '<td colspan="4">';
-            echo $this->Form->Submit(__('Continue'),array('div'=>false,
- 'name'=>'searchbutton','class'=>'tiny radius button bg-blue'));
-			echo '</td>';
-            echo '</tr>';
-            echo '</table>';
-            ?>
-
-		</div>
-        
-<table><tbody><tr><td width="100%">
-<table><tbody>
-
-<tr><td colspan=2>
 <?php
+use Cake\I18n\I18n;
 
-if(!empty($autoplacedstudents)){
-echo $this->Form->hidden('AcceptedStudent.academicyear',array('value'=>$selected_academicyear));
-if(!isset($turn_of_approve_button)){
-echo "<table>";
-
-
-echo "<tr><td>Select the campus you want to transfer the selected student.</td></tr>";
-
-echo "<tr><td>".$this->Form->input('campus_id',array('empty'=>'--select campus--',
-'required'=>true,'options'=>$available_campuses,'label'=>'Select the target campus'))."</td><td>".$this->Form->input('selected_college_id',array('empty'=>'--select campus--',
-'required'=>true,'options'=>$selected_colleges,'label'=>'Select the target college'))."</td></tr>";
-echo "</table>";
-}
-
- $count=0;
-
+$this->set('title', __('Transfer Student Campus'));
+$this->Html->script(['jquery-1.6.2.min'], ['block' => 'script']);
 ?>
-<table>
-   <tr><th colspan=11 class="smallheading"><?php echo  __('List of student placed to campus.');?></th></tr>
-	<tr>
-	        
-            <th><?php echo ('No.'); ?> </th>
-            <th style="padding:0">
-            <?php echo 'Select/ Unselect All <br/>'.$this->Form->checkbox("SelectAll", array('id' => 'select-all','checked'=>'')); ?> </th> 
-            <th><?php echo ('Full Name');?></th>
-			<th><?php echo ('Sex');?></th>
-			<th><?php echo ('Student Number');?></th>
-		
-			<th><?php echo ('College');?></th>
-			<th><?php echo ('Academic Year');?></th>
-			<th><?php echo ('Campus');?></th>
-			
-			
-	</tr>
-	<?php
-	$i = 0;
-	$serial_number=1;
-	
-	foreach ($autoplacedstudents as $acceptedStudent):
-		$class = null;
-		if ($i++ % 2 == 0) {
-			$class = ' class="altrow"';
-		}
-	?>
-	<tr<?php echo $class;?>>
-       
-        <td><?php echo $serial_number++;?></td>
-         <td ><?php echo $this->Form->checkbox('AcceptedStudent.approve.' . $acceptedStudent['AcceptedStudent']['id'],array('class'=>'checkbox1')); ?>&nbsp;</td> 
-          <?php echo $this->Form->hidden('AcceptedStudent.'.$count.'.id',array('value'=>$acceptedStudent['AcceptedStudent']['id']));?>
-        <td><?php echo $acceptedStudent['AcceptedStudent']['full_name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['sex']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['studentnumber']; ?>&nbsp;</td>
-		
-		<td><?php echo $acceptedStudent['College']['name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['academicyear']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Campus']['name']; ?>&nbsp;</td>
-		
-	</tr>
-	
-<?php 
-$count++;
-
-endforeach; 
-
-?>
-	</table>
-
-	<?php 
-	
- 
-echo '<tr><td>'.$this->Form->Submit(__('transfer'),array('div'=>false,'class'=>'tiny radius button bg-blue','name'=>'transfer')).'</td></tr>';
-	
-}
-
- ?>
-</td></tr>
-    </tbody></table>
-   
-</td></tr>
-
-</tbody></table>
-</div> 
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
-<?php echo $this->Form->end();?>
 
 <script type="text/javascript">
+    $(document).ready(function() {
+        function toggleViewFullId(id) {
+            var display = $("#" + id).css("display") === 'none';
+            $("#" + id + "-img").attr("src", display ? '<?= $this->Url->image('minus2.gif') ?>' : '<?= $this->Url->image('plus2.gif') ?>');
+            $("#" + id + "-txt").text(display ? '<?= __('Hide Filter') ?>' : '<?= __('Display Filter') ?>');
+            $("#" + id).toggle("slow");
+        }
 
-function toggleView(obj) {
-	if($('#c'+obj.id).css("display") == 'none')
-		$('#i'+obj.id).attr("src", '/img/minus2.gif');
-	else
-		$('#i'+obj.id).attr("src", '/img/plus2.gif');
-	$('#c'+obj.id).toggle("slow");
-}
+        $("[onclick^='toggleViewFullId']").click(function() {
+            toggleViewFullId('list-published-course');
+        });
 
-function toggleViewFullId(id) {
-	if($('#'+id).css("display") == 'none') {
-		$('#'+id+'Img').attr("src", '/img/minus2.gif');
-		$('#'+id+'Txt').empty();
-		$('#'+id+'Txt').append('Hide Filter');
-		}
-	else {
-		$('#'+id+'Img').attr("src", '/img/plus2.gif');
-		$('#'+id+'Txt').empty();
-		$('#'+id+'Txt').append('Display Filter');
-		}
-	$('#'+id).toggle("slow");
-}
+        $("#select-all").click(function() {
+            $(".checkbox1").prop('checked', $(this).prop('checked'));
+        });
+    });
 </script>
+
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="accepted-students-form">
+                        <p class="fs-5">
+                            <strong><?= __('Important Note:') ?></strong> <?= __('This tool will help you to change freshman student campus. By providing some criteria you can find the target student for change. After change you need to do the following:') ?>
+                        <ul>
+                            <li><?= __('Using the dean account, place the student to the new section of the campus') ?></li>
+                            <li><?= __('Register the students to the courses') ?></li>
+                        </ul>
+                        </p>
+                        <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'transferCampus'], 'class' => 'form-horizontal']) ?>
+                        <div onclick="toggleViewFullId('list-published-course')">
+                            <?php if (!empty($autoApprove)): ?>
+                                <?= $this->Html->image('plus2.gif', ['id' => 'list-published-course-img']) ?>
+                                <span style="font-size: 10px; vertical-align: top; font-weight: bold;" id="list-published-course-txt"><?= __('Display Filter') ?></span>
+                            <?php else: ?>
+                                <?= $this->Html->image('minus2.gif', ['id' => 'list-published-course-img']) ?>
+                                <span style="font-size: 10px; vertical-align: top; font-weight: bold;" id="list-published-course-txt"><?= __('Hide Filter') ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div id="list-published-course" style="display: <?= !empty($autoApprove) ? 'none' : 'block' ?>">
+                            <table class="table fs-5">
+                                <tr>
+                                    <td><?= __('Academic Year') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.academic_year', [
+                                            'id' => 'academic-year',
+                                            'label' => false,
+                                            'type' => 'select',
+                                            'options' => $academicYearLists,
+                                            'empty' => __('--Select Academic Year--'),
+                                            'value' => $selectedAcademicYear ?? '',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td><?= __('Current College') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.college_id', [
+                                            'label' => false,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><?= __('Program') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.program_id', [
+                                            'label' => false,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td><?= __('Program Type') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.program_type_id', [
+                                            'label' => false,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><?= __('Name') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.name', [
+                                            'label' => false,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td><?= __('Current Campus') ?></td>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.campus_id', [
+                                            'label' => false,
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4">
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Continue'), ['name' => 'searchbutton', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <?php if (!empty($autoPlacedStudents)): ?>
+                            <?= $this->Form->hidden('AcceptedStudent.academic_year', ['value' => $selectedAcademicYear]) ?>
+                            <?php if (empty($turnOffApproveButton)): ?>
+                                <table class="table">
+                                    <tr>
+                                        <td><?= __('Select the campus you want to transfer the selected student.') ?></td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <?= $this->Form->control('campus_id', [
+                                                'empty' => __('--select campus--'),
+                                                'required' => true,
+                                                'options' => $availableCampuses,
+                                                'label' => ['text' => __('Select the target campus'), 'class' => 'control-label'],
+                                                'class' => 'form-control'
+                                            ]) ?>
+                                        </td>
+                                        <td>
+                                            <?= $this->Form->control('selected_college_id', [
+                                                'empty' => __('--select campus--'),
+                                                'required' => true,
+                                                'options' => $selectedColleges,
+                                                'label' => ['text' => __('Select the target college'), 'class' => 'control-label'],
+                                                'class' => 'form-control'
+                                            ]) ?>
+                                        </td>
+                                    </tr>
+                                </table>
+                            <?php endif; ?>
+                            <table class="table table-bordered table-striped">
+                                <tr>
+                                    <th colspan="11" class="h2"><?= __('List of students placed to campus.') ?></th>
+                                </tr>
+                                <tr>
+                                    <th><?= __('No.') ?></th>
+                                    <th>
+                                        <?= __('Select/Unselect All') ?><br/>
+                                        <?= $this->Form->checkbox('SelectAll', ['id' => 'select-all']) ?>
+                                    </th>
+                                    <th><?= __('Full Name') ?></th>
+                                    <th><?= __('Sex') ?></th>
+                                    <th><?= __('Student Number') ?></th>
+                                    <th><?= __('College') ?></th>
+                                    <th><?= __('Academic Year') ?></th>
+                                    <th><?= __('Campus') ?></th>
+                                </tr>
+                                <?php $serialNumber = 1; $count = 0; ?>
+                                <?php foreach ($autoPlacedStudents as $index => $acceptedStudent): ?>
+                                    <tr class="<?= $index % 2 == 0 ? 'altrow' : '' ?>">
+                                        <td><?= $serialNumber++ ?></td>
+                                        <td>
+                                            <?= $this->Form->checkbox("AcceptedStudent.approve.{$acceptedStudent->id}", ['class' => 'checkbox1']) ?>
+                                            <?= $this->Form->hidden("AcceptedStudent.{$count}.id", ['value' => $acceptedStudent->id]) ?>
+                                        </td>
+                                        <td><?= h($acceptedStudent->full_name) ?></td>
+                                        <td><?= h($acceptedStudent->sex) ?></td>
+                                        <td><?= h($acceptedStudent->studentnumber) ?></td>
+                                        <td><?= h($acceptedStudent->College->name) ?></td>
+                                        <td><?= h($acceptedStudent->academic_year) ?></td>
+                                        <td><?= h($acceptedStudent->Campus->name) ?></td>
+                                    </tr>
+                                    <?php $count++; ?>
+                                <?php endforeach; ?>
+                            </table>
+                            <tr>
+                                <td>
+                                    <div class="form-group">
+                                        <?= $this->Form->button(__('Transfer'), ['name' => 'transfer', 'class' => 'btn btn-primary']) ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                        <?= $this->Form->end() ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

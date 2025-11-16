@@ -1,162 +1,115 @@
+<?php
+use Cake\I18n\I18n;
 
-<?php echo $this->Form->create('AcceptedStudent');?> 
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-	 
-             
-<div>
-<h3>Auto Student Placement to Department Cancelation</h3>
- <table cellspacing="0" cellpadding="0" class="fs14">
-	<tr>
-		<td style="width:15%">Academic Year:</td>
-		<td style="width:20%"><?php echo $this->Form->input('Search.academicyear',array('options'=>$acyear_array_data,'empty'=>'--select academic year--','label'=>false)); ?></td>
-		<td style="width:15%">Limit:</td>
-		<td style="width:20%"><?php echo $this->Form->input('Search.limit',array('label'=>'')); ?></td>
-	</tr>
-	<tr>
-		<td colspan="4">
-		<?php echo $this->Form->submit('Search',array('class'=>'tiny radius button bg-blue','name' => 'search', 'div' => false,'id'=>'Search')); ?>
-		</td>
-	</tr>
-</table>
-
-
-<?php 
-//only visible when the user clicks add reserved place
-if(!isset($selected_academic_year)){
-  /*echo '<table><tbody>';
-	   echo '<tr><td>';  
-	    echo '<div style="font-weight:bold">Academic Year:</div>';
-		echo $this->Form->input('academicyear',array('id'=>'admissionyear',
-            'label' => false,'type'=>'select','options'=>$acyear_array_data,
-            'empty'=>"--Select Academic Year--",'selected'=>isset($selected)?$selected:''));
-		echo '</td></tr>';
-		
-		 echo '<tr><td>';    
-		    echo $this->Form->Submit('Continue',array('div'=>false,
- 'name'=>'prepandacademicyear','class'=>'tiny radius button bg-blue'));
-		 echo '</td></tr>';
-		 echo '</tbody></table>';
-		 */
-} else {
-   
+$this->set('title', __('Auto Student Placement to Department Cancellation'));
 ?>
 
-<?php 
-if(!empty($acceptedStudents)){
-?>
-<div class="acceptedStudents index">
-	
-	<table  cellpadding="0" cellspacing="0">
-	<tbody>
-	    <tr>
-	    
-	    </tr>
-	</tbody>
-	</table>
-	<table  cellpadding="0" cellspacing="0"> 
-	<tr>
-	
- <td colspan=8>
-  <?php 
-  if(isset($hide_button) && $hide_button==true) {
- 
-  } else {
-     echo $this->Form->Submit('Cancel Auto Placement',array('div'=>false,
- 'name'=>'cancelplacement','class'=>'tiny radius button bg-blue'));
-  }
- ?>
- </td>
-	</tr>
-    <tr>
-            
-            <th><?php echo $this->Paginator->sort('full_name');?></th>
-			<th><?php echo $this->Paginator->sort('sex');?></th>
-			<th><?php echo $this->Paginator->sort('studentnumber');?></th>
-
-			<th><?php echo $this->Paginator->sort('EHEECE_total_results');?></th>
-			<th><?php echo $this->Paginator->sort('department_id');?></th>
-			<th><?php echo $this->Paginator->sort('program_type_id');?></th>
-			<th><?php echo $this->Paginator->sort('academicyear');?></th>
-			
-			<th><?php echo $this->Paginator->sort('placementtype');?></th> 
-		
-	</tr>
-	
-	<?php
-	
-	$i = 0;
-	foreach ($acceptedStudents as $acceptedStudent):
-		$class = null;
-		if ($i++ % 2 == 0) {
-			$class = ' class="altrow"';
-		}
-	?>
-	<tr<?php echo $class;?>>
-        <?php echo $this->Form->hidden('AcceptedStudent.'.$acceptedStudent['AcceptedStudent']['id'].'.id',array('value'=>$acceptedStudent['AcceptedStudent']['id'])); ?>
-       
-        <td><?php echo $acceptedStudent['AcceptedStudent']['full_name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['sex']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['studentnumber']; ?>&nbsp;</td>
-	
-		<td><?php echo $acceptedStudent['AcceptedStudent']['EHEECE_total_results']; ?>&nbsp;</td>
-		<td>
-			<?php echo $this->Html->link($acceptedStudent['Department']['name'], array('controller' => 'departments', 'action' => 'view', $acceptedStudent['Department']['id'])); ?>
-		</td>
-		<td>
-			<?php echo $this->Html->link($acceptedStudent['ProgramType']['name'], array('controller' => 'program_types', 'action' => 'view', $acceptedStudent['ProgramType']['id'])); ?>
-		</td>
-		<td><?php echo $this->Form->hidden('AcceptedStudent.'.$acceptedStudent['AcceptedStudent']['id'].'.academicyear',array('value'=>$acceptedStudent['AcceptedStudent']['academicyear'])); ?>&nbsp;
-		<?php 
-		echo $acceptedStudent['AcceptedStudent']['academicyear'];
-		?>
-		</td>
-	
-		
-		<td><?php echo $acceptedStudent['AcceptedStudent']['placementtype']; ?>&nbsp;</td>
-		
-	</tr>
-<?php endforeach; ?>  
-	</table>
-    <table cellpadding="0" cellspacing="0"><tbody>
-        <tr><td><tr>
- 
-</tr>
-    </tbody></table>
-	<p>
-	<?php
-	echo $this->Paginator->counter(array(
-	'format' => __('Page %page% of %pages%, showing %current% records out of %count% total, starting on record %start%, ending on %end%')
-	));
-	?>	</p>
-
-	<div class="paging">
-		<?php echo $this->Paginator->prev('<< ' . __('previous'), array(), null, array('class'=>'disabled'));?>
-	 | 	<?php echo $this->Paginator->numbers();?>
- |
-		<?php echo $this->Paginator->next(__('next') . ' >>', array(), null, array('class' => 'disabled'));?>
-	</div>
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="accepted-students-index">
+                        <h2><?= __('Auto Student Placement to Department Cancellation') ?></h2>
+                        <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'cancelAutoPlacement'], 'class' => 'form-horizontal']) ?>
+                        <table class="table">
+                            <tr>
+                                <td style="width: 15%;"><?= __('Academic Year') ?>:</td>
+                                <td style="width: 20%;">
+                                    <?= $this->Form->control('Search.academic_year', [
+                                        'options' => $academicYearList,
+                                        'empty' => __('--select academic year--'),
+                                        'label' => false,
+                                        'class' => 'form-control'
+                                    ]) ?>
+                                </td>
+                                <td style="width: 15%;"><?= __('Limit') ?>:</td>
+                                <td style="width: 20%;">
+                                    <?= $this->Form->control('Search.limit', [
+                                        'label' => false,
+                                        'class' => 'form-control'
+                                    ]) ?>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="4">
+                                    <div class="form-group">
+                                        <?= $this->Form->button(__('Search'), ['name' => 'search', 'id' => 'search', 'class' => 'btn btn-primary']) ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <?php if (isset($selectedAcademicYear)): ?>
+                            <?php if (!empty($acceptedStudents)): ?>
+                                <div class="accepted-students-index">
+                                    <table class="table table-bordered table-striped">
+                                        <tr>
+                                            <?php if (empty($hideButton)): ?>
+                                                <td colspan="8">
+                                                    <div class="form-group">
+                                                        <?= $this->Form->button(__('Cancel Auto Placement'), ['name' => 'cancelplacement', 'class' => 'btn btn-primary']) ?>
+                                                    </div>
+                                                </td>
+                                            <?php endif; ?>
+                                        </tr>
+                                        <tr>
+                                            <th><?= $this->Paginator->sort('full_name', __('Full Name')) ?></th>
+                                            <th><?= $this->Paginator->sort('sex', __('Sex')) ?></th>
+                                            <th><?= $this->Paginator->sort('studentnumber', __('Student Number')) ?></th>
+                                            <th><?= $this->Paginator->sort('EHEECE_total_results', __('EHEECE Total Results')) ?></th>
+                                            <th><?= $this->Paginator->sort('department_id', __('Department')) ?></th>
+                                            <th><?= $this->Paginator->sort('program_type_id', __('Program Type')) ?></th>
+                                            <th><?= $this->Paginator->sort('academic_year', __('Academic Year')) ?></th>
+                                            <th><?= $this->Paginator->sort('placementtype', __('Placement Type')) ?></th>
+                                        </tr>
+                                        <?php foreach ($acceptedStudents as $index => $acceptedStudent): ?>
+                                            <tr class="<?= $index % 2 == 0 ? 'altrow' : '' ?>">
+                                                <?= $this->Form->hidden("AcceptedStudent.{$acceptedStudent->id}.id", ['value' => $acceptedStudent->id]) ?>
+                                                <td><?= h($acceptedStudent->full_name) ?></td>
+                                                <td><?= h($acceptedStudent->sex) ?></td>
+                                                <td><?= h($acceptedStudent->studentnumber) ?></td>
+                                                <td><?= h($acceptedStudent->EHEECE_total_results) ?></td>
+                                                <td>
+                                                    <?= $this->Html->link(
+                                                        h($acceptedStudent->Department->name),
+                                                        ['controller' => 'Departments', 'action' => 'view', $acceptedStudent->Department->id]
+                                                    ) ?>
+                                                </td>
+                                                <td>
+                                                    <?= $this->Html->link(
+                                                        h($acceptedStudent->ProgramType->name),
+                                                        ['controller' => 'ProgramTypes', 'action' => 'view', $acceptedStudent->ProgramType->id]
+                                                    ) ?>
+                                                </td>
+                                                <td>
+                                                    <?= $this->Form->hidden("AcceptedStudent.{$acceptedStudent->id}.academic_year", ['value' => $acceptedStudent->academic_year]) ?>
+                                                    <?= h($acceptedStudent->academic_year) ?>
+                                                </td>
+                                                <td><?= h($acceptedStudent->placementtype) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </table>
+                                    <p>
+                                        <?= $this->Paginator->counter([
+                                            'format' => __('Page {{page}} of {{pages}}, showing {{current}} records out of {{count}} total, starting on record {{start}}, ending on {{end}}')
+                                        ]) ?>
+                                    </p>
+                                    <div class="pagination">
+                                        <?= $this->Paginator->prev('<< ' . __('previous')) ?>
+                                        | <?= $this->Paginator->numbers() ?> |
+                                        <?= $this->Paginator->next(__('next') . ' >>') ?>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-info">
+                                    <span></span><?= __('There is no student that needs auto placement cancellation or the auto placement has been approved by the department, in which case you cannot cancel the auto placement.') ?>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        <?= $this->Form->end() ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<?php 
-} else {
-    echo "<div class='info-box info-message'> <span></span>There is no student that 
-
-    needs auto placement cancellation or the auto placement has been approved by the 
-
-    department in that case you can not cancel the auto placement.</div>";
-}
-
-}
- //echo $this->Js->writeBuffer(); // Write cached scripts
-?>
-</div>
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
-<?php echo $this->Form->end(); ?>
-
-<?php //echo $this->Html->script('jquery-1.6.2.min'); ?>  
-<?php //echo $this->Html->script('jquery-selectall'); ?> 

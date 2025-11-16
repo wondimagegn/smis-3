@@ -1,4 +1,6 @@
-<?php
-echo $this->Form->input('Section.year_level_id',array('id'=>'ajax_year_level_s','empty'=>
-				'All'));
-?>
+<?= $this->Form->control('year_level_id', [
+    'id' => 'ajax_year_level_s',
+    'type' => 'select',
+    'empty' => __('All'),
+    'class' => 'form-control'
+]) ?>

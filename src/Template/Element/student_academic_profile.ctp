@@ -27,13 +27,19 @@ if (isset($studentSectionExamStatus['StudentBasicInfo'])
         </div>
         <?php
     } else if ($userRole == ROLE_DEPARTMENT) { ?>
-        <div class='warning-box warning-message'><span style='margin-right: 15px;'></span><i style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><?= $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('. $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')'; ?> is not attached to any curriculum. Please <a href="/acceptedStudents/attach_curriculum" target="_blank">Attach a Curriculum to student's profile</a>, set the filters: <?= $studentSectionExamStatus['StudentBasicInfo']['academicyear'] ?> as admission year, <?= $studentAcademicProfile['BasicInfo']['Program']['name']; ?> as program and <?= $studentAcademicProfile['BasicInfo']['ProgramType']['name']; ?> as program type.</i></div>
+        <div class='warning-box warning-message'><span style='margin-right: 15px;'></span><i style="font-family: 'Times New Roman', Times, serif; font-weight: bold;">
+                <?= $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('.
+                $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')'; ?>
+                is not attached to any curriculum. Please <a href="/acceptedStudents/attach_curriculum" target="_blank">Attach a Curriculum to student's profile</a>, set the filters: <?= $studentSectionExamStatus['StudentBasicInfo']['academicyear'] ?> as admission year, <?= $studentAcademicProfile['BasicInfo']['Program']['name']; ?> as program and <?= $studentAcademicProfile['BasicInfo']['ProgramType']['name']; ?> as program type.</i></div>
         <?php
     } else if ($userRole== ROLE_REGISTRAR) { ?>
         <div class='warning-box warning-message'><span style='margin-right: 15px;'></span><i style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><?= $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('. $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')'; ?> is not attached to any curriculum. Please communicate student department to attach a curriculum to student's profile.</i></div>
         <?php
     } else { ?>
-        <div class='warning-box warning-message'><span style='margin-right: 15px;'></span><i style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><?= $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('. $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')'; ?> is not attached to any curriculum.</i></div>
+        <div class='warning-box warning-message'><span style='margin-right: 15px;'></span><i style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><?=
+                $studentAcademicProfile['BasicInfo']['Student']['full_name'] . ' ('.
+                $studentAcademicProfile['BasicInfo']['Student']['studentnumber'] .')'; ?>
+                is not attached to any curriculum.</i></div>
         <?php
     }
 
@@ -127,7 +133,7 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                     $userRole== ROLE_SYSADMIN ||
                     $userRole == ROLE_DEPARTMENT ||
                     $userRole== ROLE_REGISTRAR ||
-                    $userRole == ROLE_GENERAL) && isset($otps) && !empty($otps)) { ?>
+                    $userRole == ROLE_GENERAL) && !empty($otps)) { ?>
                 <li class="tab-title">
                     <a href="#OTP">OTPs</a>
                 </li>
@@ -141,10 +147,7 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                 <?php
                 if (!empty($studentAcademicProfile)) { ?>
                     <div class="row">
-                        <!-- <div class="AddTab"> -->
-                        <!-- <table cellspacing="0" cellpading="0" class="table-borderless">
-                            <tr>
-                                <td> -->
+
                         <div class="large-6 columns" style="padding: 0.7rem;">
                             <table cellspacing="0" cellpading="0" class="table">
                                 <tbody>
@@ -188,9 +191,10 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                                     <td></td>
                                 </tr>
                                 <?php
-                                if ($this->Session->read('Auth.User')['role_id'] != ROLE_STUDENT) { ?>
+                                if ($userRole != ROLE_STUDENT) { ?>
                                     <tr>
-                                        <td style="padding-left:30px;">ID Card Printed: <?= ((!isset($studentAcademicProfile['BasicInfo']['Student']['print_count']) && !empty($studentAcademicProfile['BasicInfo']['Student']['print_count'])) || (isset($studentAcademicProfile['BasicInfo']['Student']['print_count']) && $studentAcademicProfile['BasicInfo']['Student']['print_count'] == 0 ) ?  'No' : (($studentAcademicProfile['BasicInfo']['Student']['print_count'] == 1) ? '1 time' : $studentAcademicProfile['BasicInfo']['Student']['print_count'] . ' times')); ?></td>
+                                        <td style="padding-left:30px;">ID Card Printed:
+                                            <?= ((!isset($studentAcademicProfile['BasicInfo']['Student']['print_count']) && !empty($studentAcademicProfile['BasicInfo']['Student']['print_count'])) || (isset($studentAcademicProfile['BasicInfo']['Student']['print_count']) && $studentAcademicProfile['BasicInfo']['Student']['print_count'] == 0 ) ?  'No' : (($studentAcademicProfile['BasicInfo']['Student']['print_count'] == 1) ? '1 time' : $studentAcademicProfile['BasicInfo']['Student']['print_count'] . ' times')); ?></td>
                                         <td></td>
                                     </tr>
                                     <?php
@@ -229,8 +233,6 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                                 $movedOrDeletedSectionsFromRegistration = array();
                                 $sectionLess = true;
                                 $section_ids_with_reg = array();
-                                //$graduated = $studentAcademicProfile['BasicInfo']['Student']['graduated'];
-                                //debug($graduated);
 
                                 if (isset($studentAcademicProfile['BasicInfo']['Student']['id'])) {
                                     // Retrieve section IDs for the student from CourseRegistrations
@@ -570,18 +572,10 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                                                         } else {
                                                             $days_back = 1 * 365;
                                                         }
-                                                        echo '<pre>';
-                                                        print_r($days_back);
-                                                        echo '</pre>';
-                                                      //  debug($days_back);
+
 
                                                         $minimum_allowed_graduation_date_to_delete = date('Y-m-d',
                                                             strtotime("-" . $days_back . " day "));
-                                                        //debug($minimum_allowed_graduation_date_to_delete);
-
-                                                        echo '<pre>';
-                                                        print_r($minimum_allowed_graduation_date_to_delete);
-                                                        echo '</pre>';
 
                                                         if ($minimum_allowed_graduation_date_to_delete < $graduation_date) {
                                                             $fullName = h($studentAcademicProfile['BasicInfo']['Student']['full_name'] ?? '');
@@ -769,7 +763,7 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
 
             <div class="content" id="exemption" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?php
                 if (!empty($studentAcademicProfile['CourseExemption'])) { ?>
                     <div style="overflow-x:auto;">
@@ -825,12 +819,12 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                     <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no record of course exemption for the selected student.</div>
                     <?php
                 } ?>
-                <!-- </div> -->
+
             </div>
 
             <div class="content" id="registration" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?php
                 if (!empty($studentAcademicProfile['Course Registered'])) { ?>
                     <div style="overflow-x:auto;">
@@ -878,12 +872,12 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                     <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no record of course registration for the selected student.</div>
                     <?php
                 } ?>
-                <!-- </div> -->
+
             </div>
 
             <div class="content" id="addcourses" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?php
                 if (!empty($studentAcademicProfile['Course Added'])) { ?>
                     <div style="overflow-x:auto;">
@@ -934,12 +928,12 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                     <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no record of course add for the selected student.</div>
                     <?php
                 } ?>
-                <!-- </div> -->
+
             </div>
 
             <div class="content" id="dropcourses" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?php
                 if (!empty($studentAcademicProfile['Course Dropped'])) { ?>
                     <div style="overflow-x:auto;">
@@ -987,14 +981,15 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                     <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no record of course drop for the selected student.</div>
                     <?php
                 } ?>
-                <!-- </div> -->
+
             </div>
 
             <div class="content" id="examresults" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?php
-                if (($userRole == ROLE_STUDENT && isset($show_results_tab) && $show_results_tab) ||
+
+                if (($userRole == ROLE_STUDENT && !empty($showResultsTab) && $showResultsTab) ||
                     $userRole != ROLE_STUDENT) {
 
 
@@ -1007,11 +1002,11 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                         <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>There is no exam result record for the selected student.</div>
                         <?php
                     }
-                } else if ($userRole == ROLE_STUDENT && isset($show_results_tab) && !$show_results_tab) { ?>
+                } else if ($userRole == ROLE_STUDENT && !empty($showResultsTab) && !$showResultsTab) { ?>
                     <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>Please <a href="/studentEvalutionRates/add">evaluate your instructors</a> first before checking your latest results!</div>
                     <?php
                 } ?>
-                <!-- </div> -->
+
             </div>
 
             <div class="content" id="curriculum" style="padding-left: 0px; padding-right: 0px;">
@@ -1049,9 +1044,8 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
 
             <div class="content" id="Billing" style="padding-left: 0px; padding-right: 0px;">
                 <hr style="margin-top: -10px;">
-                <!-- <div class="AddTab"> -->
+
                 <?= $this->element('billing'); ?>
-                <!-- </div> -->
             </div>
 
             <?php
@@ -1061,8 +1055,7 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
                 <div class="content" id="OTP" style="padding-left: 0px; padding-right: 0px;">
                     <hr style="margin-top: -10px;">
                     <div class="row">
-                        <!-- <div class="info-box info-message" style="font-family: 'Times New Roman', Times, serif; font-weight: bold;"><span style="margin-right: 15px;"></span>One time password is only valid until you change the passoword on the specified web address, once changed, you will use the new password you set for the site.</div> -->
-                        <?php
+                       <?php
                         $otp_services_option = Configure::read('otp_services_option');
                         $changed_otp_password = false;
                         foreach ($otps as $key => $otp) { ?>
@@ -1154,7 +1147,6 @@ if (isset($studentSectionExamStatus) && $isTheStudentDismissed && !$isTheStudent
     </div>
 </div>
 
-<!-- <a class="close-reveal-modal">&#215;</a> -->
 
 <div class="row">
     <div class="large-12 columns">

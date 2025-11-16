@@ -1,23 +1,37 @@
-<?php  
-/* 
-** File: barcode.thtml 
-** Location: views/test_pdfb 
-*/ 
-    $this->Pdf->set('P', 'mm', array( 75.0, 33.0 )); 
-    $this->Pdf->SetMargins(0.0, 0.0); 
-    $this->Pdf->SetFont("Helvetica", "", 9.5); 
+<?php
+use Cake\I18n\I18n;
 
-    $this->Pdf->AddPage(); 
+$this->set('title', __('Print Student Identification'));
 
-    //$doc_id = '1234567'; // come from controller 
-    $this->Pdf->BarCode($doc_id, "C39", 0, 4, 75.0, 33.0, 1, 1, 1, 1, "", "PNG"); 
+$pdf = new TCPDF('P', 'mm', [75.0, 33.0], true);
+$pdf->SetMargins(0.0, 0.0);
+$pdf->SetFont('helvetica', '', 9.5);
+$pdf->AddPage();
 
-    $this->Pdf->SetXY(2, 4); 
-    $this->Pdf->Cell(0, 0, "Code: 39 - 17 march 2007", 0, 0, 'C'); 
+$pdf->write1DBarcode($doc_id, 'C39', 0, 4, 75.0, 33.0, 0.4, [
+    'position' => '',
+    'align' => 'C',
+    'stretch' => false,
+    'fitwidth' => true,
+    'border' => false,
+    'vpadding' => 'auto',
+    'hpadding' => 'auto',
+    'fgcolor' => [0, 0, 0],
+    'bgcolor' => false,
+    'text' => true,
+    'font' => 'helvetica',
+    'fontsize' => 8,
+    'stretchtext' => 4
+], 'N');
 
-    $this->Pdf->Rect(0.3, 0.3, 74.4, 32.4); 
+$pdf->SetXY(2, 4);
+$pdf->Cell(0, 0, __('Code: 39 - 17 March 2007'), 0, 0, 'C');
+$pdf->Rect(0.3, 0.3, 74.4, 32.4);
 
-    $this->Pdf->SetDisplayMode('real'); 
-    $this->Pdf->Output(); 
-    $this->Pdf->closeParsers(); 
+$this->response = $this->response->withType('application/pdf');
+$this->response = $this->response->withHeader('Content-Disposition', 'attachment;filename="Student_Identification.pdf"');
+ob_start();
+$pdf->Output('php://output', 'I');
+$output = ob_get_clean();
+echo $output;
 ?>

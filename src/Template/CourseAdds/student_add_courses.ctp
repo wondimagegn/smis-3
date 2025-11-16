@@ -1,6 +1,4 @@
 <?= $this->Form->create('CourseAdd'); ?>
-<?= debug($year_level_name); ?>
-
 <script type='text/javascript'>
 
 	var student_id = null;
@@ -18,7 +16,7 @@
 		<?php
 	} ?>
 
-	<?php 
+	<?php
 	if ($student_active_section_ac_year == 0) { ?>
 		var acYear = "<?= $current_academic_year; ?>"
 		<?php
@@ -43,11 +41,10 @@
 			$("#department_id_" + id).attr('disabled', true);
 			$("#section_id_" + id).attr('disabled', true);
 			$("#add_button_disable").attr('disabled', true);
-			
-			//var formUrl = '/departments/get_department_combo/' + formData + '/0/1';
-			var formUrl = '/departments/get_department_combo/' + formData +'/1/1';
 
-			<?php 
+			var formUrl = '/departments/getDepartmentCombo/' + formData +'/1/1';
+
+			<?php
 			if ($student_active_section_ac_year == 0) { ?>
 				var acYear = "<?= $current_academic_year; ?>"
 				<?php
@@ -55,7 +52,7 @@
 				var acYear = "<?= $student_active_section_ac_year; ?>"
 				<?php
 			} ?>
-			
+
 			$.ajax({
 				type: 'get',
 				url: formUrl,
@@ -65,7 +62,7 @@
 					$("#college_id_" + id).attr('disabled', false);
 					$("#department_id_" + id).empty();
 					$("#department_id_" + id).append(data);
-					
+
 					//student lists
 					var subCat = $("#department_id_" + id).val();
 					$("#section_id_" + id).attr('disabled', true);
@@ -75,10 +72,7 @@
 					if (subCat != '') {
 
 						$("#get_published_add_courses_id_1").empty();
-
-						//var formUrl = '/sections/get_sections_by_dept/' + subCat + '/0/'+ acYear;
-
-						var formUrl = '/sections/get_sections_by_dept_add_drop/' + subCat + '/' + student_id + '/' + year_level_name + '/' + college_id;
+						var formUrl = '/sections/getSectionsByDeptAddDrop/' + subCat + '/' + student_id + '/' + year_level_name + '/' + college_id;
 
 						$.ajax({
 							type: 'post',
@@ -133,13 +127,9 @@
 		if (formData != '') {
 
 			$("#section_id_" + id).attr('disabled', true);
-			//$("#college_id_"+id).attr('disabled', true);
-			//$("#department_id_"+id).attr('disabled',true);	
 			$("#add_button_disable").attr('disabled', true);
-			
-			//var formUrl = '/sections/get_sections_by_dept/' + formData + '/0/'+ acYear;
 
-			var formUrl = '/sections/get_sections_by_dept_add_drop/' + formData + '/' + student_id + '/' + year_level_name + '/' + college_id;
+			var formUrl = '/sections/getSectionsByDeptAddDrop/' + formData + '/' + student_id + '/' + year_level_name + '/' + college_id;
 
 			$.ajax({
 				type: 'post',
@@ -175,7 +165,7 @@
 		//serialize form data
 
 		$("#get_published_add_courses_id_1").empty();
-		
+
 		var formData = $("#section_id_" + id).val();
 
 		if (formData) {
@@ -186,7 +176,7 @@
 			$("#add_button_disable").attr('disabled', true);
 
 			//get form action
-			var formUrl = '/courseAdds/get_published_add_courses/' + formData;
+			var formUrl = '/courseAdds/getPublishedAddCourses/' + formData;
 			$.ajax({
 				type: 'get',
 				url: formUrl,
@@ -282,7 +272,7 @@
 															</tr>
 															<?php
 													} ?>
-															
+
 												</tbody>
 												<tfoot>
 													<tr>
@@ -296,7 +286,7 @@
 								</div>
 								<?php
 							} ?>
-						
+
 							<div class="row">
 								<div class="large-12 columns">
 									<table cellpadding="0" cellspacing="0" class="table">
@@ -343,9 +333,6 @@
 					</tr>
 				</table>
 				<hr>
-
-				<?php //echo $this->Form->submit('Add Selected', array('id' => 'add_button_disable', 'class' => 'tiny radius button bg-blue', 'div' => false, 'name' => 'add')); ?>
-
 			</div>
 		</div>
 	</div>

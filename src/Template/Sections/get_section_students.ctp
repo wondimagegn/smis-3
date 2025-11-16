@@ -1,11 +1,6 @@
-<option value="0">--- Select Student ---</option>
-<?php
-if(count($students) > 0) {
-	foreach($students as $key => $name) {
-		echo "<option value='".$key."'>".$name."</option>";
-	}
-}
-?>
-<?php
-//echo $this->Form->input($input_name, array('id' => ($input_id != "" ? $input_id : false), 'label' => ($label != "" ? $label : false), 'type' => 'select', 'options' => $students, 'default' => false));
-?>
+<option value="0"><?= __('--- Select Student ---') ?></option>
+<?php if (!empty($students)): ?>
+    <?php foreach ($students as $key => $name): ?>
+        <option value="<?= h($key) ?>"><?= h($name) ?></option>
+    <?php endforeach; ?>
+<?php endif; ?>

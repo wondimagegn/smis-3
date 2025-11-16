@@ -1,60 +1,79 @@
-<div id="sign-up">
-	<h4 class="color-blue-logo heading">Login To SMiS</h4>
-	<hr />
-	<?php
-		$flash_message = $this->Flash->render();
-		if (!empty($flash_message)) {
-			echo $flash_message;
-		}
-	?>
-
-	<?= ($this->Form->create('User', array('action' => 'login'))); ?>
-	<br/>
-
-	<div class="row collapse">
-		<div class="small-2  columns" style="margin-bottom: 10px;">
-			<span class="prefix bg-green"><i class="text-white fontello-user tooltipstered"></i></span>
-		</div>
-		<div class="small-10  columns" style="margin-bottom: 10px;">
-		<?= ($this->Form->input('username', array('placeholder' => 'Username', 'label' => false, 'autocomplete' => "off", 'id' => 'Text1', 'required'))); ?>
-		</div>
-
-		<div class="small-2  columns" style="margin-bottom: 10px;">
-			<span class="prefix bg-green"><i class="text-white icon-lock tooltipstered"></i></span>
-		</div>
-		<div class="small-10  columns" style="margin-bottom: 10px;">
-			<?= ($this->Form->input('password', array('label' => false, 'autocomplete' => "off", 'placeholder' => 'Password', 'type' => 'password', 'id' => "Text2", 'required'))); ?>
-		</div>
-	</div>
-
-	<div class="row" style="margin-bottom: 20px;">
-		<div class="large-6  columns">
-			<?= ($this->Form->Submit('Login', array('div' => false, 'class' => "tiny radius button bg-blue"))); ?>
-		</div>
-	</div>
-
-	<div class="row">
-		<div class="large-6  columns">
-			<?= $this->Html->link(__('Forgot Password?', true), array('action' => 'forget'), array('class' => 'tiny radius button secondary')); ?>
-		</div>
-	</div>
-
-	<?php
-	if (isset($mathCaptcha)) { ?>
-		<div class="info-box message">
-			<div class="row collapse">
-				<div class="small-6  columns" style="padding-top: 10px;">
-					<span>Enter the sum of: <?= ($mathCaptcha); ?></span>
-				</div>
-				<div class="small-4 columns">
-					<?= $this->Form->input('security_code', array('label' => false, 'div' => false, 'style' => 'width:100px;')); ?>
-				</div>
-				<div class="small-2 columns">
-					<?= ($this->Form->Submit('Enter', array('div' => false, 'class' => 'tiny radius button bg-blue'))); ?>
-				</div>
-			</div>
-		</div>
-		<?php
-	} ?>
-	<?= ($this->Form->end()); ?>
+<h5 class="text-dark mb-3">Login to SMiS</h5>
+<hr>
+<?php
+$flashMessages = $this->Flash->render('flash');
+if (!empty($flashMessages)) {
+    // Assuming flash messages are set with params like ['class' => 'type', 'delay' => 5000] in the controller
+    $flashData = $this->getRequest()->getSession()->read('Flash.flash');
+    $msg = h($flashData[0]['message'] ?? '');
+    $type = h($flashData[0]['params']['class'] ?? 'info');
+    $delay = (int)($flashData[0]['params']['delay'] ?? 5000);
+    ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof showToast === 'function') {
+                showToast("<?= $msg ?>", "<?= $type ?>", <?= $delay ?>);
+            }
+        });
+    </script>
+    <?php
+} else {
+    echo $this->Flash->render();
+}
+?>
+<?= $this->Form->create(null, ['url' => ['controller' => 'Users', 'action' => 'login']]) ?>
+<div class="mb-3 input-group">
+    <span class="input-group-text bg-transparent text-dark">
+        <i class="fas fa-user"></i>
+    </span>
+    <?= $this->Form->control('username', [
+        'placeholder' => 'Username',
+        'class' => 'form-control',
+        'label' => false,
+        'autocomplete' => 'off',
+        'id' => 'Text1',
+        'required' => true
+    ]) ?>
 </div>
+<div class="mb-3 input-group">
+    <span class="input-group-text bg-transparent text-dark">
+        <i class="fas fa-key"></i>
+    </span>
+    <?= $this->Form->control('password', [
+        'type' => 'password',
+        'placeholder' => 'Password',
+        'class' => 'form-control',
+        'label' => false,
+        'autocomplete' => 'off',
+        'id' => 'Text2',
+        'required' => true
+    ]) ?>
+</div>
+<?php if (isset($mathCaptcha)) { ?>
+    <div class="mb-3 input-group">
+    <span class="input-group-text bg-transparent text-dark">
+        <i class="fas fa-shield-alt"></i>
+    </span>
+        <?= $this->Form->control('security_code', [
+            'type' => 'number',
+            'label' => false,
+            'class' => 'form-control',
+            'autocomplete' => 'off',
+            'id' => 'securityCode',
+            'min' => 0,
+            'max' => 100,
+            'placeholder' => 'Enter the sum of ' . h($mathCaptcha),
+            'required' => true
+        ]) ?>
+    </div>
+<?php } ?>
+<?= $this->Form->button('Login', ['id' => 'loginButton', 'class' => 'btn btn-primary w-100']) ?>
+<div class="mt-3">
+    <?= $this->Html->link(__('Forgot Password?'), ['controller' => 'Users', 'action' => 'forget'], ['class' => 'btn btn-secondary w-100', 'target' => '_blank']) ?>
+</div>
+<?= $this->Form->end() ?>
+<script>
+    if (window.history.replaceState) {
+        window.history.replaceState(null, null, window.location.href);
+    }
+</script>

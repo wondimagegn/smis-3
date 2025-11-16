@@ -1,179 +1,300 @@
 <?php
-    App::import('Vendor','tcpdf/tcpdf');
-    // create new PDF document
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, 'A4', true, 'UTF-8', false);
-    //show header or footer
+use Cake\Core\Configure;
+use Cake\Routing\Router;
 
-    $pdf->SetProtection($permissions = array('modify', 'copy', 'extract', 'assemble'), $user_pass = USER_PASSWORD, $owner_pass = OWNER_PASSWORD, $mode = 0, $pubkeys = null);
+// Clear output buffer
+ob_start();
+// Load TCPDF
+require_once ROOT . DS . 'vendor' . DS . 'tecnickcom' . DS . 'tcpdf' . DS . 'tcpdf.php';
 
-    $pdf->SetPrintHeader(false); 
-    $pdf->SetPrintFooter(false);
-    //SetMargins(Left, Top, Right)
-    $pdf->SetMargins(10, 10, 10);
-    $pdf->setPageOrientation('P', true, 0);
-    $pdf->AddPage("P");
-    $pdf->SetLineStyle(array('dash' => 0, 'width' => '1'));
-    $pdf->Ln(50);
+// Create new PDF document
+$pdf = new \TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
 
-    $countryAmharic = Configure::read('ApplicationDeployedCountryAmharic'); 
-	$cityAmharic = Configure::read('ApplicationDeployedCityAmharic');
-	
-	$countryEnglish = Configure::read('ApplicationDeployedCountryEnglish'); 
-	$cityEnglish = Configure::read('ApplicationDeployedCityEnglish');
-	$pobox =  Configure::read('POBOX');
+// Set document protection
+$pdf->SetProtection(['modify', 'copy', 'extract', 'assemble'],
+    Configure::read('USER_PASSWORD', ''),
+    Configure::read('OWNER_PASSWORD', ''), 0, null);
 
-    $pdf->SetCreator(PDF_CREATOR);
-	$pdf->SetAuthor('SMiS, '.Configure::read('CompanyName').'');
-	$pdf->SetTitle('Password Issue Letter Report for ' . $staff_details['Staff'][0]['Title']['title'] . ' ' . $staff_details['Staff'][0]['full_name'] . ' (' .  $staff_details['User']['username'] . ') ' .(isset($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['name']) ? $staff_details['Staff'][0]['Department']['name']: (isset($staff_details['Staff'][0]['College']) && !empty($staff_details['Staff'][0]['College']['name']) ? $staff_details['Staff'][0]['College']['name'] : '')).'');
-	$pdf->SetSubject('Password Issue Letter Report for ' . $staff_details['Staff'][0]['Title']['title'].' ' .$staff_details['Staff'][0]['full_name'].' ('. $staff_details['User']['username'] .')'.  '');
-	$pdf->SetKeywords('Password, Issue, Letter, '.$staff_details['Staff'][0]['first_name'].', '.$staff_details['Staff'][0]['middle_name'].','.$staff_details['Staff'][0]['last_name'].', '.(isset($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['name']) ? $staff_details['Staff'][0]['Department']['name'] : '').', '.(isset($staff_details['Staff'][0]['College']) && !empty($staff_details['Staff'][0]['College']['name']) ? $staff_details['Staff'][0]['College']['name'] : '').','.$staff_details['Staff'][0]['Title']['title'].','.$staff_details['User']['email'].', SMiS');
+// Disable header and footer
+$pdf->SetPrintHeader(false);
+$pdf->SetPrintFooter(false);
 
-    //Image processing
+// Set margins (left, top, right)
+$pdf->SetMargins(10, 10, 10);
 
-    /* if (isset($university['University'])) {
-        if (strcasecmp($university['Attachment']['0']['group'], 'logo') == 0) {
-            $logo_index = 0;
+// Set page orientation to portrait
+$pdf->setPageOrientation('P', true, 0);
+
+// Add a page
+$pdf->AddPage('P');
+
+// Set line style
+$pdf->SetLineStyle(['dash' => 0, 'width' => 1]);
+
+// Move down 50mm
+$pdf->Ln(50);
+
+// Configuration variables
+$countryAmharic = Configure::read('ApplicationDeployedCountryAmharic', '');
+$cityAmharic = Configure::read('ApplicationDeployedCityAmharic', '');
+$countryEnglish = Configure::read('ApplicationDeployedCountryEnglish', '');
+$cityEnglish = Configure::read('ApplicationDeployedCityEnglish', '');
+$pobox = Configure::read('POBOX', '');
+
+// Set document metadata
+$pdf->SetCreator(Configure::read('PDF_CREATOR', 'SMiS'));
+$pdf->SetAuthor('SMiS, ' . Configure::read('CompanyName', ''));
+$title = 'Password Issue Letter Report for ' . h($staffDetails->staff->title->title ?? '') . ' ' .
+    h($staffDetails->staff->full_name ?? '') . ' (' .
+    h($staffDetails->username ?? '') . ') ' .
+    (isset($staffDetails->staff->department->name)
+    && !empty($staffDetails->staff->department->name)
+        ? h($staffDetails->staff->department->name)
+        : (isset($staffDetails->staff->college->name) &&
+        !empty($staffDetails->staff->college->name)
+            ? h($staffDetails->staff->college->name) : ''));
+$pdf->SetTitle($title);
+$pdf->SetSubject($title);
+$pdf->SetKeywords('Password, Issue, Letter, ' .
+    h($staffDetails->staff->full_name  ?? '') . ', ' .
+    (isset($staffDetails->staff->department->name) ?
+        h($staffDetails->staff->department->name) : '') . ', ' .
+    (isset($staffDetails->staff->college->name) ?
+        h($staffDetails->staff->college->name) : '') . ', ' .
+    h($staffDetails->staff->title->title ?? '') . ', ' .
+    h($staffDetails->email ?? '') . ', SMiS');
+
+
+
+
+// Add logo
+
+$logoPath = WWW_ROOT . 'img' . DS .UNIVERSITY_LOGO_HEADER_FOR_TCPDF ;
+if (file_exists($logoPath)) {
+    try {
+        $pdf->Image($logoPath, 5, 5, 25, 25, '', '', 'N',
+            true, 300, 'C');
+    } catch (\Exception $e) {
+        \Cake\Log\Log::error("Failed to add logo: " . $e->getMessage());
+    }
+}
+
+/*
+// Add profile photo if available
+if (!empty($staffDetails->staff->attachments)
+    && !empty(($staffDetails->staff->attachments[0]['file_dir'])
+        && $staffDetails->staff->attachments[0]['group'] === 'img')) {
+    $attachmentPath = WWW_ROOT . ($staffDetails->staff->attachments[0]['file_dir'].
+            $staffDetails->staff->attachments[0]['file']);
+    if (file_exists($attachmentPath) && in_array($staffDetails->staff->attachments[0]['file_type'],
+            ['image/jpeg', 'image/png'])) {
+        $pdf->Image($attachmentPath, 160, 5, 25, 25, '', '', 'N', true, 300, 'R');
+    }
+}
+
+// Add profile photo
+if (!empty($staffDetails->staff->attachments) && !empty($staffDetails->staff->attachments[0]['file_dir'])
+    && in_array($staffDetails->staff->attachments[0]['attachment_group'], ['profile', 'logo', 'background'])) {
+    $attachmentPath = WWW_ROOT . $staffDetails->staff->attachments[0]['file_dir'] . $staffDetails->staff->attachments[0]['file'];
+    if (in_array($staffDetails->staff->attachments[0]['file_dir'], ['doc', 'img'])) {
+        $attachmentPath = WWW_ROOT . 'Uploads/attachments/Staff/' . $staffDetails->staff->id . '/original/' . $staffDetails->staff->attachments[0]['attachment_group'] . '/' . $staffDetails->staff->attachments[0]['file'];
+    }
+    if (file_exists($attachmentPath) && in_array($staffDetails->staff->attachments[0]['file_type'], ['image/jpeg', 'image/png'])) {
+        try {
+            $pdf->Image($attachmentPath, 160, 5, 25, 25, '', '', 'N', true, 300, 'R');
+        } catch (\Exception $e) {
+            \Cake\Log\Log::error("Failed to add profile photo: " . $e->getMessage());
+        }
+    } else {
+        \Cake\Log\Log::error("Profile photo not found or invalid: $attachmentPath");
+    }
+}
+*/
+
+if (!empty($staffDetails->staffs[0]['attachments'][0])) {
+    $attachment = $staffDetails->staffs[0]['attachments'][0];
+    if($attachment->isLegacy){
+        if ($attachment->isLegacyImageDirectory) {
+            $pdf->Image(
+                $attachment->getLegacyUrlForCake2(),
+                160,
+                5,
+                25,
+                25,
+                '',
+                '',
+                'N',
+                true,
+                300,
+                'R'
+            );
         } else {
-            $logo_index = 1;
+            $pdf->writeHTML(
+                '<a href="' . $attachment->getLegacyUrlForCake2() .
+                '">Download Attachment</a>',
+                true,
+                false,
+                true,
+                false,
+                ''
+            );
+        }
+
+    } else {
+        if ($attachment->is_image) {
+            $pdf->Image(
+                $attachment->getUrl(),
+                160,
+                5,
+                25,
+                25,
+                '',
+                '',
+                'N',
+                true,
+                300,
+                'R'
+            );
+        } else {
+            $pdf->writeHTML(
+                '<a href="' . $attachment->getUrl() .
+                '">Download Attachment (' . $attachment->file_type . ', ' . $attachment->file_size . ' bytes)</a>',
+                true,
+                false,
+                true,
+                false,
+                ''
+            );
         }
     }
-    
-    $logo_path = $this->Media->file($university['Attachment'][$logo_index]['dirname']. DS.$university['Attachment'][$logo_index]['basename']); */
-    //HEADER
+}
+// Add font
+$pdf->AddFont('freeserif', '', 'freeserif.php');
 
-    $pdf->Image($_SERVER['DOCUMENT_ROOT'] . UNIVERSITY_LOGO_HEADER_FOR_TCPDF, '5', '5', 25, 25, '', '', 'N', true, 300, 'C');
-    $fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerifBold.ttf');
-    $pdf->SetFont($fontPath, '', 14, '', false);
-    $pdf->MultiCell(92, 7, ($university['University']['name']), 0, 'C', false, 0, 1, 10);
-    $pdf->SetFont($fontPath, '', 13, '', false);
 
-    if(isset( $staff_details['Staff'][0]['College']['name'])) {
-        $pdf->MultiCell(92, 7, $staff_details['Staff'][0]['College']['name'], 0, 'C', false, 0, 1, 17);
-    } else {
-        $pdf->MultiCell(92, 7, '', 0, 'C', false, 0, 1, 17);
-    }
+// Header content
+$pdf->SetFont('freeserif', 'B', 14);
+$pdf->MultiCell(92, 7, h($university->name ?? ''), 0, 'C', false,
+    0, 1, 10);
+$pdf->SetFont('freeserif', 'B', 13);
+$pdf->MultiCell(92, 7, h($staffDetails->staff->college->name ?? ''), 0,
+    'C', false, 0, 1, 17);
+if (!empty($staffDetails->staff->department->id)) {
+    $pdf->MultiCell(92, 7, h($staffDetails->staff->department->type ?? '') .
+        ' of ' . h($staffDetails->staff->department->name ?? ''), 0, 'C',
+        false, 0, 1, 22);
+} else {
+    $pdf->MultiCell(92, 7, '', 0, 'C', false, 0, 1, 22);
+}
 
-    //$pdf->SetFont($fontPath, 'U', 13, '', false);
-    $pdf->SetFont($fontPath, '', 13, '', false);
+$pdf->SetFont('freeserif', '', 18);
+$pdf->MultiCell(85, 7, strtoupper(h($university->amharic_name ?? '')), 0,
+    'C', false, 0, 120, 10);
+$pdf->SetFont('freeserif', '', 16);
+$pdf->MultiCell(85, 7, h($staffDetails->staff->college->amharic_name ?? ''),
+    0, 'C', false, 0, 120, 17);
+if (!empty($staffDetails->staff->department->id)) {
+    $pdf->MultiCell(85, 7, 'የ' . h($staffDetails->staff->department->amharic_name ?? '') .
+        ' ' . h($staffDetails->staff->department->type_amharic ?? ''), 0, 'C', false, 0, 120, 22);
+} else {
+    $pdf->MultiCell(85, 7, '', 0, 'C', false, 0, 120, 22);
+}
 
-    if(!empty($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['id'])) {
-		$pdf->MultiCell(92, 7, $staff_details['Staff'][0]['Department']['type']. ' of '. $staff_details['Staff'][0]['Department']['name'], 0, 'C', false, 0, 1, 22);
-    } else {
-		$pdf->MultiCell(92, 7, '', 0, 'C', false, 0, 1, 22);
-    }
+// Address
+$pdf->SetFont('freeserif', '', 12);
+$pdf->MultiCell(30, 7, 'P.O.Box: ' . h($pobox), 0, 'C', false, 0, 34, 35);
+if (!empty($staffDetails->staff->department->id) &&
+    !empty($staffDetails->staff->department->phone)) {
+    $pdf->MultiCell(100, 7, 'Tel: ' . h($staffDetails->staff->department->phone),
+        0, 'L', false, 0, 146, 35);
+} elseif (empty($staffDetails->staff->department->id) &&
+    !empty($staffDetails->staff->college->phone)) {
+    $pdf->MultiCell(100, 7, 'Tel: ' . h($staffDetails->staff->college->phone),
+        0, 'L', false, 0, 146, 35);
+}
 
-    $fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/Vendor/tcpdf/fonts/jiret.ttf');
-    $pdf->SetFont($fontPath, '', 18, '', true);
-    $pdf->MultiCell(85, 7, strtoupper($university['University']['amharic_name']), 0, 'C', false, 0, 120, 10);
-    $pdf->SetFont($fontPath, '', 16, '', false);
+// Line separator
+$pdf->Line(2, 43, 207, 43);
+$pdf->SetFont('freeserif', '', 14);
+$pdf->MultiCell(157, 7, h($cityAmharic . '፡ ' . $countryAmharic), 0, 'C', false, 0, 27, 31);
+$pdf->SetFont('freeserif', 'B', 12);
+$pdf->MultiCell(157, 7, h($cityEnglish . ', ' . $countryEnglish), 0, 'C', false, 0, 27, 36);
 
-    if(!empty($staff_details['Staff'][0]['College']['amharic_name']) && !empty( $staff_details['Staff'][0]['College']['amharic_name'])) {
-		$pdf->MultiCell(85, 7, $staff_details['Staff'][0]['College']['amharic_name'], 0, 'C', false, 0, 120, 17);
-    } else {
-		$pdf->MultiCell(85, 7, '', 0, 'C', false, 0, 120, 17);
-    }
+// Title
+$pdf->SetFont('freeserif', 'B', 14);
+$pdf->MultiCell(157, 7, 'Password Issue Letter', 0, 'C', false, 0, 27,
+    46);
+$pdf->Ln(15);
 
-    //$pdf->SetFont($fontPath, 'U', 16, '', false);
-    $pdf->SetFont($fontPath, '', 16, '', false);
+// Letter content
+$welcomeFirstTime = !empty($staffDetails['User']['last_login'])
+    ? '<td colspan="2">This is a password reset letter, please login to SMiS <b>(' . h(Configure::read('PORTAL_URL_HTTPS', '')) . ')</b>, using the account details below: </td>'
+    : '<td colspan="2">Welcome to ' . h($university->name ?? '') . '!
+It is exciting world of knowledge. All academic related transactions are handled by SMiS.
+In order to access the portal <b>(' . h(Configure::read('PORTAL_URL_HTTPS', '')) . ')</b>,
+use the account details below: </td>';
 
-    if (!empty($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['id'])) {
-		$pdf->MultiCell(85, 7, '' . $staff_details['Staff'][0]['Department']['amharic_name'] . ' '. $staff_details['Staff'][0]['Department']['type_amharic'], 0, 'C', false, 0, 120, 22);
-    }  else {
-	    $pdf->MultiCell(85, 7, '', 0, 'C', false, 0, 120, 22);
-    }
+$staffCopyHtml = '
+<table style="width:100%" border="0" cellpadding="0" cellspacing="0">
+    <tr><td colspan="2">Dear ' . (isset($staffDetails->staff->title->title) ?
+        h($staffDetails->staff->title->title) . ' ' : '') . h($staffDetails->staff->full_name ?? '') . ',</td></tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+    <tr>' . $welcomeFirstTime . '</tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+    <tr>
+        <td style="width:15%">&nbsp;</td>
+        <td style="width:85%"><span style="padding-left: 5px;">Username: &nbsp;&nbsp;' . h($staffDetails->username ?? '') . '</span></td>
+    </tr>
+    <tr>
+        <td style="width:15%">&nbsp;</td>
+        <td style="width:85%"><span style="padding-left: 5px;">Temporary Password: &nbsp;&nbsp;' .
+    h($password) . '</span></td>
+    </tr>
+    <tr>
+        <td>&nbsp;</td>
+        <td><span style="padding-left: 5px;">Recovery Email: &nbsp;&nbsp;' . h($staffDetails->email ?? '') . '</span></td>
+    </tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+    <tr>
+        <td colspan="2" style="width:100%">
+            <u style="font-weight: bold;">Important Notes:</u>
+            <p>
+                <ol>
+                    <li>For first time login, you will be forced to change the above temporary password to your own chosen password.</li>
+                    <li>Make sure you provide a strong password when you are presented with the password change page and always remember your password.</li>
+                    <li>You are advised to keep your password secure and secret, particularly if using a shared computer.</li>
+                    <li>You can use the above registered email <b>' .
+    h($staffDetails->email ?? '') . '</b> on Forgot password link: <b>' .
+    h(Configure::read('BASE_URL_HTTPS', '')) . 'users/forget</b>
+                    to recover your username and password if forgotten.</li>
+                </ol>
+            </p>
+        </td>
+    </tr>
+    <tr><td colspan="2">&nbsp;</td></tr>
+</table>
+<br><br>';
 
-	//Department/College Address
+$pdf->SetFont('freeserif', '', 12);
+$pdf->writeHTML($staffCopyHtml);
 
-    $fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerif.ttf');
-    $pdf->SetFont($fontPath, '', 12, '', false);
-    // $pdf->Image($_SERVER['DOCUMENT_ROOT'].'/app/webroot/img/post_icon.png', '40', '26', 7, 7, 'PNG', '', '', true, 300, '');
-    $pdf->MultiCell(30, 7, 'P.O.Box: '. $pobox, 0, 'C', false, 0, 34, 35);
+// Reset pointer to the last page
+$pdf->lastPage();
 
-    if ((!empty($staff_details['Staff'][0]['Department'])  && !empty($staff_details['Staff'][0]['Department']['id'])  && !empty($staff_details['Staff'][0]['Department']['phone']))  || (empty($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['id']) && !empty($staff_details['Staff'][0]['College']['phone']))) {
-        
-        //$pdf->Image($_SERVER['DOCUMENT_ROOT'].'/app/webroot/img/phone_icon.png', '140', '26', 7, 7, 'PNG', '', '', true, 300, '');
-    	
-        if ((!empty($staff_details['Staff'][0]['Department']) && !empty($staff_details['Staff'][0]['Department']['id']))) {
-    		$pdf->MultiCell(100, 7, 'Tel: '. $staff_details['Staff'][0]['Department']['phone'], 0, 'L', false, 0, 146, 35);
-    	} else {
-			$pdf->MultiCell(100, 7, 'Tel: '. $staff_details['Staff'][0]['College']['phone'], 0, 'L', false, 0, 146, 35);
-		}
-	}
 
-    $fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerif.ttf');
-    $pdf->SetFont($fontPath, '', 12, '', false);
-    $pdf->Line(2, 43, 207, 43);
-    $pdf->SetFont('jiret', '', 14, '', true);
-    $pdf->MultiCell(157, 7, $cityAmharic . '፡ ' . $countryAmharic, 0, 'C', false, 0, 27, 31);
-    $fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerifBold.ttf');
-    $pdf->SetFont($fontPath, '', 12, '', false);
-    $pdf->MultiCell(157, 7, $cityEnglish . ', ' . $countryEnglish, 0, 'C', false, 0, 27, 36);
-   
-    $welcomeFirstTime = null;
+// Clear output buffer
+ob_clean();
 
-    if(!empty($staff_details['User']['last_login'])) { 
-        $welcomeFirstTime= '<td colspan="2">This is a password reset letter, please login to SMiS <b>('.BASE_URL.')</b>, using the account details below: </td>';
-    } else {
-        $welcomeFirstTime= '<td colspan="2">Welcome to '.$university['University']['name'].'! It is exciting world of knowledge.
-        All academic related transactions are handled by SMiS. Inorder to access the portal <b>('.BASE_URL.')</b>, use the account details below: </td>';
-    } 
 
-    $staff_copy_html = '
-    <table style="width:100%" border="0" cellpadding="0" cellspacing="0" >
-        <tr><td colspan="2">Dear ' . (isset($staff_details['Staff'][0]['Title']['title']) ? $staff_details['Staff'][0]['Title']['title'] . ' ' : '' ) . $staff_details['Staff'][0]['full_name']. ', </td></tr>
-        <tr><td colspan="2">&nbsp;</td></tr>
-        <tr>'.$welcomeFirstTime.'</tr>
-        <tr><td colspan="2"> &nbsp;</td></tr>
-        <tr>
-            <td style="width:15%">&nbsp;</td>
-            <td style="width:85%"><span style="padding-left: 5px;">Username: &nbsp;&nbsp;'.$staff_details['User']['username'].'</span></td>
-        </tr>
-        <tr>
-            <td style="width:15%">&nbsp;</td>
-            <td style="width:85%"><span style="padding-left: 5px;">Temporary Password: &nbsp;&nbsp;'.$password.'</span></td>
-        </tr>
-        <tr>
-            <td>&nbsp;</td>
-            <td><span style="padding-left: 5px;">Recovery Email: &nbsp;&nbsp;'.$staff_details['User']['email'].'</span></td>
-        </tr>
-        <tr>
-            <td colspan="2"> &nbsp;</td>
-        </tr>
-        <tr>
-            <td colspan="2"> &nbsp;</td>
-        </tr>
-        <tr>
-            <td colspan="2" style="width:100%"><u style="font-weight: bold;">Important Notes:</u>
-                <p>
-                    <ol>
-                        <li> For first time login, you will be forced to chanage the above temporary password to your own choosen password. </li>
-                        <li> Make sure you provide strong password when your are presented with password change page and always remember your password. </li>
-                        <li> You are advised to keep your password secure and secret particularly if using a shared computer. </li>
-                        <li> You can use the above registered email <b>('.$staff_details['User']['email'].')</b> on Forgot password link: <b>'.BASE_URL_HTTPS.'users/forget</b> to recover your username and password if forgotten. </li>
-                    </ol>
-                </p>
-            </td>
-        </tr>
-        <tr><td colspan="2"> &nbsp;</td></tr>
-    </table>
-    <br />
-    <br />';
-	
-	$fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerifBold.ttf');
-	$pdf->SetFont($fontPath, '', 14, '', false);
-    $pdf->MultiCell(157, 7, 'Password Issue Letter', 0, 'C', false, 0, 27, 46);
-	$pdf->Ln(15);
-	$fontPath = $pdf->addTTFfont($_SERVER['DOCUMENT_ROOT'].'/app/webroot/fonts/FreeSerif.ttf');
-    $pdf->SetFont($fontPath, '', 12, '', false);
-    $pdf->writeHTML($staff_copy_html);
-    // reset pointer to the last page
-    $pdf->lastPage();
-    //output the PDF to the browser
-    $pdf->Output('Password_Issue_Letter_'.$staff_details['Staff'][0]['full_name'].'_('.$staff_details['User']['username'].')_'.date('Y-m-d').'.pdf', 'I');
-    
-    /*
-    I: send the file inline to the browser.
-    D: send to the browser and force a file download with the name given by name.
-    F: save to a local file with the name given by name.
-    S: return the document as a string.
-    */
+// Output the PDF
+try {
+    $filename = 'Password_Issue_Letter_' . str_replace(' ', '_', $staffDetails->staff->full_name ?? '') . '_(' . ($staffDetails->username ?? '') . ')_' . date('Y-m-d') . '.pdf';
+    $pdf->Output($filename, 'I');
+} catch (\Exception $e) {
+    \Cake\Log\Log::error("Failed to output PDF: " . $e->getMessage());
+    throw new \Exception("Failed to output PDF.");
+}
+
+// Ensure no output after PDF
+exit;

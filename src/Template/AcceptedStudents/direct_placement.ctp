@@ -1,181 +1,176 @@
-<?php ?>
-<?php echo $this->Form->create('AcceptedStudent');?> 
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-             
-<h3>Direct/Manual Student Placement to Department</h3>
-<table>
-<tbody>
-	<tr> 
-			<td>
-			
-			 <?php 
-					echo $this->Form->input('AcceptedStudent.academicyear',array('id'=>'academicyear','label' => 'Academic Year','type'=>'select','options'=>$acyear_array_data,'empty'=>"--Select Academic Year--",'selected'=>isset($defaultacademicyear)?$defaultacademicyear:'')); 
-				
-				    
-				    ?>
-			</td>
-			<td>
-			
-			 <?php 
-					echo $this->Form->input('AcceptedStudent.program_type_id',array('id'=>'programType', 'label' => 'Program Type')); 
-				
-				    
-				    ?>
-			</td>
-	</tr>
-	<tr> 
-			<td>
-			
-			 <?php 
-					echo $this->Form->input('AcceptedStudent.name',array('id'=>'name',
-				    'label' => 'Name')); 
-				
-				    
-				    ?>
-			</td>
-			<td>
-			
-			 <?php 
-					echo $this->Form->input('AcceptedStudent.limit',array('id'=>'limit', 'label' => 'Limit')); 
-				
-				    
-				    ?>
-			</td>
-	</tr>
-    <tr> 
-			<td>
-			<?php 
-	echo $this->Form->Submit('Search',array('div'=>false,'name'=>'search','class'=>'tiny radius button bg-blue'));
-;?>
-			</td>
-	</tr>
+<?php
+use Cake\I18n\I18n;
 
-   
-	</tbody>
-	</table>
-<?php 
-if(!empty($acceptedStudents)){
-?>
-<div class="acceptedStudents index">
-	<h2><?php echo __('Select department');?></h2>
-	
-    <?php 
-        echo $this->Form->create('AcceptedStudent',array('id'=>'directplacementform'));
-	?>
-	<table  cellpadding="0" cellspacing="0">
-	<tbody>
-	    <tr>
-	    <td> <?php 
-	   echo $this->Form->input('AcceptedStudent.department_id',array('id'=>'department_id','type'=>'select',
-	    'options'=>$departments,'empty'=>'--Select Department--','selected'=>isset($selecteddepartment)?$selecteddepartment:''));
-	 
-	   //echo $this->Form->input('department_id');
-	 
+$this->set('title', __('Direct/Manual Student Placement to Department'));
+$this->Html->script(['jquery-1.6.2.min'], ['block' => 'script']);
 ?>
 
-	    </td>
-	    </tr>
-	</tbody>
-	</table>
-	<table  cellpadding="0" cellspacing="0"> 
-    <tr>
-            <th>
-            <?php echo 'Select/Unselect All <br/>'.$this->Form->checkbox('selectall', array('id' => 'select-all')); ?> </th>
-			
-            <th><?php echo $this->Paginator->sort('full_name');?></th>
-			<th><?php echo $this->Paginator->sort('sex');?></th>
-			<th><?php echo $this->Paginator->sort('studentnumber');?></th>
-			
-			<th><?php echo $this->Paginator->sort('EHEECE_total_results');?></th>
-			<th><?php echo $this->Paginator->sort('department_id');?></th>
-			<th><?php echo $this->Paginator->sort('program_type_id');?></th>
-			<th><?php echo $this->Paginator->sort('academicyear');?></th>
-			
-			<th><?php echo $this->Paginator->sort('placementtype');?></th> 
+<script type="text/javascript">
+    $(document).ready(function() {
+        $("#select-all").click(function() {
+            $(".checkbox1").prop('checked', $(this).prop('checked'));
+        });
+    });
+</script>
 
-	</tr>
-	<?php
-	
-	$i = 0;
-	foreach ($acceptedStudents as $acceptedStudent):
-		$class = null;
-		if ($i++ % 2 == 0) {
-			$class = ' class="altrow"';
-		}
-	?>
-	<tr<?php echo $class;?>>
-        <td><?php echo $this->Form->checkbox('AcceptedStudent.directplacement.' . $acceptedStudent['AcceptedStudent']['id'],array('disabled'=>$acceptedStudent['AcceptedStudent']['Placement_Approved_By_Department']==1?true:false,'class'=>'checkbox1')); ?></td>
-       
-        <td><?php echo $acceptedStudent['AcceptedStudent']['full_name']; ?>&nbsp;</td>
-
-		<td><?php echo $acceptedStudent['AcceptedStudent']['sex']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['studentnumber']; ?>&nbsp;</td>
-		
-		<td><?php echo $acceptedStudent['AcceptedStudent']['EHEECE_total_results']; ?>&nbsp;</td>
-		<td>
-			<?php echo $this->Html->link($acceptedStudent['Department']['name'], array('controller' => 'departments', 'action' => 'view', $acceptedStudent['Department']['id'])); ?>
-		</td>
-		<td>
-			<?php echo $this->Html->link($acceptedStudent['ProgramType']['name'], array('controller' => 'program_types', 'action' => 'view', $acceptedStudent['ProgramType']['id'])); ?>
-		</td>
-		<td><?php echo $acceptedStudent['AcceptedStudent']['academicyear']; ?>&nbsp;</td>
-		
-		<td><?php echo $acceptedStudent['AcceptedStudent']['placementtype']; ?>&nbsp;</td>
-		
-	</tr>
-<?php endforeach; ?>  
-	</table>
-    <table cellpadding="0" cellspacing="0"><tbody>
-        <tr><td><tr><td >
- <?php echo $this->Form->Submit('Assign To Selected Department',array('div'=>false,
- 'name'=>'assigndirectly','class'=>'tiny radius button bg-blue'));
- ?>
- 
- </td>
- 
-  <td>
-    <?php echo $this->Form->Submit('Transfer To Selected Department',array('div'=>false,
- 'name'=>'transfertodepartment','class'=>'tiny radius button bg-blue'));?>
- </td>
- <td>
-  <?php echo $this->Form->Submit('Cancel Selected Student Placement',array('div'=>false,
- 'name'=>'cancelplacement','class'=>'tiny radius button bg-blue'));?>
- </td>
-</tr>
-    </tbody></table>
-	<p>
-	<?php
-	echo $this->Paginator->counter(array(
-	'format' => __('Page %page% of %pages%, showing %current% records out of %count% total, starting on record %start%, ending on %end%')
-	));
-	?>	</p>
-
-	
-
-	<div class="pagination-centered">
-	<ul class="pagination">
-	<?php
-		echo $this->Paginator->prev('<< ' . __(''), array('tag'=>'li'), null, array('class' => 'arrow unavailable '));
-		echo $this->Paginator->numbers(array('separator' => '','tag'=>'li'));
-		echo $this->Paginator->next(__('') . ' >>', array('tag'=>'li'), null, array('class' => 'arrow  unavailable'));
-	?>
-	</ul>
-	</div>
-
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <h2><?= __('Direct/Manual Student Placement to Department') ?></h2>
+                    <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'directPlacement'], 'class' => 'form-horizontal']) ?>
+                    <table class="table">
+                        <tbody>
+                        <tr>
+                            <td>
+                                <?= $this->Form->control('AcceptedStudent.academic_year', [
+                                    'id' => 'academic-year',
+                                    'label' => ['text' => __('Academic Year'), 'class' => 'control-label'],
+                                    'type' => 'select',
+                                    'options' => $academicYearList,
+                                    'empty' => __('--Select Academic Year--'),
+                                    'value' => $defaultAcademicYear ?? '',
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </td>
+                            <td>
+                                <?= $this->Form->control('AcceptedStudent.program_type_id', [
+                                    'id' => 'program-type',
+                                    'label' => ['text' => __('Program Type'), 'class' => 'control-label'],
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <?= $this->Form->control('AcceptedStudent.name', [
+                                    'id' => 'name',
+                                    'label' => ['text' => __('Name'), 'class' => 'control-label'],
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </td>
+                            <td>
+                                <?= $this->Form->control('AcceptedStudent.limit', [
+                                    'id' => 'limit',
+                                    'label' => ['text' => __('Limit'), 'class' => 'control-label'],
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="form-group">
+                                    <?= $this->Form->button(__('Search'), ['name' => 'search', 'class' => 'btn btn-primary']) ?>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <?php if (!empty($acceptedStudents)): ?>
+                        <div class="accepted-students-index">
+                            <h3><?= __('Select Department') ?></h3>
+                            <?= $this->Form->create(null, ['id' => 'direct-placement-form', 'url' => ['action' => 'directPlacement'], 'class' => 'form-horizontal']) ?>
+                            <table class="table">
+                                <tbody>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('AcceptedStudent.department_id', [
+                                            'id' => 'department-id',
+                                            'type' => 'select',
+                                            'options' => $departments,
+                                            'empty' => __('--Select Department--'),
+                                            'value' => $selectedDepartment ?? '',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <table class="table table-bordered table-striped">
+                                <tr>
+                                    <th>
+                                        <?= __('Select/Unselect All') ?><br/>
+                                        <?= $this->Form->checkbox('selectall', ['id' => 'select-all']) ?>
+                                    </th>
+                                    <th><?= $this->Paginator->sort('full_name', __('Full Name')) ?></th>
+                                    <th><?= $this->Paginator->sort('sex', __('Sex')) ?></th>
+                                    <th><?= $this->Paginator->sort('studentnumber', __('Student Number')) ?></th>
+                                    <th><?= $this->Paginator->sort('EHEECE_total_results', __('EHEECE Total Results')) ?></th>
+                                    <th><?= $this->Paginator->sort('department_id', __('Department')) ?></th>
+                                    <th><?= $this->Paginator->sort('program_type_id', __('Program Type')) ?></th>
+                                    <th><?= $this->Paginator->sort('academic_year', __('Academic Year')) ?></th>
+                                    <th><?= $this->Paginator->sort('placementtype', __('Placement Type')) ?></th>
+                                </tr>
+                                <?php foreach ($acceptedStudents as $index => $acceptedStudent): ?>
+                                    <tr class="<?= $index % 2 == 0 ? 'altrow' : '' ?>">
+                                        <td>
+                                            <?= $this->Form->checkbox("AcceptedStudent.directplacement.{$acceptedStudent->id}", [
+                                                'disabled' => $acceptedStudent->placement_approved_by_department == 1,
+                                                'class' => 'checkbox1'
+                                            ]) ?>
+                                        </td>
+                                        <td><?= h($acceptedStudent->full_name) ?></td>
+                                        <td><?= h($acceptedStudent->sex) ?></td>
+                                        <td><?= h($acceptedStudent->studentnumber) ?></td>
+                                        <td><?= h($acceptedStudent->EHEECE_total_results) ?></td>
+                                        <td>
+                                            <?= $this->Html->link(
+                                                h($acceptedStudent->Department->name),
+                                                ['controller' => 'Departments', 'action' => 'view', $acceptedStudent->Department->id]
+                                            ) ?>
+                                        </td>
+                                        <td>
+                                            <?= $this->Html->link(
+                                                h($acceptedStudent->ProgramType->name),
+                                                ['controller' => 'ProgramTypes', 'action' => 'view', $acceptedStudent->ProgramType->id]
+                                            ) ?>
+                                        </td>
+                                        <td><?= h($acceptedStudent->academic_year) ?></td>
+                                        <td><?= h($acceptedStudent->placementtype) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </table>
+                            <table class="table">
+                                <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Assign To Selected Department'), ['name' => 'assigndirectly', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Transfer To Selected Department'), ['name' => 'transfertodepartment', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Cancel Selected Student Placement'), ['name' => 'cancelplacement', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <p>
+                                <?= $this->Paginator->counter([
+                                    'format' => __('Page {{page}} of {{pages}}, showing {{current}} records out of {{count}} total, starting on record {{start}}, ending on {{end}}')
+                                ]) ?>
+                            </p>
+                            <div class="pagination">
+                                <?= $this->Paginator->prev('<< ' . __('previous')) ?>
+                                | <?= $this->Paginator->numbers() ?> |
+                                <?= $this->Paginator->next(__('next') . ' >>') ?>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-info">
+                            <span></span><?= __('No Accepted students in the selected academic year') ?>
+                        </div>
+                    <?php endif; ?>
+                    <?= $this->Form->end() ?>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<?php 
-} else {
-    echo "<div class='info-box info-message'><span></span>No Accepted students in the selected academic year</div>";
-}
- //echo $this->Js->writeBuffer(); // Write cached scripts
-?>
-
-
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row -->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
-

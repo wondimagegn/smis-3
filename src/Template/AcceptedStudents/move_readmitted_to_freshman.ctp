@@ -1,175 +1,211 @@
-<?php echo $this->Form->create('AcceptedStudent', array('action' => 'move_readmitted_to_freshman',
-'novalidate'=>true));?> 
-
-<div class="box">
-     <div class="box-body">
-       <div class="row">
-	  <div class="large-12 columns">
-            	
-<div>
-<?php if(!isset($show_list_generated) || empty($acceptedStudents)) { ?>
-<div class="smallheading"><?php echo __('Find readmitted applicant for freshman program.')?></div>
-<?php if(!isset($show_list_generated) || empty($acceptedStudents)) { ?>
-<table cellpadding="0" cellspacing="0"><tr> 
-	<?php 
-			echo '<td>'.$this->Form->input('Search.academicyear',array('id'=>'academicyear',
-                'label' => 'Readmission Academic Year','type'=>'select','options'=>$readmittedAC,
-                'empty'=>"--Select Academic Year--",'selected'=>isset($selectedsacdemicyear)?$selectedsacdemicyear:'')).'</td>';
-            echo '<td>'. $this->Form->input('Search.college_id',array('empty'=>"--Select College--")).'</td></tr>';
-            echo '<tr><td>'. $this->Form->input('Search.program_id',array('empty'=>"--Select Program--")).'</td>'; 
-            echo '<td>'. $this->Form->input('Search.program_type_id',array('empty'=>"--Select Program Type--")).'</td></tr>'; 
-            ?>
-    <tr>
-    	
-    	<td colspan="2"><?php echo $this->Form->input('Search.name',array('label'=>"Name")); ?> </td>	
-    	
-    </tr>
-	<tr><td><?php echo $this->Form->submit('Find  Readmitted Students',array('name'=>'continue','div'=>'false','class'=>'tiny radius button bg-blue')); ?> </td>	
-	<td><?php ?> </td>	
-		
-</tr>
-
-</table>
-<?php } ?>
-<?php 
-}
-
-echo $this->Form->end();
-
-
-if(!empty($acceptedStudents)){
-?>
-
-<table><tbody><tr><td width="100%">
-<table><tbody>
-
-<tr><td colspan=2>
 <?php
+use Cake\I18n\I18n;
 
-//echo $this->Form->hidden('AcceptedStudent.id',array('value'=>));
-
-echo $this->Form->create('AcceptedStudent', array('action' => 'move_readmitted_to_freshman'));
-
-echo "<table>";
-
-
-echo "<tr><td colspan=2>Select the campus and the college you want to readmitted the selected student in freshman program.</td></tr>";
-
-echo "<tr><td>".$this->Form->input('campus_id',array('empty'=>'--select campus--',
-'required'=>true,'options'=>$available_campuses,'label'=>'Select the target campus',
-'id'=>'ajax_campus_id', 'onchange'=>'getCollege()'
-))."</td><td>".$this->Form->input('selected_college_id',array('empty'=>'--select campus--','id'=>'SelectedCollegeId',
-'required'=>true,'options'=>$selected_colleges,'label'=>'Select the target college'))."</td></tr>";
-echo "</table>";
-
- $count=0;
-
-?>
-<table>
-   <tr><th colspan=11 class="smallheading"><?php echo  __('List of student who applied for readmission application.');?></th></tr>
-	<tr>
-	        
-            <th><?php echo ('No.'); ?> </th>
-            <th style="padding:0">
-            <?php echo 'Select/ Unselect All <br/>'.$this->Form->checkbox("SelectAll", array('id' => 'select-all','checked'=>'')); ?> </th> 
-            <th><?php echo ('Full Name');?></th>
-			<th><?php echo ('Sex');?></th>
-			<th><?php echo ('Student Number');?></th>
-		
-			<th><?php echo ('College');?></th>
-			<th><?php echo ('Department');?></th>
-			<th><?php echo ('Academic Year');?></th>
-			<th><?php echo ('Campus');?></th>
-			
-			
-	</tr>
-	<?php
-	$i = 0;
-	$serial_number=1;
-	
-	foreach ($acceptedStudents as $acceptedStudent):
-		$class = null;
-		if ($i++ % 2 == 0) {
-			$class = ' class="altrow"';
-		}
-	?>
-	<tr<?php echo $class;?>>
-       
-        <td><?php echo $serial_number++;?></td>
-         <td ><?php echo $this->Form->checkbox('AcceptedStudent.approve.' . $acceptedStudent['Student']['AcceptedStudent']['id'],array('class'=>'checkbox1')); ?>&nbsp;</td> 
-          <?php //echo $this->Form->hidden('AcceptedStudent.'.$count.'.id',array('value'=>$acceptedStudent['Student']['AcceptedStudent']['id']));?>
-        <td><?php echo $acceptedStudent['Student']['AcceptedStudent']['full_name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Student']['AcceptedStudent']['sex']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Student']['AcceptedStudent']['studentnumber']; ?>&nbsp;</td>
-		
-		<td><?php echo $acceptedStudent['Student']['College']['name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Student']['Department']['name']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Student']['AcceptedStudent']['academicyear']; ?>&nbsp;</td>
-		<td><?php echo $acceptedStudent['Student']['College']['Campus']['name']; ?>&nbsp;</td>
-		
-	</tr>
-	
-<?php 
-$count++;
-
-endforeach; 
-
-?>
-	</table>
-
-	<?php 
-	
- 
-echo '<tr><td>'.$this->Form->Submit(__('Readmit selected'),array('div'=>false,'class'=>'tiny radius button bg-blue','name'=>'readmitted')).'</td></tr>';
-
-
- ?>
-</td></tr>
-    </tbody></table>
-   
-</td></tr>
-
-</tbody></table>
-
-
-<?php 
-} else if(empty($acceptedStudents) && !($isbeforesearch)){
-    echo "<div class='info-box info-message'> <span></span> No  students who applied readmission in selected criteria</div>";
-}
-?>
-</div>
-	  </div> <!-- end of columns 12 -->
-	</div> <!-- end of row --->
-      </div> <!-- end of box-body -->
-</div><!-- end of box -->
-<?php  
-echo $this->Form->end();
+$this->set('title', __('Find Readmitted Applicant for Freshman Program'));
+$this->Html->script(['jquery-1.6.2.min'], ['block' => 'script']);
 ?>
 
 <script type="text/javascript">
-var image = new Image();
-image.src = '/img/busy.gif';
- //Get year level
-function getCollege() {
-   //serialize form data
-		var clg = $("#ajax_campus_id").val();
-		$("#SelectedCollegeId").attr('disabled', true);
-		$("#SelectedCollegeId").empty().html('<img src="/img/busy.gif" class="displayed" >');
-//get form action
- var formUrl = '/colleges/get_college_combo/'+clg;
+    $(document).ready(function() {
+        var image = new Image();
+        image.src = '<?= $this->Url->image('busy.gif') ?>';
+
+        function getCollege() {
+            var clg = $("#ajax-campus-id").val();
+            $("#selected-college-id").prop('disabled', true);
+            $("#selected-college-id").html('<img src="<?= $this->Url->image('busy.gif') ?>" class="img-fluid mx-auto d-block" />');
+
+            var formUrl = '<?= $this->Url->build(['controller' => 'Colleges', 'action' => 'getCollegeCombo', '_ext' => 'json']) ?>/' + clg;
+
             $.ajax({
-                type: 'get',
+                type: 'GET',
                 url: formUrl,
-                data: clg,
-                success: function(data,textStatus,xhr){
-$("#SelectedCollegeId").attr('disabled', false);
-$("#SelectedCollegeId").empty();
-$("#SelectedCollegeId").append(data);
+                data: { clg: clg },
+                dataType: 'json',
+                success: function(data, textStatus, xhr) {
+                    $("#selected-college-id").prop('disabled', false);
+                    $("#selected-college-id").empty();
+                    $.each(data, function(key, value) {
+                        $("#selected-college-id").append('<option value="' + key + '">' + value + '</option>');
+                    });
                 },
-                error: function(xhr,textStatus,error){
-                        alert(textStatus);
+                error: function(xhr, textStatus, error) {
+                    alert(textStatus);
                 }
             });
             return false;
- }
- </script>
+        }
+
+        $("#ajax-campus-id").on('change', getCollege);
+
+        $("#select-all").click(function() {
+            $(".checkbox1").prop('checked', $(this).prop('checked'));
+        });
+    });
+</script>
+
+<div class="container">
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="accepted-students-index">
+                        <?php if (empty($showListGenerated) || empty($acceptedStudents)): ?>
+                            <h2><?= __('Find readmitted applicant for freshman program.') ?></h2>
+                            <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'moveReadmittedToFreshman'], 'novalidate' => true, 'class' => 'form-horizontal']) ?>
+                            <table class="table">
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('Search.academic_year', [
+                                            'id' => 'academic-year',
+                                            'label' => ['text' => __('Readmission Academic Year'), 'class' => 'control-label'],
+                                            'type' => 'select',
+                                            'options' => $readmittedAC,
+                                            'empty' => __('--Select Academic Year--'),
+                                            'value' => $selectedAcademicYear ?? '',
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td>
+                                        <?= $this->Form->control('Search.college_id', [
+                                            'empty' => __('--Select College--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <?= $this->Form->control('Search.program_id', [
+                                            'empty' => __('--Select Program--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                    <td>
+                                        <?= $this->Form->control('Search.program_type_id', [
+                                            'empty' => __('--Select Program Type--'),
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2">
+                                        <?= $this->Form->control('Search.name', [
+                                            'label' => ['text' => __('Name'), 'class' => 'control-label'],
+                                            'class' => 'form-control'
+                                        ]) ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="form-group">
+                                            <?= $this->Form->button(__('Find Readmitted Students'), ['name' => 'continue', 'class' => 'btn btn-primary']) ?>
+                                        </div>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </table>
+                            <?= $this->Form->end() ?>
+                        <?php endif; ?>
+                        <?php if (!empty($acceptedStudents)): ?>
+                            <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'moveReadmittedToFreshman'], 'class' => 'form-horizontal']) ?>
+                            <table class="table">
+                                <tbody>
+                                <tr>
+                                    <td width="100%">
+                                        <table class="table">
+                                            <tbody>
+                                            <tr>
+                                                <td colspan="2">
+                                                    <table class="table">
+                                                        <tr>
+                                                            <td colspan="2"><?= __('Select the campus and the college you want to readmit the selected student in freshman program.') ?></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>
+                                                                <?= $this->Form->control('campus_id', [
+                                                                    'empty' => __('--select campus--'),
+                                                                    'required' => true,
+                                                                    'options' => $availableCampuses,
+                                                                    'label' => ['text' => __('Select the target campus'), 'class' => 'control-label'],
+                                                                    'id' => 'ajax-campus-id',
+                                                                    'class' => 'form-control'
+                                                                ]) ?>
+                                                            </td>
+                                                            <td>
+                                                                <?= $this->Form->control('selected_college_id', [
+                                                                    'empty' => __('--select campus--'),
+                                                                    'id' => 'selected-college-id',
+                                                                    'required' => true,
+                                                                    'options' => $selectedColleges,
+                                                                    'label' => ['text' => __('Select the target college'), 'class' => 'control-label'],
+                                                                    'class' => 'form-control'
+                                                                ]) ?>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="2">
+                                                    <table class="table table-bordered table-striped">
+                                                        <tr>
+                                                            <th colspan="11" class="h2"><?= __('List of students who applied for readmission application.') ?></th>
+                                                        </tr>
+                                                        <tr>
+                                                            <th><?= __('No.') ?></th>
+                                                            <th>
+                                                                <?= __('Select/Unselect All') ?><br/>
+                                                                <?= $this->Form->checkbox('SelectAll', ['id' => 'select-all']) ?>
+                                                            </th>
+                                                            <th><?= __('Full Name') ?></th>
+                                                            <th><?= __('Sex') ?></th>
+                                                            <th><?= __('Student Number') ?></th>
+                                                            <th><?= __('College') ?></th>
+                                                            <th><?= __('Department') ?></th>
+                                                            <th><?= __('Academic Year') ?></th>
+                                                            <th><?= __('Campus') ?></th>
+                                                        </tr>
+                                                        <?php $serialNumber = 1; ?>
+                                                        <?php foreach ($acceptedStudents as $index => $acceptedStudent): ?>
+                                                            <tr class="<?= $index % 2 == 0 ? 'altrow' : '' ?>">
+                                                                <td><?= $serialNumber++ ?></td>
+                                                                <td>
+                                                                    <?= $this->Form->checkbox("AcceptedStudent.approve.{$acceptedStudent->Student->AcceptedStudent->id}", ['class' => 'checkbox1']) ?>
+                                                                </td>
+                                                                <td><?= h($acceptedStudent->Student->AcceptedStudent->full_name) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->AcceptedStudent->sex) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->AcceptedStudent->studentnumber) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->College->name) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->Department->name) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->AcceptedStudent->academic_year) ?></td>
+                                                                <td><?= h($acceptedStudent->Student->College->Campus->name) ?></td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <div class="form-group">
+                                                        <?= $this->Form->button(__('Readmit Selected'), ['name' => 'readmitted', 'class' => 'btn btn-primary']) ?>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                            <?= $this->Form->end() ?>
+                        <?php elseif (empty($acceptedStudents) && !$isBeforeSearch): ?>
+                            <div class="alert alert-info">
+                                <span></span><?= __('No students who applied for readmission in selected criteria') ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

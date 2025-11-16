@@ -1,105 +1,68 @@
 <?php
-App::import('Vendor','tcpdf/tcpdf');
-// create new PDF document
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true); 
+use Cake\I18n\I18n;
 
-    //show header or footer
-    $pdf->SetPrintHeader(true); 
-    $pdf->SetPrintFooter(true);
-    //$textfont = 'freesans'; // looks better, finer, and more condensed than 'dejavusans' 
-    // set default header data
-   
-    $pdf->SetHeaderData(PDF_HEADER_LOGO, PDF_HEADER_LOGO_WIDTH, PDF_HEADER_TITLE, PDF_HEADER_STRING);
+$this->set('title', __('Auto Placement Result'));
 
-    // set header and footer fonts
-    $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
-    $pdf->setFooterFont(Array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
+$pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true);
+$pdf->SetPrintHeader(true);
+$pdf->SetPrintFooter(true);
+$pdf->SetHeaderData(PDF_HEADER_LOGO, PDF_HEADER_LOGO_WIDTH, PDF_HEADER_TITLE, PDF_HEADER_STRING);
+$pdf->setHeaderFont([PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN]);
+$pdf->setFooterFont([PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA]);
+$pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+$pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
+$pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
+$pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+$pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
+$pdf->SetFont('freeserif', '', 11);
+$pdf->AddPage();
 
-    //set margins
-    
-    $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
-    //$pdf->SetMargins(15,15,15);
-    $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
-    $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
-    //set auto page breaks
-    $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
-    
-    //set image scale factor
-    $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
-    
-    // set font
-    $pdf->SetFont("freeserif", "", 11);
-    
-    // add a page
-    $pdf->AddPage();
-   
-    if(!empty($autoplacedstudents)){
-            $summery=$autoplacedstudents['auto_summery'];
-             $pdf->writeHTML('<div style="width:700px;text-align:left;font-size:70px">Auto Placement Summery</div><br/>', true, 0, true, 0,'');
-            $tbl = '<table style="width: 638px;" cellspacing="0">';
-            $tbl .= '<tr><th style="border: 1px solid #000000; width: 200px;font-weight:bold;">Department</th><th style="border: 1px solid #000000; width: 200px;width: 200px;font-weight:bold;">Competitive Assignment</th><th style="border: 1px solid #000000; width: 200px;width: 200px;font-weight:bold;"> Privilaged Quota Assignment</th></tr>';
-            foreach ($summery as $sk=>$sv){ 
-            $tbl .= '
-            <tr>
-                <td style="border: 1px solid #000000; width: 200px;">'.$sk.'</td>
-                <td style="border: 1px solid #000000; width: 200px;">'.$sv['C'].'</td>
-                <td style="border: 1px solid #000000; width: 200px;">'.$sv['Q'].'</td>
-            </tr>
-           ';
-           }
-          $tbl .= '</table>';
-          $pdf->writeHTML($tbl, true, false, false, false, '');
-          
-          unset($autoplacedstudents['auto_summery']);
-           foreach($autoplacedstudents as $key =>$data){
-                $count=1;
-                $pdf->writeHTML('<div style="width:710px;text-align:left;font-size:70px">'.$key.'</div><br/>', true, 0, true, 0,'');
-                $department_placement = '<table margin="20px" cellspacing="0" cellpadding="2px">';
-                $department_placement .= '<tr><th style="border: 1px solid #000000; width:50px;font-weight:bold;">No.</th><th style="border: 1px solid #000000; width: 200px;font-weight:bold;">Full Name</th><th style="border: 1px solid #000000; width: 40px;font-weight:bold;">Sex</th><th style="border: 1px solid #000000; width: 80px;font-weight:bold;">Student Number</th><th style="border: 1px solid #000000; width: 70px;font-weight:bold;">EHEECE Total Result</th><th style="border: 1px solid #000000; width: 80px;font-weight:bold;">Department</th>
-                <th style="border: 1px solid #000000; width: 75px;font-weight:bold;">Preference</th><th style="border: 1px solid #000000; width: 80px;font-weight:bold;">Placement Based</th></tr>';
-                foreach ($data as $acceptedStudent) {
-                    $preference_order=null;
-                    if(!empty($acceptedStudent['Preference'])){
-		                   foreach($acceptedStudent['Preference'] as $key=>$value){
-		                    if($value['department_id']==$acceptedStudent['Department']['id']){
-	                            	$preference_order=$value['preferences_order']; 
-	                            	break;
-	                    	}
-		                }
-		             }
-		             
-		             $placement_based=($acceptedStudent['AcceptedStudent']['placement_based']=='C' ? 'Competitive' : 'Quota');
-		             $sex=(strcasecmp($acceptedStudent['AcceptedStudent']['sex'],'male')==0 ? 'M' : 'F');
-                     $department_placement .= '
-                            <tr>
-                                 <td style="border: 1px solid #000000; width: 50px;">'.$count++.'</td>
-                                <td style="border: 1px solid #000000; width: 200px;">'.$acceptedStudent['AcceptedStudent']['full_name'].'</td>
-                                <td style="border: 1px solid #000000; width: 40px;">'.$sex.'</td>
-                                <td style="border: 1px solid #000000; width: 80px;">'.$acceptedStudent['AcceptedStudent']['studentnumber'].'</td>
-                                <td style="border: 1px solid #000000; width: 70px;">'.$acceptedStudent['AcceptedStudent']['EHEECE_total_results'].'</td>
-                                <td style="border: 1px solid #000000; width:80px;">'.$acceptedStudent['Department']['name'].'</td>
-                                <td style="border: 1px solid #000000; width: 75px;">'.$preference_order.'</td>
-                                <td style="border: 1px solid #000000; width: 80px;">'.$placement_based.'</td>
-                               
-                            </tr>
-                        ';
+if (!empty($autoPlacedStudents)) {
+    $summary = $autoPlacedStudents['auto_summary'];
+    $pdf->writeHTML('<div style="width:700px;text-align:left;font-size:70px">' . __('Auto Placement Summary') . '</div><br/>', true, 0, true, 0, '');
+
+    $tbl = '<table style="width: 638px;" cellspacing="0">';
+    $tbl .= '<tr><th style="border: 1px solid #000000; width: 200px;font-weight:bold;">' . __('Department') . '</th><th style="border: 1px solid #000000; width: 200px;font-weight:bold;">' . __('Competitive Assignment') . '</th><th style="border: 1px solid #000000; width: 200px;font-weight:bold;">' . __('Privileged Quota Assignment') . '</th></tr>';
+    foreach ($summary as $sk => $sv) {
+        $tbl .= '<tr><td style="border: 1px solid #000000; width: 200px;">' . h($sk) . '</td><td style="border: 1px solid #000000; width: 200px;">' . h($sv['C']) . '</td><td style="border: 1px solid #000000; width: 200px;">' . h($sv['Q']) . '</td></tr>';
+    }
+    $tbl .= '</table>';
+    $pdf->writeHTML($tbl, true, false, false, false, '');
+
+    unset($autoPlacedStudents['auto_summary']);
+
+    foreach ($autoPlacedStudents as $key => $data) {
+        $count = 1;
+        $pdf->writeHTML('<div style="width:710px;text-align:left;font-size:70px">' . h($key) . '</div><br/>', true, 0, true, 0, '');
+
+        $department_placement = '<table margin="20px" cellspacing="0" cellpadding="2px">';
+        $department_placement .= '<tr><th style="border: 1px solid #000000; width:50px;font-weight:bold;">' . __('No.') . '</th><th style="border: 1px solid #000000; width:200px;font-weight:bold;">' . __('Full Name') . '</th><th style="border: 1px solid #000000; width:40px;font-weight:bold;">' . __('Sex') . '</th><th style="border: 1px solid #000000; width:80px;font-weight:bold;">' . __('Student Number') . '</th><th style="border: 1px solid #000000; width:70px;font-weight:bold;">' . __('EHEECE Total Result') . '</th><th style="border: 1px solid #000000; width:80px;font-weight:bold;">' . __('Department') . '</th><th style="border: 1px solid #000000; width:75px;font-weight:bold;">' . __('Preference') . '</th><th style="border: 1px solid #000000; width:80px;font-weight:bold;">' . __('Placement Based') . '</th></tr>';
+
+        foreach ($data as $acceptedStudent) {
+            $preference_order = '';
+            if (!empty($acceptedStudent->Preferences)) {
+                foreach ($acceptedStudent->Preferences as $preference) {
+                    if ($preference->department_id == $acceptedStudent->Department->id) {
+                        $preference_order = $preference->preferences_order;
+                        break;
+                    }
                 }
-                $department_placement .= '</table>';
-                $pdf->writeHTML($department_placement, true, false, false, false, '');
             }
-           
-	   }
-	
-    // reset pointer to the last page
-    $pdf->lastPage();
+            $placement_based = $acceptedStudent->placement_based == 'C' ? __('Competitive') : __('Privileged Quota');
+            $sex = strcasecmp($acceptedStudent->sex, 'male') == 0 ? 'M' : 'F';
 
-    //output the PDF to the browser
+            $department_placement .= '<tr><td style="border: 1px solid #000000; width:50px;">' . $count++ . '</td><td style="border: 1px solid #000000; width:200px;">' . h($acceptedStudent->full_name) . '</td><td style="border: 1px solid #000000; width:40px;">' . h($sex) . '</td><td style="border: 1px solid #000000; width:80px;">' . h($acceptedStudent->studentnumber) . '</td><td style="border: 1px solid #000000; width:70px;">' . h($acceptedStudent->EHEECE_total_results) . '</td><td style="border: 1px solid #000000; width:80px;">' . h($acceptedStudent->Department->name) . '</td><td style="border: 1px solid #000000; width:75px;">' . h($preference_order) . '</td><td style="border: 1px solid #000000; width:80px;">' . h($placement_based) . '</td></tr>';
+        }
+        $department_placement .= '</table>';
+        $pdf->writeHTML($department_placement, true, false, false, false, '');
+    }
+}
 
-    $pdf->Output('AutoPlaced-'.$selected_academic_year.'.pdf', 'D');
-    /*
-    I: send the file inline to the browser.
-    D: send to the browser and force a file download with the name given by name.
-    F: save to a local file with the name given by name.
-    S: return the document as a string.
-    */
-?> 
+$pdf->lastPage();
+$this->response = $this->response->withType('application/pdf');
+$this->response = $this->response->withHeader('Content-Disposition', 'attachment;filename="AutoPlaced-' . $selectedAcademicYear . '.pdf"');
+ob_start();
+$pdf->Output('php://output', 'I');
+$output = ob_get_clean();
+echo $output;
+?>

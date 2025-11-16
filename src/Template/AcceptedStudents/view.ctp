@@ -1,318 +1,440 @@
-<div class="box">
-	<div class="box-header bg-transparent">
-		<div class="box-title" style="margin-top: 10px;"><i class="fontello-info-outline" style="font-size: larger; font-weight: bold;"></i>
-			<span style="font-size: medium; font-weight: bold; margin-top: 20px;"> <?= 'Accepted Student Details: ' . (isset($this->request->data['AcceptedStudent']) ? $this->request->data['AcceptedStudent']['full_name'] . '  (' .  $this->request->data['AcceptedStudent']['studentnumber'] . ')' : ''); ?></span>
-		</div>
-	</div>
-	<div class="box-body">
-		<div class="row">
-			<div class="large-12 columns">
-				<div style="margin-top: -30px;"><hr></div>
-				<?= $this->Form->create('AcceptedStudent', array('action' => 'view')); ?>
+<?php
+use Cake\I18n\I18n;
 
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-4 columns">
-							<?= $this->Form->input('id'); ?>
-							<?= $this->Form->input('first_name', array('style' => 'width:100%', 'label' => 'First Name: ', 'required', 'readOnly')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('middle_name', array('style' => 'width:100%', 'label' => 'Middle Name: ', 'required', 'readOnly')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('last_name', array('style' => 'width:100%', 'label' => 'Last Name: ', 'required', 'readOnly')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-4 columns">
-							<?php
-							$options = array('male' => ' Male', 'female' => ' Female'); 
-							echo '<h6 class="fs13 text-gray">Sex: </h6> ' . $this->Form->input('sex', array('options' => $options, 'type' => 'radio', 'disabled', 'div' => false, 'legend' => false, 'separator' => ' &nbsp; ', 'label' => false));
-							?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('EHEECE_total_results', array('style' => 'width:100%', 'label' => 'EHEECE Result: ', 'required', 'readOnly')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('moeadmissionnumber', array('style' => 'width:100%', 'label' => 'MoE Admission Number: ', 'readOnly')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-4 columns">
-							<?= $this->Form->input('studentnumber', array('style' => 'width:100%', 'label' => 'Student ID: ', 'required', 'readOnly')); ?>
-						</div>
-						<div class="large-8 columns">
-							<?= $this->Form->input('high_school', array('style' => 'width:100%', 'label' => 'High School Attended: ', 'readOnly')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<hr>
-					<div class="row">
-						<div class="large-3 columns">
-							<?= $this->Form->input('academicyear', array('style' => 'width:100%', 'id' => 'academicyear', 'label' => 'Admission Year: ', 'type' => 'select', 'options' => $acyear_array_data, 'disabled', 'empty' => '[ Select Admission Year ]', 'default' => isset($currentacyeardata) ? $currentacyeardata : '')); ?>
-						</div>
-						<div class="large-3 columns">
-							<?= $this->Form->input('program_id', array('style' => 'width:100%', 'label' => 'Program: ', 'disabled')); ?>
-						</div>
-						<div class="large-3 columns">
-							<?= $this->Form->input('program_type_id', array('style' => 'width:100%', 'label' => 'Program Type: ', 'disabled')); ?>
-						</div>
-						<div class="large-3 columns">
-							<?= $this->Form->input('placement_type_id', array('style' => 'width:100%', 'label' => 'Placement Type: ', 'empty' => '[ Select Placement Type ]', 'disabled')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-4 columns">
-							<?= $this->Form->input('campus_id', array('style' => 'width:100%', 'label' => 'Campus: ', 'disabled', 'empty' => '[ Select Campus ]')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('college_id', array('style' => 'width:100%', 'label' => 'College: ', 'id' => 'CollegeID', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('department_id', array('style' => 'width:100%', 'label' => 'Department: ', 'default' => (isset($selected_department) ? $selected_department : ''), 'empty' => ' College Freshman ', 'id' => 'DepartmentID', 'disabled')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-12 columns"><hr></div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('country_id', array('id' => 'country_id_1', 'label' => 'Country: ', 'required', 'options' => $countries, 'style' => 'width:100%', 'empty' => '[ Select Country ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('region_id', array('id' => 'region_id_1', 'label' => 'Region: ', 'required', 'options' => $regions, 'style' => 'width:100%', 'empty' => '[ Select Region ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('zone_id', array('id' => 'zone_id_1', 'label' => 'Zone: ', 'required', 'options' => $zones, 'style' => 'width:100%', 'empty' => '[ Select Zone ]', 'disabled')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-4 columns">
-							<?= $this->Form->input('woreda_id', array('id' => 'woreda_id_1', 'label' => 'Woreda: ', 'required',  'options' => $woredas, 'style' => 'width:100%', 'empty' => '[ Select Woreda ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('city_id', array('id' => 'city_id_1', 'label' => 'City: ', 'options' => $cities, 'default' => (!empty($studentDetail['Student']['city_id']) ? $studentDetail['Student']['city_id'] : ''), 'style' => 'width:100%', 'empty' => '[ Select City ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('student_national_id', array('label' => 'Student National ID: ', 'type' => 'text', 'style' => 'width:100%', 'readOnly')); ?>
-						</div>
-					</div>
-				</div>
-				<div class="large-12 columns">
-					<div class="row">
-						<div class="large-12 columns"><hr></div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('benefit_group', array('label' => 'Benefit Group: ', 'options' => Configure::read('benefit_groups'), 'style' => 'width:100%', 'default' => 'Normal', 'empty' => '[ Select Benefit Group ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('disability_id', array('label' => 'Disability: ', 'style' => 'width:100%', 'empty' => '[ Select Disability (If Applicable) ]', 'disabled')); ?>
-						</div>
-						<div class="large-4 columns">
-							<?= $this->Form->input('foreign_program_id', array('label' => 'Foreign Program: ', 'style' => 'width:100%', 'empty' => '[ Select Foreign Program (If Applicable) ]', 'disabled')); ?>
-						</div>
-					</div>
-				</div>
-				<br><br>
-				<?= $this->Form->end(); ?>
-			</div>
-		</div>
-	</div>
-</div>
+$this->set('title', __('Accepted Student Details'));
+$this->Html->script(['jquery-1.6.2.min'], ['block' => 'script']);
+?>
 
-<script type='text/javascript'>
-	$(document).ready(function() {
-		$("#CollegeID").change(function() {
-			$("#DepartmentID").attr('disabled', true);
-			$("#CollegeID").attr('disabled', true);
-			var cid = $("#CollegeID").val();
-			//get form action
-			var formUrl = '/departments/get_department_combo/' + cid;
-			$.ajax({
-				type: 'get',
-				url: formUrl,
-				data: cid,
-				success: function(data, textStatus, xhr) {
-					$("#DepartmentID").attr('disabled', false);
-					$("#CollegeID").attr('disabled', false);
-					$("#DepartmentID").empty();
-					//$("#DepartmentID").append('<option>No department</option>');
-					$("#DepartmentID").append(data);
+<script type="text/javascript">
+    $(document).ready(function() {
+        $("#college-id").change(function() {
+            $("#department-id").prop('disabled', true);
+            $("#college-id").prop('disabled', true);
+            var cid = $("#college-id").val();
+            var formUrl = '<?= $this->Url->build(['controller' => 'Departments', 'action' => 'getDepartmentCombo', '_ext' => 'json']) ?>/' + cid;
 
-				},
-				error: function(xhr, textStatus, error) {
-					alert(textStatus);
-				}
-			});
+            $.ajax({
+                type: 'GET',
+                url: formUrl,
+                data: { cid: cid },
+                dataType: 'json',
+                success: function(data, textStatus, xhr) {
+                    $("#department-id").prop('disabled', false);
+                    $("#college-id").prop('disabled', false);
+                    $("#department-id").empty();
+                    $.each(data, function(key, value) {
+                        $("#department-id").append('<option value="' + key + '">' + value + '</option>');
+                    });
+                },
+                error: function(xhr, textStatus, error) {
+                    alert(textStatus);
+                }
+            });
+            return false;
+        });
 
-			return false;
-		});
-	});
+        $("#country-id-1").change(function() {
+            var countryId = $(this).val();
+            $("#region-id-1").prop('disabled', true);
+            $("#zone-id-1").prop('disabled', true);
+            $("#woreda-id-1").prop('disabled', true);
+            $("#city-id-1").prop('disabled', true);
 
-	var form_being_submitted = false;
+            if (countryId) {
+                $.ajax({
+                    url: '<?= $this->Url->build(['controller' => 'Students', 'action' => 'getRegions', '_ext' => 'json']) ?>/' + countryId,
+                    type: 'GET',
+                    data: { countryId: countryId },
+                    dataType: 'json',
+                    success: function(data, textStatus, xhr) {
+                        $("#region-id-1").prop('disabled', false);
+                        $("#region-id-1").empty().append(data);
+                        $("#zone-id-1").empty().append('<option value=""><?= __('[ Select Zone ]') ?></option>');
+                        $("#woreda-id-1").empty().append('<option value=""><?= __('[ Select Woreda ]') ?></option>');
+                        $("#city-id-1").empty().append('<option value=""><?= __('[ Select City ]') ?></option>');
+                    },
+                    error: function(xhr, textStatus, error) {
+                        alert(textStatus);
+                    }
+                });
+            } else {
+                $("#region-id-1").empty().append('<option value=""><?= __('[ Select Region ]') ?></option>');
+                $("#zone-id-1").empty().append('<option value=""><?= __('[ Select Zone ]') ?></option>');
+                $("#woreda-id-1").empty().append('<option value=""><?= __('[ Select Woreda ]') ?></option>');
+                $("#city-id-1").empty().append('<option value=""><?= __('[ Select City ]') ?></option>');
+            }
+            return false;
+        });
 
-	var checkForm = function(form) {
-		
-		/* if (form.email.value != '' && !isValidEmail(form.email.value)) { 
-			form.email.focus();
-			return false;
-		}
+        $("#region-id-1").change(function() {
+            var regionId = $(this).val();
+            $("#zone-id-1").prop('disabled', true);
+            $("#woreda-id-1").prop('disabled', true);
+            $("#city-id-1").prop('disabled', true);
 
+            if (regionId) {
+                $.ajax({
+                    url: '<?= $this->Url->build(['controller' => 'Students', 'action' => 'getZones', '_ext' => 'json']) ?>/' + regionId,
+                    type: 'GET',
+                    data: { regionId: regionId },
+                    dataType: 'json',
+                    success: function(data, textStatus, xhr) {
+                        $("#zone-id-1").prop('disabled', false);
+                        $("#zone-id-1").empty().append(data);
+                        $("#woreda-id-1").empty().append('<option value=""><?= __('[ Select Woreda ]') ?></option>');
+                        $("#city-id-1").empty().append('<option value=""><?= __('[ Select City ]') ?></option>');
+                    },
+                    error: function(xhr, textStatus, error) {
+                        alert(textStatus);
+                    }
+                });
+            } else {
+                $("#zone-id-1").empty().append('<option value=""><?= __('[ Select Zone ]') ?></option>');
+                $("#woreda-id-1").empty().append('<option value=""><?= __('[ Select Woreda ]') ?></option>');
+                $("#city-id-1").empty().append('<option value=""><?= __('[ Select City ]') ?></option>');
+            }
+            return false;
+        });
 
-		if (form.etPhone.value != '' && form.etPhone.value.length != 13) { 
-			form.etPhone.focus();
-			return false;
-		} */
+        $("#zone-id-1").change(function() {
+            var zoneId = $(this).val();
+            $("#woreda-id-1").prop('disabled', true);
+            $("#city-id-1").prop('disabled', true);
 
+            if (zoneId) {
+                $.ajax({
+                    url: '<?= $this->Url->build(['controller' => 'Students', 'action' => 'getWoredas', '_ext' => 'json']) ?>/' + zoneId,
+                    type: 'GET',
+                    data: { zoneId: zoneId },
+                    dataType: 'json',
+                    success: function(data, textStatus, xhr) {
+                        $("#woreda-id-1").prop('disabled', false);
+                        $("#woreda-id-1").empty().append(data);
 
-		if (form_being_submitted) {
-			alert("Updating Student Profile, please wait a moment...");
-			form.saveIt.disabled = true;
-			return false;
-		}
+                        var regionId = $("#region-id-1").val();
+                        $.ajax({
+                            url: '<?= $this->Url->build(['controller' => 'Students', 'action' => 'getCities', '_ext' => 'json']) ?>/' + regionId,
+                            type: 'GET',
+                            data: { regionId: regionId },
+                            dataType: 'json',
+                            success: function(data, textStatus, xhr) {
+                                $("#city-id-1").prop('disabled', false);
+                                $("#city-id-1").empty().append(data);
+                            },
+                            error: function(xhr, textStatus, error) {
+                                alert(textStatus);
+                            }
+                        });
+                    },
+                    error: function(xhr, textStatus, error) {
+                        alert(textStatus);
+                    }
+                });
+            } else {
+                $("#woreda-id-1").empty().append('<option value=""><?= __('[ Select Woreda ]') ?></option>');
+                $("#city-id-1").empty().append('<option value=""><?= __('[ Select City ]') ?></option>');
+            }
+            return false;
+        });
 
-		form.saveIt.value = 'Updating Student Profile...';
-		form_being_submitted = true;
-		return true; 
-	};
-
-
-	// get regions based on selected country
-
-	$('#country_id_1').change(function() {
-		
-		var countryId = $(this).val();
-
-		$('#region_id_1').attr('disabled', true);
-		$('#zone_id_1').attr('disabled', true);
-		$('#woreda_id_1').attr('disabled', true);
-		$('#city_id_1').attr('disabled', true);
-
-		if (countryId) {
-			$.ajax({
-				url: '/students/get_regions/' + countryId,
-				type: 'get',
-				data: countryId,
-				success: function(data, textStatus, xhr) {
-					$('#region_id_1').attr('disabled', false);
-					$('#region_id_1').empty();
-					$('#region_id_1').append(data);
-
-					$('#zone_id_1').empty().append('<option value="">[ Select Zone ]</option>');
-					$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');
-					$('#city_id_1').empty().append('<option value="">[ Select City ]</option>');
-				},
-				error: function(xhr, textStatus, error) {
-					alert(textStatus);
-				}
-			});
-
-			return false;
-
-		} else {
-			$('#region_id_1').empty().append('<option value="">[ Select Region ]</option>');
-			$('#zone_id_1').empty().append('<option value="">[ Select Zone ]</option>');
-			$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');
-			$('#city_id_1').empty().append('<option value="">[ Select City ]</option>');
-		}
-	});
-
-	// Load zone options based on selected region
-	$('#region_id_1').change(function() {
-		
-		var regionId = $(this).val();
-
-		$('#zone_id_1').attr('disabled', true);
-		$('#woreda_id_1').attr('disabled', true);
-		$('#city_id_1').attr('disabled', true);
-
-		if (regionId) {
-			$.ajax({
-				url: '/students/get_zones/'+ regionId,
-				type: 'get',
-				data: regionId,
-				success: function(data, textStatus, xhr) {
-					$('#zone_id_1').attr('disabled', false);
-					$('#zone_id_1').empty();
-					$('#zone_id_1').append(data);
-
-					$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');
-					$('#city_id_1').empty().append('<option value="">[ Select City ]</option>');
-				},
-				error: function(xhr, textStatus, error) {
-					alert(textStatus);
-				}
-			});
-
-			return false;
-			
-		} else {
-			$('#zone_id_1').empty().append('<option value="">[ Select Zone ]</option>');
-			$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');
-			$('#city_id_1').empty().append('<option value="">[ Select City ]</option>');
-		}
-	});
-
-	// Load woreda options based on selected zone
-	$('#zone_id_1').change(function() {
-
-		var zoneId = $(this).val();
-
-		$('#woreda_id_1').attr('disabled', true);
-		$("#city_id_1").attr('disabled', true);
-
-		if (zoneId) {
-			$.ajax({
-				url: '/students/get_woredas/'+ zoneId,
-				type: 'get',
-				data: zoneId,
-				success: function(data, textStatus, xhr) {
-					$('#woreda_id_1').attr('disabled', false);
-					$('#woreda_id_1').empty();
-					$('#woreda_id_1').append(data);
-
-					// sub category
-					var regionId = $("#region_id_1").val();
-					$("#city_id_1").empty();
-
-					$.ajax({
-						type: 'get',
-						url: '/students/get_cities/' + regionId,
-						data: regionId,
-						success: function(data, textStatus, xhr) {
-							$("#city_id_1").attr('disabled', false);
-							$("#city_id_1").empty();
-							$("#city_id_1").append(data);
-						},
-						error: function(xhr, textStatus, error) {
-							alert(textStatus);
-						}
-					});
-
-					// end of sub category
-				},
-				error: function(xhr, textStatus, error) {
-					alert(textStatus);
-				}
-			});
-
-			return false;
-
-		} else {
-			$('#woreda_id_1').empty().append('<option value="">[ Select Woreda ]</option>');
-			$('#city_id_1').empty().append('<option value="">[ Select City ]</option>');
-		}
-	});
-
-	if (window.history.replaceState) {
-		window.history.replaceState(null, null, window.location.href);
-	}
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+    });
 </script>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-info-circle" style="font-size: larger; font-weight: bold;"></i>
+                <span style="font-size: medium; font-weight: bold; margin-top: 20px;">
+                    <?= __('Accepted Student Details: ') . ($this->request->getData('AcceptedStudent.full_name') ? h($this->request->getData('AcceptedStudent.full_name')) . ' (' . h($this->request->getData('AcceptedStudent.studentnumber')) . ')' : '') ?>
+                </span>
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <div style="margin-top: -30px;"><hr></div>
+                    <?= $this->Form->create(null, ['type' => 'post', 'url' => ['action' => 'view'], 'class' => 'form-horizontal']) ?>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <?= $this->Form->control('id') ?>
+                                <?= $this->Form->control('first_name', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('First Name'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('middle_name', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Middle Name'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('last_name', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Last Name'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="text-muted fs-5"><?= __('Sex') ?>:</h6>
+                                <?= $this->Form->control('sex', [
+                                    'options' => ['male' => __('Male'), 'female' => __('Female')],
+                                    'type' => 'radio',
+                                    'disabled' => true,
+                                    'label' => false,
+                                    'separator' => ' &nbsp; ',
+                                    'class' => 'form-check-input'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('EHEECE_total_results', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('EHEECE Result'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('moeadmissionnumber', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('MoE Admission Number'), 'class' => 'control-label'],
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <?= $this->Form->control('studentnumber', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Student ID'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-8">
+                                <?= $this->Form->control('high_school', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('High School Attended'), 'class' => 'control-label'],
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <?= $this->Form->control('academic_year', [
+                                    'style' => 'width: 100%',
+                                    'id' => 'academic-year',
+                                    'label' => ['text' => __('Admission Year'), 'class' => 'control-label'],
+                                    'type' => 'select',
+                                    'options' => $academicYearList,
+                                    'disabled' => true,
+                                    'empty' => __('[ Select Admission Year ]'),
+                                    'value' => $currentAcademicYearData ?? '',
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-3">
+                                <?= $this->Form->control('program_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Program'), 'class' => 'control-label'],
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-3">
+                                <?= $this->Form->control('program_type_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Program Type'), 'class' => 'control-label'],
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-3">
+                                <?= $this->Form->control('placement_type_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Placement Type'), 'class' => 'control-label'],
+                                    'empty' => __('[ Select Placement Type ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <?= $this->Form->control('campus_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Campus'), 'class' => 'control-label'],
+                                    'disabled' => true,
+                                    'empty' => __('[ Select Campus ]'),
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('college_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('College'), 'class' => 'control-label'],
+                                    'id' => 'college-id',
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('department_id', [
+                                    'style' => 'width: 100%',
+                                    'label' => ['text' => __('Department'), 'class' => 'control-label'],
+                                    'value' => $selectedDepartment ?? '',
+                                    'empty' => __('College Freshman'),
+                                    'id' => 'department-id',
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-12"><hr></div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('country_id', [
+                                    'id' => 'country-id-1',
+                                    'label' => ['text' => __('Country'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'options' => $countries,
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Country ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('region_id', [
+                                    'id' => 'region-id-1',
+                                    'label' => ['text' => __('Region'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'options' => $regions,
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Region ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('zone_id', [
+                                    'id' => 'zone-id-1',
+                                    'label' => ['text' => __('Zone'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'options' => $zones,
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Zone ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <?= $this->Form->control('woreda_id', [
+                                    'id' => 'woreda-id-1',
+                                    'label' => ['text' => __('Woreda'), 'class' => 'control-label'],
+                                    'required' => true,
+                                    'options' => $woredas,
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Woreda ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('city_id', [
+                                    'id' => 'city-id-1',
+                                    'label' => ['text' => __('City'), 'class' => 'control-label'],
+                                    'options' => $cities,
+                                    'value' => (!empty($studentDetail->Student->city_id) ? $studentDetail->Student->city_id : ''),
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select City ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('student_national_id', [
+                                    'label' => ['text' => __('Student National ID'), 'class' => 'control-label'],
+                                    'type' => 'text',
+                                    'style' => 'width: 100%',
+                                    'readonly' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-12"><hr></div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('benefit_group', [
+                                    'label' => ['text' => __('Benefit Group'), 'class' => 'control-label'],
+                                    'options' => \Cake\Core\Configure::read('benefit_groups'),
+                                    'style' => 'width: 100%',
+                                    'value' => 'Normal',
+                                    'empty' => __('[ Select Benefit Group ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('disability_id', [
+                                    'label' => ['text' => __('Disability'), 'class' => 'control-label'],
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Disability (If Applicable) ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                            <div class="col-md-4">
+                                <?= $this->Form->control('foreign_program_id', [
+                                    'label' => ['text' => __('Foreign Program'), 'class' => 'control-label'],
+                                    'style' => 'width: 100%',
+                                    'empty' => __('[ Select Foreign Program (If Applicable) ]'),
+                                    'disabled' => true,
+                                    'class' => 'form-control'
+                                ]) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <br><br>
+                    <?= $this->Form->end() ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
