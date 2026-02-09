@@ -1,80 +1,77 @@
 <?php
-
 namespace App\Controller;
 
 use App\Controller\AppController;
-
-use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
+use Cake\I18n\FrozenTime;
+use Cake\Mailer\Email;
 use Cake\Core\Configure;
+use Cake\Utility\Inflector;
+use Cake\Routing\Router;
+use Cake\View\Exception\MissingViewException;
+use Cake\Http\Exception\NotFoundException;
 
 class PagesController extends AppController
 {
-
-    public $menuOptions = array(
+    public $menuOptions = [
         'parent' => 'dashboard',
-        'exclude' => array(
-            'academic_calender',
+        'exclude' => [
+            'academicCalender',
             'announcement',
-            'official_transcript_request',
-            'official_request_tracking',
-            'online_admission_tracking',
+            'officialTranscriptRequest',
+            'officialRequestTracking',
+            'onlineAdmissionTracking',
             'admission',
-            'check_graduate',
-            'get_department_combo'
-        )
-    );
+            'checkGraduate',
+            'checkRemedialResult',
+            'checkCampusPlacement',
+            'getDepartmentCombo'
+        ]
+    ];
 
-    public $uses = array('OfficialTranscriptRequest', 'OnlineApplicant');
-
-
-    public $paginate = [];
-
-    public function initialize()
+    public function initialize(): void
     {
-
         parent::initialize();
-        $this->loadComponent('AcademicYear');
+
         $this->loadComponent('EthiopicDateTime');
         $this->loadComponent('Paginator');
+        $this->loadComponent('AcademicYear');
         $this->loadComponent('MathCaptcha');
-        $this->loadComponent('Email');
-        $this->viewBuilder()->setHelpers(['DatePicker', 'Media.Media']);
-    }
-
-    public function beforeFilter(Event $event)
-    {
-
-        parent::beforeFilter($event);
-        //$this->layout='page';
-        $this->layout = "page-alternative";
-        $this->Auth->allow(
-            'academic_calender',
+        $this->Auth->allow([
+            'academicCalender',
             'announcement',
-            'official_transcript_request',
-            'official_request_tracking',
-            'online_admission_tracking',
+            'officialTranscriptRequest',
+            'officialRequestTracking',
+            'onlineAdmissionTracking',
             'admission',
-            'check_graduate',
-            'get_department_combo'
-        );
+            'checkGraduate',
+            'checkRemedialResult',
+            'checkCampusPlacement',
+            'getDepartmentCombo'
+        ]);
     }
 
-    public function beforeRender(Event $event)
+    public function beforeRender(\Cake\Event\EventInterface $event)
     {
-
         parent::beforeRender($event);
+
         $acyear_array_data = $this->AcademicYear->academicYearInArray(date('Y') - 1, date('Y'));
         $defaultacademicyear = $this->AcademicYear->currentAcademicYear();
+
         $this->set(compact('acyear_array_data', 'defaultacademicyear'));
     }
 
+    public function beforeFilter(\Cake\Event\EventInterface $event)
+    {
+        parent::beforeFilter($event);
+        $this->viewBuilder()->setLayout('page-alternative');
+    }
 
     public function display()
     {
+        $this->viewBuilder()->setLayout('default-e');
 
-        $this->layout = 'default-e';
-        $path = func_get_args();
+        $path = $this->request->getParam('pass');
         $count = count($path);
 
         if (!$count) {
@@ -86,11 +83,9 @@ class PagesController extends AppController
         if (!empty($path[0])) {
             $page = $path[0];
         }
-
         if (!empty($path[1])) {
             $subpage = $path[1];
         }
-
         if (!empty($path[$count - 1])) {
             $title_for_layout = Inflector::humanize($path[$count - 1]);
         }
@@ -107,533 +102,428 @@ class PagesController extends AppController
         }
     }
 
-
-    public function academic_calender()
+    public function academicCalender()
     {
+        $academicCalendars = [];
+        $programs = TableRegistry::getTableLocator()->get('Programs')->find('list')->toArray();
+        $programTypes = TableRegistry::getTableLocator()->get('ProgramTypes')->find('list')->toArray();
 
-        if (isset($this->request->data) && !empty($this->request->data['viewAcademicCalendar'])) {
-            $options = array();
+        debug($this->request->getData());
 
-            if (!empty($this->request->data['Search']['program_id'])) {
-                $options[] = array(
-                    'AcademicCalendar.program_id' => $this->request->data['Search']['program_id']
-                );
+        if ($this->request->is('post') && !empty($this->request->getData('viewAcademicCalendar'))) {
+            $options = [];
+
+            $data = $this->request->getData('Search');
+
+            debug($data);
+            if (!empty($data['program_id'])) {
+                $options['AcademicCalendars.program_id'] = $data['program_id'];
+            }
+            if (!empty($data['program_type_id'])) {
+                $options['AcademicCalendars.program_type_id'] = $data['program_type_id'];
+            }
+            if (!empty($data['department_id'])) {
+                $options['AcademicCalendars.department_id LIKE'] = '%s:_:"' . $data['department_id'] . '"%';
+            }
+            if (!empty($data['academic_year'])) {
+                $options['AcademicCalendars.academic_year'] = $data['academic_year'];
+            }
+            if (!empty($data['semester'])) {
+                $options['AcademicCalendars.semester'] = $data['semester'];
             }
 
-            if (!empty($this->request->data['Search']['program_type_id'])) {
-                $options[] = array(
-                    'AcademicCalendar.program_type_id' => $this->request->data['Search']['program_type_id']
-                );
-            }
+            $academicCalendars = TableRegistry::getTableLocator()->get('AcademicCalendars')
+                ->find('all')
+                ->where($options)
+                ->contain(['Programs', 'ProgramTypes'])
+                ->toArray();
 
-            if (!empty($this->request->data['Search']['department_id'])) {
-                $options[] = array(
-                    'AcademicCalendar.department_id like ' => '%s:_:"' . $this->request->data['Search']['department_id'] . '"%',
-                );
-            }
-
-            if (!empty($this->request->data['Search']['academic_year'])) {
-                $options[] = array(
-                    'AcademicCalendar.academic_year' => $this->request->data['Search']['academic_year']
-                );
-            }
-
-            if (!empty($this->request->data['Search']['semester'])) {
-                $options[] = array(
-                    'AcademicCalendar.semester' => $this->request->data['Search']['semester']
-                );
-            }
-
-            $academicCalendars = ClassRegistry::init('AcademicCalendar')->find('all', array(
-                'conditions' => $options,
-                'contain' => array('Program', 'ProgramType')
-            ));
-
-            /* $academicCalendars = ClassRegistry::init('AcademicCalendar')->find('all', array(
-                'conditions' => $options,
-                'contain' => array('College', 'Department', 'YearLevel', 'Program', 'ProgramType')
-            )); */
+            debug($academicCalendars);
 
             if (empty($academicCalendars)) {
                 $this->Flash->info('There is no academic calendar defined in the system in the given criteria.');
             } else {
-                foreach ($academicCalendars as $ack => &$ackv) {
-                    $department_ids = unserialize($ackv['AcademicCalendar']['department_id']);
-                    $year_level_ids = unserialize($ackv['AcademicCalendar']['year_level_id']);
-                    $found = false;
-
-                    $college_ids_found = array();
+                foreach ($academicCalendars as $calendar) {
+                    $department_ids = unserialize($calendar->department_id);
+                    $year_level_ids = unserialize($calendar->year_level_id);
+                    debug($year_level_ids);
+                    $college_ids_found = [];
 
                     if (!empty($department_ids)) {
-                        foreach ($department_ids as $dptkey => $dptvalue) {
-                            $college_ids = explode('pre_', $dptvalue);
-                            if (count($college_ids) > 1) {
-                                array_push($college_ids_found, $college_ids[1]);
+                        foreach ($department_ids as $dpt) {
+                            $parts = explode('pre_', $dpt);
+                            if (count($parts) > 1) {
+                                $college_ids_found[] = $parts[1];
                             }
                         }
 
-                        // debug(implode(", ", $college_ids_found));
-
-                        // this is  not the correct setting, pre selection in adding in acalendar affects how department and year level is being displayed, this fixes that temporarly
-                        // but it is not to see and correct duplicated calendar definitions for frehsnam(selecting check all for departments while adding calendar, pre is also selected)
-
-                        //$ackv['AcademicCalendar']['department_name'] = implode(", ", ClassRegistry::init('AcademicCalendar')->Department->find('list', array('conditions' => array('Department.id' => $department_ids))));
-                        //$ackv['AcademicCalendar']['year_name'] = implode(", ", $year_level_ids);
-
                         if (!empty($college_ids_found)) {
-                            $ackv['AcademicCalendar']['department_name'] = implode(
-                                ", ",
-                                ClassRegistry::init('AcademicCalendar')->College->find(
-                                    'list',
-                                    array('conditions' => array('College.id' => $college_ids_found))
-                                )
-                            );
-                            $ackv['AcademicCalendar']['year_name'] = 'Pre/Freshman';
+                            $collegeNames = TableRegistry::getTableLocator()->get('Colleges')
+                                ->find('list')
+                                ->where(['Colleges.id IN' => $college_ids_found])
+                                ->toArray();
+                            $calendar->department_name = implode(', ', $collegeNames);
+                            $calendar->year_name = 'Pre/Freshman';
                         } else {
-                            // will show the calendar have duplicate definition or whether the added calendar is correct as desired.
-                            // although this is the correct setting, pre selection in adding in acalendar affects how department and year level is being displayed
+                            $deptNames = TableRegistry::getTableLocator()->get('Departments')
+                                ->find('list')
+                                ->where(['Departments.id IN' => $department_ids])
+                                ->toArray();
+                            $calendar->department_name = implode(', ', $deptNames);
+                            $calendar->year_name = implode(', ', $year_level_ids);
 
-                            $ackv['AcademicCalendar']['department_name'] = implode(
-                                ", ",
-                                ClassRegistry::init('AcademicCalendar')->Department->find(
-                                    'list',
-                                    array('conditions' => array('Department.id' => $department_ids))
-                                )
-                            );
-                            $ackv['AcademicCalendar']['year_name'] = implode(", ", $year_level_ids);
                         }
                     }
-                    /* if (in_array("pre_", $department_ids, true)) {
-                        $ackv['AcademicCalendar']['department_name'] = implode(", ", ClassRegistry::init('AcademicCalendar')->College->find('list', array('conditions' => array('College.id' => $department_ids))));
-                        $ackv['AcademicCalendar']['year_name'] = 'Pre/1st';
-                    } else {
-                        $ackv['AcademicCalendar']['department_name'] = implode(", ", ClassRegistry::init('AcademicCalendar')->Department->find('list', array('conditions' => array('Department.id' => $department_ids))));
-                        $ackv['AcademicCalendar']['year_name'] = implode("\n", $year_level_ids);
-                    } */
                 }
             }
+            debug($academicCalendars);
         }
 
-        $programs = ClassRegistry::init('Program')->find('list');
-        $programTypes = ClassRegistry::init('ProgramType')->find('list');
-
         $this->set(compact('academicCalendars', 'programs', 'programTypes'));
-        //$this->set(compact('departments', 'academicCalendars', 'programs', 'programTypes'));
     }
-
 
     public function announcement()
     {
-
-        $announcements = ClassRegistry::init('Announcement')->getNotExpiredAnnouncements();
+        $announcements = TableRegistry::getTableLocator()->get('Announcements')
+            ->getNotExpiredAnnouncements();
         $this->set(compact('announcements'));
     }
 
-    public function official_transcript_request()
+    public function officialTranscriptRequest()
     {
+        $this->viewBuilder()->setLayout('login');
 
-        $this->layout = 'login';
-        $trackingnumber = ClassRegistry::init('OfficialTranscriptRequest')->nextTrackingNumber();
+        $officialTranscriptRequestTable = TableRegistry::getTableLocator()->get('OfficialTranscriptRequests');
+        $trackingnumber = $officialTranscriptRequestTable->nextTrackingNumber();
 
-        $this->OfficialTranscriptRequest->set($this->request->data);
-
-        if ($this->OfficialTranscriptRequest->validates($this->request->data)) {
-            debug($this->request->data);
-        } else {
-            $errors = $this->OfficialTranscriptRequest->validationErrors;
-            $errors = $this->OfficialTranscriptRequest->invalidFields();
-        }
         if ($this->request->is('post')) {
-            $this->request->data['OfficialTranscriptRequest']['trackingnumber'] = $trackingnumber;
-            $this->OfficialTranscriptRequest->create();
-            $this->OfficialTranscriptRequest->set($this->request->data);
-            if ($this->OfficialTranscriptRequest->saveAll($this->request->data)) {
-                $this->Flash->success(
-                    'The official transcript request has been forwared to designated personnel.Your tracking number is $trackingnumber.'
-                );
-                return $this->redirect(array('action' => 'official_request_tracking'));
+            $data = $this->request->getData();
+            $data['OfficialTranscriptRequest']['trackingnumber'] = $trackingnumber;
+
+            $officialTranscriptRequestTable->patchEntity($this->OfficialTranscriptRequest, $data, ['validate' => true]);
+
+            if ($officialTranscriptRequestTable->save($this->OfficialTranscriptRequest)) {
+                $this->Flash->success("The official transcript request has been forwarded. Your tracking number is <strong>{$trackingnumber}</strong>.");
+                return $this->redirect(['action' => 'official_request_tracking']);
             } else {
-                $error = $this->OfficialTranscriptRequest->invalidFields();
-                debug($error);
                 $this->Flash->error('The official transcript request could not be saved.');
             }
         }
 
-        $admissiontypes = ClassRegistry::init('ProgramType')->find('list', array(
-            'fields' => array(
-                'ProgramType.name',
-                'ProgramType.name'
-            )
-        ));
+        $admissiontypes = TableRegistry::getTableLocator()->get('ProgramTypes')
+            ->find('list', ['keyField' => 'name', 'valueField' => 'name'])
+            ->toArray();
 
-        $degreetypes['Bachelor of Arts'] = "Bachelor of Arts";
-        $degreetypes['Bachelor of Science'] = "Bachelor of Science";
-        $degreetypes['Doctor of Medicine'] = "Doctor of Medicine";
-        $degreetypes['Master of Science'] = "Master of Science";
-        $degreetypes['Master of Arts'] = "Master of Arts";
-        $degreetypes['Doctor of Philosophy'] = 'Doctor of Philosophy';
+        $degreetypes = [
+            'Bachelor of Arts' => 'Bachelor of Arts',
+            'Bachelor of Science' => 'Bachelor of Science',
+            'Doctor of Medicine' => 'Doctor of Medicine',
+            'Master of Science' => 'Master of Science',
+            'Master of Arts' => 'Master of Arts',
+            'Doctor of Philosophy' => 'Doctor of Philosophy'
+        ];
 
-        $this->set(compact('admissiontypes', 'degreetypes'));
+        $this->set(compact('admissiontypes', 'degreetypes', 'trackingnumber'));
     }
 
-    public function official_request_tracking()
+    public function officialRequestTracking()
     {
-
-        if (isset($this->request->data['OfficialTranscriptRequest']) && !empty($this->request->data['OfficialTranscriptRequest']['trackingnumber'])) {
-            $request = $this->OfficialTranscriptRequest->find(
-                'first',
-                array(
-                    'conditions' => array(
-                        'OfficialTranscriptRequest.trackingnumber' => trim(
-                            $this->request->data['OfficialTranscriptRequest']['trackingnumber']
-                        )
-                    ),
-                    'contain' => array('OfficialRequestStatus')
-                )
-            );
-            if (empty($request)) {
-                $this->Flash->warning('The tracking number provided is not valid or request cancelled.');
-            }
-            $this->set(compact('request'));
-        }
-
-        $statuses = array(
+        $request = null;
+        $statuses = [
             'request_verified' => 'Request Verified',
             'request_cancelled' => 'Request Cancelled',
             'document_sent' => 'Document Sent To Destination'
-        );
-        $this->set(compact('statuses'));
+        ];
+
+        if ($this->request->is('post') && !empty($this->request->getData('OfficialTranscriptRequest.trackingnumber'))) {
+            $trackingnumber = trim($this->request->getData('OfficialTranscriptRequest.trackingnumber'));
+
+            $request = TableRegistry::getTableLocator()->get('OfficialTranscriptRequests')
+                ->find('first')
+                ->where(['OfficialTranscriptRequests.trackingnumber' => $trackingnumber])
+                ->contain(['OfficialRequestStatuses'])
+                ->first();
+
+            if (!$request) {
+                $this->Flash->warning('The tracking number provided is not valid or request cancelled.');
+            }
+        }
+
+        $this->set(compact('request', 'statuses'));
     }
 
-
-    public function online_admission_tracking()
+    public function onlineAdmissionTracking()
     {
+        $request = null;
+        $statuses = ['0' => 'Pending', '1' => 'Approved', '-1' => 'Rejected'];
 
-        if (isset($this->request->data['OnlineApplicant']) && !empty($this->request->data['OnlineApplicant']['trackingnumber'])) {
-            $request = $this->OnlineApplicant->find('first', array(
-                'conditions' => array(
-                    'OnlineApplicant.applicationnumber' => trim(
-                        $this->request->data['OnlineApplicant']['trackingnumber']
-                    )
-                ),
-                'contain' => array(
-                    'OnlineApplicantStatus',
-                    'Program',
-                    'ProgramType',
-                    'Department',
-                    'College'
-                )
-            ));
+        if ($this->request->is('post') && !empty($this->request->getData('OnlineApplicant.trackingnumber'))) {
+            $trackingnumber = trim($this->request->getData('OnlineApplicant.trackingnumber'));
+            $onlineApplicantTable = TableRegistry::getTableLocator()->get('OnlineApplicants');
 
-            if (isset($this->request->data['Attachment'][1]['file']['name']) && !empty($this->request->data['Attachment'][1]['file']['name']) && isset($request) && !empty($request)) {
-                //incase already submitted update attachment
-                $this->request->data = $this->OnlineApplicant->preparedAttachment($this->request->data);
-                $this->request->data['OnlineApplicant'] = $request['OnlineApplicant'];
-                debug($this->request->data);
+            $request = $onlineApplicantTable->find()
+                ->where(['OnlineApplicants.applicationnumber' => $trackingnumber])
+                ->contain(['OnlineApplicantStatuses', 'Programs', 'ProgramTypes', 'Departments', 'Colleges'])
+                ->first();
 
-                if (isset($request['Attachment'][1]) && !empty($request['Attachment'][1])) {
-                    $this->request->data['Attachment'][1]['id'] = $request['Attachment'][1]['id'];
-                    $this->request->data['Attachment'][1]['foreign_key'] = $request['Attachment'][1]['foreign_key'];
+            // Handle file upload update
+            if ($request && !empty($this->request->getData('Attachment.1.file.name'))) {
+                $data = $onlineApplicantTable->preparedAttachment($this->request->getData());
+                $data['OnlineApplicant'] = $request->toArray();
 
-                    if (isset($this->request->data['Attachment'][1]) && !empty($this->request->data['Attachment'][1])) {
-                        if ($this->OnlineApplicant->saveAll($this->request->data)) {
-                            $this->Flash->success(
-                                'Your online application paymentslip is updated successfully to application number ' . $request['OnlineApplicant']['applicationnumber'] . ' and use it for tracking your application status.'
-                            );
-                        }
-                    }
-                } else {
-                    //upload the first time
-                    if (isset($this->request->data['Attachment'][1]['name']) && !empty($this->request->data['Attachment'][1]['name']) && isset($this->request->data['OnlineApplicant']['id']) && !empty($this->request->data['OnlineApplicant']['id'])) {
-                        if ($this->OnlineApplicant->saveAll($this->request->data)) {
-                            $this->Flash->success(
-                                'Your online application paymentslip is updated successfully to application number ' . $request['OnlineApplicant']['applicationnumber'] . ' and use it for tracking your application status.'
-                            );
-                        }
-                    }
+                if (!empty($request->attachments[1])) {
+                    $data['Attachment'][1]['id'] = $request->attachments[1]->id;
+                    $data['Attachment'][1]['foreign_key'] = $request->attachments[1]->foreign_key;
+                }
+
+                if ($onlineApplicantTable->saveAssociated($data)) {
+                    $this->Flash->success("Payment slip updated for application #{$request->applicationnumber}.");
                 }
             }
-            debug($request);
-            if (empty($request)) {
-                $this->Flash->info('The application number  is invalid or request cancelled.');
-            }
-            $this->set(compact('request'));
-        }
-        //$statuses = array('pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected');
-        $statuses = array('0' => 'Pending', '1' => 'Approved', '-1' => 'Rejected');
 
-        $this->set(compact('statuses'));
+            if (!$request) {
+                $this->Flash->info('The application number is invalid or request cancelled.');
+            }
+        }
+
+        $this->set(compact('request', 'statuses'));
     }
 
     public function admission()
     {
+        $onlineApplicantTable = TableRegistry::getTableLocator()->get('OnlineApplicants');
+        $applicationnumber = $onlineApplicantTable->nextTrackingNumber();
 
-        // application form will be active based on the deadline
-        $applicationnumber = ClassRegistry::init('OnlineApplicant')->nextTrackingNumber();
-        $this->OnlineApplicant->set($this->request->data);
-        $academicCalendars = ClassRegistry::init('AcademicCalendar')->find(
-            'first',
-            array('conditions' => array('AcademicCalendar.online_admission_end_date >=' => date('Y-m-d')))
-        );
+        $academicCalendar = TableRegistry::getTableLocator()->get('AcademicCalendars')
+            ->find()
+            ->where(['AcademicCalendars.online_admission_end_date >=' => FrozenTime::now()])
+            ->first();
 
-        if (isset($academicCalendars) && !empty($academicCalendars)) {
-            $departmentIds = array();
-            $programIds = array();
-            $programTypesIds = array();
+        $departments = $colleges = $programs = $programTypes = $acyeardatas = $semester = [];
 
-            foreach ($academicCalendars as $k => $v) {
-                $tmp = unserialize($v['AcademicCalendar']['department_id']);
-                $departmentIds = array_merge($departmentIds, $tmp);
-                $programIds[$v['AcademicCalendar']['program_id']] = $v['AcademicCalendar']['program_id'];
-                $programTypesIds[$v['AcademicCalendar']['program_type_id']] = $v['AcademicCalendar']['program_type_id'];
-            }
+        if ($academicCalendar) {
+            $departmentIds = unserialize($academicCalendar->department_id);
+            $programIds = [$academicCalendar->program_id];
+            $programTypesIds = [$academicCalendar->program_type_id];
 
-            $academicCalendar['AcademicCalendar']['department_id'] = $departmentIds;
+            $departments = TableRegistry::getTableLocator()->get('Departments')
+                ->find('list')
+                ->where(['Departments.id IN' => $departmentIds])
+                ->toArray();
 
-            $departments = ClassRegistry::init('Department')->find(
-                'list',
-                array('conditions' => array('Department.id' => $departmentIds))
-            );
-            $college_ids = ClassRegistry::init('Department')->find(
-                'list',
-                array(
-                    'conditions' => array('Department.id' => $departmentIds),
-                    'fields' => array('Department.college_id', 'Department.college_id')
-                )
-            );
-            $colleges = ClassRegistry::init('College')->find(
-                'list',
-                array('conditions' => array('College.id' => $college_ids))
-            );
-            $programs = ClassRegistry::init('Program')->find(
-                'list',
-                array('conditions' => array('Program.id' => $programIds))
-            );
-            $programTypes = ClassRegistry::init('ProgramType')->find(
-                'list',
-                array('conditions' => array('ProgramType.id' => $programTypesIds))
-            );
+             $college_ids = TableRegistry::getTableLocator()->get('Departments')
+                ->find('list', ['keyField' => 'id', 'valueField' => 'college_id'])
+                ->where(['Departments.id IN' => $departmentIds])
+                ->toArray();
+
+            $colleges = TableRegistry::getTableLocator()->get('Colleges')
+                ->find('list')
+                ->where(['Colleges.id IN' => array_values($college_ids)])
+                ->toArray();
+
+            $programs = TableRegistry::getTableLocator()->get('Programs')
+                ->find('list')
+                ->where(['Programs.id IN' => $programIds])
+                ->toArray();
+
+            $programTypes = TableRegistry::getTableLocator()->get('ProgramTypes')
+                ->find('list')
+                ->where(['ProgramTypes.id IN' => $programTypesIds])
+                ->toArray();
+
+            $acyeardatas[$academicCalendar->academic_year] = $academicCalendar->academic_year;
+            $semester[$academicCalendar->semester] = $academicCalendar->semester;
         }
 
-        /*
-        if($this->OnlineApplicant->validates($this->request->data)) {
-            debug($this->request->data);
-        } else {
-            $errors=$this->OnlineApplicant->validationErrors;
-            $errors=$this->OnlineApplicant->invalidFields();
-            debug($errors);
-        }
-        */
-        if ($this->request->is(
-                'post'
-            ) && isset($this->request->data['applyOnline']) && !empty($this->request->data['applyOnline'])) {
-            $this->request->data['OnlineApplicant']['applicationnumber'] = $applicationnumber;
-            $isAdmitted = $this->OnlineApplicant->isAppliedFordmittion($this->request->data);
+        if ($this->request->is('post') && !empty($this->request->getData('applyOnline'))) {
+            $data = $this->request->getData();
+            $data['OnlineApplicant']['applicationnumber'] = $applicationnumber;
+
+            $isAdmitted = $onlineApplicantTable->isAppliedFordmittion($data);
 
             if ($isAdmitted == 0) {
-                $this->request->data = $this->OnlineApplicant->preparedAttachment($this->request->data);
+                $data = $onlineApplicantTable->preparedAttachment($data);
 
-                if ($this->OnlineApplicant->saveAll($this->request->data, array('validate' => false))) {
-                    $message = "You made an online admission application request that has been forwared to designated personnel of the university for further processing. <br /> <strong>Your application  number is <u> $applicationnumber </u> and use it for tracking your application status.</strong> <br /> <br/> ";
-                    $departmentName = $this->OnlineApplicant->Department->field(
-                        'Department.name',
-                        array('Department.id' => $this->request->data['OnlineApplicant']['department_id'])
-                    );
-                    $collegeName = $this->OnlineApplicant->College->field(
-                        'College.name',
-                        array('College.id' => $this->request->data['OnlineApplicant']['college_id'])
-                    );
-                    $programName = $this->OnlineApplicant->Program->field(
-                        'Program.name',
-                        array('Program.id' => $this->request->data['OnlineApplicant']['program_id'])
-                    );
-                    $programTypeName = $this->OnlineApplicant->ProgramType->field(
-                        'ProgramType.name',
-                        array('ProgramType.id' => $this->request->data['OnlineApplicant']['program_type_id'])
-                    );
-
-                    $message .= '<table width="100%" bgcolor="#ffffff" border="0" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:0;margin:0;auto">';
-                    $message .= "<tr><td align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>Name:</td><td align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>" . $this->request->data['OnlineApplicant']['first_name'] . ' ' . $this->request->data['OnlineApplicant']['father_name'] . ' ' . $this->request->data['OnlineApplicant']['father_name'] . "</td></tr>";
-                    $message .= "<tr><td  align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>Study Level:</td><td  align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>" . $programName . "</td></tr>";
-                    $message .= "<tr><td align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>Admission Type:</td><td  align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>" . $programTypeName . "</td></tr>";
-                    $message .= "<tr><td align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>College:</td><td  align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>" . $collegeName . "</td></tr>";
-                    $message .= "<tr><td align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>Department:</td><td  align='left' valign='top' style='font-family:Tahoma,Arial,Helvetica,sans-serif;color:#000;font-size:16px;line-height:24px;'>" . $departmentName . "</td></tr>";
-                    $message .= '</table>';
-
-                    $Email = new CakeEmail('default');
-                    $Email->template('onlineapplication');
-                    $Email->emailFormat('html');
-                    $Email->to($this->request->data['OnlineApplicant']['email']);
-                    $Email->subject(
-                        'Online Admission Summary: ' . $this->request->data['OnlineApplicant']['first_name'] . ' ' . $this->request->data['OnlineApplicant']['father_name'] . ' for ' . $this->request->data['OnlineApplicant']['academic_year'] . ' academic year'
-                    );
-                    $Email->viewVars(array('message' => $message));
-
-                    try {
-                        if ($Email->send()) {
-                            $this->Flash->success(
-                                "Your online admission application request has been forwarded to designated personnel of the university for further processing. Your application number is  $applicationnumber and sent to " . $this->request->data['OnlineApplicant']['email'] . " address for tracking your application status."
-                            );
-                        } else {
-                            $this->Flash->success(
-                                "Your online application request has been forwared to designated personnel of the university for further processing. Your application  number is $applicationnumber and use it for tracking your application status."
-                            );
-                        }
-                    } catch (Exception $e) {
-                        $this->Flash->success(
-                            "Your online application request has been forwared to designated personnel of the university for further processing. Your application  number is $applicationnumber and use it for tracking your application status."
-                        );
-                        return $this->redirect(array('action' => 'online_admission_tracking'));
-                    }
-                    return $this->redirect(array('action' => 'online_admission_tracking'));
+                if ($onlineApplicantTable->saveAssociated($data, ['validate' => false])) {
+                    $this->sendAdmissionEmail($data, $applicationnumber);
+                    $this->Flash->success("Application submitted. Your number is <strong>{$applicationnumber}</strong>.");
+                    return $this->redirect(['action' => 'online_admission_tracking']);
                 } else {
-                    $error = $this->OnlineApplicant->invalidFields();
-                    debug($error);
-                    $this->Flash->error('The online admission request could not be saved.');
+                    $this->Flash->error('Application could not be saved.');
                 }
             } else {
-                $this->Flash->success(
-                    "Your online application request has been forwared to designated personnel of the university for further processing. Your application  number is $isAdmitted and use it for tracking your application status."
-                );
-                return $this->redirect(array('action' => 'online_admission_tracking'));
+                $this->Flash->success("Already applied. Your number: <strong>{$isAdmitted}</strong>.");
+                return $this->redirect(['action' => 'online_admission_tracking']);
             }
         }
 
-        //$departments = ClassRegistry::init('Department')->find('list');
-        //$colleges = ClassRegistry::init('College')->find('list');
-
-        if (isset($academicCalendars['AcademicCalendar']['academic_year']) && !empty($academicCalendars['AcademicCalendar']['academic_year'])) {
-            $acyeardatas[$academicCalendars['AcademicCalendar']['academic_year']] = $academicCalendars['AcademicCalendar']['academic_year'];
-            $semester[$academicCalendars['AcademicCalendar']['semester']] = $academicCalendars['AcademicCalendar']['semester'];
-        }
-
-        $this->set(
-            compact(
-                'departments',
-                'academicCalendars',
-                'programs',
-                'programTypes',
-                'colleges',
-                'departments',
-                'semester',
-                'acyeardatas'
-            )
-        );
+        $this->set(compact('departments', 'colleges', 'programs', 'programTypes', 'acyeardatas', 'semester', 'applicationnumber'));
     }
 
-    public function check_graduate($studentID = null)
+    private function sendAdmissionEmail($data, $applicationnumber)
     {
+        $departmentName = TableRegistry::getTableLocator()->get('Departments')
+            ->get($data['OnlineApplicant']['department_id'])->name ?? '';
+        $collegeName = TableRegistry::getTableLocator()->get('Colleges')
+            ->get($data['OnlineApplicant']['college_id'])->name ?? '';
+        $programName = TableRegistry::getTableLocator()->get('Programs')
+            ->get($data['OnlineApplicant']['program_id'])->name ?? '';
+        $programTypeName = TableRegistry::getTableLocator()->get('ProgramTypes')
+            ->get($data['OnlineApplicant']['program_type_id'])->name ?? '';
 
-        debug($this->request->data);
-        if ((!empty($this->request->data) && isset($this->request->data['continue'])) || !empty($studentID)) {
-            if ((isset($this->request->data['Page']['security_code']) && $this->MathCaptcha->validates(
-                        $this->request->data['Page']['security_code']
-                    )) || isset($this->request->data['Page']['mathCaptcha']) || !empty($studentID)) {
-                if (empty($studentID)) {
-                    $studentID = trim($this->request->data['Page']['studentID']);
+        $message = "Online admission application received.<br><strong>Application #: {$applicationnumber}</strong><br><br>";
+        $message .= "<table width='100%' style='font-family:Arial,sans-serif;'>";
+        $message .= "<tr><td>Name:</td><td>{$data['OnlineApplicant']['first_name']} {$data['OnlineApplicant']['father_name']}</td></tr>";
+        $message .= "<tr><td>Level:</td><td>{$programName}</td></tr>";
+        $message .= "<tr><td>Type:</td><td>{$programTypeName}</td></tr>";
+        $message .= "<tr><td>College:</td><td>{$collegeName}</td></tr>";
+        $message .= "<tr><td>Department:</td><td>{$departmentName}</td></tr>";
+        $message .= "</table>";
+
+        $email = new Email('default');
+        $email->setViewVars(['message' => $message])
+            ->setTemplate('onlineapplication')
+            ->setEmailFormat('html')
+            ->setTo($data['OnlineApplicant']['email'])
+            ->setSubject('Admission Application - ' . $data['OnlineApplicant']['first_name']);
+
+        try {
+            $email->send();
+            $this->Flash->success('Application submitted and email sent!');
+        } catch (\Exception $e) {
+            $this->Flash->warning('Application saved, but email failed.');
+        }
+    }
+
+    public function checkGraduate($studentID = null)
+    {
+        $students = null;
+        $studentIDNotFound = 0;
+
+        if (($this->request->is('post') && !empty($this->request->getData('continue'))) || $studentID) {
+            if ($this->MathCaptcha->validates($this->request->getData('Page.security_code')) || $studentID) {
+                $id = $studentID ? str_replace('-', '/', $studentID) : trim($this->request->getData('Page.studentID'));
+
+                $count = TableRegistry::getTableLocator()->get('Students')
+                    ->find()
+                    ->where(['Students.studentnumber' => $id])
+                    ->count();
+
+                if ($count > 0) {
+                    $students = TableRegistry::getTableLocator()->get('GraduateLists')
+                        ->find()
+                        ->where(['Students.studentnumber' => $id])
+                        ->contain([
+                            'Students' => [
+                                'Programs', 'Departments', 'Colleges', 'ProgramTypes',
+                                'Curriculums' => ['fields' => ['english_degree_nomenclature']],
+                                'StudentExamStatuses' => [
+                                    'order' => ['StudentExamStatuses.id DESC', 'StudentExamStatuses.academic_year DESC', 'StudentExamStatuses.semester DESC']
+                                ],
+                                'ExitExams' => ['order' => ['ExitExams.exam_date DESC', 'ExitExams.id DESC']]
+                            ],
+                            'Attachments'
+                        ])
+                        ->first();
                 } else {
-                    $studentID = str_replace('-', '/', $studentID);
-                }
-
-                $isStudentValid = ClassRegistry::init('Student')->find(
-                    'count',
-                    array('conditions' => array('Student.studentnumber' => $studentID), 'recursive' => -1)
-                );
-
-                debug($this->request->data);
-                debug($isStudentValid);
-
-                if ($isStudentValid > 0) {
-                    $students = ClassRegistry::init('GraduateList')->Student->find('first', array(
-                        'conditions' => array(
-                            'Student.studentnumber' => $studentID
-                        ),
-                        'contain' => array(
-                            'GraduateList',
-                            'Attachment',
-                            'Program',
-                            'Department',
-                            'College',
-                            'ProgramType',
-                            'Curriculum' => array(
-                                'fields' => array(
-                                    'english_degree_nomenclature',
-                                    /* 'amharic_degree_nomenclature',
-                                    'certificate_name',
-                                    'specialization_amharic_degree_nomenclature',
-                                    'specialization_english_degree_nomenclature' */
-                                )
-                            ),
-                            'StudentExamStatus' => array('order' => array('StudentExamStatus.created' => 'DESC')),
-                            'ExitExam' => array('order' => array('ExitExam.exam_date' => 'DESC'))
-                        )
-                    ));
-
-                    $this->set(compact('students'));
-                } else {
-                    $this->Flash->info(
-                        'The student number provided is not found in our system. If you made typo error please try again else the given student number is not our student based on the admitted student data since 2012 G.C!. For Further verification of students graduated offline or not enrolled online, contact office of the university registrar via email, official letter or in person.'
-                    );
+                    $this->Flash->info('Student ID not found. Please check and try again.');
+                    $studentIDNotFound = 1;
                 }
             } else {
-                $this->Flash->error('Please enter the correct answer to the math question.');
+                $this->Flash->error('Incorrect math answer.');
             }
-            if (!empty($this->request->data['Page']['studentID'])) {
-                $this->set('studentID', trim($this->request->data['Page']['studentID']));
-            } else {
-                $this->set('studentID', $studentID);
-            }
+
+            $this->set('studentID', $id);
         }
 
-        //debug($student_number);
-        /* if (!empty($studentID) && !isset($this->request->data['continue'])) {
-            $this->set('studentID', str_replace('-','/', $studentID));
-            //$this->request->data['continue'] = 1;
-            debug($this->request->data);
-            debug($_POST);
-
-        } */
-
+        $this->set(compact('students', 'studentIDNotFound'));
         $this->set('mathCaptcha', $this->MathCaptcha->generateEquation());
     }
 
-    public function get_department_combo($college_id)
+    public function getDepartmentCombo($college_id)
     {
+        $this->viewBuilder()->setLayout('ajax');
+        $departments = [];
 
-        $this->layout = 'ajax';
-        $departments = array();
-        $academicCalendars = ClassRegistry::init('AcademicCalendar')->find(
-            'first',
-            array('conditions' => array('AcademicCalendar.online_admission_end_date >=' => date('Y-m-d')))
-        );
+        $academicCalendar = TableRegistry::getTableLocator()->get('AcademicCalendars')
+            ->find()
+            ->where(['AcademicCalendars.online_admission_end_date >=' => FrozenTime::now()])
+            ->first();
 
-        debug($academicCalendars);
-
-        if (isset($academicCalendars) && !empty($academicCalendars)) {
-            $academicCalendars['AcademicCalendar']['department_id'] = unserialize(
-                $academicCalendars['AcademicCalendar']['department_id']
-            );
-            debug($academicCalendars);
-
-            $collegeIds = ClassRegistry::init('Department')->find(
-                'list',
-                array(
-                    'conditions' => array('Department.id' => $academicCalendars['AcademicCalendar']['department_id']),
-                    'fields' => array('Department.college_id', 'Department.college_id')
-                )
-            );
-            //$collegeIds = $academicCalendar['AcademicCalendar']['college_id'];
+        if ($academicCalendar) {
+            $departmentIds = unserialize($academicCalendar->department_id);
+            $collegeIds = TableRegistry::getTableLocator()->get('Departments')
+                ->find('list', ['valueField' => 'college_id'])
+                ->where(['Departments.id IN' => $departmentIds])
+                ->toArray();
 
             if (in_array($college_id, $collegeIds)) {
-                $departments = ClassRegistry::init('Department')->find('list', array(
-                    'conditions' => array(
-                        'Department.college_id' => $college_id,
-                        'Department.id' => $academicCalendars['AcademicCalendar']['department_id']
-                    )
-                ));
+                $departments = TableRegistry::getTableLocator()->get('Departments')
+                    ->find('list')
+                    ->where(['Departments.college_id' => $college_id, 'Departments.id IN' => $departmentIds])
+                    ->toArray();
             }
         }
 
         $this->set(compact('departments'));
+    }
+
+    public function checkRemedialResult()
+    {
+        if (Configure::read('SHOW_REMEDIAL_RESULT_CHECK_LINK') != 1) {
+            $this->Flash->info('Remedial result checking is currently unavailable.');
+            return $this->redirect('/');
+        }
+
+        $resultFound = null;
+        $firstNameProvided = $searchKeyProvided = '';
+
+        if ($this->request->is('post') && !empty($this->request->getData('continue'))) {
+            $firstNameProvided = $this->request->getData('Page.first_name');
+            $searchKeyProvided = $this->request->getData('Page.search_key');
+
+            if ($this->MathCaptcha->validates($this->request->getData('Page.security_code'))) {
+                $resultFound = TableRegistry::getTableLocator()->get('RemedialResults')
+                    ->findRemedialResult($this->request->getData());
+
+                if (!$resultFound) {
+                    $this->Flash->info('No result found. Please check your name and ID.');
+                }
+            } else {
+                $this->Flash->error('Incorrect math answer.');
+            }
+        }
+
+        $this->set(compact('resultFound', 'firstNameProvided', 'searchKeyProvided'));
+        $this->set('mathCaptcha', $this->MathCaptcha->generateEquation());
+    }
+
+    public function checkCampusPlacement()
+    {
+        if (Configure::read('SHOW_CAMPUS_PLACEMENT_CHECK_LINK') != 1) {
+            return $this->redirect('/');
+        }
+
+        $resultFound = null;
+        $firstNameProvided = $searchKeyProvided = '';
+
+        if ($this->request->is('post') && !empty($this->request->getData('continue'))) {
+            $firstNameProvided = $this->request->getData('Page.first_name');
+            $searchKeyProvided = $this->request->getData('Page.search_key');
+
+            if ($this->MathCaptcha->validates($this->request->getData('Page.security_code'))) {
+                $resultFound = TableRegistry::getTableLocator()->get('CampusPlacements')
+                    ->checkCampusPlacement($this->request->getData());
+
+                if (!$resultFound) {
+                    $this->Flash->info('No placement found. Please verify your details.');
+                }
+            } else {
+                $this->Flash->error('Incorrect math answer.');
+            }
+        }
+
+        $this->set(compact('resultFound', 'firstNameProvided', 'searchKeyProvided'));
+        $this->set('mathCaptcha', $this->MathCaptcha->generateEquation());
     }
 }

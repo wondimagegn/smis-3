@@ -3,82 +3,94 @@ namespace App\Model\Table;
 
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-use Cake\I18n\Time;
+use Cake\I18n\FrozenTime;
 
-/**
- * Announcements Table
- */
 class AnnouncementsTable extends Table
 {
     /**
      * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
      */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
 
         $this->setTable('announcements');
-        $this->setDisplayField('id');
+        $this->setDisplayField('headline');
         $this->setPrimaryKey('id');
 
+        $this->addBehavior('Timestamp');
+
+        // Associations
         $this->belongsTo('Users', [
             'foreignKey' => 'user_id',
-            'joinType' => 'LEFT',
+            'joinType' => 'INNER'
         ]);
     }
 
     /**
      * Default validation rules.
-     *
-     * @param Validator $validator Validator instance.
-     * @return Validator
      */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
         $validator
-            ->allowEmptyString('id', null, 'create')
             ->scalar('headline')
             ->requirePresence('headline', 'create')
-            ->notEmptyString('headline', 'Please provide a headline.')
+            ->notEmptyString('headline', 'Please enter a headline.');
+
+        $validator
             ->scalar('story')
             ->requirePresence('story', 'create')
-            ->notEmptyString('story', 'Please provide a story.')
-            ->numeric('is_published')
+            ->notEmptyString('story', 'Please enter the announcement story.');
+
+        $validator
+            ->boolean('is_published')
             ->requirePresence('is_published', 'create')
-            ->notEmptyString('is_published', 'Please specify publication status.')
-            ->dateTime('announcement_start')
-            ->requirePresence('announcement_start', 'create')
-            ->notEmptyDateTime('announcement_start', 'Please provide a valid start date.')
-            ->dateTime('announcement_end')
-            ->requirePresence('announcement_end', 'create')
-            ->notEmptyDateTime('announcement_end', 'Please provide a valid end date.')
+            ->notEmptyString('is_published');
+
+        $validator
+            ->dateTime('annucement_start')
+            ->requirePresence('annucement_start', 'create')
+            ->notEmptyDateTime('annucement_start', 'Please select a start date and time.');
+
+        $validator
+            ->dateTime('annucement_end')
+            ->requirePresence('annucement_end', 'create')
+            ->notEmptyDateTime('annucement_end', 'Please select an end date and time.')
+            ->add('annucement_end', 'compare', [
+                'rule' => ['dateTimeComparison', 'annucement_start', '>'],
+                'message' => 'End date must be after start date.'
+            ]);
+
+        $validator
             ->uuid('user_id')
             ->requirePresence('user_id', 'create')
-            ->notEmptyString('user_id', 'Please provide a valid user ID.');
+            ->notEmptyString('user_id');
 
         return $validator;
     }
 
     /**
-     * Retrieves non-expired, published announcements
-     *
-     * @return array Announcements
+     * Custom finder: Get active (not expired) announcements
+     */
+    public function findActive($query)
+    {
+        $now = FrozenTime::now()->format('Y-m-d H:i:s');
+
+        return $query
+            ->where([
+                'Announcements.annucement_start <=' => $now,
+                'Announcements.annucement_end >=' => $now,
+                'Announcements.is_published' => 1
+            ])
+            ->contain(['Users'])
+            ->orderDesc('Announcements.annucement_start');
+    }
+
+    /**
+     * Convenience method: getNotExpiredAnnouncements()
      */
     public function getNotExpiredAnnouncements()
     {
-        $today = Time::now()->format('Y-m-d');
-
-        return $this->find()
-            ->where([
-                'Announcements.announcement_start <=' => $today,
-                'Announcements.announcement_end >=' => $today,
-                'Announcements.is_published' => 1
-            ])
-            ->order(['Announcements.announcement_start' => 'DESC'])
-            ->contain(['Users'])
-            ->toArray();
+        return $this->find('active')->toArray();
     }
 }

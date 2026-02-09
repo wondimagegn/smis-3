@@ -1,285 +1,154 @@
 <?php
-
 namespace App\Model\Table;
 
-use Cake\ORM\Query;
-use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Cake\ORM\RulesChecker;
 
 class OnlineApplicantsTable extends Table
 {
-    /**
-     * Initialize method
-     *
-     * @param array $config The configuration for the Table.
-     * @return void
-     */
-    public function initialize(array $config)
+    public function initialize(array $config): void
     {
         parent::initialize($config);
-
         $this->setTable('online_applicants');
-        $this->setDisplayField('id');
+        $this->setDisplayField('full_name');
         $this->setPrimaryKey('id');
-
-        $this->addBehavior('Timestamp');
 
         $this->belongsTo('Colleges', [
             'foreignKey' => 'college_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
         $this->belongsTo('Departments', [
             'foreignKey' => 'department_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
         $this->belongsTo('Programs', [
             'foreignKey' => 'program_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
         $this->belongsTo('ProgramTypes', [
             'foreignKey' => 'program_type_id',
-            'joinType' => 'INNER',
+            'joinType' => 'INNER'
         ]);
-        $this->hasMany('AcceptedStudents', [
-            'foreignKey' => 'online_applicant_id',
-        ]);
+
         $this->hasMany('OnlineApplicantStatuses', [
             'foreignKey' => 'online_applicant_id',
+            'dependent' => false
+        ]);
+        $this->hasMany('Attachments', [
+            'className' => 'Media.Attachments',
+            'foreignKey' => 'foreign_key',
+            'conditions' => ['Attachments.model' => 'OnlineApplicant'],
+            'dependent' => true
         ]);
     }
 
-    /**
-     * Default validation rules.
-     *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
-     */
-    public function validationDefault(Validator $validator)
+    public function validationDefault(Validator $validator): Validator
     {
-
         $validator
-            ->integer('applicationnumber')
-            ->requirePresence('applicationnumber', 'create')
-            ->notEmptyString('applicationnumber');
-
-        $validator
+            ->integer('college_id')
+            ->notEmptyString('college_id', __('Please select the college you want to join'))
+            ->integer('department_id')
+            ->notEmptyString('department_id', __('Please select the department you want to join'))
+            ->integer('program_id')
+            ->notEmptyString('program_id', __('Please select the study level'))
+            ->integer('program_type_id')
+            ->notEmptyString('program_type_id', __('Please select the admission type'))
             ->scalar('academic_year')
-            ->maxLength('academic_year', 10)
-            ->requirePresence('academic_year', 'create')
-            ->notEmptyString('academic_year');
-
-        $validator
+            ->notEmptyString('academic_year', __('Please select the academic year you want to start.'))
             ->scalar('semester')
-            ->maxLength('semester', 10)
-            ->requirePresence('semester', 'create')
-            ->notEmptyString('semester');
-
-        $validator
+            ->notEmptyString('semester', __('Please select the semester you want to start.'))
             ->scalar('undergraduate_university_name')
-            ->maxLength('undergraduate_university_name', 200)
-            ->requirePresence('undergraduate_university_name', 'create')
-            ->notEmptyString('undergraduate_university_name');
-
-        $validator
+            ->notEmptyString('undergraduate_university_name', __('Provide undergraduate university name.'))
             ->numeric('undergraduate_university_cgpa')
-            ->requirePresence('undergraduate_university_cgpa', 'create')
-            ->notEmptyString('undergraduate_university_cgpa');
-
-        $validator
+            ->notEmptyString('undergraduate_university_cgpa', __('Provide undergraduate university CGPA.'))
             ->scalar('undergraduate_university_field_of_study')
-            ->maxLength('undergraduate_university_field_of_study', 200)
-            ->requirePresence('undergraduate_university_field_of_study', 'create')
-            ->notEmptyString('undergraduate_university_field_of_study');
-
-        $validator
-            ->scalar('postgraduate_university_name')
-            ->maxLength('postgraduate_university_name', 200)
-            ->requirePresence('postgraduate_university_name', 'create')
-            ->notEmptyString('postgraduate_university_name');
-
-        $validator
-            ->numeric('postgraduate_university_cgpa')
-            ->requirePresence('postgraduate_university_cgpa', 'create')
-            ->notEmptyString('postgraduate_university_cgpa');
-
-        $validator
-            ->scalar('postgraduate_university_field_of_study')
-            ->maxLength('postgraduate_university_field_of_study', 200)
-            ->requirePresence('postgraduate_university_field_of_study', 'create')
-            ->notEmptyString('postgraduate_university_field_of_study');
-
-        $validator
+            ->notEmptyString('undergraduate_university_field_of_study', __('Provide undergraduate university field of study.'))
             ->scalar('financial_support')
-            ->maxLength('financial_support', 200)
-            ->requirePresence('financial_support', 'create')
-            ->notEmptyString('financial_support');
-
-        $validator
+            ->notEmptyString('financial_support', __('Provide financial support type.'))
             ->scalar('name_of_sponsor')
-            ->maxLength('name_of_sponsor', 200)
-            ->requirePresence('name_of_sponsor', 'create')
-            ->notEmptyString('name_of_sponsor');
-
-        $validator
-            ->integer('year_of_experience')
-            ->notEmptyString('year_of_experience');
-
-        $validator
-            ->scalar('disability')
-            ->maxLength('disability', 200)
-            ->requirePresence('disability', 'create')
-            ->notEmptyString('disability');
-
-        $validator
+            ->notEmptyString('name_of_sponsor', __('Provide name of sponsor.'))
             ->scalar('first_name')
-            ->maxLength('first_name', 200)
-            ->requirePresence('first_name', 'create')
-            ->notEmptyString('first_name');
-
-        $validator
+            ->notEmptyString('first_name', __('Provide first name.'))
             ->scalar('father_name')
-            ->maxLength('father_name', 200)
-            ->requirePresence('father_name', 'create')
-            ->notEmptyString('father_name');
-
-        $validator
+            ->notEmptyString('father_name', __('Provide father name.'))
             ->scalar('grand_father_name')
-            ->maxLength('grand_father_name', 200)
-            ->requirePresence('grand_father_name', 'create')
-            ->notEmptyString('grand_father_name');
-
-        $validator
+            ->notEmptyString('grand_father_name', __('Provide grand father name.'))
             ->date('date_of_birth')
-            ->requirePresence('date_of_birth', 'create')
-            ->notEmptyDate('date_of_birth');
-
-        $validator
+            ->notEmptyDate('date_of_birth', __('Please provide birth date.'))
             ->scalar('gender')
-            ->maxLength('gender', 10)
-            ->requirePresence('gender', 'create')
-            ->notEmptyString('gender');
-
-        $validator
+            ->notEmptyString('gender', __('Please select gender.'))
             ->scalar('mobile_phone')
-            ->maxLength('mobile_phone', 36)
-            ->requirePresence('mobile_phone', 'create')
-            ->notEmptyString('mobile_phone');
-
-        $validator
+            ->notEmptyString('mobile_phone', __('Please provide the mobile number.'))
             ->email('email')
-            ->requirePresence('email', 'create')
-            ->notEmptyString('email');
-
-        $validator
-            ->boolean('application_status')
-            ->notEmptyString('application_status');
-
-        $validator
-            ->scalar('approved_by')
-            ->maxLength('approved_by', 36)
-            ->requirePresence('approved_by', 'create')
-            ->notEmptyString('approved_by');
-
-        $validator
-            ->boolean('document_submitted')
-            ->notEmptyString('document_submitted');
-
-        $validator
-            ->numeric('entrance_result')
-            ->requirePresence('entrance_result', 'create')
-            ->notEmptyString('entrance_result');
+            ->notEmptyString('email', __('Please provide the email address.'));
 
         return $validator;
     }
 
-    /**
-     * Returns a rules checker object that will be used for validating
-     * application integrity.
-     *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
-     */
-    public function buildRules(RulesChecker $rules)
+    public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add($rules->isUnique(['email']));
         $rules->add($rules->existsIn(['college_id'], 'Colleges'));
         $rules->add($rules->existsIn(['department_id'], 'Departments'));
         $rules->add($rules->existsIn(['program_id'], 'Programs'));
         $rules->add($rules->existsIn(['program_type_id'], 'ProgramTypes'));
-
         return $rules;
     }
 
-
-    public function nextTrackingNumber()
+    public function nextTrackingNumber(): int
     {
-        $nextapplicationnumber = $this->find(
-            'first',
-            array('order' => array('OnlineApplicant.created DESC'))
-        );
-        if (
-            isset($nextapplicationnumber)
-            && !empty($nextapplicationnumber)
-        ) {
-            return $nextapplicationnumber['OnlineApplicant']['applicationnumber'] + 1;
-        }
-        return 12100;
-    }
-    public function isAppliedFordmittion($data)
-    {
-        $applied = $this->find(
-            'first',
-            array(
-                'conditions' => array(
-                    'OnlineApplicant.department_id' => $data['OnlineApplicant']['department_id'],
-                    'OnlineApplicant.college_id' => $data['OnlineApplicant']['college_id'],
+        $last = $this->find()
+            ->select(['applicationnumber'])
+            ->orderDesc('created')
+            ->first();
 
-                    'OnlineApplicant.program_id' => $data['OnlineApplicant']['program_id'],
-                    'OnlineApplicant.program_type_id' => $data['OnlineApplicant']['program_type_id'],
-                    'OnlineApplicant.academic_year' => $data['OnlineApplicant']['academic_year'],
-                    'OnlineApplicant.semester' => $data['OnlineApplicant']['semester'],
-                    'OnlineApplicant.email' => $data['OnlineApplicant']['email']
-
-                ),
-                'order' => array('OnlineApplicant.created DESC'),
-                'recursive' => -1
-            )
-        );
-        debug($data);
-        debug($applied);
-        if (isset($applied) && !empty($applied)) {
-            return $applied['OnlineApplicant']['applicationnumber'];
-        }
-        return 0;
+        return $last ? $last->applicationnumber + 1 : 12100;
     }
 
+    public function isAppliedForAdmission(array $data): int
+    {
+        $conditions = [
+            'OnlineApplicants.department_id' => $data['OnlineApplicant']['department_id'],
+            'OnlineApplicants.college_id' => $data['OnlineApplicant']['college_id'],
+            'OnlineApplicants.program_id' => $data['OnlineApplicant']['program_id'],
+            'OnlineApplicants.program_type_id' => $data['OnlineApplicant']['program_type_id'],
+            'OnlineApplicants.academic_year' => $data['OnlineApplicant']['academic_year'],
+            'OnlineApplicants.semester' => $data['OnlineApplicant']['semester'],
+            'OnlineApplicants.email' => $data['OnlineApplicant']['email']
+        ];
 
-    function checkUnique($data, $fieldName)
-    {
-        $valid = false;
-        if (isset($fieldName) && $this->hasField($fieldName)) {
-            $valid = $this->isUnique(array($fieldName => $data));
-        }
-        return $valid;
+        $applied = $this->find()
+            ->select(['applicationnumber'])
+            ->where($conditions)
+            ->orderDesc('created')
+            ->first();
+
+        return $applied ? $applied->applicationnumber : 0;
     }
-    function preparedAttachment($data = null)
+
+    public function checkUnique($data, string $fieldName): bool
     {
+        if (!$this->hasField($fieldName)) {
+            return false;
+        }
+        return $this->isUnique([$fieldName => $data]);
+    }
+
+    public function preparedAttachment(array $data = null): array
+    {
+        if (empty($data['Attachment'])) {
+            return $data;
+        }
 
         foreach ($data['Attachment'] as $in => &$dv) {
-            if (
-                empty($dv['file']['name']) && empty($dv['file']['type'])
-                && empty($dv['tmp_name'])
-            ) {
+            if (empty($dv['file']['name']) && empty($dv['file']['type']) && empty($dv['file']['tmp_name'])) {
                 unset($data['Attachment'][$in]);
-            } elseif ($in == 0) {
+            } else {
                 $dv['model'] = 'OnlineApplicant';
-                $dv['group'] = 'OnlineApplicantFiles';
-            } elseif ($in == 1) {
-                $dv['model'] = 'OnlineApplicant';
-                $dv['group'] = 'OnlineApplicantPaymentSlips';
+                $dv['group'] = ($in == 0) ? 'OnlineApplicantFiles' : 'OnlineApplicantPaymentSlips';
             }
         }
+
         return $data;
     }
 }

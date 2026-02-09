@@ -25,4 +25,11 @@ class ArrayHelper
 
         return $array;
     }
+    public static function toIntArray($value)
+    {
+        if (empty($value)) {
+            return [];
+        }
+        return array_filter(array_map('intval', explode(',', $value)));
+    }
 }

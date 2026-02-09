@@ -1046,6 +1046,8 @@ define('PROGRAM_TYPE_PART_TIME', 5);
 define('PROGRAM_TYPE_DISTANCE', 6);
 define('PROGRAM_TYPE_ON_LINE', 7);
 define('PROGRAM_TYPE_WEEKEND', 8);
+define('PROGRAM_TYPE_EXCHANGE', 9);
+define('PROGRAM_TYPE_DAY_TIME_EXTENSION', 10);
 
 
 /**Program  ***/

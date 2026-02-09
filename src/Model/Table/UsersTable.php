@@ -1284,6 +1284,7 @@ class UsersTable extends Table
         return ['ApplicableAssignments' => $applicableAssignments, 'Student' => $student->toArray()];
     }
 
+
     private function getStaffDetails($userId, $roleId, $isAdmin)
     {
         $staffTable = TableRegistry::getTableLocator()->get('Staffs');
@@ -1294,6 +1295,11 @@ class UsersTable extends Table
                 'Colleges' => ['fields' => ['id', 'name']],
                 'Departments' => ['fields' => ['id', 'name']]
             ])
+            ->first();
+
+        $userStaffDetails = $this->find()
+            ->where(['Users.id' => $userId])
+            ->contain(['Roles','StaffAssignes'])
             ->first();
 
 
@@ -1326,7 +1332,11 @@ class UsersTable extends Table
         ) {
 
 
-            if ($isAdmin) {
+            if ($isAdmin && in_array($roleId, [
+                    Configure::read('Roles.MEAL'),
+                    Configure::read('Roles.ACCOMODATION')
+                ])) {
+                debug($activePrograms);
                 $applicableAssignments['program_ids'] = $activePrograms;
                 $applicableAssignments['program_type_ids'] = $activeProgramTypes;
                 $applicableAssignments['college_ids'] = TableRegistry::getTableLocator()->get('Colleges')
@@ -1336,8 +1346,86 @@ class UsersTable extends Table
                     ->find('list', ['conditions' => ['active' => 1], 'keyField' => 'id', 'valueField' => 'id'])
                     ->toArray();
                 $applicableAssignments['year_level_names'] = [0 => 'Pre'];
-            }
 
+                $year_names_from_active_departments = [];
+
+                if (!empty($activePrograms)) {
+                    $YearLevelsTable = TableRegistry::getTableLocator()->get('YearLevels');
+                    $year_names_from_active_departments = $YearLevelsTable->distinctYearLevelBasedOnRole(
+                       $roleId,
+                        null,
+                        $applicableAssignments['department_ids'],
+                        $activePrograms
+                    );
+                }
+
+                if (!empty($year_names_from_active_departments)) {
+                    $applicableAssignments['year_level_names']= $year_names_from_active_departments;
+                }
+            } elseif (!empty($userStaffDetails['StaffAssign'][0])) {
+
+                $assign = $userStaffDetails['StaffAssign'][0];
+
+                $applicableAssignments['college_permission'] = $assign['collegepermission'];
+                $applicableAssignments['program_ids'] = unserialize($assign['program_id']) ?: [];
+                $applicableAssignments['program_type_ids'] = unserialize($assign['program_type_id']) ?: [];
+
+                debug($applicableAssignments);
+
+                if ($applicableAssignments['college_permission'] == 1) {
+                    $applicableAssignments['college_ids'] = unserialize($assign['college_id']) ?: [];
+                    $applicableAssignments['program_ids'] = Configure::read('programs_available_for_registrar_college_level_permissions') ?: [];
+                    $applicableAssignments['program_type_ids'] = Configure::read('program_types_available_for_registrar_college_level_permissions') ?: [];
+                    $applicableAssignments['year_level_names'][0] = 'Pre';
+                } else {
+                    $deptIds = unserialize($assign['department_id']) ?: [];
+                    $collIds = unserialize($assign['college_id']) ?: [];
+
+                    $activeDepts =  TableRegistry::getTableLocator()->get('Departments')->find('list', [
+                        'conditions' => ['Departments.id IN' => $deptIds, 'Departments.active' => 1]
+                    ])->toArray();
+                    if(!empty($activeDepts)) {
+                        $applicableAssignments['department_ids'] = $activeDepts;
+
+                        $availablePrograms = TableRegistry::getTableLocator()->get('Curriculums')->find('list', [
+                            'keyField' => 'program_id',
+                            'valueField' => 'program_id',
+                            'conditions' => [
+                                'Curriculums.department_id IN' => array_keys($activeDepts),
+                                'Curriculums.program_id IN' => $applicableAssignments['program_ids'],
+                                'Curriculums.active' => 1
+                            ],
+                            'group' => 'Curriculums.program_id'
+                        ])->toArray();
+                        $filteredPrograms = TableRegistry::getTableLocator()->get('Programs')->find('list', [
+                            'conditions' => ['Programs.id IN' => $availablePrograms, 'Programs.active' => 1],
+                            'keyField' => 'id', 'valueField' => 'id'
+                        ])->toArray();
+
+                        if ($isAdmin == 1 && $roleId == ROLE_REGISTRAR) {
+                            $filteredPrograms[PROGRAM_REMEDIAL] = PROGRAM_REMEDIAL;
+                        }
+                        if (!empty($filteredPrograms)) {
+                            $applicableAssignments['program_ids'] = $filteredPrograms;
+                        }
+                        $year_names = [];
+                        if (!empty($applicableAssignments['program_ids']) && !empty($activeDepts)) {
+                            $year_names = TableRegistry::getTableLocator()->get('YearLevels')->distinctYearLevelBasedOnRole(
+                                $roleId,
+                                null,
+                                array_keys($activeDepts),
+                                array_keys($applicableAssignments['program_ids'])
+                            );
+                        }
+                        if (!empty($year_names)) {
+                            $applicableAssignments['year_level_names'] = $year_names;
+                        }
+
+
+                    }
+                }
+
+            }
 
         } elseif ($roleId == Configure::read('Roles.COLLEGE')) {
             $applicableAssignments['college_ids'] = [$staff->college->id => $staff->college->id];
@@ -1370,6 +1458,9 @@ class UsersTable extends Table
 
       //  return ['ApplicableAssignments' => $applicableAssignments, 'Staff' => $staff->toArray()];
     }
+
+
+
     public function getEquivalentProgramTypes($program_type_id = 0)
     {
         $programTypesToLook = [$program_type_id];

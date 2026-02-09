@@ -1,282 +1,175 @@
 <?php
 namespace App\Controller;
 
-
 use App\Controller\AppController;
-
-
-use Cake\Event\Event;
 use Cake\ORM\TableRegistry;
-use Cake\Core\Configure;
+use Cake\I18n\FrozenTime;
+use Cake\Network\Exception\NotFoundException;
+use Cake\Mailer\Email;
 
 class AlumniController extends AppController
 {
 
-    public $name = 'Alumni';
-
-    public $menuOptions = array(
-
-        //'parent' => 'graduation',
-        'exclude' => array('index', 'edit', 'add'),
+    public $menuOptions = [
         'weight' => 2,
-
-        'alias' => array(
+        'alias' => [
             'checkAlumniSurvey' => 'Check Alumni Survey',
             'alumniSurveyView' => 'Baseline Survey View',
             'addBaselinesurveyOnbehalf' => 'Fill Baseline Survey On Behalf of Student'
-        )
-    );
+        ]
+    ];
 
-    public $paginate = array();
-
-    public function initialize()
+    public function initialize(): void
     {
-
         parent::initialize();
+        $this->loadComponent('RequestHandler');
         $this->loadComponent('EthiopicDateTime');
-
-        $this->loadComponent('Paginator');
         $this->loadComponent('AcademicYear');
+        $this->loadComponent('Paginator');
 
-        $this->loadComponent('Email');
-        $this->viewBuilder()->setHelpers(['Xls', 'Media.Media']);
+        $this->loadModel('Alumni');
+        $this->loadModel('Students');
+        $this->loadModel('AlumniResponses');
+        $this->loadModel('SurveyQuestions');
+        $this->loadModel('AlumniMembers');
     }
 
-    public function beforeRender(Event $event)
+    public function beforeRender(): void
     {
-
-        parent::beforeRender($event);
+        parent::beforeRender();
         $acyear_array_data = $this->AcademicYear->acyearArray();
-        //To diplay current academic year as default in drop down list
-        $defaultacademicyear = $this->AcademicYear->currentAcademicyear();
-
-        $this->set(
-            compact(
-                'acyear_array_data',
-                'defaultacademicyear'
-            )
-        );
+        $defaultacademicyear = $this->AcademicYear->currentAcademicYear();
+        $this->set(compact('acyear_array_data', 'defaultacademicyear'));
     }
 
-
-    public function beforeFilter(Event $event)
+    public function beforeFilter(\Cake\Event\EventInterface $event): void
     {
-
         parent::beforeFilter($event);
-        //$this->Security->unlockedActions();
-        $this->Auth->Allow(
-            'add',
-            'alumni_survey_view',
-            'member_registration',
-            'check_alumni_survey'
-        );
+        $this->Auth->allow(['member_registration']);
     }
 
     public function alumniSurveyView()
     {
+        $this->paginate = [
+            'contain' => [
+                'Students' => [
+                    'SenateLists',
+                    'Departments' => ['fields' => ['id', 'name']]
+                ],
+                'AlumniResponses'
+            ]
+        ];
 
-        $this->paginate = array('contain' => array('Student' => array('SenateList'), 'AlumniResponse'));
-
-
-        // filter by graduation year
-        if (isset($this->request->data['Search']['gradution_academic_year']) && !empty($this->request->data['Search']['gradution_academic_year'])) {
-            $this->paginate['conditions'][]['Alumnus.gradution_academic_year'] = $this->request->data['Search']['gradution_academic_year'];
+        if (!empty($this->request->getData('Search.gradution_academic_year'))) {
+            $this->paginate['conditions'][]['Alumni.gradution_academic_year'] = $this->request->getData('Search.gradution_academic_year');
         }
-
-
-        // filter by program
-        if (isset($this->request->data['Search']['program_id']) && !empty($this->request->data['Search']['program_id'])) {
-            $this->paginate['conditions'][]['Student.program_id'] = $this->request->data['Search']['program_id'];
+        if (!empty($this->request->getData('Search.program_id'))) {
+            $this->paginate['conditions'][]['Students.program_id'] = $this->request->getData('Search.program_id');
         }
-
-        // filter by program type
-        if (isset($this->request->data['Search']['program_type_id']) && !empty($this->request->data['Search']['program_type_id'])) {
-            $this->paginate['conditions'][]['Student.program_type_id'] = $this->request->data['Search']['program_type_id'];
+        if (!empty($this->request->getData('Search.program_type_id'))) {
+            $this->paginate['conditions'][]['Students.program_type_id'] = $this->request->getData('Search.program_type_id');
         }
-
-        // filter by department
-        /*
-        if (isset($this->request->data['Search']['department_id']) && !empty($this->request->data['Search']['department_id'])) {
-            $this->paginate['conditions'][]['Student.department_id'] = $this->request->data['Search']['department_id'];
-        }
-        */
-
-        // filter by department or college
-
-        if (isset($this->request->data['Search']['department_id']) && !empty($this->request->data['Search']['department_id'])) {
-            $department_id = $this->request->data['Search']['department_id'];
+        if (!empty($this->request->getData('Search.department_id'))) {
+            $department_id = $this->request->getData('Search.department_id');
             $college_id = explode('~', $department_id);
             if (count($college_id) > 1) {
-                $this->paginate['conditions'][]['Student.college_id'] = $college_id[1];
+                $this->paginate['conditions'][]['Students.college_id'] = $college_id[1];
             } else {
-                $this->paginate['conditions'][]['Student.department_id'] = $department_id;
+                $this->paginate['conditions'][]['Students.department_id'] = $department_id;
             }
-            $default_department_id = $this->request->data['Search']['department_id'];
+            $default_department_id = $department_id;
+        }
+        if (!empty($this->request->getData('Search.name'))) {
+            $this->paginate['conditions'][]['Alumnus.full_name LIKE'] = '%' . $this->request->getData('Search.name') . '%';
+        }
+        if (!empty($this->request->getData('Search.limit'))) {
+            $this->paginate['limit'] = $this->request->getData('Search.limit');
+            $this->paginate['maxLimit'] = $this->request->getData('Search.limit');
         }
 
-        // filter by name
-
-        if (isset($this->request->data['Search']['name']) && !empty($this->request->data['Search']['name'])) {
-            $this->paginate['conditions'][]['Alumnus.full_name like '] = $this->request->data['SenateList']['minute_number'] . '%';
-        }
-
-        if (isset($this->request->data['Search']['limit'])) {
-            $this->paginate['limit'] = $this->request->data['Search']['limit'];
-            $this->paginate['maxLimit'] = $this->request->data['Search']['limit'];
-            $this->request->data['Search']['limit'] = $this->request->data['Search']['limit'];
-        }
-        debug($this->paginate);
         $this->Paginator->settings = $this->paginate;
+        $alumni = $this->Paginator->paginate('Alumni');
 
-        if (isset($this->Paginator->settings['conditions'])) {
-            $alumni =
-                $this->Paginator->paginate('Alumnus');
-        } else {
-            $alumni = array();
+        if (empty($alumni) && $this->request->getData()) {
+            $this->Flash->info(__('There is no student based on your search criteria.'));
         }
 
-        if (empty($alumni) && isset($this->request->data) && !empty($this->request->data)) {
-            $this->Session->setFlash(
-                '<span></span>' . __('There is no student  based on the given criteria.'),
-                'default',
-                array('class' => 'info-box info-message')
-            );
-        }
+        if ($this->request->getData('getAlumniQuestionnaireInExcel')) {
+            $surveyQuestions = $this->Alumni->AlumniResponses->SurveyQuestions->find('list', [
+                'keyField' => 'id',
+                'valueField' => 'question_english'
+            ])->toArray();
 
-        //Issue Student Password button is clicked
-        if (isset($this->request->data['getAlumniQuestionnaireInExcel'])) {
-            $surveyQuestions = $this->Alumnus->AlumniResponse->SurveyQuestion->find(
-                'list',
-                array('fields' => array('SurveyQuestion.id', 'SurveyQuestion.question_english'))
-            );
-            $student_ids = array();
-            foreach (
-                $this->request->data['Alumnus'] as
-                $key => $student
-            ) {
-                if (is_numeric($key)
-                    && !empty($student['student_id'])) {
-                    if (isset($student['gp'])
-                        && $student['gp'] == 1) {
+            $student_ids = [];
+            if (!empty($this->request->getData('Alumnus'))) {
+                foreach ($this->request->getData('Alumnus') as $key => $student) {
+                    if (is_numeric($key) && !empty($student['student_id']) && !empty($student['gp'])) {
                         $student_ids[] = $student['student_id'];
                     }
                 }
             }
 
             if (empty($student_ids)) {
-                $this->Session->setFlash(
-                    '<span></span>' . __('You are required to select at least one student.', true),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('You are required to select at least one student.'));
             } else {
-                $alumniSurvey = $this->Alumnus->getCompletedSurvey($student_ids);
-
+                $alumniSurvey = $this->Alumni->getCompletedSurvey($student_ids);
                 if (empty($alumniSurvey)) {
-                    $this->Session->setFlash(
-                        '<span></span>' .
-                        __(
-                            'Baseline Survey Questionnaire generation has experiance problem  for the selected students. Please try again.'
-                        ),
-                        'default',
-                        array('class' => 'info-box info-message')
-                    );
+                    $this->Flash->info(__('Baseline Survey Questionnaire generation has experienced a problem for the selected students. Please try again.'));
                 } else {
-                    $this->autoLayout = false;
-                    $filename = 'baselinequestionnaire' . date('Ymd H:i:s');
-
+                    $this->autoRender = false;
+                    $filename = 'baselinequestionnaire' . date('Ymd His');
                     $this->set(compact('alumniSurvey', 'surveyQuestions', 'filename'));
-                    $this->render('/Elements/baseline_survey_questionnaire_xls');
-
+                    $this->viewBuilder()->setTemplate('/Elements/baseline_survey_questionnaire_xls');
                     return;
                 }
             }
         }
 
-        if (isset($this->request->data['deleteAlumniQuestionnaireInExcel'])) {
-            $surveyQuestions = $this->Alumnus->AlumniResponse->SurveyQuestion->find('list', array(
-                'fields' => array(
-                    'SurveyQuestion.id',
-                    'SurveyQuestion.question_english'
-                )
-            ));
-            $student_ids = array();
-            foreach (
-                $this->request->data['Alumnus'] as
-                $key => $student
-            ) {
-                if (is_numeric($key) &&
-                    !empty($student['student_id'])) {
-                    if (isset($student['gp'])
-                        && $student['gp'] == 1) {
+        if ($this->request->getData('deleteAlumniQuestionnaireInExcel')) {
+            $student_ids = [];
+            if (!empty($this->request->getData('Alumnus'))) {
+                foreach ($this->request->getData('Alumnus') as $key => $student) {
+                    if (is_numeric($key) && !empty($student['student_id']) && !empty($student['gp'])) {
                         $student_ids[] = $student['student_id'];
                     }
                 }
             }
 
             if (empty($student_ids)) {
-                $this->Session->setFlash(
-                    '<span></span>' . __('You are required to select at least one student.', true),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('You are required to select at least one student.'));
             } else {
-                $alumniSurvey = $this->Alumnus->getSelectedAlumniSurvey($student_ids);
+                $alumniSurvey = $this->Alumni->getSelectedAlumniSurvey($student_ids);
                 $deletedCount = 0;
-
-                foreach ($alumniSurvey as $alk => $alv) {
-                    if ($this->Alumnus->delete($alv['Alumnus']['id'])) {
-                        $deletedCount++;
+                if (!empty($alumniSurvey)) {
+                    foreach ($alumniSurvey as $alv) {
+                        if ($this->Alumni->delete($alv['Alumni'])) {
+                            $deletedCount++;
+                        }
                     }
                 }
                 if ($deletedCount) {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            'You have deleted ' . $deletedCount . ' alumni baseline survey, please ask them to fill again.',
-                            true
-                        ),
-                        'default',
-                        array('class' => 'success-box success-message')
-                    );
-                    return $this->redirect(array(
-                            'controller' => 'alumni',
-                            'action' => "alumni_survey_view"
-                        )
-                    );
+                    $this->Flash->success(__('You have deleted ' . $deletedCount . ' alumni baseline survey, please ask them to fill again.'));
+                    return $this->redirect(['action' => 'alumni_survey_view']);
                 }
             }
         }
 
-        $programs = $this->Alumnus->Student->Program->find('list');
-        $programTypes = $this->Alumnus->Student->ProgramType->find('list');
-        if (isset($this->department_ids) && !empty($this->department_ids)) {
-            //$departments = $this->Alumnus->Student->Department->find('list',array('conditions'=>array('Department.id'=>$this->department_ids)));
-            $departments = $this->Alumnus->Student->Department->allDepartmentsByCollege2(
-                1,
-                $this->department_ids,
-                $this->college_ids
-            );
+        $programs = $this->Alumni->Students->Programs->find('list', [
+            'conditions' => ['Programs.id IN' => $this->program_ids, 'Programs.active' => 1]
+        ])->toArray();
+
+        $programTypes = $this->Alumni->Students->ProgramTypes->find('list', [
+            'conditions' => ['ProgramTypes.id IN' => $this->program_type_ids, 'ProgramTypes.active' => 1]
+        ])->toArray();
+
+        if ($this->request->getSession()->read('Auth.User.is_admin') == 1 && $this->request->getSession()->read('Auth.User.role_id') == ROLE_REGISTRAR) {
+            $departments = $this->Alumni->Students->Departments->allDepartmentsByCollege2(1, $this->department_ids, $this->college_ids);
+            $departments = [0 => 'All University Students'] + $departments;
         } else {
-            //$departments = $this->Alumnus->Student->Department->find('list');
-            $departments = $this->Alumnus->Student->Department->allDepartmentsByCollege2(
-                1,
-                $this->department_ids,
-                $this->college_ids
-            );
+            $departments = $this->Alumni->Students->Departments->allDepartmentsByCollege2(1, $this->department_ids, $this->college_ids);
         }
-        $departments = array(0 => 'All University Students') + $departments;
-        $default_department_id = null;
 
-
-        $this->set(
-            compact(
-                'programs',
-                'programTypes',
-                'alumni',
-                'departments',
-                'default_department_id'
-            )
-        );
+        $this->set(compact('programs', 'programTypes', 'alumni', 'departments', 'default_department_id'));
     }
 
     public function index()
@@ -285,467 +178,237 @@ class AlumniController extends AppController
 
     public function view($id = null)
     {
-
-        if (!$this->Alumnus->exists($id)) {
-            throw new NotFoundException(__('Invalid alumnus'));
+        if (!$this->Alumni->exists($id)) {
+            throw new NotFoundException(__('Invalid Alumnus'));
         }
-        $options = array('conditions' => array('Alumnus.' . $this->Alumnus->primaryKey => $id));
-        $this->set('alumnus', $this->Alumnus->find('first', $options));
+        $alumnus = $this->Alumni->get($id);
+        $this->set(compact('alumnus'));
     }
 
     public function add()
     {
+        $student = $this->Alumni->Students->find('first', [
+            'conditions' => ['Students.studentnumber' => $this->Auth->user('username')],
+            'contain' => ['GraduateLists', 'Users']
+        ])->first();
 
-        /*
-        if (!$this->Alumnus->Student->exists($id)) {
-            throw new NotFoundException(__('Invalid alumnus'));
-        }
-        */
-        $student = ClassRegistry::init('Student')->find(
-            'first',
-            array(
-                'conditions' => array('Student.studentnumber' => $this->Auth->user('username')),
-                'contain' => array('GraduateList', 'User')
-            )
-        );
-        if (isset($student['Student']['id']) && !empty($student['Student']['id'])) {
-            //check if it exists
-            $student_id = $student['Student']['id'];
-        } else {
-            $this->Session->setFlash(
-                '<span></span>' . __(
-                    'You are not elegible to fill survey. The baseline survey is only available for graduting students.'
-                ),
-                'default',
-                array('class' => 'warning-box warning-message')
-            );
+        if (empty($student)) {
+            $this->Flash->warning(__('You are not eligible to fill the survey. The Alumni baseline survey is only available for graduating students.'));
             return $this->redirect('/');
         }
 
+        $student_id = $student->id;
 
-
-        if ($this->Alumnus->checkIfStudentGradutingClass($student_id) == false) {
-            $this->Session->setFlash(
-                '<span></span>' . __(
-                    'You can not fill alumni baseline survey due to either you are not graduting class students or department did not define the final year project as thesis or project work.'
-                ),
-                'default',
-                array('class' => 'warning-box warning-message')
-            );
+        if (!$this->Alumni->checkIfStudentGradutingClass($student_id)) {
+            $this->Flash->warning(__('Either you are not graduating class student or your department did not define a final year project as thesis or project work. You cannot fill alumni baseline survey at this time.'));
             return $this->redirect('/');
         }
 
-        //$student_id=2020;
-        $filled1stLevelQuestionair = $this->Alumnus->completedRoundOneQuestionner($student_id);
-
-        if ($filled1stLevelQuestionair == true) {
-            $this->Session->setFlash(
-                '<span></span>' . __(
-                    'Thank you for completing alumni baseline questionnair. Congratulations for your graduation and part of our alumni.'
-                ),
-                'default',
-                array('class' => 'success-box success-message')
-            );
-            return $this->redirect(array('controller' => 'exam_grades', 'action' => "student_grade_view"));
-        } else {
-            if ($this->Alumnus->checkIfStudentGradutingClass($student_id) == false && false) {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'You are not elegible to fill the survey. The survey is intended only for graduating  class.'
-                    ),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
-                return $this->redirect(array('controller' => 'exam_grades', 'action' => "student_grade_view"));
-            }
+        if ($this->Alumni->completedRoundOneQuestionner($student_id)) {
+            $this->Flash->success(__('Thank you for completing alumni baseline questionnaire. Congratulations for your graduation and part of our alumni.'));
+            return $this->redirect(['controller' => 'exam_grades', 'action' => 'student_grade_view']);
         }
-        debug($this->Auth->user('username'));
+
         if ($this->request->is('post')) {
-            debug($this->request);
-            $this->request->data = $this->Alumnus->formatResponse($this->request->data);
-            $this->Alumnus->create();
-            if ($this->Alumnus->saveAll($this->request->data)) {
-                $this->Session->setFlash(
-                    '<span></span>' . __('THANK YOU FOR YOUR PARTICIPATION!'),
-                    'default',
-                    array('class' => 'success-box success-message')
-                );
-                return $this->redirect(array('controller' => 'exam_grades', 'action' => "student_grade_view"));
+            $this->request->data = $this->Alumni->formatResponse($this->request->getData());
+            $alumnus = $this->Alumni->newEntity($this->request->getData(), ['associated' => ['AlumniResponses']]);
+            if ($this->Alumni->save($alumnus)) {
+                $this->Flash->success(__('THANK YOU FOR YOUR PARTICIPATION!'));
+                return $this->redirect(['controller' => 'exam_grades', 'action' => 'student_grade_view']);
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __('Your response could not be saved. Please try again.'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('Your response could not be saved. Please try again.'));
             }
-
-            debug($this->Alumnus->invalidFields());
         }
 
+        $surveyQuestions = $this->Alumni->AlumniResponses->SurveyQuestions->find('all', [
+            'contain' => ['SurveyQuestionAnswers']
+        ])->toArray();
 
-        $surveyQuestions = $this->Alumnus->AlumniResponse->SurveyQuestion->find(
-            'all',
-            array('contain' => array('SurveyQuestionAnswer'))
-        );
-        $student = $this->Alumnus->Student->find(
-            'first',
-            array('conditions' => array('Student.id' => $student_id), 'contain' => array('Region', 'Curriculum'))
-        );
-        $student['Student']['age'] = $this->Alumnus->Student->getAge($student['Student']['birthdate']);
+        $student = $this->Alumni->Students->find('first', [
+            'conditions' => ['Students.id' => $student_id],
+            'contain' => ['Regions', 'Curricula']
+        ])->first();
 
-        $regions = $this->Alumnus->Student->Region->find(
-            'list',
-            array('fields' => array('Region.name', 'Region.name'))
-        );
-        $sexes = array('female' => 'Female', 'male' => 'Male');
-
-        $university = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
+        $student->age = $this->Alumni->Students->getAge($student->birthdate);
+        $regions = $this->Alumni->Students->Regions->find('list')->toArray();
+        $sexes = ['female' => 'Female', 'male' => 'Male'];
+        $university = TableRegistry::getTableLocator()->get('Universities')->getStudentUnivrsity($student_id);
 
         $this->set(compact('surveyQuestions', 'sexes', 'university', 'student', 'regions', 'student_id'));
     }
 
-    public function addBaselinesurveyOnbehalf()
+    public function add_baselinesurvey_onbehalf()
     {
-
         $student_id = 0;
         $everythingfine = false;
 
-        if (!empty($this->request->data) && isset($this->request->data['continue'])) {
-            if (!empty($this->request->data['Alumnus']['studentID'])) {
-                $student_id_valid = $this->Alumnus->Student->find(
-                    'count',
-                    array(
-                        'conditions' => array(
-                            'Student.studentnumber' => trim(
-                                $this->request->data['Alumnus']['studentID']
-                            )
-                        )
-                    )
-                );
-                debug($student_id_valid);
-                $studentIDs = 1;
+        if ($this->request->is('post') && !empty($this->request->getData('continue'))) {
+            if (!empty($this->request->getData('Alumnus.studentID'))) {
+                $student_id_valid = $this->Alumni->Students->find()->where(['Students.studentnumber' => trim($this->request->getData('Alumnus.studentID'))])->count();
                 if ($student_id_valid > 0) {
                     $everythingfine = true;
-                    $student_id = $this->Alumnus->Student->field(
-                        'id',
-                        array(
-                            'studentnumber' =>
-                                trim($this->request->data['Alumnus']['studentID'])
-                        )
-                    );
+                    $student_id = $this->Alumni->Students->find()->select(['id'])->where(['Students.studentnumber' => trim($this->request->getData('Alumnus.studentID'))])->first()->id;
                 } else {
-                    if ($check_id_is_valid == 0) {
-                        $this->Session->setFlash(
-                            '<span></span> ' . __('You dont have the privilage to view the selected students profile.'),
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                    } else {
-                        $this->Session->setFlash(
-                            '<span></span> ' . __('The provided student number is not valid.'),
-                            'default',
-                            array('class' => 'error-box error-message')
-                        );
-                    }
+                    $this->Flash->error(__('The provided student number is not valid.'));
                 }
             } else {
-                $this->Session->setFlash(
-                    '<span></span> ' .
-                    __('Please provide student number to  view profile.'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('Please provide student number or ID to continue.'));
             }
         }
+
         if ($everythingfine) {
-            $student = ClassRegistry::init('Student')->find(
-                'first',
-                array('conditions' => array('Student.id' => $student_id), 'contain' => array('GraduateList', 'User'))
-            );
+            $student = $this->Alumni->Students->find('first', [
+                'conditions' => ['Students.id' => $student_id],
+                'contain' => ['GraduateLists', 'Users']
+            ])->first();
 
-            if (isset($student['Student']['id']) && !empty($student['Student']['id'])) {
-                //check if it exists
-                $student_id = $student['Student']['id'];
-            } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'You are not elegible to fill survey. The baseline survey is only available for graduting students.'
-                    ),
-                    'default',
-                    array('class' => 'warning-box warning-message')
-                );
+            if (empty($student)) {
+                $this->Flash->warning(__('You are not eligible to fill the survey. The Alumni baseline survey is only available for graduating students.'));
                 return $this->redirect('/');
             }
 
-            if ($this->Alumnus->checkIfStudentGradutingClass($student_id) == false) {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'You can not fill alumni baseline survey due to either you are not graduting class students or department did not define the final year project as thesis or project work.'
-                    ),
-                    'default',
-                    array('class' => 'warning-box warning-message')
-                );
+            if (!$this->Alumni->checkIfStudentGradutingClass($student_id)) {
+                $this->Flash->warning(__('Either you are not graduating class student or your department did not define a final year project.'));
                 return $this->redirect('/');
             }
 
-            //$student_id=2020;
-            $filled1stLevelQuestionair = $this->Alumnus->completedRoundOneQuestionner($student_id);
-
-            if ($filled1stLevelQuestionair == true) {
-                $this->Session->setFlash(
-                    '<span></span>' . __(
-                        'Thank you for completing alumni baseline questionnair. Congratulations for your graduation and part of our alumni.'
-                    ),
-                    'default',
-                    array('class' => 'success-box success-message')
-                );
+            if ($this->Alumni->completedRoundOneQuestionner($student_id)) {
+                $this->Flash->success(__('Thank you for completing alumni baseline questionnaire.'));
                 return $this->redirect('/');
-            } else {
-                if ($this->Alumnus->checkIfStudentGradutingClass($student_id) == false && false) {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            'You are not elegible to fill the survey. The survey is intended only for graduating  class.'
-                        ),
-                        'default',
-                        array('class' => 'error-box error-message')
-                    );
-                    return $this->redirect('/');
-                }
             }
 
+            $surveyQuestions = $this->Alumni->AlumniResponses->SurveyQuestions->find('all', [
+                'contain' => ['SurveyQuestionAnswers']
+            ])->toArray();
 
-            $surveyQuestions = $this->Alumnus->AlumniResponse->SurveyQuestion->find(
-                'all',
-                array('contain' => array('SurveyQuestionAnswer'))
-            );
-            $student = $this->Alumnus->Student->find(
-                'first',
-                array('conditions' => array('Student.id' => $student_id), 'contain' => array('Region', 'Curriculum'))
-            );
-            $student['Student']['age'] = $this->Alumnus->Student->getAge($student['Student']['birthdate']);
+            $student = $this->Alumni->Students->find('first', [
+                'conditions' => ['Students.id' => $student_id],
+                'contain' => ['Regions', 'Curricula']
+            ])->first();
 
-            $regions = $this->Alumnus->Student->Region->find(
-                'list',
-                array('fields' => array('Region.name', 'Region.name'))
-            );
-            $sexes = array('female' => 'Female', 'male' => 'Male');
+            $student->age = $this->Alumni->Students->getAge($student->birthdate);
+            $regions = $this->Alumni->Students->Regions->find('list')->toArray();
+            $sexes = ['female' => 'Female', 'male' => 'Male'];
+            $university = TableRegistry::getTableLocator()->get('Universities')->getStudentUnivrsity($student_id);
 
-            $university = ClassRegistry::init('University')->getStudentUnivrsity($student_id);
-
-            $this->set(
-                compact(
-                    'surveyQuestions',
-                    'sexes',
-                    'university',
-                    'student',
-                    'regions',
-                    'student_id'
-                )
-            );
+            $this->set(compact('surveyQuestions', 'sexes', 'university', 'student', 'regions', 'student_id'));
         }
 
-        if ($this->request->is('post') && isset($this->request->data['fillAlumnus'])) {
-            $this->request->data = $this->Alumnus->formatResponse($this->request->data);
-            $this->Alumnus->create();
-            if ($this->Alumnus->saveAll($this->request->data)) {
-                $this->Session->setFlash(
-                    '<span></span>' . __('THANK YOU FOR YOUR PARTICIPATION!'),
-                    'default',
-                    array('class' => 'success-box success-message')
-                );
-                //return $this->redirect(array('controller'=>'exam_grades','action' => "student_grade_view"));
-                $this->redirect('/');
+        if ($this->request->is('post') && !empty($this->request->getData('fillAlumnus'))) {
+            $this->request->data = $this->Alumni->formatResponse($this->request->getData());
+            $alumnus = $this->Alumni->newEntity($this->request->getData(), ['associated' => ['AlumniResponses']]);
+            if ($this->Alumni->save($alumnus)) {
+                $this->Flash->success(__('THANK YOU FOR YOUR PARTICIPATION!'));
+                return $this->redirect('/');
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __('Your response could not be saved. Please try again.'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('Your response could not be saved. Please try again.'));
             }
         }
+
         $this->set(compact('everythingfine'));
     }
 
-
     public function checkAlumniSurvey()
     {
+        if ($this->request->is('post') && !empty($this->request->getData('check'))) {
+            $studentValid = $this->Alumni->Students->find()->where(['Students.studentnumber' => trim($this->request->getData('Alumnus.studentID'))])->first();
+            if ($studentValid) {
+                $alumniDetail = $this->Alumni->find('first', [
+                    'conditions' => ['Alumni.student_id' => $studentValid->id],
+                    'contain' => [
+                        'AlumniResponses' => [
+                            'SurveyQuestions',
+                            'SurveyQuestionAnswers'
+                        ],
+                        'Students' => ['GraduateLists']
+                    ]
+                ])->first();
 
-        debug($this->request->data);
-        if (!empty($this->request->data) && isset($this->request->data['check'])) {
-            $studentValid = $this->Alumnus->Student->find('first', array(
-                'conditions' => array('Student.studentnumber' => trim($this->request->data['Alumnus']['studentID'])),
-                'recursive' => -1
-            ));
-            if (isset($studentValid) && !empty($studentValid)) {
-                $alumniDetail = $this->Alumnus->find('first', array(
-                    'conditions' => array('Alumnus.student_id' => $studentValid['Student']['id']),
-                    'contain' => array(
-                        'AlumniResponse' => array('SurveyQuestion', 'SurveyQuestionAnswer'),
-                        'Student' => array('GraduateList')
-                    )
-                ));
-                if (!isset($alumniDetail) && empty($alumniDetail)) {
-                    $this->Session->setFlash(
-                        '<span></span> ' . __(
-                            'The student is not an alumni member and has not completed alumni survey.'
-                        ),
-                        'default',
-                        array('class' => 'info-box info-message')
-                    );
+                if (empty($alumniDetail)) {
+                    $this->Flash->info(__('The student is not an alumni member and has not completed alumni survey.'));
                 }
-                debug($alumniDetail);
 
-                $surveyQuestions = $this->Alumnus->AlumniResponse->SurveyQuestion->find(
-                    'all',
-                    array('contain' => array('SurveyQuestionAnswer'))
-                );
-                $student = $this->Alumnus->Student->find(
-                    'first',
-                    array(
-                        'conditions' => array('Student.id' => $studentValid['Student']['id']),
-                        'contain' => array('Region', 'Curriculum')
-                    )
-                );
-                $student['Student']['age'] = $this->Alumnus->Student->getAge($studentValid['Student']['birthdate']);
+                $surveyQuestions = $this->Alumni->AlumniResponses->SurveyQuestions->find('all', [
+                    'contain' => ['SurveyQuestionAnswers']
+                ])->toArray();
 
-                $regions = $this->Alumnus->Student->Region->find(
-                    'list',
-                    array('fields' => array('Region.name', 'Region.name'))
-                );
-                $sexes = array('female' => 'Female', 'male' => 'Male');
+                $student = $this->Alumni->Students->find('first', [
+                    'conditions' => ['Students.id' => $studentValid->id],
+                    'contain' => ['Regions', 'Curricula']
+                ])->first();
 
-                $university = ClassRegistry::init('University')->getStudentUnivrsity($studentValid['Student']['id']);
+                $student->age = $this->Alumni->Students->getAge($studentValid->birthdate);
+                $regions = $this->Alumni->Students->Regions->find('list')->toArray();
+                $sexes = ['female' => 'Female', 'male' => 'Male'];
+                $university = TableRegistry::getTableLocator()->get('Universities')->getStudentUnivrsity($studentValid->id);
 
-
-                $this->set(
-                    compact(
-                        'alumniDetail',
-                        'student',
-                        'regions',
-                        'university',
-                        'surveyQuestions'
-                    )
-                );
+                $this->set(compact('alumniDetail', 'student', 'regions', 'university', 'surveyQuestions'));
             } else {
-                $this->Session->setFlash(
-                    '<span></span> ' . __('The provided student number is not valid.'),
-                    'default',
-                    array('class' => 'error-box error-message')
-                );
+                $this->Flash->error(__('The provided student number is not valid.'));
             }
         }
     }
 
     public function memberRegistration()
     {
+        $this->viewBuilder()->setLayout('login');
 
-        $this->layout = 'login';
+        if ($this->request->is('post') && !empty($this->request->getData('applyOnline'))) {
+            $applicationnumber = $this->AlumniMembers->nextTrackingNumber();
+            $data = $this->request->getData('Alumnus');
+            $data['trackingnumber'] = $applicationnumber;
 
-        if ($this->request->is('post') &&
-            isset($this->request->data['applyOnline']) && !empty($this->request->data['applyOnline'])) {
-            $applicationnumber = ClassRegistry::init('AlumniMember')->nextTrackingNumber();
+            if (!empty($data['date_of_birth']) && is_array($data['date_of_birth'])) {
+                $data['date_of_birth'] = sprintf('%04d-%02d-%02d', $data['date_of_birth']['year'], $data['date_of_birth']['month'], $data['date_of_birth']['day']);
+            }
+            if (!empty($data['gradution']) && is_array($data['gradution'])) {
+                $data['gradution'] = $data['gradution']['year'];
+            }
 
+            $member = $this->AlumniMembers->newEntity(['AlumniMember' => $data]);
+            if ($this->AlumniMembers->save($member)) {
+                $fullname = $data['title'] . '. ' . $data['first_name'] . ' ' . $data['last_name'];
+                $autoMessage = "$fullname registered to our alumni membership database with an alumni number " . $data['trackingnumber'];
+                TableRegistry::getTableLocator()->get('AutoMessages')->alumniRegistrationMessage($autoMessage);
 
-            $data['AlumniMember'] = $this->request->data['Alumnus'];
-            $data['AlumniMember']['trackingnumber'] = $applicationnumber;
+                $message = "<p>Dear $fullname,</p> Now you are officially Arbaminch University alumni member. Your alumni number is " . $data['trackingnumber'] . ".<br /> <p>Be our follower on the following social medias: </p> <ul> <li>https://www.facebook.com/arbaminchuniversityalumni</li> <li>https://www.twitter.com/alumniarbaminch</li> <li>https://www.linkedin.com/arba-minch-university-alumni</li> </ul> <br/> Your faithfully<br/> Alumni team!";
 
-
-            ClassRegistry::init('AlumniMember')->create();
-            ClassRegistry::init('AlumniMember')->set($data);
-            if (ClassRegistry::init('AlumniMember')->save($data)) {
-                $fullname = $data['AlumniMember']['title'] . ' ' . $data['AlumniMember']['first_name'];
-                $autoMessage = "$fullname registered to our alumni membership database with an alumni number " . $data['AlumniMember']['trackingnumber'];
-
-
-                $message = "Dear $fullname, <br/>
-			    Now you are officially Arbaminch University alumni member. You will recieve information related to alumni events through your email. Your alumni number is " . $data['AlumniMember']['trackingnumber'] . " and provide this number whenever you need service from AMU.
-			     <br /> Be our followers on the following social medias: <br/> <ul>
-			     <li>https://www.facebook.com/arbaminchuniversityalumni</li>
-			      <li>https://www.twitter.com/alumniarbaminch</li>
-			       <li>https://www.linkedin.com/arba-minch-university-alumni</li>
-
-			     </ul>
-			     <br/>
-			     Your faithfully
-			     Alumni team!
-			      ";
-
-                $Email = new CakeEmail('default');
-                $Email->template('onlineapplication');
-                $Email->emailFormat('html');
-                $Email->from(array('wondetask@gmail.com' => 'AMU Alumni Portal'));
-                $Email->to($data['AlumniMember']['email']);
-                $Email->subject('Congratulation!');
-                $Email->viewVars(array('message' => $message));
-
-
-                try {
-                    if ($Email->send()) {
-                        $this->Session->setFlash(
-                            '<span></span>' . __(
-                                " Now you are officially Arbaminch University alumni member. You will recieve information related to alumni events through your email. "
-                            ),
-                            'default',
-                            array('class' => 'success-box success-message')
-                        );
-
-                        ClassRegistry::init('AutoMessage')->alumniRegistrationMessage($autoMessage);
-                    } else {
-                        $this->Session->setFlash(
-                            '<span></span>' . __(
-                                " Now you are officially Arbaminch University alumni member. You will recieve information related to alumni events through your email. "
-                            ),
-                            'default',
-                            array('class' => 'success-box success-message')
-                        );
-                        ClassRegistry::init('AutoMessage')->alumniRegistrationMessage($autoMessage);
-                    }
-                } catch (Exception $e) {
-                    $this->Session->setFlash(
-                        '<span></span>' . __(
-                            "Now you are officially Arbaminch University alumni member. You will recieve information related to alumni events through your email."
-                        ),
-                        'default',
-                        array('class' => 'success-box success-message')
-                    );
-                    ClassRegistry::init('AutoMessage')->alumniRegistrationMessage($autoMessage);
-                    //return $this->redirect('/');
+                if (!empty($data['email']) && filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+                    $email = new Email('default');
+                    $email->setTemplate('onlineapplication')
+                        ->setEmailFormat('html')
+                        ->setTo($data['email'])
+                        ->setSubject('Congratulations! You\'ve successfully joined our alumni network.')
+                        ->setViewVars(['message' => $message])
+                        ->send();
                 }
-                //return $this->redirect('/');
 
+                $this->request->getSession()->write('Flash.flash', [
+                    'message' => 'Now you are officially Arbaminch University alumni member.',
+                    'element' => 'default',
+                    'params' => ['class' => 'success', 'delay' => 15000]
+                ]);
+                unset($this->request->data);
+                return $this->redirect('/');
             } else {
-                $this->Session->setFlash(
-                    '<span></span>' . __('The membership  could not be saved, please try again.'),
-                    'default',
-                    array('class' => 'error-box	error-message')
-                );
-
-                $errors = ClassRegistry::init('AlumniMember')->validationErrors;
-                //$errors=ClassRegistry::init('AlumniMember')->invalidFields();
+                $this->Flash->error(__('Your Alumni membership request could not be saved, please try again.'));
+                $errors = $this->AlumniMembers->validationErrors;
                 $this->set(compact('errors'));
             }
         }
 
-        //$titles = ClassRegistry::init('Title')->find('list',array('fields'=>array('title','title')));
-        $titles = array(
-            'Professor' => 'Professor',
-            'Dr.' => 'Dr.',
-            'Mrs' => 'Mrs',
-            'Mr' => 'Mr',
-            'Ms' => 'Ms'
-        );
-        $programs = array(
-            'Degree' => 'Degree',
-            'Master' => 'Master',
-            'PhD' => 'PhD',
-            'Diploma' => 'Diploma'
-        );
-        $institute_colleges = ClassRegistry::init('College')->find(
-            'list',
-            array('fields' => array('name', 'name'), 'order' => array('College.name ASC'))
-        );
-        $this->set(compact('titles', 'institute_colleges', 'programs'));
+        $titles = ['Mr' => 'Mr', 'Ms' => 'Ms', 'Mrs' => 'Mrs', 'Dr.' => 'Dr.', 'Professor' => 'Professor'];
+        $programs = ['Degree' => 'Bachelor\'s Degree', 'Master' => 'Master\'s Degree', 'PhD' => 'PhD', 'Diploma' => 'Diploma'];
+        $institute_colleges = $this->Alumni->Students->Colleges->find('list', [
+            'conditions' => [
+                'NOT' => ['Colleges.id IN' => \Cake\Core\Configure::read('only_stream_based_freshman_college_ids')],
+                'Colleges.active' => 1
+            ],
+            'order' => ['Colleges.name' => 'ASC']
+        ])->toArray();
 
-	}
+        $countries = $this->Alumni->Students->Countries->find('list')->toArray();
 
+        $this->set(compact('titles', 'institute_colleges', 'programs', 'countries'));
+    }
 }

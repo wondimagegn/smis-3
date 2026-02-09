@@ -213,24 +213,17 @@ return [
      * appropriate file to src/Mailer/Transport. Transports should be named
      * 'YourTransport.php', where 'Your' is the name of the transport.
      */
+
     'EmailTransport' => [
         'default' => [
-            'className' => MailTransport::class,
-            /*
-             * The keys host, port, timeout, username, password, client and tls
-             * are used in SMTP transports
-             */
-            'host' => 'localhost',
-            'port' => 25,
+            'className' => 'Smtp',
+            'host' => 'smtp.gmail.com',
+            'port' => 587,
             'timeout' => 30,
-            /*
-             * It is recommended to set these options through your environment or app_local.php
-             */
-            //'username' => null,
-            //'password' => null,
-            'client' => null,
-            'tls' => false,
-            'url' => env('EMAIL_TRANSPORT_DEFAULT_URL', null),
+            'username' => 'wondimagegn.desta@aait.edu.et',  // ← Your real Gmail
+            'password' => 'idhb vhhv vppy yhae ',
+            'tls' => true,
+            'log' => true, // Optional: logs to logs/debug.log
         ],
     ],
 
@@ -243,15 +236,13 @@ return [
      * easier. Each profile accepts a number of keys. See `Cake\Mailer\Email`
      * for more information.
      */
+
     'Email' => [
         'default' => [
             'transport' => 'default',
-            'from' => 'you@localhost',
-            /*
-             * Will by default be set to config value of App.encoding, if that exists otherwise to UTF-8.
-             */
-            //'charset' => 'utf-8',
-            //'headerCharset' => 'utf-8',
+            'from' => ['noreply@amu.edu.et'=>'University Registrar'], // Change to your domain
+            'charset' => 'utf-8',
+            'headerCharset' => 'utf-8',
         ],
     ],
 

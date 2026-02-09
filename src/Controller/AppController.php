@@ -260,6 +260,8 @@ class AppController extends Controller
                 $this->onlyPre = $userDetail['ApplicableAssignments']['college_permission'] ?? 0;
                 $this->year_levels = $userDetail['ApplicableAssignments']['year_level_names'] ?? [];
 
+                debug($userDetail['ApplicableAssignments']);
+
 
 
                 if ($this->onlyPre == 1) {
